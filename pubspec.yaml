@@ -1,0 +1,14 @@
+name: niyya
+description: asd
+version: 1.0.0+1
+
+environment:
+  sdk: '^3.8.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ffi: ^2.0.1
+
+flutter:
+  uses-material-design: true
