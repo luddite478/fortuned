@@ -1,4 +1,5 @@
 import 'dart:ffi';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:ffi/ffi.dart';
 import 'miniaudio.dart';
@@ -9,87 +10,79 @@ void main() {
 }
 
 class MyApp extends StatelessWidget {
-  final List<String> samplePaths = List.generate(8, (i) => 'sample_$i.wav');
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       home: Scaffold(
-        appBar: AppBar(title: Text('Simple Tracker')),
-        body: TrackerGrid(samplePaths: samplePaths),
+        appBar: AppBar(title: Text('Sample Selector')),
+        body: SampleSelector(),
       ),
     );
   }
 }
 
-class TrackerGrid extends StatefulWidget {
-  final List<String> samplePaths;
-
-  const TrackerGrid({required this.samplePaths});
-
+class SampleSelector extends StatefulWidget {
   @override
-  State<TrackerGrid> createState() => _TrackerGridState();
+  State<SampleSelector> createState() => _SampleSelectorState();
 }
 
-class _TrackerGridState extends State<TrackerGrid> {
-  final int steps = 16;
-  late List<List<bool>> grid;
+class _SampleSelectorState extends State<SampleSelector> {
+  final List<String?> samplePaths = List.filled(8, null);
 
-  @override
-  void initState() {
-    super.initState();
-    grid = List.generate(widget.samplePaths.length, (_) => List.filled(steps, false));
+  void _selectSample(int index) async {
+    String? filePath = await FilePicker.platform.pickFiles(
+      type: FileType.audio,
+    ).then((result) => result?.files.single.path);
+
+    if (filePath != null) {
+      setState(() {
+        samplePaths[index] = filePath;
+      });
+    }
   }
 
-  void _trigger(int track, int step) {
-    final path = widget.samplePaths[track];
-    final cPath = path.toNativeUtf8();
-    playSample(cPath);
-    malloc.free(cPath);
-  }
-
-  void _toggle(int track, int step) {
-    setState(() {
-      grid[track][step] = !grid[track][step];
-    });
-  }
-
-  void _playSequence() async {
-    for (int step = 0; step < steps; step++) {
-      for (int track = 0; track < widget.samplePaths.length; track++) {
-        if (grid[track][step]) _trigger(track, step);
-      }
-      await Future.delayed(Duration(milliseconds: 250));
+  void _playSample(int index) {
+    final path = samplePaths[index];
+    if (path != null) {
+      final cPath = path.toNativeUtf8();
+      playSample(cPath);
+      malloc.free(cPath);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No sample attached to this button')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        ElevatedButton(onPressed: _playSequence, child: Text('Play')),
-        Expanded(
-          child: ListView.builder(
-            itemCount: widget.samplePaths.length,
-            itemBuilder: (context, track) {
-              return Row(
-                children: List.generate(steps, (step) {
-                  return Expanded(
-                    child: GestureDetector(
-                      onTap: () => _toggle(track, step),
-                      child: Container(
-                        margin: EdgeInsets.all(2),
-                        height: 30,
-                        color: grid[track][step] ? Colors.green : Colors.grey,
-                      ),
-                    ),
-                  );
-                }),
-              );
-            },
+    return ListView.builder(
+      itemCount: samplePaths.length,
+      itemBuilder: (context, index) {
+        return Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Row(
+            children: [
+              ElevatedButton(
+                onPressed: () => _selectSample(index),
+                child: Text('Attach Sample ${index + 1}'),
+              ),
+              SizedBox(width: 10),
+              ElevatedButton(
+                onPressed: () => _playSample(index),
+                child: Text('Play Sample ${index + 1}'),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  samplePaths[index] ?? 'No sample attached',
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
