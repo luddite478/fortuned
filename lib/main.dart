@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'miniaudio_library.dart';
 
 void main() {
   runApp(const MyApp());
@@ -55,15 +56,25 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   int _counter = 0;
+  late final MiniaudioLibrary _miniaudioLibrary;
+
+  @override
+  void initState() {
+    super.initState();
+    _miniaudioLibrary = MiniaudioLibrary.instance;
+    _miniaudioLibrary.initialize();
+  }
+
+  @override
+  void dispose() {
+    _miniaudioLibrary.cleanup();
+    super.dispose();
+  }
 
   void _incrementCounter() {
     setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
+      // Now using FFI to call the C function for incrementing
+      _counter = _miniaudioLibrary.incrementCounter(_counter);
     });
   }
 
@@ -105,6 +116,14 @@ class _MyHomePageState extends State<MyHomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             const Text('You have pushed the button this many times:'),
+            const Text(
+              '(Using FFI C Function)',
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey,
+              ),
+            ),
             Text(
               '$_counter',
               style: Theme.of(context).textTheme.headlineMedium,
