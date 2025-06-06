@@ -2,7 +2,7 @@ name: 'MiniaudioBindings'
 output: 'lib/miniaudio_bindings_generated.dart'
 headers:
   entry-points:
-    - 'native/miniaudio.h'
+    - 'native/miniaudio_wrapper.h'
 preamble: |
   // Generated bindings for miniaudio.
   // ignore_for_file: always_specify_types

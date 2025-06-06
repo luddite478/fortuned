@@ -56,16 +56,28 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
   late final MiniaudioLibrary _miniaudioLibrary;
   String? _selectedFilePath;
   String? _selectedFileName;
+  bool _isPlaying = false;
 
   @override
   void initState() {
     super.initState();
     _miniaudioLibrary = MiniaudioLibrary.instance;
-    _miniaudioLibrary.initialize();
+    _initializeAudio();
+  }
+
+  Future<void> _initializeAudio() async {
+    bool success = _miniaudioLibrary.initialize();
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to initialize audio engine'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -74,11 +86,54 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
-  void _incrementCounter() {
+  void _playSelectedFile() {
+    if (_selectedFilePath == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select an audio file first'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     setState(() {
-      // Now using FFI to call the C function for incrementing
-      _counter = _miniaudioLibrary.incrementCounter(_counter);
+      _isPlaying = true;
     });
+
+    bool success = _miniaudioLibrary.playSound(_selectedFilePath!);
+    
+    if (!success) {
+      setState(() {
+        _isPlaying = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to play audio file'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Playing audio file'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }
+  }
+
+  void _stopAudio() {
+    _miniaudioLibrary.stopAllSounds();
+    setState(() {
+      _isPlaying = false;
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Audio stopped'),
+        backgroundColor: Colors.blue,
+      ),
+    );
   }
 
   Future<void> _pickFile() async {
@@ -145,18 +200,20 @@ class _MyHomePageState extends State<MyHomePage> {
           // wireframe for each widget.
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            const Text('You have pushed the button this many times:'),
             const Text(
-              '(Using FFI C Function)',
+              'Miniaudio FFI Player',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Text(
+              '(Using FFI + Miniaudio)',
               style: TextStyle(
                 fontSize: 14,
                 fontStyle: FontStyle.italic,
                 color: Colors.grey,
               ),
-            ),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
             ),
             const SizedBox(height: 40),
             ElevatedButton.icon(
@@ -166,6 +223,31 @@ class _MyHomePageState extends State<MyHomePage> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
+            ),
+            const SizedBox(height: 20),
+            // Audio Control Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _selectedFilePath != null ? _playSelectedFile : null,
+                  icon: Icon(_isPlaying ? Icons.play_arrow : Icons.play_arrow),
+                  label: Text(_isPlaying ? 'Playing...' : 'Play'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isPlaying ? Colors.green : null,
+                    foregroundColor: _isPlaying ? Colors.white : null,
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isPlaying ? _stopAudio : null,
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Stop'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade400,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 20),
             if (_selectedFileName != null) ...[
@@ -223,11 +305,7 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
-      ), // This trailing comma makes auto-formatting nicer for build methods.
+      // Remove the floating action button since we have audio controls now
     );
   }
 }

@@ -29,28 +29,52 @@ class MiniaudioBindings {
     ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName) lookup,
   ) : _lookup = lookup;
 
-  /// Simple counter function to replace the Flutter increment logic
-  int increment_counter(int current_value) {
-    return _increment_counter(current_value);
-  }
-
-  late final _increment_counterPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int)>>(
-        'increment_counter',
-      );
-  late final _increment_counter = _increment_counterPtr
-      .asFunction<int Function(int)>();
-
-  /// Initialize function (placeholder for future miniaudio integration)
-  void miniaudio_init() {
+  /// Initialize the miniaudio engine
+  int miniaudio_init() {
     return _miniaudio_init();
   }
 
   late final _miniaudio_initPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('miniaudio_init');
-  late final _miniaudio_init = _miniaudio_initPtr.asFunction<void Function()>();
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_init');
+  late final _miniaudio_init = _miniaudio_initPtr.asFunction<int Function()>();
 
-  /// Cleanup function (placeholder for future miniaudio integration)
+  /// Play an audio file
+  int miniaudio_play_sound(ffi.Pointer<ffi.Char> file_path) {
+    return _miniaudio_play_sound(file_path);
+  }
+
+  late final _miniaudio_play_soundPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
+        'miniaudio_play_sound',
+      );
+  late final _miniaudio_play_sound = _miniaudio_play_soundPtr
+      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+
+  /// Stop all sounds
+  void miniaudio_stop_all_sounds() {
+    return _miniaudio_stop_all_sounds();
+  }
+
+  late final _miniaudio_stop_all_soundsPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>(
+        'miniaudio_stop_all_sounds',
+      );
+  late final _miniaudio_stop_all_sounds = _miniaudio_stop_all_soundsPtr
+      .asFunction<void Function()>();
+
+  /// Check if engine is initialized
+  int miniaudio_is_initialized() {
+    return _miniaudio_is_initialized();
+  }
+
+  late final _miniaudio_is_initializedPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+        'miniaudio_is_initialized',
+      );
+  late final _miniaudio_is_initialized = _miniaudio_is_initializedPtr
+      .asFunction<int Function()>();
+
+  /// Cleanup the miniaudio engine
   void miniaudio_cleanup() {
     return _miniaudio_cleanup();
   }
