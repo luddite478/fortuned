@@ -1,6 +1,5 @@
 import 'dart:ffi';
 import 'dart:io';
-import 'package:path/path.dart' as path;
 import 'miniaudio_bindings_generated.dart';
 
 class MiniaudioLibrary {
