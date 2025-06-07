@@ -1,4 +1,0 @@
-#define MINIAUDIO_IMPLEMENTATION
-#define MA_NO_AVFOUNDATION  // Disable AVFoundation to avoid conflicts
-#define MA_NO_RUNTIME_LINKING
-#include "miniaudio.h"

@@ -11,8 +11,9 @@
 		331C808B294A63AB00263BE5 /* RunnerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 331C807B294A618700263BE5 /* RunnerTests.swift */; };
 		3B3967161E833CAA004F5970 /* AppFrameworkInfo.plist in Resources */ = {isa = PBXBuildFile; fileRef = 3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */; };
 		4058479C1233B47F510CED4C /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CC849E078AD7C896DE57656 /* Pods_RunnerTests.framework */; };
-		55B1D0692DF328BF007CCD5D /* miniaudio_wrapper.c in Sources */ = {isa = PBXBuildFile; fileRef = 55B1D0682DF328BF007CCD5D /* miniaudio_wrapper.c */; };
-		55B1D06B2DF329A4007CCD5D /* miniaudio.c in Sources */ = {isa = PBXBuildFile; fileRef = 55B1D06A2DF329A4007CCD5D /* miniaudio.c */; };
+		55433E352DF4040A00D2AA40 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E342DF4040A00D2AA40 /* CoreAudio.framework */; };
+		55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E362DF4041800D2AA40 /* AudioToolbox.framework */; };
+		55433E3D2DF4055400D2AA40 /* miniaudio_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
@@ -52,9 +53,11 @@
 		331C8081294A63A400263BE5 /* RunnerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RunnerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		3865A30097AB0464DA51D342 /* Pods-RunnerTests.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-RunnerTests.release.xcconfig"; path = "Target Support Files/Pods-RunnerTests/Pods-RunnerTests.release.xcconfig"; sourceTree = "<group>"; };
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
-		55B1D0672DF328BF007CCD5D /* miniaudio_wrapper.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = miniaudio_wrapper.h; path = ../native/miniaudio_wrapper.h; sourceTree = "<group>"; };
-		55B1D0682DF328BF007CCD5D /* miniaudio_wrapper.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio_wrapper.c; path = ../native/miniaudio_wrapper.c; sourceTree = "<group>"; };
-		55B1D06A2DF329A4007CCD5D /* miniaudio.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio.c; path = ../native/miniaudio.c; sourceTree = "<group>"; };
+		55433E342DF4040A00D2AA40 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
+		55433E362DF4041800D2AA40 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		55433E382DF4047800D2AA40 /* miniaudio_wrapper.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio_wrapper.c; path = ../native/miniaudio_wrapper.c; sourceTree = "<group>"; };
+		55433E392DF4047800D2AA40 /* miniaudio.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio.c; path = ../native/miniaudio.c; sourceTree = "<group>"; };
+		55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_wrapper.mm; path = ../native/miniaudio_wrapper.mm; sourceTree = "<group>"; };
 		73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -77,6 +80,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */,
+				55433E352DF4040A00D2AA40 /* CoreAudio.framework in Frameworks */,
 				ABEA471F108E7F3748C9D60E /* Pods_Runner.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -127,9 +132,9 @@
 		97C146E51CF9000F007C117D = {
 			isa = PBXGroup;
 			children = (
-				55B1D06A2DF329A4007CCD5D /* miniaudio.c */,
-				55B1D0682DF328BF007CCD5D /* miniaudio_wrapper.c */,
-				55B1D0672DF328BF007CCD5D /* miniaudio_wrapper.h */,
+				55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */,
+				55433E382DF4047800D2AA40 /* miniaudio_wrapper.c */,
+				55433E392DF4047800D2AA40 /* miniaudio.c */,
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				97C146EF1CF9000F007C117D /* Products */,
@@ -166,6 +171,8 @@
 		CF4BC767707F2F0EA1F22A49 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				55433E362DF4041800D2AA40 /* AudioToolbox.framework */,
+				55433E342DF4040A00D2AA40 /* CoreAudio.framework */,
 				73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */,
 				0CC849E078AD7C896DE57656 /* Pods_RunnerTests.framework */,
 			);
@@ -384,10 +391,9 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				55433E3D2DF4055400D2AA40 /* miniaudio_wrapper.mm in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
-				55B1D0692DF328BF007CCD5D /* miniaudio_wrapper.c in Sources */,
-				55B1D06B2DF329A4007CCD5D /* miniaudio.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
