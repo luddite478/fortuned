@@ -60,6 +60,8 @@ class _MyHomePageState extends State<MyHomePage> {
   String? _selectedFilePath;
   String? _selectedFileName;
   bool _isPlaying = false;
+  bool _useMemoryPlayback = false;
+  bool _isLoaded = false;
 
   @override
   void initState() {
@@ -101,7 +103,20 @@ class _MyHomePageState extends State<MyHomePage> {
       _isPlaying = true;
     });
 
-    bool success = _miniaudioLibrary.playSound(_selectedFilePath!);
+    bool success;
+    if (_useMemoryPlayback) {
+      if (!_isLoaded) {
+        success = _miniaudioLibrary.loadSoundIntoMemory(_selectedFilePath!);
+        if (success) {
+          _isLoaded = true;
+          success = _miniaudioLibrary.playLoadedSound();
+        }
+      } else {
+        success = _miniaudioLibrary.playLoadedSound();
+      }
+    } else {
+      success = _miniaudioLibrary.playSoundFromFile(_selectedFilePath!);
+    }
     
     if (!success) {
       setState(() {
@@ -115,8 +130,8 @@ class _MyHomePageState extends State<MyHomePage> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Playing audio file'),
+        SnackBar(
+          content: Text(_useMemoryPlayback ? 'Playing loaded sound' : 'Playing audio file'),
           backgroundColor: Colors.green,
         ),
       );
@@ -148,6 +163,7 @@ class _MyHomePageState extends State<MyHomePage> {
         setState(() {
           _selectedFilePath = result.files.single.path;
           _selectedFileName = result.files.single.name;
+          _isLoaded = false; // Reset loaded state when new file is selected
         });
       }
     } catch (e) {
@@ -216,6 +232,25 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
             const SizedBox(height: 40),
+            // Playback Mode Toggle
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Playback Mode:'),
+                const SizedBox(width: 10),
+                Switch(
+                  value: _useMemoryPlayback,
+                  onChanged: (bool value) {
+                    setState(() {
+                      _useMemoryPlayback = value;
+                      _isLoaded = false; // Reset loaded state when switching modes
+                    });
+                  },
+                ),
+                Text(_useMemoryPlayback ? 'Memory' : 'Direct File'),
+              ],
+            ),
+            const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: _pickFile,
               icon: const Icon(Icons.audiotrack),
@@ -223,31 +258,6 @@ class _MyHomePageState extends State<MyHomePage> {
               style: ElevatedButton.styleFrom(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               ),
-            ),
-            const SizedBox(height: 20),
-            // Audio Control Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  onPressed: _selectedFilePath != null ? _playSelectedFile : null,
-                  icon: Icon(_isPlaying ? Icons.play_arrow : Icons.play_arrow),
-                  label: Text(_isPlaying ? 'Playing...' : 'Play'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isPlaying ? Colors.green : null,
-                    foregroundColor: _isPlaying ? Colors.white : null,
-                  ),
-                ),
-                ElevatedButton.icon(
-                  onPressed: _isPlaying ? _stopAudio : null,
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Stop'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade400,
-                    foregroundColor: Colors.white,
-                  ),
-                ),
-              ],
             ),
             const SizedBox(height: 20),
             if (_selectedFileName != null) ...[
@@ -302,6 +312,42 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
               ),
+            const SizedBox(height: 20),
+            // Audio Control Buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: _selectedFilePath != null ? _playSelectedFile : null,
+                  icon: Icon(_isPlaying ? Icons.play_arrow : Icons.play_arrow),
+                  label: Text(_isPlaying ? 'Playing...' : 'Play'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isPlaying ? Colors.green : null,
+                    foregroundColor: _isPlaying ? Colors.white : null,
+                  ),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _isPlaying ? _stopAudio : null,
+                  icon: const Icon(Icons.stop),
+                  label: const Text('Stop'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade400,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            // Status Indicators
+            if (_useMemoryPlayback) ...[
+              Text(
+                'Memory Status: ${_isLoaded ? 'Loaded' : 'Not Loaded'}',
+                style: TextStyle(
+                  color: _isLoaded ? Colors.green : Colors.orange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
           ],
         ),
       ),

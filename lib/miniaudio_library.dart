@@ -57,11 +57,12 @@ class MiniaudioLibrary {
   // Wrapper methods for easier access
   bool initialize() {
     int result = _bindings.miniaudio_init();
-    return result == 1;
+    return result == 0;  // 0 means success in C code
   }
 
-  bool playSound(String filePath) {
-    print('Attempting to play: $filePath');
+  // Direct file playback (streaming from disk)
+  bool playSoundFromFile(String filePath) {
+    print('Attempting to play from file: $filePath');
     
     // Convert Dart string to C string using manual allocation
     final utf8Bytes = utf8.encode(filePath);
@@ -76,8 +77,8 @@ class MiniaudioLibrary {
       
       // Call the native function
       int result = _bindings.miniaudio_play_sound(cString.cast());
-      print('🎵 FFI RESULT: $result (1=success, 0=failure)');
-      bool success = result == 1;
+      print('🎵 FFI RESULT: $result (0=success, -1=failure)');
+      bool success = result == 0;  // 0 means success in C code
       if (success) {
         print('✅ DART: Audio command sent successfully via FFI!');
       } else {
@@ -88,6 +89,48 @@ class MiniaudioLibrary {
       // Always free the allocated memory
       free(cString.cast());
     }
+  }
+
+  // Load sound into memory for faster playback
+  bool loadSoundIntoMemory(String filePath) {
+    print('Loading sound into memory: $filePath');
+    
+    final utf8Bytes = utf8.encode(filePath);
+    final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
+    
+    try {
+      for (int i = 0; i < utf8Bytes.length; i++) {
+        cString[i] = utf8Bytes[i];
+      }
+      cString[utf8Bytes.length] = 0;
+      
+      int result = _bindings.miniaudio_load_sound(cString.cast());
+      print('📥 FFI RESULT: $result (0=success, -1=failure)');
+      bool success = result == 0;
+      if (success) {
+        print('✅ DART: Sound loaded into memory successfully!');
+      } else {
+        print('❌ DART: Failed to load sound into memory!');
+      }
+      return success;
+    } finally {
+      free(cString.cast());
+    }
+  }
+
+  // Play the previously loaded sound
+  bool playLoadedSound() {
+    print('Playing loaded sound from memory');
+    
+    int result = _bindings.miniaudio_play_loaded_sound();
+    print('▶️ FFI RESULT: $result (0=success, -1=failure)');
+    bool success = result == 0;
+    if (success) {
+      print('✅ DART: Loaded sound started successfully!');
+    } else {
+      print('❌ DART: Failed to play loaded sound!');
+    }
+    return success;
   }
 
   void stopAllSounds() {

@@ -9,11 +9,19 @@ extern "C" {
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_init(void);
 
-// Play an audio file
+// Play a sound from a file
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_play_sound(const char* file_path);
 
-// Stop all sounds
+// Load a sound into memory
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_load_sound(const char* file_path);
+
+// Play a previously loaded sound
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_play_loaded_sound(void);
+
+// Stop all currently playing sounds
 __attribute__((visibility("default"))) __attribute__((used))
 void miniaudio_stop_all_sounds(void);
 

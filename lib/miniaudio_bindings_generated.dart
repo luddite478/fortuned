@@ -50,6 +50,28 @@ class MiniaudioBindings {
   late final _miniaudio_play_sound = _miniaudio_play_soundPtr
       .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
+  /// Load a sound into memory
+  int miniaudio_load_sound(ffi.Pointer<ffi.Char> file_path) {
+    return _miniaudio_load_sound(file_path);
+  }
+
+  late final _miniaudio_load_soundPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
+        'miniaudio_load_sound',
+      );
+  late final _miniaudio_load_sound = _miniaudio_load_soundPtr
+      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+
+  /// Play a previously loaded sound
+  int miniaudio_play_loaded_sound() {
+    return _miniaudio_play_loaded_sound();
+  }
+
+  late final _miniaudio_play_loaded_soundPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_play_loaded_sound');
+  late final _miniaudio_play_loaded_sound = _miniaudio_play_loaded_soundPtr
+      .asFunction<int Function()>();
+
   /// Stop all sounds
   void miniaudio_stop_all_sounds() {
     return _miniaudio_stop_all_sounds();
