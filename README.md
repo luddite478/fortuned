@@ -510,6 +510,31 @@ flutter run -d [DEVICE_ID]
 flutter build ios --release
 ```
 
+### Deploy to Physical iOS Device
+
+1. **Install ios-deploy** (if not already installed):
+```bash
+npm install -g ios-deploy
+```
+
+2. **List Connected Devices**:
+```bash
+ios-deploy -c
+```
+This will show your connected iPhone with its ID (e.g., `00008110-000251422E02601E`)
+
+3. **Deploy the Release Build**:
+```bash
+ios-deploy --bundle build/ios/iphoneos/Runner.app --id <YOUR_DEVICE_ID>
+```
+Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 2.
+
+**Note**: Make sure your iPhone is:
+- Connected via USB
+- Unlocked
+- Trusts your development computer
+- Has developer mode enabled in Settings → Privacy & Security → Developer Mode
+
 ## 🚨 **Problems Encountered & Solutions**
 
 ### Major iOS Integration Challenges
