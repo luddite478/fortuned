@@ -362,10 +362,21 @@ int miniaudio_play_slot(int slot) {
             rc = -1;
             return;
         }
+        
+        // If already playing, stop first to restart from beginning
+        if (ma_sound_is_playing(&g_slot_sounds[slot])) {
+            ma_sound_stop(&g_slot_sounds[slot]);
+        }
+        
+        // Seek to beginning to ensure restart
+        ma_sound_seek_to_pcm_frame(&g_slot_sounds[slot], 0);
+        
         ma_result result = ma_sound_start(&g_slot_sounds[slot]);
         if (result != MA_SUCCESS) {
             LOG_MA_ERROR(result, "Failed to start slot sound");
             rc = -1;
+        } else {
+            os_log(OS_LOG_DEFAULT, "✅ [MINIAUDIO] Slot %d restarted from beginning", slot);
         }
     });
     return rc;
