@@ -1,10 +1,10 @@
 # Niyya - Flutter FFI + Miniaudio Integration Project
 
-A Flutter project demonstrating FFI (Foreign Function Interface) integration with native C code on iOS, specifically designed for audio applications. This project includes file picker functionality and a complete FFI chain setup with miniaudio integration.
+A Flutter project demonstrating FFI (Foreign Function Interface) integration with native C code on iOS, specifically designed for audio applications. This project showcases a complete FFI chain setup with miniaudio integration for low-latency audio mixing and playback.
 
 ## 🎯 **Project Overview**
 - **🎵 Multi-slot audio mixing** - Play up to 8 audio samples simultaneously
-- **⚡ Low latency audio playback** using miniaudio
+- **⚡ Low latency audio playbook** using miniaudio
 - **🎚️ Memory vs Stream toggle** - Choose between memory-loaded (low latency) or streamed playback per slot
 - **🔄 Instant restart capability** - Trigger samples from beginning on each play press
 - **📱 Cross-platform support** (iOS focus)
@@ -17,7 +17,7 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** File picker for audio files  
 ✅ **WORKING:** iOS build and deployment (simulator and physical device)  
 ✅ **WORKING:** Miniaudio integration with CoreAudio backend  
-✅ **WORKING:** Audio playback with proper lifecycle management  
+✅ **WORKING:** Audio playbook with proper lifecycle management  
 ✅ **WORKING:** **8-slot multi-track mixing system**  
 ✅ **WORKING:** **Memory vs streaming toggle per slot**  
 ✅ **WORKING:** **Instant sample triggering with restart capability**  
@@ -25,13 +25,13 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** **Play All / Stop All global controls**  
 ✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**
 
-## 🚀 **Key Features Added Since v8c01ef075**
+## 🚀 **Key Features**
 
 ### **🎛️ Multi-Slot Audio System**
 - **8 Independent Audio Slots**: Load different samples into separate slots (0-7)
 - **Simultaneous Playback**: All slots can play at the same time, mixed together seamlessly
 - **Per-Slot Memory Control**: Toggle between memory-loaded (instant) vs streamed (disk) playback per slot
-- **Individual Controls**: Each slot has its own Pick/Play/Stop controls
+- **Individual Controls**: Each slot has its own load/play/stop controls
 - **Real-time Status**: Visual feedback showing loaded/playing state per slot
 
 ### **⚡ Performance & Safety Improvements**
@@ -53,13 +53,6 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **No User Intervention Required**: Works seamlessly without manual audio route selection
 - **Background Compatibility**: Audio session persists across app lifecycle changes
 - **CoreAudio + AVFoundation**: Combines miniaudio's performance with iOS audio routing
-
-### **🖥️ Enhanced UI**
-- **Slot-Based Interface**: Card layout showing all 8 slots
-- **Per-Slot Controls**: Memory toggle, file picker, play/stop per slot
-- **Global Controls**: "Play All" and "Stop All" buttons in app bar
-- **Status Indicators**: Shows file names, loading status, and playing state
-- **Responsive Design**: Scrollable list accommodates all slots
 
 ## 🔄 **Complete Step-by-Step Setup Guide**
 
@@ -161,16 +154,16 @@ Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 3.
 - Trusts your development computer
 - Has developer mode enabled in Settings → Privacy & Security → Developer Mode
 
-## 🎵 **How to Use the Multi-Slot System**
+## 🎵 **Multi-Slot Audio Usage**
 
 ### **Loading Samples**
-1. **Pick Audio Files**: Tap "Pick" button for each slot to select different audio files
+1. **Pick Audio Files**: Select different audio files for each slot
 2. **Memory Toggle**: Turn on "Memory" switch for instant triggering (loads entire file into RAM)
 3. **Auto-Loading**: Files are automatically loaded when you first press play
 
 ### **Playing & Mixing**
-1. **Individual Playback**: Press "Play" on any slot to start that sample
-2. **Instant Restart**: Press "Play" again while playing to restart from beginning
+1. **Individual Playback**: Start any slot to play that sample
+2. **Instant Restart**: Trigger again while playing to restart from beginning
 3. **Mixing**: Play multiple slots simultaneously - they mix together automatically
 4. **Global Controls**: 
    - **Play All**: Starts all loaded slots at once
@@ -352,12 +345,6 @@ Based on the official miniaudio "simple mixing" example, the architecture uses:
 - **Memory-safe string conversion** for file paths
 - **Error handling** with proper return codes
 - **Helper functions** for batch operations
-
-**UI Layer (Flutter):**
-- **Per-slot state management** using Lists
-- **Card-based interface** for clear separation
-- **Real-time status updates** with setState
-- **Responsive design** with ListView builder
 
 ### **FFI Type Mapping**
 - Dart `int` → C `int`
