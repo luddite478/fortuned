@@ -9,62 +9,56 @@ void main() {
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      title: 'Niyya Audio Tracker',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: Colors.black,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.blue,
+          brightness: Brightness.dark,
+        ),
       ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
+      home: const TrackerPage(),
+      debugShowCheckedModeBanner: false,
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
+class TrackerPage extends StatefulWidget {
+  const TrackerPage({super.key});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<TrackerPage> createState() => _TrackerPageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _TrackerPageState extends State<TrackerPage> {
   late final MiniaudioLibrary _miniaudioLibrary;
   late final int _slotCount;
 
-  // Per-slot state
+  // Per-slot state for sample banks
   late List<String?> _filePaths;
   late List<String?> _fileNames;
   late List<bool> _slotUseMemory;
   late List<bool> _slotLoaded;
   late List<bool> _slotPlaying;
+
+  // UI state
+  int _activeBank = 0;
+  int? _activePad;
+
+  // Grid colors for each bank
+  final List<Color> _bankColors = [
+    Colors.blue,
+    Colors.green,
+    Colors.red,
+    Colors.purple,
+    Colors.orange,
+    Colors.pink,
+    Colors.indigo,
+    Colors.teal,
+  ];
 
   @override
   void initState() {
@@ -73,18 +67,21 @@ class _MyHomePageState extends State<MyHomePage> {
     _initializeAudio();
 
     _slotCount = _miniaudioLibrary.slotCount;
-    _filePaths     = List.filled(_slotCount, null);
-    _fileNames     = List.filled(_slotCount, null);
+    _filePaths = List.filled(_slotCount, null);
+    _fileNames = List.filled(_slotCount, null);
     _slotUseMemory = List.filled(_slotCount, false);
-    _slotLoaded    = List.filled(_slotCount, false);
-    _slotPlaying   = List.filled(_slotCount, false);
+    _slotLoaded = List.filled(_slotCount, false);
+    _slotPlaying = List.filled(_slotCount, false);
   }
 
   Future<void> _initializeAudio() async {
     bool success = _miniaudioLibrary.initialize();
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to initialize audio engine'), backgroundColor: Colors.red),
+        const SnackBar(
+          content: Text('Failed to initialize audio engine'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }
@@ -113,7 +110,10 @@ class _MyHomePageState extends State<MyHomePage> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking file: $e'), backgroundColor: Colors.red),
+          SnackBar(
+            content: Text('Error picking file: $e'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -122,7 +122,11 @@ class _MyHomePageState extends State<MyHomePage> {
   void _loadSlot(int slot) {
     final path = _filePaths[slot];
     if (path == null) return;
-    bool success = _miniaudioLibrary.loadSoundToSlot(slot, path, loadToMemory: _slotUseMemory[slot]);
+    bool success = _miniaudioLibrary.loadSoundToSlot(
+      slot,
+      path,
+      loadToMemory: _slotUseMemory[slot],
+    );
     setState(() {
       _slotLoaded[slot] = success;
     });
@@ -160,10 +164,10 @@ class _MyHomePageState extends State<MyHomePage> {
         _loadSlot(i);
       }
     }
-    
+
     // Then play all loaded slots
     _miniaudioLibrary.playAllLoadedSlots();
-    
+
     // Update UI state for all loaded slots
     setState(() {
       for (int i = 0; i < _slotCount; i++) {
@@ -174,62 +178,258 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
-  Widget _buildSlotCard(int slot) {
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Slot ${slot+1}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
+  void _handleBankChange(int bankIndex) {
+    setState(() {
+      _activeBank = bankIndex;
+    });
+  }
+
+  void _handlePadPress(int padIndex) {
+    setState(() {
+      _activePad = padIndex;
+    });
+    
+    // Play the active bank's sample when pad is pressed
+    if (_filePaths[_activeBank] != null) {
+      _playSlot(_activeBank);
+    }
+    
+    // Reset active pad after animation
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        setState(() {
+          _activePad = null;
+        });
+      }
+    });
+  }
+
+  Widget _buildSampleBanks() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: List.generate(8, (bank) {
+          final isActive = _activeBank == bank;
+          final hasFile = _fileNames[bank] != null;
+          final isPlaying = _slotPlaying[bank];
+          
+          return Expanded(
+            child: GestureDetector(
+              onTap: () => _handleBankChange(bank),
+              onLongPress: () => _pickFileForSlot(bank),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 1),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Colors.white
+                      : hasFile
+                          ? _bankColors[bank].withOpacity(0.8)
+                          : const Color(0xFF404040),
+                  borderRadius: BorderRadius.circular(6),
+                  border: isPlaying
+                      ? Border.all(color: Colors.greenAccent, width: 2)
+                      : null,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      String.fromCharCode(65 + bank), // A, B, C, etc.
+                      style: TextStyle(
+                        color: isActive ? Colors.black : Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (hasFile) ...[
+                      const SizedBox(height: 2),
+                      Icon(
+                        Icons.audiotrack,
+                        size: 12,
+                        color: isActive ? Colors.black : Colors.white70,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _buildSampleGrid() {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF1f2937),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: GridView.builder(
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 4,
+            crossAxisSpacing: 4,
+            mainAxisSpacing: 4,
+            childAspectRatio: 2.5,
+          ),
+          itemCount: 64,
+          itemBuilder: (context, index) {
+            final isActivePad = _activePad == index;
+            final baseColor = _bankColors[_activeBank];
+            
+            return GestureDetector(
+              onTap: () => _handlePadPress(index),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 100),
+                decoration: BoxDecoration(
+                  color: isActivePad ? Colors.white : baseColor,
+                  borderRadius: BorderRadius.circular(4),
+                  boxShadow: isActivePad
+                      ? [
+                          BoxShadow(
+                            color: Colors.white.withOpacity(0.5),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          )
+                        ]
+                      : null,
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${index + 1}',
+                        style: TextStyle(
+                          color: isActivePad ? Colors.black : Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        'C-4',
+                        style: TextStyle(
+                          color: isActivePad
+                              ? Colors.black54
+                              : Colors.white70,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusDisplay() {
+    final hasFile = _fileNames[_activeBank] != null;
+    final isPlaying = _slotPlaying[_activeBank];
+    
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1f2937),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'BANK: ${String.fromCharCode(65 + _activeBank)}',
+                style: const TextStyle(
+                  color: Colors.greenAccent,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+              Text(
+                'STATUS: ${isPlaying ? 'PLAYING' : 'STOPPED'}',
+                style: TextStyle(
+                  color: isPlaying ? Colors.greenAccent : Colors.redAccent,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'SAMPLE: ${hasFile ? _fileNames[_activeBank]! : 'NO FILE'}',
+            style: const TextStyle(
+              color: Colors.yellowAccent,
+              fontFamily: 'monospace',
+              fontSize: 12,
+            ),
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (hasFile) ...[
+            const SizedBox(height: 4),
             Row(
               children: [
-                const Text('Memory:'),
+                Text(
+                  'MEMORY: ${_slotUseMemory[_activeBank] ? 'ON' : 'OFF'}',
+                  style: const TextStyle(
+                    color: Colors.cyanAccent,
+                    fontFamily: 'monospace',
+                    fontSize: 10,
+                  ),
+                ),
+                const Spacer(),
                 Switch(
-                  value: _slotUseMemory[slot],
+                  value: _slotUseMemory[_activeBank],
                   onChanged: (val) {
                     setState(() {
-                      _slotUseMemory[slot] = val;
-                      _slotLoaded[slot] = false; // re-load required
+                      _slotUseMemory[_activeBank] = val;
+                      _slotLoaded[_activeBank] = false;
                     });
                   },
+                  activeColor: Colors.cyanAccent,
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
               ],
             ),
-            Row(
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.folder_open),
-                  label: const Text('Pick'),
-                  onPressed: () => _pickFileForSlot(slot),
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  icon: Icon(_slotPlaying[slot] ? Icons.music_note : Icons.play_arrow),
-                  label: Text(_slotPlaying[slot] ? 'Playing' : 'Play'),
-                  style: ElevatedButton.styleFrom(backgroundColor: _slotPlaying[slot] ? Colors.green : null),
-                  onPressed: _filePaths[slot] != null ? () => _playSlot(slot) : null,
-                ),
-                const SizedBox(width: 8),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.stop),
-                  label: const Text('Stop'),
-                  onPressed: _slotPlaying[slot] ? () => _stopSlot(slot) : null,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            _fileNames[slot] != null
-                ? Text('File: ${_fileNames[slot]}')
-                : const Text('No file selected', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
-            if (_slotUseMemory[slot])
-              Text('Status: ${_slotLoaded[slot] ? 'Loaded' : 'Not Loaded'}',
-                  style: TextStyle(color: _slotLoaded[slot] ? Colors.green : Colors.orange)),
           ],
-        ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSequencerBottom() {
+    return Container(
+      padding: const EdgeInsets.only(top: 16),
+      child: Row(
+        children: List.generate(8, (col) {
+          return Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 1),
+              child: Column(
+                children: List.generate(4, (row) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(vertical: 1),
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF404040),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  );
+                }),
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -237,41 +437,46 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text(widget.title),
+        backgroundColor: const Color(0xFF111827),
+        elevation: 0,
+        title: const Text(
+          'NIYYA TRACKER',
+          style: TextStyle(
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
+        ),
         actions: [
-          // Play All button
           IconButton(
-            icon: Icon(Icons.play_circle, color: Colors.green),
+            icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
             onPressed: _playAll,
             tooltip: 'Play All',
           ),
-          // Stop All button
           IconButton(
-            icon: Icon(Icons.stop_circle, color: Colors.red),
+            icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
             onPressed: _stopAll,
             tooltip: 'Stop All',
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: _slotCount + 1,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text('Miniaudio Multi-Slot Player', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 4),
-                  Text('Pick up to 8 samples, toggle memory load, and mix them together.', style: TextStyle(fontSize: 14, color: Colors.grey)),
-                ],
-              ),
-            );
-          }
-          return _buildSlotCard(index - 1);
-        },
+      body: SafeArea(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 400),
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            children: [
+              const SizedBox(height: 16),
+              _buildSampleBanks(),
+              _buildStatusDisplay(),
+              _buildSampleGrid(),
+              _buildSequencerBottom(),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
       ),
     );
   }
