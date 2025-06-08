@@ -144,4 +144,48 @@ class MiniaudioLibrary {
   void cleanup() {
     _bindings.miniaudio_cleanup();
   }
+
+  // -------------- MULTI SLOT --------------
+  int get slotCount => _bindings.miniaudio_get_slot_count();
+
+  bool loadSoundToSlot(int slot, String filePath, {bool loadToMemory = false}) {
+    final utf8Bytes = utf8.encode(filePath);
+    final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
+    try {
+      for (int i = 0; i < utf8Bytes.length; i++) {
+        cString[i] = utf8Bytes[i];
+      }
+      cString[utf8Bytes.length] = 0;
+      int result = _bindings.miniaudio_load_sound_to_slot(slot, cString.cast(), loadToMemory ? 1 : 0);
+      return result == 0;
+    } finally {
+      free(cString.cast());
+    }
+  }
+
+  bool playSlot(int slot) {
+    int result = _bindings.miniaudio_play_slot(slot);
+    return result == 0;
+  }
+
+  void stopSlot(int slot) {
+    _bindings.miniaudio_stop_slot(slot);
+  }
+
+  void unloadSlot(int slot) {
+    _bindings.miniaudio_unload_slot(slot);
+  }
+
+  bool isSlotLoaded(int slot) {
+    return _bindings.miniaudio_is_slot_loaded(slot) == 1;
+  }
+
+  // Helper to play all loaded slots at once
+  void playAllLoadedSlots() {
+    for (int i = 0; i < slotCount; i++) {
+      if (isSlotLoaded(i)) {
+        playSlot(i);
+      }
+    }
+  }
 } 

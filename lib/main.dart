@@ -57,27 +57,34 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   late final MiniaudioLibrary _miniaudioLibrary;
-  String? _selectedFilePath;
-  String? _selectedFileName;
-  bool _isPlaying = false;
-  bool _useMemoryPlayback = false;
-  bool _isLoaded = false;
+  late final int _slotCount;
+
+  // Per-slot state
+  late List<String?> _filePaths;
+  late List<String?> _fileNames;
+  late List<bool> _slotUseMemory;
+  late List<bool> _slotLoaded;
+  late List<bool> _slotPlaying;
 
   @override
   void initState() {
     super.initState();
     _miniaudioLibrary = MiniaudioLibrary.instance;
     _initializeAudio();
+
+    _slotCount = _miniaudioLibrary.slotCount;
+    _filePaths     = List.filled(_slotCount, null);
+    _fileNames     = List.filled(_slotCount, null);
+    _slotUseMemory = List.filled(_slotCount, false);
+    _slotLoaded    = List.filled(_slotCount, false);
+    _slotPlaying   = List.filled(_slotCount, false);
   }
 
   Future<void> _initializeAudio() async {
     bool success = _miniaudioLibrary.initialize();
-    if (!success) {
+    if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to initialize audio engine'),
-          backgroundColor: Colors.red,
-        ),
+        const SnackBar(content: Text('Failed to initialize audio engine'), backgroundColor: Colors.red),
       );
     }
   }
@@ -88,70 +95,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.dispose();
   }
 
-  void _playSelectedFile() {
-    if (_selectedFilePath == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select an audio file first'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    setState(() {
-      _isPlaying = true;
-    });
-
-    bool success;
-    if (_useMemoryPlayback) {
-      if (!_isLoaded) {
-        success = _miniaudioLibrary.loadSoundIntoMemory(_selectedFilePath!);
-        if (success) {
-          _isLoaded = true;
-          success = _miniaudioLibrary.playLoadedSound();
-        }
-      } else {
-        success = _miniaudioLibrary.playLoadedSound();
-      }
-    } else {
-      success = _miniaudioLibrary.playSoundFromFile(_selectedFilePath!);
-    }
-    
-    if (!success) {
-      setState(() {
-        _isPlaying = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to play audio file'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_useMemoryPlayback ? 'Playing loaded sound' : 'Playing audio file'),
-          backgroundColor: Colors.green,
-        ),
-      );
-    }
-  }
-
-  void _stopAudio() {
-    _miniaudioLibrary.stopAllSounds();
-    setState(() {
-      _isPlaying = false;
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Audio stopped'),
-        backgroundColor: Colors.blue,
-      ),
-    );
-  }
-
-  Future<void> _pickFile() async {
+  Future<void> _pickFileForSlot(int slot) async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -161,197 +105,166 @@ class _MyHomePageState extends State<MyHomePage> {
 
       if (result != null && result.files.single.path != null) {
         setState(() {
-          _selectedFilePath = result.files.single.path;
-          _selectedFileName = result.files.single.name;
-          _isLoaded = false; // Reset loaded state when new file is selected
+          _filePaths[slot] = result.files.single.path;
+          _fileNames[slot] = result.files.single.name;
+          _slotLoaded[slot] = false;
         });
       }
     } catch (e) {
-      // Handle error - check if widget is still mounted
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking file: $e'),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text('Error picking file: $e'), backgroundColor: Colors.red),
         );
       }
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
+  void _loadSlot(int slot) {
+    final path = _filePaths[slot];
+    if (path == null) return;
+    bool success = _miniaudioLibrary.loadSoundToSlot(slot, path, loadToMemory: _slotUseMemory[slot]);
+    setState(() {
+      _slotLoaded[slot] = success;
+    });
+  }
+
+  void _playSlot(int slot) {
+    final bool loaded = _slotLoaded[slot];
+    if (!loaded) {
+      _loadSlot(slot);
+    }
+    bool success = _miniaudioLibrary.playSlot(slot);
+    if (success) {
+      setState(() => _slotPlaying[slot] = true);
+    }
+  }
+
+  void _stopSlot(int slot) {
+    _miniaudioLibrary.stopSlot(slot);
+    setState(() => _slotPlaying[slot] = false);
+  }
+
+  void _stopAll() {
+    _miniaudioLibrary.stopAllSounds();
+    setState(() {
+      for (int i = 0; i < _slotCount; ++i) {
+        _slotPlaying[i] = false;
+      }
+    });
+  }
+
+  void _playAll() {
+    // First, ensure any slots with files are loaded
+    for (int i = 0; i < _slotCount; i++) {
+      if (_filePaths[i] != null && !_slotLoaded[i]) {
+        _loadSlot(i);
+      }
+    }
+    
+    // Then play all loaded slots
+    _miniaudioLibrary.playAllLoadedSlots();
+    
+    // Update UI state for all loaded slots
+    setState(() {
+      for (int i = 0; i < _slotCount; i++) {
+        if (_slotLoaded[i]) {
+          _slotPlaying[i] = true;
+        }
+      }
+    });
+  }
+
+  Widget _buildSlotCard(int slot) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
         child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text(
-              'Miniaudio FFI Player',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const Text(
-              '(Using FFI + Miniaudio)',
-              style: TextStyle(
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 40),
-            // Playback Mode Toggle
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Slot ${slot+1}', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 10),
             Row(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text('Playback Mode:'),
-                const SizedBox(width: 10),
+                const Text('Memory:'),
                 Switch(
-                  value: _useMemoryPlayback,
-                  onChanged: (bool value) {
+                  value: _slotUseMemory[slot],
+                  onChanged: (val) {
                     setState(() {
-                      _useMemoryPlayback = value;
-                      _isLoaded = false; // Reset loaded state when switching modes
+                      _slotUseMemory[slot] = val;
+                      _slotLoaded[slot] = false; // re-load required
                     });
                   },
                 ),
-                Text(_useMemoryPlayback ? 'Memory' : 'Direct File'),
               ],
             ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: _pickFile,
-              icon: const Icon(Icons.audiotrack),
-              label: const Text('Pick Audio File'),
-              style: ElevatedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              ),
-            ),
-            const SizedBox(height: 20),
-            if (_selectedFileName != null) ...[
-              const Text(
-                'Selected File:',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey.shade50,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Name: $_selectedFileName',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Path: $_selectedFilePath',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey.shade600,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 2,
-                    ),
-                  ],
-                ),
-              ),
-            ] else
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey.shade300),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey.shade100,
-                ),
-                child: const Text(
-                  'No file selected',
-                  style: TextStyle(
-                    color: Colors.grey,
-                    fontStyle: FontStyle.italic,
-                  ),
-                ),
-              ),
-            const SizedBox(height: 20),
-            // Audio Control Buttons
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 ElevatedButton.icon(
-                  onPressed: _selectedFilePath != null ? _playSelectedFile : null,
-                  icon: Icon(_isPlaying ? Icons.play_arrow : Icons.play_arrow),
-                  label: Text(_isPlaying ? 'Playing...' : 'Play'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: _isPlaying ? Colors.green : null,
-                    foregroundColor: _isPlaying ? Colors.white : null,
-                  ),
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Pick'),
+                  onPressed: () => _pickFileForSlot(slot),
                 ),
+                const SizedBox(width: 8),
                 ElevatedButton.icon(
-                  onPressed: _isPlaying ? _stopAudio : null,
+                  icon: Icon(_slotPlaying[slot] ? Icons.music_note : Icons.play_arrow),
+                  label: Text(_slotPlaying[slot] ? 'Playing' : 'Play'),
+                  style: ElevatedButton.styleFrom(backgroundColor: _slotPlaying[slot] ? Colors.green : null),
+                  onPressed: _filePaths[slot] != null ? () => _playSlot(slot) : null,
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton.icon(
                   icon: const Icon(Icons.stop),
                   label: const Text('Stop'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red.shade400,
-                    foregroundColor: Colors.white,
-                  ),
+                  onPressed: _slotPlaying[slot] ? () => _stopSlot(slot) : null,
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            // Status Indicators
-            if (_useMemoryPlayback) ...[
-              Text(
-                'Memory Status: ${_isLoaded ? 'Loaded' : 'Not Loaded'}',
-                style: TextStyle(
-                  color: _isLoaded ? Colors.green : Colors.orange,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+            const SizedBox(height: 10),
+            _fileNames[slot] != null
+                ? Text('File: ${_fileNames[slot]}')
+                : const Text('No file selected', style: TextStyle(fontStyle: FontStyle.italic, color: Colors.grey)),
+            if (_slotUseMemory[slot])
+              Text('Status: ${_slotLoaded[slot] ? 'Loaded' : 'Not Loaded'}',
+                  style: TextStyle(color: _slotLoaded[slot] ? Colors.green : Colors.orange)),
           ],
         ),
       ),
-      // Remove the floating action button since we have audio controls now
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(widget.title), actions: [
+        IconButton(
+          icon: const Icon(Icons.play_circle_fill), 
+          tooltip: 'Play All', 
+          onPressed: _playAll,
+          color: Colors.green,
+        ),
+        IconButton(icon: const Icon(Icons.stop_circle), tooltip: 'Stop All', onPressed: _stopAll),
+      ]),
+      body: ListView.builder(
+        itemCount: _slotCount + 1,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text('Miniaudio Multi-Slot Player', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  SizedBox(height: 4),
+                  Text('Pick up to 8 samples, toggle memory load, and mix them together.', style: TextStyle(fontSize: 14, color: Colors.grey)),
+                ],
+              ),
+            );
+          }
+          return _buildSlotCard(index - 1);
+        },
+      ),
     );
   }
 }
