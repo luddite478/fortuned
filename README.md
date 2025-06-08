@@ -3,10 +3,13 @@
 A Flutter project demonstrating FFI (Foreign Function Interface) integration with native C code on iOS, specifically designed for audio applications. This project includes file picker functionality and a complete FFI chain setup with miniaudio integration.
 
 ## 🎯 **Project Overview**
-- Low latency audio playback using miniaudio
-- Cross-platform support (iOS focus)
-- Native audio performance through FFI
-- File picker for audio files
+- **🎵 Multi-slot audio mixing** - Play up to 8 audio samples simultaneously
+- **⚡ Low latency audio playback** using miniaudio
+- **🎚️ Memory vs Stream toggle** - Choose between memory-loaded (low latency) or streamed playback per slot
+- **🔄 Instant restart capability** - Trigger samples from beginning on each play press
+- **📱 Cross-platform support** (iOS focus)
+- **🎛️ Real-time mixing** through native audio performance via FFI
+- **📁 File picker** for audio files
 
 ## 📋 **Current Status**
 
@@ -14,7 +17,41 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** File picker for audio files  
 ✅ **WORKING:** iOS build and deployment (simulator and physical device)  
 ✅ **WORKING:** Miniaudio integration with CoreAudio backend  
-✅ **WORKING:** Audio playback with proper lifecycle management
+✅ **WORKING:** Audio playback with proper lifecycle management  
+✅ **WORKING:** **8-slot multi-track mixing system**  
+✅ **WORKING:** **Memory vs streaming toggle per slot**  
+✅ **WORKING:** **Instant sample triggering with restart capability**  
+✅ **WORKING:** **Thread-safe slot operations**  
+✅ **WORKING:** **Play All / Stop All global controls**
+
+## 🚀 **Key Features Added Since v8c01ef075**
+
+### **🎛️ Multi-Slot Audio System**
+- **8 Independent Audio Slots**: Load different samples into separate slots (0-7)
+- **Simultaneous Playback**: All slots can play at the same time, mixed together seamlessly
+- **Per-Slot Memory Control**: Toggle between memory-loaded (instant) vs streamed (disk) playback per slot
+- **Individual Controls**: Each slot has its own Pick/Play/Stop controls
+- **Real-time Status**: Visual feedback showing loaded/playing state per slot
+
+### **⚡ Performance & Safety Improvements**
+- **Thread-Safe Operations**: All slot operations use Grand Central Dispatch serial queue
+- **Memory-Safe Design**: Proper resource cleanup and memory management
+- **Symbol Export Fix**: Added proper `__attribute__((visibility("default")))` for iOS device compatibility
+- **Instant Restart**: Samples restart from beginning when triggered while playing
+- **Fast Triggering**: Safe to press play/stop rapidly without crashes
+
+### **🎵 Audio Engineering Features**
+- **Based on Official Miniaudio Examples**: Implements the "simple mixing" pattern from [miniaudio docs](https://miniaud.io/docs/examples/simple_mixing.html)
+- **Single Device Architecture**: Uses one `ma_engine` for optimal performance, no multiple device overhead
+- **Automatic Mixing**: Samples are naturally mixed by the audio engine
+- **Low-Latency Path**: Memory-loaded samples bypass file I/O for instant triggering
+
+### **🖥️ Enhanced UI**
+- **Slot-Based Interface**: Card layout showing all 8 slots
+- **Per-Slot Controls**: Memory toggle, file picker, play/stop per slot
+- **Global Controls**: "Play All" and "Stop All" buttons in app bar
+- **Status Indicators**: Shows file names, loading status, and playing state
+- **Responsive Design**: Scrollable list accommodates all slots
 
 ## 🔄 **Complete Step-by-Step Setup Guide**
 
@@ -116,6 +153,26 @@ Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 3.
 - Trusts your development computer
 - Has developer mode enabled in Settings → Privacy & Security → Developer Mode
 
+## 🎵 **How to Use the Multi-Slot System**
+
+### **Loading Samples**
+1. **Pick Audio Files**: Tap "Pick" button for each slot to select different audio files
+2. **Memory Toggle**: Turn on "Memory" switch for instant triggering (loads entire file into RAM)
+3. **Auto-Loading**: Files are automatically loaded when you first press play
+
+### **Playing & Mixing**
+1. **Individual Playback**: Press "Play" on any slot to start that sample
+2. **Instant Restart**: Press "Play" again while playing to restart from beginning
+3. **Mixing**: Play multiple slots simultaneously - they mix together automatically
+4. **Global Controls**: 
+   - **Play All**: Starts all loaded slots at once
+   - **Stop All**: Stops all currently playing slots
+
+### **Performance Tips**
+- **Use Memory Mode** for short samples you'll trigger frequently (drums, FX)
+- **Use Stream Mode** for longer audio files to save RAM
+- **Preload Samples** by toggling memory on before playing for instant response
+
 ## 🚨 **Common Issues & Solutions**
 
 ### 1. **iOS Integration Challenges**
@@ -140,6 +197,19 @@ Parse Issue (Xcode): Could not build module 'AVFoundation'
 - Only define `MINIAUDIO_IMPLEMENTATION` in one file (`miniaudio_wrapper.mm`)
 - Use forward declarations in wrapper files
 - Separate compilation units properly
+
+#### **⚠️ Symbol Export Issues (iOS Device)**
+**Problem**: App works in simulator but crashes on real device with symbol lookup errors:
+```
+Failed to lookup symbol 'miniaudio_init': dlsym(RTLD_DEFAULT, miniaudio_init): symbol not found
+```
+
+**Solution**: 
+Added proper export attributes to ALL native functions:
+```c
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_init(void) { ... }
+```
 
 ### 2. **File Access Issues**
 
@@ -168,14 +238,36 @@ platform :ios, '12.0'
 flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
 ```
 
-## 🛠️ **Technical Notes**
+## 🛠️ **Technical Architecture**
 
-### FFI Type Mapping
+### **🎛️ Multi-Slot Design Pattern**
+Based on the official miniaudio "simple mixing" example, the architecture uses:
+
+**Native Layer (C++):**
+- **Single `ma_engine`** for optimal performance
+- **8 `ma_sound` objects** for individual sample playback
+- **Resource manager** for memory vs streaming control
+- **Serial dispatch queue** for thread-safe operations
+- **Automatic mixing** by the miniaudio engine
+
+**FFI Layer (Dart):**
+- **Slot-based API** with indexed operations
+- **Memory-safe string conversion** for file paths
+- **Error handling** with proper return codes
+- **Helper functions** for batch operations
+
+**UI Layer (Flutter):**
+- **Per-slot state management** using Lists
+- **Card-based interface** for clear separation
+- **Real-time status updates** with setState
+- **Responsive design** with ListView builder
+
+### **FFI Type Mapping**
 - Dart `int` → C `int`
 - Dart `bool` → C `int` (0=false, 1=true)
 - String conversion requires manual memory management
 
-### Symbol Visibility
+### **Symbol Visibility**
 C functions must be declared with proper visibility attributes for iOS:
 ```c
 __attribute__((visibility("default"))) __attribute__((used))
@@ -184,7 +276,7 @@ int your_function_name() {
 }
 ```
 
-### Memory Management
+### **Memory Management**
 Always free allocated memory for string conversions:
 ```dart
 final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
@@ -195,9 +287,38 @@ try {
 }
 ```
 
+### **🔄 Thread Safety**
+All slot operations are serialized through GCD:
+```c
+dispatch_sync(g_audio_queue, ^{
+    // Thread-safe slot operations
+});
+```
+
+## 📊 **API Reference**
+
+### **Core Functions**
+- `miniaudio_init()` - Initialize audio engine
+- `miniaudio_cleanup()` - Cleanup all resources
+
+### **Multi-Slot Functions**
+- `miniaudio_get_slot_count()` - Returns 8 (max slots)
+- `miniaudio_load_sound_to_slot(slot, path, useMemory)` - Load audio to slot
+- `miniaudio_play_slot(slot)` - Play/restart slot sample
+- `miniaudio_stop_slot(slot)` - Stop slot playback
+- `miniaudio_unload_slot(slot)` - Free slot resources
+- `miniaudio_is_slot_loaded(slot)` - Check if slot has audio
+
+### **Legacy Functions (Still Supported)**
+- `miniaudio_play_sound(path)` - Direct file playback
+- `miniaudio_load_sound(path)` - Load to legacy single buffer
+- `miniaudio_play_loaded_sound()` - Play legacy buffer
+- `miniaudio_stop_all_sounds()` - Stop everything (slots + legacy)
+
 ## Resources
 
 - [Flutter FFI Documentation](https://dart.dev/guides/libraries/c-interop)
 - [iOS FFI Integration Guide](https://docs.flutter.dev/platform-integration/ios/c-interop)
 - [package:ffigen Documentation](https://pub.dev/packages/ffigen)
 - [Miniaudio Library](https://github.com/mackron/miniaudio)
+- [Miniaudio Simple Mixing Example](https://miniaud.io/docs/examples/simple_mixing.html)
