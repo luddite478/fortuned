@@ -237,15 +237,23 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title), actions: [
-        IconButton(
-          icon: const Icon(Icons.play_circle_fill), 
-          tooltip: 'Play All', 
-          onPressed: _playAll,
-          color: Colors.green,
-        ),
-        IconButton(icon: const Icon(Icons.stop_circle), tooltip: 'Stop All', onPressed: _stopAll),
-      ]),
+      appBar: AppBar(
+        title: Text(widget.title),
+        actions: [
+          // Play All button
+          IconButton(
+            icon: Icon(Icons.play_circle, color: Colors.green),
+            onPressed: _playAll,
+            tooltip: 'Play All',
+          ),
+          // Stop All button
+          IconButton(
+            icon: Icon(Icons.stop_circle, color: Colors.red),
+            onPressed: _stopAll,
+            tooltip: 'Stop All',
+          ),
+        ],
+      ),
       body: ListView.builder(
         itemCount: _slotCount + 1,
         itemBuilder: (context, index) {

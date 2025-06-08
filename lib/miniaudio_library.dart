@@ -188,4 +188,6 @@ class MiniaudioLibrary {
       }
     }
   }
+
+  // Debug functions removed - Bluetooth audio working correctly
 } 

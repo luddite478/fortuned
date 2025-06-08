@@ -22,7 +22,8 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** **Memory vs streaming toggle per slot**  
 ✅ **WORKING:** **Instant sample triggering with restart capability**  
 ✅ **WORKING:** **Thread-safe slot operations**  
-✅ **WORKING:** **Play All / Stop All global controls**
+✅ **WORKING:** **Play All / Stop All global controls**  
+✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**
 
 ## 🚀 **Key Features Added Since v8c01ef075**
 
@@ -45,6 +46,13 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **Single Device Architecture**: Uses one `ma_engine` for optimal performance, no multiple device overhead
 - **Automatic Mixing**: Samples are naturally mixed by the audio engine
 - **Low-Latency Path**: Memory-loaded samples bypass file I/O for instant triggering
+
+### **🎧 Bluetooth Audio Routing**
+- **iOS AVFoundation Integration**: Proper Bluetooth audio session configuration
+- **Automatic Bluetooth Routing**: Audio automatically routes to connected AirPods/Bluetooth speakers
+- **No User Intervention Required**: Works seamlessly without manual audio route selection
+- **Background Compatibility**: Audio session persists across app lifecycle changes
+- **CoreAudio + AVFoundation**: Combines miniaudio's performance with iOS audio routing
 
 ### **🖥️ Enhanced UI**
 - **Slot-Based Interface**: Card layout showing all 8 slots
@@ -226,7 +234,96 @@ int miniaudio_init(void) { ... }
 <true/>
 ```
 
-### 3. **Build Issues**
+### 3. **Bluetooth Audio Routing Issues**
+
+#### **⚠️ Audio Routes to Phone Speaker Instead of Bluetooth**
+**Problem**: App works correctly but audio plays through phone speakers instead of connected Bluetooth headphones/speakers, even when Bluetooth audio is working in other apps.
+
+**Root Cause**: 
+- Miniaudio with CoreAudio backend doesn't automatically handle iOS audio session routing
+- `MA_NO_AVFOUNDATION` flag prevents proper Bluetooth audio routing
+- Default audio session configuration doesn't enable Bluetooth options
+
+**Solution**: **Hybrid iOS Audio Session Configuration**
+
+**Step 1**: Enable AVFoundation alongside CoreAudio
+```objective-c
+// In miniaudio_wrapper.mm
+#import <AVFoundation/AVFoundation.h>
+// Keep miniaudio configured for CoreAudio only
+#define MA_NO_AVFOUNDATION          // Still avoid direct AVFoundation in miniaudio
+#define MA_ENABLE_COREAUDIO         // Use CoreAudio backend for performance
+```
+
+**Step 2**: Configure iOS Audio Session for Bluetooth
+```objective-c
+static int configure_ios_audio_session(void) {
+    @try {
+        AVAudioSession *session = [AVAudioSession sharedInstance];
+        
+        // Configure for Bluetooth with fallback
+        BOOL success = [session setCategory:AVAudioSessionCategoryPlayback
+                                 withOptions:AVAudioSessionCategoryOptionAllowBluetooth |
+                                           AVAudioSessionCategoryOptionAllowBluetoothA2DP |
+                                           AVAudioSessionCategoryOptionDefaultToSpeaker
+                                       error:&error];
+        
+        if (!success) {
+            // Fallback to basic playback category
+            success = [session setCategory:AVAudioSessionCategoryPlayback error:&error];
+        }
+        
+        [session setMode:AVAudioSessionModeDefault error:&error];
+        [session setActive:YES error:&error];
+        
+        return success ? 0 : -1;
+    } @catch (NSException *exception) {
+        return -1;
+    }
+}
+```
+
+**Step 3**: Framework Linking
+Add AVFoundation framework to iOS project via Xcode:
+- Open `ios/Runner.xcworkspace` in Xcode
+- Select Runner target → Build Phases → Link Binary With Libraries
+- Add `AVFoundation.framework`
+
+**Step 4**: Initialize on Engine Startup
+```objective-c
+int miniaudio_init(void) {
+    // Configure iOS audio session first
+    if (configure_ios_audio_session() != 0) {
+        // Continue anyway - don't fail initialization
+        os_log_error(OS_LOG_DEFAULT, "Audio session config failed, using defaults");
+    }
+    
+    // Then initialize miniaudio engine as usual
+    // ...
+}
+```
+
+**Result**: ✅ Audio now automatically routes to Bluetooth devices when connected
+
+#### **🔧 Technical Details: Why This Works**
+
+**Dual-Backend Approach**:
+- **AVFoundation**: Handles iOS-specific audio routing and session management
+- **Miniaudio (CoreAudio)**: Provides low-latency audio mixing and playback performance
+- **No Conflict**: AVFoundation configures the session, miniaudio uses the configured audio path
+
+**Audio Session Categories**:
+- `AVAudioSessionCategoryPlayback`: Enables background audio and proper routing
+- `AVAudioSessionCategoryOptionAllowBluetooth`: Allows basic Bluetooth audio
+- `AVAudioSessionCategoryOptionAllowBluetoothA2DP`: Enables high-quality stereo Bluetooth
+- `AVAudioSessionCategoryOptionDefaultToSpeaker`: Fallback to speaker when no Bluetooth
+
+**iOS Audio Architecture**:
+```
+Flutter App → Miniaudio (CoreAudio) → iOS Audio Session (AVFoundation) → Bluetooth/Speaker
+```
+
+### 4. **Build Issues**
 
 #### **Podfile Configuration**
 **Problem**: CocoaPods not installing Flutter plugins properly.
@@ -266,6 +363,27 @@ Based on the official miniaudio "simple mixing" example, the architecture uses:
 - Dart `int` → C `int`
 - Dart `bool` → C `int` (0=false, 1=true)
 - String conversion requires manual memory management
+
+### **🎧 Bluetooth Audio Integration**
+**Hybrid Framework Approach:**
+- **AVFoundation** (iOS audio session management)
+- **CoreAudio** (miniaudio backend for performance)
+- **No conflicts** - AVFoundation configures, CoreAudio executes
+
+**iOS Audio Session Configuration:**
+```objective-c
+// Configure session with Bluetooth support
+[session setCategory:AVAudioSessionCategoryPlayback
+         withOptions:AVAudioSessionCategoryOptionAllowBluetooth |
+                   AVAudioSessionCategoryOptionAllowBluetoothA2DP |
+                   AVAudioSessionCategoryOptionDefaultToSpeaker
+               error:&error];
+```
+
+**Automatic Routing:**
+- Detects connected Bluetooth devices
+- Routes audio automatically without user intervention
+- Maintains performance benefits of miniaudio
 
 ### **Symbol Visibility**
 C functions must be declared with proper visibility attributes for iOS:

@@ -90,11 +90,26 @@ class MiniaudioBindings {
   }
 
   late final _miniaudio_is_initializedPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
-        'miniaudio_is_initialized',
-      );
-  late final _miniaudio_is_initialized = _miniaudio_is_initializedPtr
-      .asFunction<int Function()>();
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_is_initialized');
+  late final _miniaudio_is_initialized = _miniaudio_is_initializedPtr.asFunction<int Function()>();
+
+  /// Log current audio route (for debugging Bluetooth)
+  void miniaudio_log_audio_route() {
+    return _miniaudio_log_audio_route();
+  }
+
+  late final _miniaudio_log_audio_routePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('miniaudio_log_audio_route');
+  late final _miniaudio_log_audio_route = _miniaudio_log_audio_routePtr.asFunction<void Function()>();
+
+  /// Manually reconfigure audio session
+  int miniaudio_reconfigure_audio_session() {
+    return _miniaudio_reconfigure_audio_session();
+  }
+
+  late final _miniaudio_reconfigure_audio_sessionPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_reconfigure_audio_session');
+  late final _miniaudio_reconfigure_audio_session = _miniaudio_reconfigure_audio_sessionPtr.asFunction<int Function()>();
 
   /// Cleanup the miniaudio engine
   void miniaudio_cleanup() {

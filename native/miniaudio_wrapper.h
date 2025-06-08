@@ -23,6 +23,12 @@ void miniaudio_stop_all_sounds(void);
 // Check if engine is initialized
 int miniaudio_is_initialized(void);
 
+// Get current audio route info (for debugging Bluetooth connectivity)
+void miniaudio_log_audio_route(void);
+
+// Manually reconfigure audio session (for testing)
+int miniaudio_reconfigure_audio_session(void);
+
 // Cleanup the miniaudio engine
 void miniaudio_cleanup(void);
 

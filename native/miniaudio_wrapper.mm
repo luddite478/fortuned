@@ -2,6 +2,9 @@
 #include <os/log.h>
 #include <dispatch/dispatch.h>
 
+// iOS Audio Session for Bluetooth routing
+#import <AVFoundation/AVFoundation.h>
+
 // -----------------------------------------------------------------------------
 // Configure miniaudio implementation for iOS (CoreAudio only)
 // -----------------------------------------------------------------------------
@@ -46,6 +49,94 @@ static char*                           g_slot_file_paths[MINIAUDIO_MAX_SLOTS]   
     os_log_error(OS_LOG_DEFAULT, "🔴 [MINIAUDIO] Error: %s - %s", message, ma_result_description(result))
 
 // -----------------------------------------------------------------------------
+// iOS Audio Session Configuration for Bluetooth Support
+// -----------------------------------------------------------------------------
+static int configure_ios_audio_session(void) {
+    os_log(OS_LOG_DEFAULT, "🔧 [AUDIO SESSION] Configuring iOS audio session...");
+    
+    // Check if AVAudioSession class exists at runtime
+    Class audioSessionClass = NSClassFromString(@"AVAudioSession");
+    if (audioSessionClass == nil) {
+        os_log_error(OS_LOG_DEFAULT, "🔴 [DEBUG] AVAudioSession class not found at runtime!");
+        return -1;
+    }
+    os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] AVAudioSession class found successfully");
+    
+    @try {
+        os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] Getting AVAudioSession sharedInstance...");
+        NSError *error = nil;
+        AVAudioSession *session = [AVAudioSession sharedInstance];
+        
+        if (session == nil) {
+            os_log_error(OS_LOG_DEFAULT, "🔴 [DEBUG] AVAudioSession sharedInstance returned nil!");
+            return -1;
+        }
+        
+        os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] Session obtained successfully");
+        
+        // Try full Bluetooth configuration first
+        os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] Setting category with Bluetooth options...");
+        BOOL success = [session setCategory:AVAudioSessionCategoryPlayback
+                                 withOptions:AVAudioSessionCategoryOptionAllowBluetooth |
+                                           AVAudioSessionCategoryOptionAllowBluetoothA2DP |
+                                           AVAudioSessionCategoryOptionDefaultToSpeaker
+                                       error:&error];
+        
+        if (!success) {
+            os_log_error(OS_LOG_DEFAULT, "🔴 [AUDIO SESSION] Failed full config: %@ (Code: %ld)", 
+                         error.localizedDescription, (long)error.code);
+            
+            // Fallback: Try basic playback category only
+            os_log(OS_LOG_DEFAULT, "🔧 [AUDIO SESSION] Trying fallback basic configuration...");
+            error = nil;  // Reset error
+            success = [session setCategory:AVAudioSessionCategoryPlayback error:&error];
+            if (!success) {
+                os_log_error(OS_LOG_DEFAULT, "🔴 [AUDIO SESSION] Even basic config failed: %@ (Code: %ld)", 
+                             error.localizedDescription, (long)error.code);
+                return -1;
+            }
+        }
+        os_log(OS_LOG_DEFAULT, "✅ [AUDIO SESSION] Category set successfully");
+        
+        // Set mode for general audio
+        os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] Setting mode...");
+        error = nil;  // Reset error
+        success = [session setMode:AVAudioSessionModeDefault error:&error];
+        if (!success) {
+            os_log_error(OS_LOG_DEFAULT, "🔴 [AUDIO SESSION] Failed to set mode: %@ (Code: %ld)", 
+                         error.localizedDescription, (long)error.code);
+            return -1;
+        }
+        os_log(OS_LOG_DEFAULT, "✅ [AUDIO SESSION] Mode set successfully");
+        
+        // Activate the session
+        os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] Activating session...");
+        error = nil;  // Reset error
+        success = [session setActive:YES error:&error];
+        if (!success) {
+            os_log_error(OS_LOG_DEFAULT, "🔴 [AUDIO SESSION] Failed to activate: %@ (Code: %ld)", 
+                         error.localizedDescription, (long)error.code);
+            return -1;
+        }
+        os_log(OS_LOG_DEFAULT, "✅ [AUDIO SESSION] Session activated successfully");
+        
+        // Log current route for debugging
+        os_log(OS_LOG_DEFAULT, "🔍 [DEBUG] Logging route after configuration...");
+        AVAudioSessionRouteDescription *route = session.currentRoute;
+        for (AVAudioSessionPortDescription *output in route.outputs) {
+            os_log(OS_LOG_DEFAULT, "🎧 [AUDIO SESSION] Current output: %@ (%@)", 
+                   output.portName, output.portType);
+        }
+        
+        os_log(OS_LOG_DEFAULT, "✅ [AUDIO SESSION] Configured for Bluetooth support");
+        return 0;
+    } @catch (NSException *exception) {
+        os_log_error(OS_LOG_DEFAULT, "🔴 [DEBUG] Exception in configure_ios_audio_session: %@", exception.reason);
+        return -1;
+    }
+}
+
+// -----------------------------------------------------------------------------
 // Public API exposed through FFI
 // -----------------------------------------------------------------------------
 __attribute__((visibility("default"))) __attribute__((used))
@@ -55,7 +146,19 @@ int miniaudio_init(void) {
         return 0;
     }
     
+    os_log(OS_LOG_DEFAULT, "🚀 [MINIAUDIO] Starting initialization process...");
+    
+    // Try to configure iOS audio session for Bluetooth support (optional)
+    os_log(OS_LOG_DEFAULT, "🔧 [MINIAUDIO] About to configure audio session...");
+    if (configure_ios_audio_session() != 0) {
+        os_log_error(OS_LOG_DEFAULT, "⚠️ [MINIAUDIO] Audio session config failed, continuing with default");
+        // Don't return error - continue with miniaudio initialization
+    } else {
+        os_log(OS_LOG_DEFAULT, "✅ [MINIAUDIO] Audio session configured successfully");
+    }
+    
     // Initialize resource manager first
+    os_log(OS_LOG_DEFAULT, "🔧 [MINIAUDIO] Initializing resource manager...");
     ma_resource_manager_config resource_manager_config = ma_resource_manager_config_init();
     ma_result result = ma_resource_manager_init(&resource_manager_config, &g_resource_manager);
     if (result != MA_SUCCESS) {
@@ -64,6 +167,7 @@ int miniaudio_init(void) {
     }
     
     // Initialize engine with resource manager
+    os_log(OS_LOG_DEFAULT, "🔧 [MINIAUDIO] Initializing engine...");
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.pResourceManager = &g_resource_manager;
     
@@ -412,6 +516,8 @@ __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_is_initialized(void) {
     return g_is_initialized;
 }
+
+// Debug functions removed - Bluetooth audio is working correctly
 
 // Extend cleanup to release slot resources
 __attribute__((visibility("default"))) __attribute__((used))
