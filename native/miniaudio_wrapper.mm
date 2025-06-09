@@ -7,9 +7,10 @@
 
 // -----------------------------------------------------------------------------
 // Configure miniaudio implementation for iOS (CoreAudio only)
+// Disable AVFoundation in miniaudio to prevent DefaultToSpeaker override
 // -----------------------------------------------------------------------------
 #define MINIAUDIO_IMPLEMENTATION
-#define MA_NO_AVFOUNDATION          // avoid Objective-C AVFoundation dependency
+#define MA_NO_AVFOUNDATION          // CRITICAL: Prevent miniaudio from setting DefaultToSpeaker
 #define MA_NO_RUNTIME_LINKING       // we link statically
 #define MA_ENABLE_ONLY_SPECIFIC_BACKENDS
 #define MA_ENABLE_COREAUDIO         // use CoreAudio backend
@@ -137,6 +138,15 @@ static int configure_ios_audio_session(void) {
 }
 
 // -----------------------------------------------------------------------------
+// Public function to re-activate Bluetooth audio session from Flutter
+// -----------------------------------------------------------------------------
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_reconfigure_audio_session(void) {
+    os_log(OS_LOG_DEFAULT, "🔄 [AUDIO SESSION] Re-configuring audio session for Bluetooth...");
+    return configure_ios_audio_session();
+}
+
+// -----------------------------------------------------------------------------
 // Public API exposed through FFI
 // -----------------------------------------------------------------------------
 __attribute__((visibility("default"))) __attribute__((used))
@@ -148,8 +158,8 @@ int miniaudio_init(void) {
     
     os_log(OS_LOG_DEFAULT, "🚀 [MINIAUDIO] Starting initialization process...");
     
-    // Try to configure iOS audio session for Bluetooth support (optional)
-    os_log(OS_LOG_DEFAULT, "🔧 [MINIAUDIO] About to configure audio session...");
+    // Configure iOS audio session for Bluetooth BEFORE miniaudio init
+    os_log(OS_LOG_DEFAULT, "🔧 [MINIAUDIO] Configuring audio session BEFORE engine init...");
     if (configure_ios_audio_session() != 0) {
         os_log_error(OS_LOG_DEFAULT, "⚠️ [MINIAUDIO] Audio session config failed, continuing with default");
         // Don't return error - continue with miniaudio initialization

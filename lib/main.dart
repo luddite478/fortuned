@@ -33,7 +33,7 @@ class TrackerPage extends StatefulWidget {
   State<TrackerPage> createState() => _TrackerPageState();
 }
 
-class _TrackerPageState extends State<TrackerPage> {
+class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   late final MiniaudioLibrary _miniaudioLibrary;
   late final int _slotCount;
 
@@ -63,6 +63,7 @@ class _TrackerPageState extends State<TrackerPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _miniaudioLibrary = MiniaudioLibrary.instance;
     _initializeAudio();
 
@@ -72,6 +73,17 @@ class _TrackerPageState extends State<TrackerPage> {
     _slotUseMemory = List.filled(_slotCount, false);
     _slotLoaded = List.filled(_slotCount, false);
     _slotPlaying = List.filled(_slotCount, false);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    // Re-configure Bluetooth audio session when app becomes active
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('🔄 App resumed - reconfiguring Bluetooth audio session');
+      _miniaudioLibrary.reconfigureAudioSession();
+    }
   }
 
   Future<void> _initializeAudio() async {
@@ -88,6 +100,7 @@ class _TrackerPageState extends State<TrackerPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _miniaudioLibrary.cleanup();
     super.dispose();
   }
@@ -137,6 +150,10 @@ class _TrackerPageState extends State<TrackerPage> {
     if (!loaded) {
       _loadSlot(slot);
     }
+    
+    // Ensure Bluetooth audio routing is active before playback
+    _miniaudioLibrary.reconfigureAudioSession();
+    
     bool success = _miniaudioLibrary.playSlot(slot);
     if (success) {
       setState(() => _slotPlaying[slot] = true);
@@ -164,6 +181,9 @@ class _TrackerPageState extends State<TrackerPage> {
         _loadSlot(i);
       }
     }
+
+    // Ensure Bluetooth audio routing is active before playback
+    _miniaudioLibrary.reconfigureAudioSession();
 
     // Then play all loaded slots
     _miniaudioLibrary.playAllLoadedSlots();

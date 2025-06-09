@@ -145,6 +145,12 @@ class MiniaudioLibrary {
     _bindings.miniaudio_cleanup();
   }
 
+  // Re-activate Bluetooth audio session (call when Bluetooth routing stops working)
+  bool reconfigureAudioSession() {
+    int result = _bindings.miniaudio_reconfigure_audio_session();
+    return result == 0;
+  }
+
   // -------------- MULTI SLOT --------------
   int get slotCount => _bindings.miniaudio_get_slot_count();
 

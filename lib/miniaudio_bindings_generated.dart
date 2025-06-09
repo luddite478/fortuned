@@ -38,7 +38,7 @@ class MiniaudioBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_init');
   late final _miniaudio_init = _miniaudio_initPtr.asFunction<int Function()>();
 
-  /// Play an audio file
+  /// Play a sound from a file
   int miniaudio_play_sound(ffi.Pointer<ffi.Char> file_path) {
     return _miniaudio_play_sound(file_path);
   }
@@ -68,11 +68,13 @@ class MiniaudioBindings {
   }
 
   late final _miniaudio_play_loaded_soundPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_play_loaded_sound');
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+        'miniaudio_play_loaded_sound',
+      );
   late final _miniaudio_play_loaded_sound = _miniaudio_play_loaded_soundPtr
       .asFunction<int Function()>();
 
-  /// Stop all sounds
+  /// Stop all currently playing sounds
   void miniaudio_stop_all_sounds() {
     return _miniaudio_stop_all_sounds();
   }
@@ -90,26 +92,35 @@ class MiniaudioBindings {
   }
 
   late final _miniaudio_is_initializedPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_is_initialized');
-  late final _miniaudio_is_initialized = _miniaudio_is_initializedPtr.asFunction<int Function()>();
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+        'miniaudio_is_initialized',
+      );
+  late final _miniaudio_is_initialized = _miniaudio_is_initializedPtr
+      .asFunction<int Function()>();
 
-  /// Log current audio route (for debugging Bluetooth)
+  /// Get current audio route info (for debugging Bluetooth connectivity)
   void miniaudio_log_audio_route() {
     return _miniaudio_log_audio_route();
   }
 
   late final _miniaudio_log_audio_routePtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('miniaudio_log_audio_route');
-  late final _miniaudio_log_audio_route = _miniaudio_log_audio_routePtr.asFunction<void Function()>();
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>(
+        'miniaudio_log_audio_route',
+      );
+  late final _miniaudio_log_audio_route = _miniaudio_log_audio_routePtr
+      .asFunction<void Function()>();
 
-  /// Manually reconfigure audio session
+  /// Manually reconfigure audio session (for testing)
   int miniaudio_reconfigure_audio_session() {
     return _miniaudio_reconfigure_audio_session();
   }
 
   late final _miniaudio_reconfigure_audio_sessionPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_reconfigure_audio_session');
-  late final _miniaudio_reconfigure_audio_session = _miniaudio_reconfigure_audio_sessionPtr.asFunction<int Function()>();
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+        'miniaudio_reconfigure_audio_session',
+      );
+  late final _miniaudio_reconfigure_audio_session =
+      _miniaudio_reconfigure_audio_sessionPtr.asFunction<int Function()>();
 
   /// Cleanup the miniaudio engine
   void miniaudio_cleanup() {
@@ -121,52 +132,86 @@ class MiniaudioBindings {
   late final _miniaudio_cleanup = _miniaudio_cleanupPtr
       .asFunction<void Function()>();
 
-  /// Get number of slots
+  /// Returns the number of available playback slots (always MINIAUDIO_MAX_SLOTS)
   int miniaudio_get_slot_count() {
     return _miniaudio_get_slot_count();
   }
 
   late final _miniaudio_get_slot_countPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('miniaudio_get_slot_count');
-  late final _miniaudio_get_slot_count = _miniaudio_get_slot_countPtr.asFunction<int Function()>();
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+        'miniaudio_get_slot_count',
+      );
+  late final _miniaudio_get_slot_count = _miniaudio_get_slot_countPtr
+      .asFunction<int Function()>();
 
-  /// Load a sound into a slot (slot, *file_path, loadToMemory)
-  int miniaudio_load_sound_to_slot(int slot, ffi.Pointer<ffi.Char> file_path, int loadToMemory) {
+  /// Loads a sound into the given slot. When loadToMemory == 1 the file will be
+  /// fully decoded into memory for lowest-latency playback. When 0 the file will
+  /// be streamed from disk.
+  int miniaudio_load_sound_to_slot(
+    int slot,
+    ffi.Pointer<ffi.Char> file_path,
+    int loadToMemory,
+  ) {
     return _miniaudio_load_sound_to_slot(slot, file_path, loadToMemory);
   }
 
-  late final _miniaudio_load_sound_to_slotPtr = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Pointer<ffi.Char>, ffi.Int)>>('miniaudio_load_sound_to_slot');
-  late final _miniaudio_load_sound_to_slot = _miniaudio_load_sound_to_slotPtr.asFunction<int Function(int, ffi.Pointer<ffi.Char>, int)>();
+  late final _miniaudio_load_sound_to_slotPtr =
+      _lookup<
+        ffi.NativeFunction<
+          ffi.Int Function(ffi.Int, ffi.Pointer<ffi.Char>, ffi.Int)
+        >
+      >('miniaudio_load_sound_to_slot');
+  late final _miniaudio_load_sound_to_slot = _miniaudio_load_sound_to_slotPtr
+      .asFunction<int Function(int, ffi.Pointer<ffi.Char>, int)>();
 
-  /// Checks if slot has loaded sound
+  /// Returns 1 if the slot successfully has a sound loaded, 0 otherwise.
   int miniaudio_is_slot_loaded(int slot) {
     return _miniaudio_is_slot_loaded(slot);
   }
 
-  late final _miniaudio_is_slot_loadedPtr = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int)>>('miniaudio_is_slot_loaded');
-  late final _miniaudio_is_slot_loaded = _miniaudio_is_slot_loadedPtr.asFunction<int Function(int)>();
+  late final _miniaudio_is_slot_loadedPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int)>>(
+        'miniaudio_is_slot_loaded',
+      );
+  late final _miniaudio_is_slot_loaded = _miniaudio_is_slot_loadedPtr
+      .asFunction<int Function(int)>();
 
-  /// Play slot
+  /// Starts playback of the sound in the given slot. The sound is mixed together
+  /// with any other playing slots.
   int miniaudio_play_slot(int slot) {
     return _miniaudio_play_slot(slot);
   }
 
-  late final _miniaudio_play_slotPtr = _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int)>>('miniaudio_play_slot');
-  late final _miniaudio_play_slot = _miniaudio_play_slotPtr.asFunction<int Function(int)>();
+  late final _miniaudio_play_slotPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int)>>(
+        'miniaudio_play_slot',
+      );
+  late final _miniaudio_play_slot = _miniaudio_play_slotPtr
+      .asFunction<int Function(int)>();
 
-  /// Stop slot
+  /// Stops playback of the sound in the given slot.
   void miniaudio_stop_slot(int slot) {
     return _miniaudio_stop_slot(slot);
   }
 
-  late final _miniaudio_stop_slotPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('miniaudio_stop_slot');
-  late final _miniaudio_stop_slot = _miniaudio_stop_slotPtr.asFunction<void Function(int)>();
+  late final _miniaudio_stop_slotPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+        'miniaudio_stop_slot',
+      );
+  late final _miniaudio_stop_slot = _miniaudio_stop_slotPtr
+      .asFunction<void Function(int)>();
 
-  /// Unload slot
+  /// Unloads the sound from the given slot and frees all associated memory.
   void miniaudio_unload_slot(int slot) {
     return _miniaudio_unload_slot(slot);
   }
 
-  late final _miniaudio_unload_slotPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('miniaudio_unload_slot');
-  late final _miniaudio_unload_slot = _miniaudio_unload_slotPtr.asFunction<void Function(int)>();
+  late final _miniaudio_unload_slotPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+        'miniaudio_unload_slot',
+      );
+  late final _miniaudio_unload_slot = _miniaudio_unload_slotPtr
+      .asFunction<void Function(int)>();
 }
+
+const int MINIAUDIO_MAX_SLOTS = 8;
