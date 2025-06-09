@@ -151,6 +151,29 @@ class MiniaudioLibrary {
     return result == 0;
   }
 
+  // Memory tracking methods
+  int getTotalMemoryUsage() {
+    return _bindings.miniaudio_get_total_memory_usage();
+  }
+
+  int getSlotMemoryUsage(int slot) {
+    return _bindings.miniaudio_get_slot_memory_usage(slot);
+  }
+
+  int getMemorySlotCount() {
+    return _bindings.miniaudio_get_memory_slot_count();
+  }
+
+  String formatMemorySize(int bytes) {
+    if (bytes < 1024) {
+      return '${bytes}B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    } else {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+    }
+  }
+
   // -------------- MULTI SLOT --------------
   int get slotCount => _bindings.miniaudio_get_slot_count();
 

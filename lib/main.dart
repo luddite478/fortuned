@@ -37,10 +37,9 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   late final MiniaudioLibrary _miniaudioLibrary;
   late final int _slotCount;
 
-  // Per-slot state for sample banks
+  // Audio state
   late List<String?> _filePaths;
   late List<String?> _fileNames;
-  late List<bool> _slotUseMemory;
   late List<bool> _slotLoaded;
   late List<bool> _slotPlaying;
 
@@ -70,7 +69,6 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     _slotCount = _miniaudioLibrary.slotCount;
     _filePaths = List.filled(_slotCount, null);
     _fileNames = List.filled(_slotCount, null);
-    _slotUseMemory = List.filled(_slotCount, false);
     _slotLoaded = List.filled(_slotCount, false);
     _slotPlaying = List.filled(_slotCount, false);
   }
@@ -119,6 +117,9 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           _fileNames[slot] = result.files.single.name;
           _slotLoaded[slot] = false;
         });
+        
+        // Always load sample to memory immediately
+        _loadSlot(slot);
       }
     } catch (e) {
       if (mounted) {
@@ -138,7 +139,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     bool success = _miniaudioLibrary.loadSoundToSlot(
       slot,
       path,
-      loadToMemory: _slotUseMemory[slot],
+      loadToMemory: true,
     );
     setState(() {
       _slotLoaded[slot] = success;
@@ -146,9 +147,11 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   }
 
   void _playSlot(int slot) {
-    final bool loaded = _slotLoaded[slot];
-    if (!loaded) {
+    // Sample should already be loaded in memory
+    if (!_slotLoaded[slot]) {
+      // If not loaded for some reason, try loading first
       _loadSlot(slot);
+      if (!_slotLoaded[slot]) return; // Give up if loading failed
     }
     
     // Ensure Bluetooth audio routing is active before playback
@@ -353,6 +356,9 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   Widget _buildStatusDisplay() {
     final hasFile = _fileNames[_activeBank] != null;
     final isPlaying = _slotPlaying[_activeBank];
+    final totalMemoryUsage = _miniaudioLibrary.getTotalMemoryUsage();
+    final memorySlotCount = _miniaudioLibrary.getMemorySlotCount();
+    final activeSlotMemory = _miniaudioLibrary.getSlotMemoryUsage(_activeBank);
     
     return Container(
       padding: const EdgeInsets.all(12),
@@ -395,29 +401,56 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
             ),
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 8),
+          // Memory usage display
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'MEMORY: $memorySlotCount/8 slots',
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                ),
+              ),
+              Text(
+                'TOTAL: ${_miniaudioLibrary.formatMemorySize(totalMemoryUsage)}',
+                style: const TextStyle(
+                  color: Colors.orangeAccent,
+                  fontFamily: 'monospace',
+                  fontSize: 10,
+                ),
+              ),
+            ],
+          ),
           if (hasFile) ...[
             const SizedBox(height: 4),
             Row(
               children: [
-                Text(
-                  'MEMORY: ${_slotUseMemory[_activeBank] ? 'ON' : 'OFF'}',
-                  style: const TextStyle(
-                    color: Colors.cyanAccent,
-                    fontFamily: 'monospace',
-                    fontSize: 10,
-                  ),
-                ),
-                const Spacer(),
-                Switch(
-                  value: _slotUseMemory[_activeBank],
-                  onChanged: (val) {
-                    setState(() {
-                      _slotUseMemory[_activeBank] = val;
-                      _slotLoaded[_activeBank] = false;
-                    });
-                  },
-                  activeColor: Colors.cyanAccent,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'STATUS: ${_slotLoaded[_activeBank] ? 'LOADED' : 'LOADING...'}',
+                      style: const TextStyle(
+                        color: Colors.cyanAccent,
+                        fontFamily: 'monospace',
+                        fontSize: 10,
+                      ),
+                    ),
+                    if (_slotLoaded[_activeBank] && activeSlotMemory > 0) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'SIZE: ${_miniaudioLibrary.formatMemorySize(activeSlotMemory)}',
+                        style: const TextStyle(
+                          color: Colors.cyanAccent,
+                          fontFamily: 'monospace',
+                          fontSize: 9,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

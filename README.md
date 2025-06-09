@@ -5,7 +5,8 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ## 🎯 **Project Overview**
 - **🎵 Multi-slot audio mixing** - Play up to 8 audio samples simultaneously
 - **⚡ Low latency audio playbook** using miniaudio
-- **🎚️ Memory vs Stream toggle** - Choose between memory-loaded (low latency) or streamed playback per slot
+- **💾 Memory-loaded samples** - All samples are loaded into memory for instant triggering
+- **📊 Memory usage tracking** - Real-time display of memory consumption per slot and total usage
 - **🔄 Instant restart capability** - Trigger samples from beginning on each play press
 - **📱 Cross-platform support** (iOS focus)
 - **🎛️ Real-time mixing** through native audio performance via FFI
@@ -19,8 +20,8 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** Miniaudio integration with CoreAudio backend  
 ✅ **WORKING:** Audio playbook with proper lifecycle management  
 ✅ **WORKING:** **8-slot multi-track mixing system**  
-✅ **WORKING:** **Memory vs streaming toggle per slot**  
-✅ **WORKING:** **Instant sample triggering with restart capability**  
+✅ **WORKING:** **Memory-loaded samples with instant triggering**  
+✅ **WORKING:** **Real-time memory usage tracking and display**  
 ✅ **WORKING:** **Thread-safe slot operations**  
 ✅ **WORKING:** **Play All / Stop All global controls**  
 ✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**
@@ -30,7 +31,7 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ### **🎛️ Multi-Slot Audio System**
 - **8 Independent Audio Slots**: Load different samples into separate slots (0-7)
 - **Simultaneous Playback**: All slots can play at the same time, mixed together seamlessly
-- **Per-Slot Memory Control**: Toggle between memory-loaded (instant) vs streamed (disk) playback per slot
+- **Memory-Loaded**: All samples are loaded into memory for instant, zero-latency triggering
 - **Individual Controls**: Each slot has its own load/play/stop controls
 - **Real-time Status**: Visual feedback showing loaded/playing state per slot
 
@@ -46,6 +47,25 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **Single Device Architecture**: Uses one `ma_engine` for optimal performance, no multiple device overhead
 - **Automatic Mixing**: Samples are naturally mixed by the audio engine
 - **Low-Latency Path**: Memory-loaded samples bypass file I/O for instant triggering
+
+### **📊 Memory Usage Tracking**
+**Real-time Memory Monitoring:**
+- **Per-slot tracking** - Shows memory usage for each loaded sample
+- **Total memory display** - Aggregate memory consumption across all slots
+- **Memory-only counting** - Only samples loaded in memory mode are tracked
+- **Automatic updates** - Memory display refreshes when samples are loaded/unloaded
+
+**Native Implementation:**
+- **Precise calculation** - Uses miniaudio's PCM frame data to calculate exact memory usage
+- **Format awareness** - Accounts for sample rate, channels, and bit depth
+- **Efficient tracking** - Minimal overhead with static memory counters
+- **Memory safety** - Proper cleanup and tracking when samples are unloaded
+
+**UI Display:**
+- **Slot counter**: Shows "X/8 slots" with samples in memory
+- **Total usage**: Displays aggregate memory (B/KB/MB format)
+- **Per-sample size**: Shows individual sample memory consumption
+- **Color-coded**: Orange for memory stats, cyan for sample details
 
 ### **🎧 Bluetooth Audio Integration**
 **Hybrid Framework Approach:**
@@ -174,11 +194,11 @@ Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 3.
 
 ### **Loading Samples**
 1. **Pick Audio Files**: Select different audio files for each slot
-2. **Memory Toggle**: Turn on "Memory" switch for instant triggering (loads entire file into RAM)
-3. **Auto-Loading**: Files are automatically loaded when you first press play
+2. **Automatic Loading**: Samples are immediately loaded into memory when selected
+3. **Instant Access**: All loaded samples are ready for immediate triggering
 
 ### **Playing & Mixing**
-1. **Individual Playback**: Start any slot to play that sample
+1. **Individual Playback**: Start any slot to play that sample instantly
 2. **Instant Restart**: Trigger again while playing to restart from beginning
 3. **Mixing**: Play multiple slots simultaneously - they mix together automatically
 4. **Global Controls**: 
@@ -186,9 +206,10 @@ Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 3.
    - **Stop All**: Stops all currently playing slots
 
 ### **Performance Tips**
-- **Use Memory Mode** for short samples you'll trigger frequently (drums, FX)
-- **Use Stream Mode** for longer audio files to save RAM
-- **Preload Samples** by toggling memory on before playing for instant response
+- **Choose Files Wisely**: Since all samples load into memory, consider file sizes
+- **Memory Monitoring**: Check memory usage in the status display to manage resources
+- **Instant Triggering**: Perfect for drums, FX, loops, and any samples requiring zero latency
+- **Hot-Swapping**: Replace samples anytime - new files load immediately
 
 ## 🚨 **Common Issues & Solutions**
 
@@ -440,11 +461,16 @@ dispatch_sync(g_audio_queue, ^{
 
 ### **Multi-Slot Functions**
 - `miniaudio_get_slot_count()` - Returns 8 (max slots)
-- `miniaudio_load_sound_to_slot(slot, path, useMemory)` - Load audio to slot
+- `miniaudio_load_sound_to_slot(slot, path)` - Load audio to slot (always in memory)
 - `miniaudio_play_slot(slot)` - Play/restart slot sample
 - `miniaudio_stop_slot(slot)` - Stop slot playback
 - `miniaudio_unload_slot(slot)` - Free slot resources
 - `miniaudio_is_slot_loaded(slot)` - Check if slot has audio
+
+### **Memory Tracking Functions**
+- `miniaudio_get_total_memory_usage()` - Get total memory used by all samples (bytes)
+- `miniaudio_get_slot_memory_usage(slot)` - Get memory used by specific slot (bytes)
+- `miniaudio_get_memory_slot_count()` - Get count of slots loaded in memory mode
 
 ### **Legacy Functions (Still Supported)**
 - `miniaudio_play_sound(path)` - Direct file playback

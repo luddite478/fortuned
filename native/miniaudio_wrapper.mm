@@ -45,6 +45,8 @@ static ma_resource_manager_data_source g_slot_data_sources[MINIAUDIO_MAX_SLOTS];
 static int                             g_slot_has_sound[MINIAUDIO_MAX_SLOTS]         = {0};
 static int                             g_slot_loaded_in_memory[MINIAUDIO_MAX_SLOTS]  = {0};
 static char*                           g_slot_file_paths[MINIAUDIO_MAX_SLOTS]        = {0};
+static uint64_t                        g_slot_memory_sizes[MINIAUDIO_MAX_SLOTS]      = {0}; // Track memory usage per slot
+static uint64_t                        g_total_memory_used                            = 0;   // Total memory used
 
 #define LOG_MA_ERROR(result, message) \
     os_log_error(OS_LOG_DEFAULT, "🔴 [MINIAUDIO] Error: %s - %s", message, ma_result_description(result))
@@ -375,11 +377,40 @@ static int validate_slot(int slot) {
     return 1;
 }
 
+// Helper function to calculate memory size of a loaded audio sample
+static uint64_t calculate_sample_memory_size(ma_resource_manager_data_source* data_source) {
+    if (data_source == NULL) return 0;
+    
+    ma_uint64 lengthInPCMFrames;
+    ma_result result = ma_resource_manager_data_source_get_length_in_pcm_frames(data_source, &lengthInPCMFrames);
+    if (result != MA_SUCCESS) {
+        return 0;
+    }
+    
+    ma_format format;
+    ma_uint32 channels;
+    ma_uint32 sampleRate;
+    result = ma_resource_manager_data_source_get_data_format(data_source, &format, &channels, &sampleRate, NULL, 0);
+    if (result != MA_SUCCESS) {
+        return 0;
+    }
+    
+    // Calculate memory usage: frames * channels * bytes_per_sample
+    uint32_t bytesPerSample = ma_get_bytes_per_sample(format);
+    uint64_t totalBytes = lengthInPCMFrames * channels * bytesPerSample;
+    
+    return totalBytes;
+}
+
 static void free_slot_resources(int slot) {
     // Assumes dispatch_sync already protecting
     if (g_slot_has_sound[slot]) {
         ma_sound_uninit(&g_slot_sounds[slot]);
         if (g_slot_loaded_in_memory[slot]) {
+            // Update memory tracking before freeing
+            g_total_memory_used -= g_slot_memory_sizes[slot];
+            g_slot_memory_sizes[slot] = 0;
+            
             ma_resource_manager_data_source_uninit(&g_slot_data_sources[slot]);
             g_slot_loaded_in_memory[slot] = 0;
         }
@@ -439,14 +470,27 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
                 resultCode = -1;
                 return;
             }
+            
+            // Calculate memory usage for this sample
+            uint64_t memorySize = calculate_sample_memory_size(&g_slot_data_sources[slot]);
+            g_slot_memory_sizes[slot] = memorySize;
+            g_total_memory_used += memorySize;
+            
             result = ma_sound_init_from_data_source(&g_engine, &g_slot_data_sources[slot], 0, NULL, &g_slot_sounds[slot]);
             if (result != MA_SUCCESS) {
                 LOG_MA_ERROR(result, "Failed to init sound from data source");
+                // Rollback memory tracking
+                g_total_memory_used -= g_slot_memory_sizes[slot];
+                g_slot_memory_sizes[slot] = 0;
                 ma_resource_manager_data_source_uninit(&g_slot_data_sources[slot]);
                 resultCode = -1;
                 return;
             }
             g_slot_loaded_in_memory[slot] = 1;
+            
+            // Log memory usage
+            os_log(OS_LOG_DEFAULT, "💾 [MINIAUDIO] Slot %d loaded %llu bytes (%.2f MB) - Total: %.2f MB", 
+                   slot, memorySize, memorySize / (1024.0 * 1024.0), g_total_memory_used / (1024.0 * 1024.0));
         } else {
             os_log(OS_LOG_DEFAULT, "📥 [MINIAUDIO] Slot %d loading (stream) %s", slot, file_path);
             result = ma_sound_init_from_file(&g_engine, file_path, 0, NULL, NULL, &g_slot_sounds[slot]);
@@ -456,6 +500,7 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
                 return;
             }
             g_slot_loaded_in_memory[slot] = 0;
+            g_slot_memory_sizes[slot] = 0; // Streaming uses no additional memory
         }
         g_slot_has_sound[slot] = 1;
     });
@@ -525,6 +570,29 @@ void miniaudio_unload_slot(int slot) {
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_is_initialized(void) {
     return g_is_initialized;
+}
+
+// Memory usage tracking functions
+__attribute__((visibility("default"))) __attribute__((used))
+uint64_t miniaudio_get_total_memory_usage(void) {
+    return g_total_memory_used;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+uint64_t miniaudio_get_slot_memory_usage(int slot) {
+    if (!validate_slot(slot)) return 0;
+    return g_slot_memory_sizes[slot];
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_get_memory_slot_count(void) {
+    int count = 0;
+    for (int i = 0; i < MINIAUDIO_MAX_SLOTS; ++i) {
+        if (g_slot_loaded_in_memory[i]) {
+            count++;
+        }
+    }
+    return count;
 }
 
 // Debug functions removed - Bluetooth audio is working correctly

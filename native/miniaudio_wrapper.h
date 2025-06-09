@@ -1,6 +1,8 @@
 #ifndef MINIAUDIO_WRAPPER_H
 #define MINIAUDIO_WRAPPER_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,6 +57,11 @@ void miniaudio_stop_slot(int slot);
 
 // Unloads the sound from the given slot and frees all associated memory.
 void miniaudio_unload_slot(int slot);
+
+// Memory usage tracking functions
+uint64_t miniaudio_get_total_memory_usage(void);
+uint64_t miniaudio_get_slot_memory_usage(int slot);
+int miniaudio_get_memory_slot_count(void);
 
 #ifdef __cplusplus
 }
