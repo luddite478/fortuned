@@ -6,6 +6,7 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **🎵 Multi-slot audio mixing** - Play up to 8 audio samples simultaneously
 - **⚡ Low latency audio playbook** using miniaudio
 - **💾 Memory-loaded samples** - All samples are loaded into memory for instant triggering
+- **🎛️ DAW-style step sequencer** - 4-column × 16-step grid with BPM-based timing
 - **📊 Memory usage tracking** - Real-time display of memory consumption per slot and total usage
 - **🔄 Instant restart capability** - Trigger samples from beginning on each play press
 - **📱 Cross-platform support** (iOS focus)
@@ -22,8 +23,8 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** **8-slot multi-track mixing system**  
 ✅ **WORKING:** **Memory-loaded samples with instant triggering**  
 ✅ **WORKING:** **Real-time memory usage tracking and display**  
+✅ **WORKING:** **DAW-style step sequencer (4×16 grid, BPM timing)**  
 ✅ **WORKING:** **Thread-safe slot operations**  
-✅ **WORKING:** **Play All / Stop All global controls**  
 ✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**
 
 ## 🚀 **Key Features**
@@ -66,6 +67,38 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **Total usage**: Displays aggregate memory (B/KB/MB format)
 - **Per-sample size**: Shows individual sample memory consumption
 - **Color-coded**: Orange for memory stats, cyan for sample details
+
+### **🎛️ DAW-Style Step Sequencer**
+**Grid Layout:**
+- **4 columns × 16 rows** = 64 cells total
+- **Column = Track**: Each column represents an independent audio track
+- **Row = Step**: Each row represents a 1/16 note timing step
+- **Visual feedback**: Current playing step highlighted with yellow border
+
+**Timing & BPM:**
+- **120 BPM default** with precise timing calculation
+- **1/16 note resolution**: Each step = 125ms at 120 BPM
+- **Formula**: `stepDuration = (60 * 1000) / (bpm * 4)` milliseconds
+- **Automatic looping**: Continuously cycles through steps 1-16
+
+**Sound Management:**
+- **Simultaneous playback**: All sounds on current step play together
+- **Column-based replacement**: Sound in column only stops when new sound appears in same column
+- **Cross-step sustain**: Sounds continue playing until explicitly replaced
+- **Loop continuation**: Sounds from step 16 continue into step 1 if no replacement
+
+**Sequencer Controls:**
+- **Play button** (green): Starts sequencer from step 1
+- **Stop button** (red): Stops sequencer and all sounds completely
+- **Real-time display**: Shows current step (X/16) and BPM
+- **Status indicator**: "PLAYING" vs "STOPPED"
+
+**Example Workflow:**
+1. Load samples into slots A-H (memory-loaded instantly)
+2. Select sample → tap grid cells to place in sequence
+3. Press Play → sequencer loops through 16 steps at BPM tempo
+4. Each step plays all placed samples simultaneously
+5. Column sounds sustain until replaced by new sound in same column
 
 ### **🎧 Bluetooth Audio Integration**
 **Hybrid Framework Approach:**
@@ -197,19 +230,25 @@ Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 3.
 2. **Automatic Loading**: Samples are immediately loaded into memory when selected
 3. **Instant Access**: All loaded samples are ready for immediate triggering
 
-### **Playing & Mixing**
-1. **Individual Playback**: Start any slot to play that sample instantly
-2. **Instant Restart**: Trigger again while playing to restart from beginning
-3. **Mixing**: Play multiple slots simultaneously - they mix together automatically
-4. **Global Controls**: 
-   - **Play All**: Starts all loaded slots at once
-   - **Stop All**: Stops all currently playing slots
+### **DAW Sequencer Mode**
+1. **Sample Selection**: Tap loaded sample slot to select it for placement (yellow highlight)
+2. **Grid Placement**: Tap any cell in the 4×16 grid to place selected sample
+3. **Visual Organization**: Placed samples show with their unique colors and letters (A-H)
+4. **Sequencer Playback**: Press Play to start BPM-based step sequencing
+5. **Real-time Control**: Stop button halts all playback immediately
+
+### **Manual Playback Mode**
+1. **Individual Playback**: Tap grid cell to instantly play placed sample
+2. **Simultaneous Mixing**: Multiple samples can play together naturally
+3. **Direct Triggering**: Perfect for live performance and beat making
 
 ### **Performance Tips**
 - **Choose Files Wisely**: Since all samples load into memory, consider file sizes
 - **Memory Monitoring**: Check memory usage in the status display to manage resources
 - **Instant Triggering**: Perfect for drums, FX, loops, and any samples requiring zero latency
 - **Hot-Swapping**: Replace samples anytime - new files load immediately
+- **Sequencer Patterns**: Create complex rhythms using the 16-step grid
+- **Layering**: Use multiple columns for polyrhythmic patterns
 
 ## 🚨 **Common Issues & Solutions**
 
@@ -387,7 +426,7 @@ Based on the official miniaudio "simple mixing" example, the architecture uses:
 **Native Layer (C++):**
 - **Single `ma_engine`** for optimal performance
 - **8 `ma_sound` objects** for individual sample playback
-- **Resource manager** for memory vs streaming control
+- **Resource manager** for memory-loaded samples
 - **Serial dispatch queue** for thread-safe operations
 - **Automatic mixing** by the miniaudio engine
 
@@ -396,6 +435,12 @@ Based on the official miniaudio "simple mixing" example, the architecture uses:
 - **Memory-safe string conversion** for file paths
 - **Error handling** with proper return codes
 - **Helper functions** for batch operations
+
+**Sequencer Layer (Flutter):**
+- **4×16 grid state** tracking sample placement
+- **BPM-based timing** using Dart `Timer` for precise step control
+- **Column-specific sound management** for proper audio replacement
+- **Real-time UI updates** with step highlighting and status display
 
 ### **FFI Type Mapping**
 - Dart `int` → C `int`
@@ -424,34 +469,6 @@ Based on the official miniaudio "simple mixing" example, the architecture uses:
 - **Prevents Override**: `MA_NO_AVFOUNDATION` stops miniaudio from forcing `DefaultToSpeaker`
 - **External Control**: Our AVFoundation setup configures Bluetooth routing before miniaudio init
 - **Automatic Routing**: iOS handles device switching based on our session configuration
-
-### **Symbol Visibility**
-C functions must be declared with proper visibility attributes for iOS:
-```c
-__attribute__((visibility("default"))) __attribute__((used))
-int your_function_name() {
-    // implementation
-}
-```
-
-### **Memory Management**
-Always free allocated memory for string conversions:
-```dart
-final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
-try {
-  // Use cString
-} finally {
-  free(cString.cast());
-}
-```
-
-### **🔄 Thread Safety**
-All slot operations are serialized through GCD:
-```c
-dispatch_sync(g_audio_queue, ^{
-    // Thread-safe slot operations
-});
-```
 
 ## 📊 **API Reference**
 
