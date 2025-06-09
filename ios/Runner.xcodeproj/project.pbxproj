@@ -13,8 +13,8 @@
 		4058479C1233B47F510CED4C /* Pods_RunnerTests.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0CC849E078AD7C896DE57656 /* Pods_RunnerTests.framework */; };
 		55433E352DF4040A00D2AA40 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E342DF4040A00D2AA40 /* CoreAudio.framework */; };
 		55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E362DF4041800D2AA40 /* AudioToolbox.framework */; };
-		55433E3D2DF4055400D2AA40 /* miniaudio_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */; };
 		55433E3F2DF40A7F00D2AA40 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */; };
+		5571F8BD2DF776970025EF91 /* miniaudio_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
@@ -60,6 +60,8 @@
 		55433E392DF4047800D2AA40 /* miniaudio.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio.c; path = ../native/miniaudio.c; sourceTree = "<group>"; };
 		55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_wrapper.mm; path = ../native/miniaudio_wrapper.mm; sourceTree = "<group>"; };
 		55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		5571F8BA2DF775080025EF91 /* miniaudio_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = miniaudio_wrapper.cpp; path = ../native/miniaudio_wrapper.cpp; sourceTree = "<group>"; };
+		5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_wrapper.mm; path = ../native/miniaudio_wrapper.mm; sourceTree = "<group>"; };
 		73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -135,6 +137,8 @@
 		97C146E51CF9000F007C117D = {
 			isa = PBXGroup;
 			children = (
+				5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */,
+				5571F8BA2DF775080025EF91 /* miniaudio_wrapper.cpp */,
 				55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */,
 				55433E382DF4047800D2AA40 /* miniaudio_wrapper.c */,
 				55433E392DF4047800D2AA40 /* miniaudio.c */,
@@ -395,7 +399,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				55433E3D2DF4055400D2AA40 /* miniaudio_wrapper.mm in Sources */,
+				5571F8BD2DF776970025EF91 /* miniaudio_wrapper.mm in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
