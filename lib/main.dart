@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'miniaudio_library.dart';
+import 'dart:async';
 
 void main() {
   runApp(const MyApp());
@@ -48,8 +49,18 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   int? _activePad;
   int? _selectedSampleSlot; // Track which sample is selected for placement
   
-  // Grid state - tracks which sample slot is assigned to each of the 64 grid cells
+  // Grid state - tracks which sample slot is assigned to each grid cell
+  // 4 columns (sample slots) × 16 rows (steps) = 64 cells
   late List<int?> _gridSamples;
+  
+  // Sequencer state
+  int _bpm = 120;
+  int _currentStep = -1; // -1 means not playing, 0-15 for current step
+  bool _isSequencerPlaying = false;
+  Timer? _sequencerTimer;
+  
+  // Track which samples are currently playing in each column
+  late List<bool> _columnPlaying;
 
   // Grid colors for each bank
   final List<Color> _bankColors = [
@@ -76,6 +87,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     _slotLoaded = List.filled(_slotCount, false);
     _slotPlaying = List.filled(_slotCount, false);
     _gridSamples = List.filled(64, null);
+    _columnPlaying = List.filled(4, false);
   }
 
   @override
@@ -104,6 +116,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _sequencerTimer?.cancel();
     _miniaudioLibrary.cleanup();
     super.dispose();
   }
@@ -250,6 +263,77 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     }
   }
 
+  // Sequencer control methods
+  void _startSequencer() {
+    if (_isSequencerPlaying) return;
+    
+    setState(() {
+      _isSequencerPlaying = true;
+      _currentStep = 0;
+    });
+    
+    _scheduleNextStep();
+  }
+
+  void _stopSequencer() {
+    setState(() {
+      _isSequencerPlaying = false;
+      _currentStep = -1;
+    });
+    
+    _sequencerTimer?.cancel();
+    _sequencerTimer = null;
+    
+    // Stop all currently playing sounds
+    _stopAll();
+  }
+
+  void _scheduleNextStep() {
+    if (!_isSequencerPlaying) return;
+    
+    // Calculate step duration based on BPM
+    // 1/16 note at 120 BPM = 60/120/4 = 0.125 seconds = 125ms
+    final stepDurationMs = (60 * 1000) ~/ (_bpm * 4);
+    
+    _sequencerTimer = Timer(Duration(milliseconds: stepDurationMs), () {
+      if (_isSequencerPlaying) {
+        _playCurrentStep();
+        
+        setState(() {
+          _currentStep = (_currentStep + 1) % 16; // Loop back to 0 after 15
+        });
+        
+        _scheduleNextStep();
+      }
+    });
+  }
+
+  void _playCurrentStep() {
+    // Play new sounds and only stop sounds where there's a new sound in the same column
+    for (int col = 0; col < 4; col++) {
+      final cellIndex = _currentStep * 4 + col;
+      final cellSample = _gridSamples[cellIndex];
+      
+      // Only act if there's a sample in this cell
+      if (cellSample != null && _slotLoaded[cellSample]) {
+        // Stop previous sound in this column only if there was one playing
+        if (_columnPlaying[col]) {
+          // Find which sample was playing in this column and stop it
+          for (int i = 0; i < _slotCount; i++) {
+            if (_slotPlaying[i]) {
+              _stopSlot(i);
+            }
+          }
+        }
+        
+        // Play the new sound
+        _playSlot(cellSample);
+        _columnPlaying[col] = true;
+      }
+      // If there's no sample in this cell, do nothing - let previous sound continue
+    }
+  }
+
   Widget _buildSampleBanks() {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
@@ -321,24 +405,31 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
         ),
         child: GridView.builder(
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4,
+            crossAxisCount: 4, // 4 columns
             crossAxisSpacing: 4,
             mainAxisSpacing: 4,
             childAspectRatio: 2.5,
           ),
-          itemCount: 64,
+          itemCount: 64, // 4 columns × 16 rows
           itemBuilder: (context, index) {
+            final row = index ~/ 4;
+            final col = index % 4;
             final isActivePad = _activePad == index;
+            final isCurrentStep = _currentStep == row && _isSequencerPlaying;
             final placedSample = _gridSamples[index];
             final hasPlacedSample = placedSample != null;
             
             Color cellColor;
             if (isActivePad) {
               cellColor = Colors.white;
+            } else if (isCurrentStep) {
+              cellColor = hasPlacedSample 
+                  ? _bankColors[placedSample!].withOpacity(0.8)
+                  : Colors.grey.withOpacity(0.6); // Highlight current step
             } else if (hasPlacedSample) {
               cellColor = _bankColors[placedSample!];
             } else {
-              cellColor = _bankColors[_activeBank];
+              cellColor = const Color(0xFF404040); // Default gray for empty cells
             }
             
             return GestureDetector(
@@ -348,9 +439,11 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                 decoration: BoxDecoration(
                   color: cellColor,
                   borderRadius: BorderRadius.circular(4),
-                  border: hasPlacedSample && !isActivePad
-                      ? Border.all(color: Colors.white38, width: 1)
-                      : null,
+                  border: isCurrentStep
+                      ? Border.all(color: Colors.yellowAccent, width: 2)
+                      : hasPlacedSample && !isActivePad
+                          ? Border.all(color: Colors.white38, width: 1)
+                          : null,
                   boxShadow: isActivePad
                       ? [
                           BoxShadow(
@@ -369,7 +462,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                       Text(
                         hasPlacedSample 
                             ? String.fromCharCode(65 + placedSample!)
-                            : '${index + 1}',
+                            : '${row + 1}',
                         style: TextStyle(
                           color: isActivePad ? Colors.black : Colors.white,
                           fontWeight: FontWeight.w600,
@@ -425,13 +518,37 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                 ),
               ),
               Text(
-                'STATUS: ${isPlaying ? 'PLAYING' : 'STOPPED'}',
-                style: TextStyle(
-                  color: isPlaying ? Colors.greenAccent : Colors.redAccent,
+                'BPM: $_bpm',
+                style: const TextStyle(
+                  color: Colors.cyanAccent,
                   fontFamily: 'monospace',
                   fontSize: 12,
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'STATUS: ${_isSequencerPlaying ? 'PLAYING' : 'STOPPED'}',
+                style: TextStyle(
+                  color: _isSequencerPlaying ? Colors.greenAccent : Colors.redAccent,
+                  fontFamily: 'monospace',
+                  fontSize: 12,
+                ),
+              ),
+              if (_isSequencerPlaying) ...[
+                Text(
+                  'STEP: ${_currentStep + 1}/16',
+                  style: const TextStyle(
+                    color: Colors.yellowAccent,
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 8),
@@ -544,13 +661,16 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
-            onPressed: _playAll,
-            tooltip: 'Play All',
+            icon: Icon(
+              _isSequencerPlaying ? Icons.pause_circle : Icons.play_circle, 
+              color: _isSequencerPlaying ? Colors.orangeAccent : Colors.greenAccent,
+            ),
+            onPressed: _isSequencerPlaying ? _stopSequencer : _startSequencer,
+            tooltip: _isSequencerPlaying ? 'Stop Sequencer' : 'Start Sequencer',
           ),
           IconButton(
             icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
-            onPressed: _stopAll,
+            onPressed: _stopSequencer,
             tooltip: 'Stop All',
           ),
         ],
