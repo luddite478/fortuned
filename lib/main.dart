@@ -46,6 +46,10 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   // UI state
   int _activeBank = 0;
   int? _activePad;
+  int? _selectedSampleSlot; // Track which sample is selected for placement
+  
+  // Grid state - tracks which sample slot is assigned to each of the 64 grid cells
+  late List<int?> _gridSamples;
 
   // Grid colors for each bank
   final List<Color> _bankColors = [
@@ -71,6 +75,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     _fileNames = List.filled(_slotCount, null);
     _slotLoaded = List.filled(_slotCount, false);
     _slotPlaying = List.filled(_slotCount, false);
+    _gridSamples = List.filled(64, null);
   }
 
   @override
@@ -202,29 +207,47 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   }
 
   void _handleBankChange(int bankIndex) {
-    setState(() {
-      _activeBank = bankIndex;
-    });
+    final hasFile = _fileNames[bankIndex] != null;
+    
+    if (!hasFile) {
+      // Empty slot - immediately open file picker
+      _pickFileForSlot(bankIndex);
+    } else {
+      // Loaded slot - select it for placement
+      setState(() {
+        _selectedSampleSlot = bankIndex;
+        _activeBank = bankIndex; // Keep active bank in sync for status display
+      });
+    }
   }
 
   void _handlePadPress(int padIndex) {
-    setState(() {
-      _activePad = padIndex;
-    });
-    
-    // Play the active bank's sample when pad is pressed
-    if (_filePaths[_activeBank] != null) {
-      _playSlot(_activeBank);
-    }
-    
-    // Reset active pad after animation
-    Future.delayed(const Duration(milliseconds: 200), () {
-      if (mounted) {
+    if (_selectedSampleSlot == null) {
+      // No sample selected - play the sample in this cell if any
+      final cellSample = _gridSamples[padIndex];
+      if (cellSample != null && _slotLoaded[cellSample]) {
+        _playSlot(cellSample);
+        
+        // Visual feedback
         setState(() {
-          _activePad = null;
+          _activePad = padIndex;
+        });
+        
+        Future.delayed(const Duration(milliseconds: 200), () {
+          if (mounted) {
+            setState(() {
+              _activePad = null;
+            });
+          }
         });
       }
-    });
+    } else {
+      // Place selected sample in this cell
+      setState(() {
+        _gridSamples[padIndex] = _selectedSampleSlot;
+        _selectedSampleSlot = null; // Deselect after placing
+      });
+    }
   }
 
   Widget _buildSampleBanks() {
@@ -233,6 +256,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
       child: Row(
         children: List.generate(8, (bank) {
           final isActive = _activeBank == bank;
+          final isSelected = _selectedSampleSlot == bank;
           final hasFile = _fileNames[bank] != null;
           final isPlaying = _slotPlaying[bank];
           
@@ -244,15 +268,19 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                 margin: const EdgeInsets.symmetric(horizontal: 1),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
-                  color: isActive
-                      ? Colors.white
-                      : hasFile
-                          ? _bankColors[bank].withOpacity(0.8)
-                          : const Color(0xFF404040),
+                  color: isSelected
+                      ? Colors.yellowAccent.withOpacity(0.8) // Selected for placement
+                      : isActive
+                          ? Colors.white
+                          : hasFile
+                              ? _bankColors[bank].withOpacity(0.8)
+                              : const Color(0xFF404040),
                   borderRadius: BorderRadius.circular(6),
                   border: isPlaying
                       ? Border.all(color: Colors.greenAccent, width: 2)
-                      : null,
+                      : isSelected
+                          ? Border.all(color: Colors.yellowAccent, width: 2)
+                          : null,
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -260,7 +288,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                     Text(
                       String.fromCharCode(65 + bank), // A, B, C, etc.
                       style: TextStyle(
-                        color: isActive ? Colors.black : Colors.white,
+                        color: isSelected || isActive ? Colors.black : Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -270,7 +298,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                       Icon(
                         Icons.audiotrack,
                         size: 12,
-                        color: isActive ? Colors.black : Colors.white70,
+                        color: isSelected || isActive ? Colors.black54 : Colors.white70,
                       ),
                     ],
                   ],
@@ -301,15 +329,28 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           itemCount: 64,
           itemBuilder: (context, index) {
             final isActivePad = _activePad == index;
-            final baseColor = _bankColors[_activeBank];
+            final placedSample = _gridSamples[index];
+            final hasPlacedSample = placedSample != null;
+            
+            Color cellColor;
+            if (isActivePad) {
+              cellColor = Colors.white;
+            } else if (hasPlacedSample) {
+              cellColor = _bankColors[placedSample!];
+            } else {
+              cellColor = _bankColors[_activeBank];
+            }
             
             return GestureDetector(
               onTap: () => _handlePadPress(index),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 100),
                 decoration: BoxDecoration(
-                  color: isActivePad ? Colors.white : baseColor,
+                  color: cellColor,
                   borderRadius: BorderRadius.circular(4),
+                  border: hasPlacedSample && !isActivePad
+                      ? Border.all(color: Colors.white38, width: 1)
+                      : null,
                   boxShadow: isActivePad
                       ? [
                           BoxShadow(
@@ -326,7 +367,9 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        '${index + 1}',
+                        hasPlacedSample 
+                            ? String.fromCharCode(65 + placedSample!)
+                            : '${index + 1}',
                         style: TextStyle(
                           color: isActivePad ? Colors.black : Colors.white,
                           fontWeight: FontWeight.w600,
@@ -455,34 +498,31 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
               ],
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSequencerBottom() {
-    return Container(
-      padding: const EdgeInsets.only(top: 16),
-      child: Row(
-        children: List.generate(8, (col) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 1),
-              child: Column(
-                children: List.generate(4, (row) {
-                  return Container(
-                    margin: const EdgeInsets.symmetric(vertical: 1),
-                    height: 30,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF404040),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  );
-                }),
+          
+          // Show sample selection status
+          if (_selectedSampleSlot != null) ...[
+            Text(
+              'SELECTED: ${String.fromCharCode(65 + _selectedSampleSlot!)} - ${_fileNames[_selectedSampleSlot!] ?? 'NO FILE'}',
+              style: const TextStyle(
+                color: Colors.yellowAccent,
+                fontFamily: 'monospace',
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'TAP GRID CELL TO PLACE SAMPLE',
+              style: TextStyle(
+                color: Colors.yellowAccent,
+                fontFamily: 'monospace',
+                fontSize: 9,
               ),
             ),
-          );
-        }),
+            const SizedBox(height: 8),
+          ],
+        ],
       ),
     );
   }
@@ -525,7 +565,6 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
               _buildSampleBanks(),
               _buildStatusDisplay(),
               _buildSampleGrid(),
-              _buildSequencerBottom(),
               const SizedBox(height: 16),
             ],
           ),
