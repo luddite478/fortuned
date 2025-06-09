@@ -60,7 +60,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   Timer? _sequencerTimer;
   
   // Track which samples are currently playing in each column
-  late List<bool> _columnPlaying;
+  late List<int?> _columnPlayingSample; // Track which specific sample slot is playing in each column
 
   // Grid colors for each bank
   final List<Color> _bankColors = [
@@ -87,7 +87,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     _slotLoaded = List.filled(_slotCount, false);
     _slotPlaying = List.filled(_slotCount, false);
     _gridSamples = List.filled(64, null);
-    _columnPlaying = List.filled(4, false);
+    _columnPlayingSample = List.filled(4, null);
   }
 
   @override
@@ -286,6 +286,11 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     
     // Stop all currently playing sounds
     _stopAll();
+    
+    // Reset column tracking
+    for (int i = 0; i < 4; i++) {
+      _columnPlayingSample[i] = null;
+    }
   }
 
   void _scheduleNextStep() {
@@ -309,28 +314,26 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   }
 
   void _playCurrentStep() {
-    // Play new sounds and only stop sounds where there's a new sound in the same column
+    // Play all sounds on the current line simultaneously
+    // Only stop sounds where there's a new sound in the same column
     for (int col = 0; col < 4; col++) {
       final cellIndex = _currentStep * 4 + col;
       final cellSample = _gridSamples[cellIndex];
       
-      // Only act if there's a sample in this cell
+      // Check if there's a sample in this cell on the current line
       if (cellSample != null && _slotLoaded[cellSample]) {
         // Stop previous sound in this column only if there was one playing
-        if (_columnPlaying[col]) {
-          // Find which sample was playing in this column and stop it
-          for (int i = 0; i < _slotCount; i++) {
-            if (_slotPlaying[i]) {
-              _stopSlot(i);
-            }
-          }
+        if (_columnPlayingSample[col] != null) {
+          // Stop only the specific sample that was playing in this column
+          _stopSlot(_columnPlayingSample[col]!);
         }
         
-        // Play the new sound
+        // Play the new sound (all sounds on this line will play simultaneously)
         _playSlot(cellSample);
-        _columnPlaying[col] = true;
+        _columnPlayingSample[col] = cellSample;
       }
       // If there's no sample in this cell, do nothing - let previous sound continue
+      // This allows sounds from previous steps to continue until replaced
     }
   }
 
@@ -661,17 +664,14 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
         ),
         actions: [
           IconButton(
-            icon: Icon(
-              _isSequencerPlaying ? Icons.pause_circle : Icons.play_circle, 
-              color: _isSequencerPlaying ? Colors.orangeAccent : Colors.greenAccent,
-            ),
-            onPressed: _isSequencerPlaying ? _stopSequencer : _startSequencer,
-            tooltip: _isSequencerPlaying ? 'Stop Sequencer' : 'Start Sequencer',
+            icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
+            onPressed: _startSequencer,
+            tooltip: 'Start Sequencer',
           ),
           IconButton(
             icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
             onPressed: _stopSequencer,
-            tooltip: 'Stop All',
+            tooltip: 'Stop Sequencer',
           ),
         ],
       ),
