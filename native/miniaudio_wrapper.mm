@@ -16,8 +16,8 @@
     #define MA_ENABLE_NULL              // keep null device for testing
     
     // Logging macros for iOS
-    #define NIYYA_LOG(fmt, ...) os_log(OS_LOG_DEFAULT, fmt, ##__VA_ARGS__)
-    #define NIYYA_LOG_ERROR(fmt, ...) os_log_error(OS_LOG_DEFAULT, fmt, ##__VA_ARGS__)
+    #define prnt(fmt, ...) os_log(OS_LOG_DEFAULT, fmt, ##__VA_ARGS__)
+    #define prnt_err(fmt, ...) os_log_error(OS_LOG_DEFAULT, fmt, ##__VA_ARGS__)
     
 #elif defined(__ANDROID__)
     #include <android/log.h>
@@ -31,8 +31,8 @@
     #define MA_ENABLE_NULL             // keep null device for testing
     
     // Logging macros for Android
-    #define NIYYA_LOG(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, "NIYYA", fmt, ##__VA_ARGS__)
-    #define NIYYA_LOG_ERROR(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, "NIYYA", fmt, ##__VA_ARGS__)
+    #define prnt(fmt, ...) __android_log_print(ANDROID_LOG_DEBUG, "audio", fmt, ##__VA_ARGS__)
+    #define prnt_err(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, "audio", fmt, ##__VA_ARGS__)
     
 #else
     #include <stdio.h>
@@ -42,8 +42,8 @@
     #define MA_NO_RUNTIME_LINKING
     
     // Logging macros for other platforms (simple printf)
-    #define NIYYA_LOG(fmt, ...) printf("[NIYYA] " fmt "\n", ##__VA_ARGS__)
-    #define NIYYA_LOG_ERROR(fmt, ...) printf("[NIYYA ERROR] " fmt "\n", ##__VA_ARGS__)
+    #define prnt(fmt, ...) printf("[audio] " fmt "\n", ##__VA_ARGS__)
+    #define prnt_err(fmt, ...) printf("[audio error] " fmt "\n", ##__VA_ARGS__)
 #endif
 
 // -----------------------------------------------------------------------------
@@ -86,7 +86,7 @@ static uint64_t                        g_slot_memory_sizes[MINIAUDIO_MAX_SLOTS] 
 static uint64_t                        g_total_memory_used                            = 0;   // Total memory used
 
 #define LOG_MA_ERROR(result, message) \
-    NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Error: %s - %s", message, ma_result_description(result))
+    prnt_err("🔴 [miniaudio] Error: %s - %s", message, ma_result_description(result))
 
 // -----------------------------------------------------------------------------
 // Cross-platform threading helpers (unified pthread implementation)
@@ -110,30 +110,30 @@ static void cleanup_threading(void) {
 // -----------------------------------------------------------------------------
 #ifdef __APPLE__
 static int configure_ios_audio_session(void) {
-    NIYYA_LOG("🔧 [AUDIO SESSION] Configuring iOS audio session...");
+    prnt("🔧 [AUDIO SESSION] Configuring iOS audio session...");
     
     // Check if AVAudioSession class exists at runtime
     Class audioSessionClass = NSClassFromString(@"AVAudioSession");
     if (audioSessionClass == nil) {
-        NIYYA_LOG_ERROR("🔴 [DEBUG] AVAudioSession class not found at runtime!");
+        prnt_err("🔴 [DEBUG] AVAudioSession class not found at runtime!");
         return -1;
     }
-    NIYYA_LOG("🔍 [DEBUG] AVAudioSession class found successfully");
+    prnt("🔍 [DEBUG] AVAudioSession class found successfully");
     
     @try {
-        NIYYA_LOG("🔍 [DEBUG] Getting AVAudioSession sharedInstance...");
+        prnt("🔍 [DEBUG] Getting AVAudioSession sharedInstance...");
         NSError *error = nil;
         AVAudioSession *session = [AVAudioSession sharedInstance];
         
         if (session == nil) {
-            NIYYA_LOG_ERROR("🔴 [DEBUG] AVAudioSession sharedInstance returned nil!");
+            prnt_err("🔴 [DEBUG] AVAudioSession sharedInstance returned nil!");
             return -1;
         }
         
-        NIYYA_LOG("🔍 [DEBUG] Session obtained successfully");
+        prnt("🔍 [DEBUG] Session obtained successfully");
         
         // Try full Bluetooth configuration first
-        NIYYA_LOG("🔍 [DEBUG] Setting category with Bluetooth options...");
+        prnt("🔍 [DEBUG] Setting category with Bluetooth options...");
         BOOL success = [session setCategory:AVAudioSessionCategoryPlayback
                                  withOptions:AVAudioSessionCategoryOptionAllowBluetooth |
                                            AVAudioSessionCategoryOptionAllowBluetoothA2DP |
@@ -141,55 +141,55 @@ static int configure_ios_audio_session(void) {
                                        error:&error];
         
         if (!success) {
-            NIYYA_LOG_ERROR("🔴 [AUDIO SESSION] Failed full config: %@ (Code: %ld)", 
+            prnt_err("🔴 [AUDIO SESSION] Failed full config: %@ (Code: %ld)", 
                          error.localizedDescription, (long)error.code);
             
             // Fallback: Try basic playback category only
-            NIYYA_LOG("🔧 [AUDIO SESSION] Trying fallback basic configuration...");
+            prnt("🔧 [AUDIO SESSION] Trying fallback basic configuration...");
             error = nil;  // Reset error
             success = [session setCategory:AVAudioSessionCategoryPlayback error:&error];
             if (!success) {
-                NIYYA_LOG_ERROR("🔴 [AUDIO SESSION] Even basic config failed: %@ (Code: %ld)", 
+                prnt_err("🔴 [AUDIO SESSION] Even basic config failed: %@ (Code: %ld)", 
                              error.localizedDescription, (long)error.code);
                 return -1;
             }
         }
-        NIYYA_LOG("✅ [AUDIO SESSION] Category set successfully");
+        prnt("✅ [AUDIO SESSION] Category set successfully");
         
         // Set mode for general audio
-        NIYYA_LOG("🔍 [DEBUG] Setting mode...");
+        prnt("🔍 [DEBUG] Setting mode...");
         error = nil;  // Reset error
         success = [session setMode:AVAudioSessionModeDefault error:&error];
         if (!success) {
-            NIYYA_LOG_ERROR("🔴 [AUDIO SESSION] Failed to set mode: %@ (Code: %ld)", 
+            prnt_err("🔴 [AUDIO SESSION] Failed to set mode: %@ (Code: %ld)", 
                          error.localizedDescription, (long)error.code);
             return -1;
         }
-        NIYYA_LOG("✅ [AUDIO SESSION] Mode set successfully");
+        prnt("✅ [AUDIO SESSION] Mode set successfully");
         
         // Activate the session
-        NIYYA_LOG("🔍 [DEBUG] Activating session...");
+        prnt("🔍 [DEBUG] Activating session...");
         error = nil;  // Reset error
         success = [session setActive:YES error:&error];
         if (!success) {
-            NIYYA_LOG_ERROR("🔴 [AUDIO SESSION] Failed to activate: %@ (Code: %ld)", 
+            prnt_err("🔴 [AUDIO SESSION] Failed to activate: %@ (Code: %ld)", 
                          error.localizedDescription, (long)error.code);
             return -1;
         }
-        NIYYA_LOG("✅ [AUDIO SESSION] Session activated successfully");
+        prnt("✅ [AUDIO SESSION] Session activated successfully");
         
         // Log current route for debugging
-        NIYYA_LOG("🔍 [DEBUG] Logging route after configuration...");
+        prnt("🔍 [DEBUG] Logging route after configuration...");
         AVAudioSessionRouteDescription *route = session.currentRoute;
         for (AVAudioSessionPortDescription *output in route.outputs) {
-            NIYYA_LOG("🎧 [AUDIO SESSION] Current output: %@ (%@)", 
+            prnt("🎧 [AUDIO SESSION] Current output: %@ (%@)", 
                    output.portName, output.portType);
         }
         
-        NIYYA_LOG("✅ [AUDIO SESSION] Configured for Bluetooth support");
+        prnt("✅ [AUDIO SESSION] Configured for Bluetooth support");
         return 0;
     } @catch (NSException *exception) {
-        NIYYA_LOG_ERROR("🔴 [DEBUG] Exception in configure_ios_audio_session: %@", exception.reason);
+        prnt_err("🔴 [DEBUG] Exception in configure_ios_audio_session: %@", exception.reason);
         return -1;
     }
 }
@@ -199,19 +199,19 @@ static int configure_ios_audio_session(void) {
 // -----------------------------------------------------------------------------
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_reconfigure_audio_session(void) {
-    NIYYA_LOG("🔄 [AUDIO SESSION] Re-configuring audio session for Bluetooth...");
+    prnt("🔄 [AUDIO SESSION] Re-configuring audio session for Bluetooth...");
     return configure_ios_audio_session();
 }
 #else
 // Stub implementations for non-iOS platforms
 static int configure_ios_audio_session(void) {
-    NIYYA_LOG("ℹ️ [AUDIO SESSION] Audio session configuration not needed on this platform");
+    prnt("ℹ️ [AUDIO SESSION] Audio session configuration not needed on this platform");
     return 0;
 }
 
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_reconfigure_audio_session(void) {
-    NIYYA_LOG("ℹ️ [AUDIO SESSION] Audio session reconfiguration not needed on this platform");
+    prnt("ℹ️ [AUDIO SESSION] Audio session reconfiguration not needed on this platform");
     return 0;
 }
 #endif
@@ -222,29 +222,29 @@ int miniaudio_reconfigure_audio_session(void) {
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_init(void) {
     if (g_is_initialized) {
-        NIYYA_LOG("ℹ️ [MINIAUDIO] Engine already initialized");
+        prnt("ℹ️ [MINIAUDIO] Engine already initialized");
         return 0;
     }
     
-    NIYYA_LOG("🚀 [MINIAUDIO] Starting initialization process...");
+    prnt("🚀 [MINIAUDIO] Starting initialization process...");
     
     // Configure audio session for platform-specific audio routing BEFORE miniaudio init
-    NIYYA_LOG("🔧 [MINIAUDIO] Configuring audio session BEFORE engine init...");
+    prnt("🔧 [MINIAUDIO] Configuring audio session BEFORE engine init...");
     if (configure_ios_audio_session() != 0) {
-        NIYYA_LOG_ERROR("⚠️ [MINIAUDIO] Audio session config failed, continuing with default");
+        prnt_err("⚠️ [MINIAUDIO] Audio session config failed, continuing with default");
         // Don't return error - continue with miniaudio initialization
     } else {
-        NIYYA_LOG("✅ [MINIAUDIO] Audio session configured successfully");
+        prnt("✅ [MINIAUDIO] Audio session configured successfully");
     }
     
     // Initialize threading
     if (init_threading() != 0) {
-        NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Failed to initialize threading");
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize threading");
         return -1;
     }
     
     // Initialize resource manager first
-    NIYYA_LOG("🔧 [MINIAUDIO] Initializing resource manager...");
+    prnt("🔧 [MINIAUDIO] Initializing resource manager...");
     ma_resource_manager_config resource_manager_config = ma_resource_manager_config_init();
     ma_result result = ma_resource_manager_init(&resource_manager_config, &g_resource_manager);
     if (result != MA_SUCCESS) {
@@ -254,7 +254,7 @@ int miniaudio_init(void) {
     }
     
     // Initialize engine with resource manager
-    NIYYA_LOG("🔧 [MINIAUDIO] Initializing engine...");
+    prnt("🔧 [MINIAUDIO] Initializing engine...");
     ma_engine_config engine_config = ma_engine_config_init();
     engine_config.pResourceManager = &g_resource_manager;
     
@@ -275,23 +275,23 @@ int miniaudio_init(void) {
     }
     
     g_is_initialized = 1;
-    NIYYA_LOG("✅ [MINIAUDIO] Engine initialized successfully");
+    prnt("✅ [MINIAUDIO] Engine initialized successfully");
     return 0;
 }
 
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_play_sound(const char* file_path) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err("🔴 [MINIAUDIO] Engine not initialized");
         return -1;
     }
     
     if (file_path == NULL || strlen(file_path) == 0) {
-        NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Invalid file path");
+        prnt_err("🔴 [MINIAUDIO] Invalid file path");
         return -1;
     }
     
-    NIYYA_LOG("▶️ [MINIAUDIO] Attempting to play sound: %s", file_path);
+    prnt("▶️ [MINIAUDIO] Attempting to play sound: %s", file_path);
     
     // Store the current file path
     if (g_current_file_path != NULL) {
@@ -322,18 +322,18 @@ int miniaudio_play_sound(const char* file_path) {
         return -1;
     }
     
-    NIYYA_LOG("✅ [MINIAUDIO] Sound started successfully");
+    prnt("✅ [MINIAUDIO] Sound started successfully");
     return 0;
 }
 
 __attribute__((visibility("default"))) __attribute__((used))
 void miniaudio_stop_all_sounds(void) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err("🔴 [MINIAUDIO] Engine not initialized");
         return;
     }
     
-    NIYYA_LOG("⏹️ [MINIAUDIO] Stopping all sounds");
+    prnt("⏹️ [MINIAUDIO] Stopping all sounds");
     
     // Stop single legacy sound
     if (g_sound.pDataSource != NULL) {
@@ -353,16 +353,16 @@ void miniaudio_stop_all_sounds(void) {
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_load_sound(const char* file_path) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err("🔴 [MINIAUDIO] Engine not initialized");
         return -1;
     }
     
     if (file_path == NULL || strlen(file_path) == 0) {
-        NIYYA_LOG_ERROR("🔴 [MINIAUDIO] Invalid file path");
+        prnt_err("🔴 [MINIAUDIO] Invalid file path");
         return -1;
     }
     
-    NIYYA_LOG("📥 [MINIAUDIO] Loading sound into memory: %s", file_path);
+    prnt("📥 [MINIAUDIO] Loading sound into memory: %s", file_path);
     
     // Unload previous sound if any
     if (g_has_loaded_sound) {
@@ -385,23 +385,23 @@ int miniaudio_load_sound(const char* file_path) {
     }
     
     g_has_loaded_sound = 1;
-    NIYYA_LOG( "✅ [MINIAUDIO] Sound loaded into memory successfully");
+    prnt( "✅ [MINIAUDIO] Sound loaded into memory successfully");
     return 0;
 }
 
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_play_loaded_sound(void) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err( "🔴 [MINIAUDIO] Engine not initialized");
         return -1;
     }
     
     if (!g_has_loaded_sound) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] No sound loaded in memory");
+        prnt_err( "🔴 [MINIAUDIO] No sound loaded in memory");
         return -1;
     }
     
-    NIYYA_LOG( "▶️ [MINIAUDIO] Playing loaded sound");
+    prnt( "▶️ [MINIAUDIO] Playing loaded sound");
     
     // Stop and uninitialize any currently playing sound
     if (g_sound.pDataSource != NULL) {
@@ -433,7 +433,7 @@ int miniaudio_play_loaded_sound(void) {
         return -1;
     }
     
-    NIYYA_LOG( "✅ [MINIAUDIO] Loaded sound started successfully");
+    prnt( "✅ [MINIAUDIO] Loaded sound started successfully");
     return 0;
 }
 
@@ -442,7 +442,7 @@ int miniaudio_play_loaded_sound(void) {
 // -----------------------------
 static int validate_slot(int slot) {
     if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Invalid slot index: %d", slot);
+        prnt_err( "🔴 [MINIAUDIO] Invalid slot index: %d", slot);
         return 0;
     }
     return 1;
@@ -511,12 +511,12 @@ int miniaudio_is_slot_loaded(int slot) {
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemory) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err( "🔴 [MINIAUDIO] Engine not initialized");
         return -1;
     }
     if (!validate_slot(slot)) return -1;
     if (file_path == NULL || strlen(file_path) == 0) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Invalid file path");
+        prnt_err( "🔴 [MINIAUDIO] Invalid file path");
         return -1;
     }
 
@@ -530,7 +530,7 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
 
         ma_result result;
         if (loadToMemory) {
-            NIYYA_LOG( "📥 [MINIAUDIO] Slot %d loading (memory) %s", slot, file_path);
+            prnt( "📥 [MINIAUDIO] Slot %d loading (memory) %s", slot, file_path);
             result = ma_resource_manager_data_source_init(&g_resource_manager,
                                                           file_path,
                                                           MA_RESOURCE_MANAGER_DATA_SOURCE_FLAG_DECODE,
@@ -548,7 +548,7 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
                     g_slot_has_sound[slot] = 1;
                     
                     // Log memory usage
-                    NIYYA_LOG( "💾 [MINIAUDIO] Slot %d loaded %llu bytes (%.2f MB) - Total: %.2f MB", 
+                    prnt( "💾 [MINIAUDIO] Slot %d loaded %llu bytes (%.2f MB) - Total: %.2f MB", 
                            slot, memorySize, memorySize / (1024.0 * 1024.0), g_total_memory_used / (1024.0 * 1024.0));
                 } else {
                     LOG_MA_ERROR(result, "Failed to init sound from data source");
@@ -563,7 +563,7 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
                 resultCode = -1;
             }
         } else {
-            NIYYA_LOG( "📥 [MINIAUDIO] Slot %d loading (stream) %s", slot, file_path);
+            prnt( "📥 [MINIAUDIO] Slot %d loading (stream) %s", slot, file_path);
             result = ma_sound_init_from_file(&g_engine, file_path, 0, NULL, NULL, &g_slot_sounds[slot]);
             if (result == MA_SUCCESS) {
                 g_slot_loaded_in_memory[slot] = 0;
@@ -581,7 +581,7 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
 __attribute__((visibility("default"))) __attribute__((used))
 int miniaudio_play_slot(int slot) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err( "🔴 [MINIAUDIO] Engine not initialized");
         return -1;
     }
     if (!validate_slot(slot)) return -1;
@@ -598,13 +598,13 @@ int miniaudio_play_slot(int slot) {
             
             ma_result result = ma_sound_start(&g_slot_sounds[slot]);
             if (result == MA_SUCCESS) {
-                NIYYA_LOG( "✅ [MINIAUDIO] Slot %d restarted from beginning", slot);
+                prnt( "✅ [MINIAUDIO] Slot %d restarted from beginning", slot);
             } else {
                 LOG_MA_ERROR(result, "Failed to start slot sound");
                 rc = -1;
             }
         } else {
-            NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Slot %d has no sound loaded", slot);
+            prnt_err( "🔴 [MINIAUDIO] Slot %d has no sound loaded", slot);
             rc = -1;
         }
     });
@@ -614,7 +614,7 @@ int miniaudio_play_slot(int slot) {
 __attribute__((visibility("default"))) __attribute__((used))
 void miniaudio_stop_slot(int slot) {
     if (!g_is_initialized) {
-        NIYYA_LOG_ERROR( "🔴 [MINIAUDIO] Engine not initialized");
+        prnt_err( "🔴 [MINIAUDIO] Engine not initialized");
         return;
     }
     if (!validate_slot(slot)) return;
@@ -670,7 +670,7 @@ int miniaudio_get_memory_slot_count(void) {
 // Extend cleanup to release slot resources
 __attribute__((visibility("default"))) __attribute__((used))
 void miniaudio_cleanup(void) {
-    NIYYA_LOG( "🧹 [MINIAUDIO] Cleaning up");
+    prnt( "🧹 [MINIAUDIO] Cleaning up");
     if (!g_is_initialized) return;
 
     // Legacy sound cleanup
@@ -701,5 +701,5 @@ void miniaudio_cleanup(void) {
 
     g_is_initialized = 0;
     cleanup_threading();
-    NIYYA_LOG( "✅ [MINIAUDIO] Cleanup completed successfully");
+    prnt( "✅ [MINIAUDIO] Cleanup completed successfully");
 } 
