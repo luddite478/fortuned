@@ -164,6 +164,53 @@ dev_dependencies:
 
 ### 4. **Building and Running**
 
+---
+
+### **Android: Building and Running**
+
+**1. Build the APK (Debug):**
+```bash
+cd android
+./gradlew assembleDebug
+```
+
+**2. Install on Emulator or Device:**
+```bash
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+```
+- The `-r` flag reinstalls the app if it already exists.
+- Make sure your emulator or device is running and visible to `adb devices`.
+
+### **Important Notes on CMake and Gradle Configuration (Android Native Builds)**
+
+- **CMake Configuration:**
+  - The main CMake file is at `native/CMakeLists.txt`.
+  - It configures the native build, sets up sources (e.g., `miniaudio_wrapper.mm`), and applies C++ flags for Objective-C++ files.
+  - For Android, it links against `OpenSLES` and `log` libraries for audio and logging support.
+  - Edit this file to add or remove native sources or change build flags.
+
+- **Gradle Configuration:**
+  - The Android Gradle config is in `android/app/build.gradle.kts`.
+  - Uses `externalNativeBuild` to point to the CMake file (`../../native/CMakeLists.txt`).
+  - Sets the NDK version (`ndkVersion`), ABI filters (armeabi-v7a, arm64-v8a, x86, x86_64), and JNI source directory.
+  - Requires the Android NDK and CMake to be installed (install via Android Studio > SDK Manager > SDK Tools).
+
+- **gradle.properties and local.properties:**
+  - `local.properties` must have `sdk.dir` (Android SDK path) and `flutter.sdk` (Flutter SDK path).
+  - `gradle.properties` can be tuned for JVM memory and other Gradle options.
+
+- **Gradle Wrapper:**
+  - The project uses Gradle 8.12 (see `android/gradle/wrapper/gradle-wrapper.properties`).
+  - The wrapper ensures consistent Gradle version for all developers.
+
+- **Native Header/Sources:**
+  - Native APIs are defined in `native/miniaudio_wrapper.h` and implemented in `native/miniaudio_wrapper.mm`.
+  - Platform-specific flags and logging are handled in the source files for Android/iOS/other.
+
+---
+
+### **iOS: Building and Running**
+
 #### **Simulator Setup**
 ```bash
 # Install pods

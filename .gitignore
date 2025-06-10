@@ -73,6 +73,18 @@ windows/Flutter/ephemeral/
 android/.gradle/
 android/local.properties
 android/.idea/
+android/.kotlin/
+android/.cxx/
+android/build/
+android/app/build/
+android/app/.cxx/
+android/app/.cxx/**
+android/app/.cxx/Debug/
+android/app/.cxx/RelWithDebInfo/
+android/app/.cxx/tools/
+
+# Android memory dumps
+android/java_pid*.hprof
 
 # Flutter ephemeral files
 .metadata
