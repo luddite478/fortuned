@@ -31,6 +31,8 @@ jobs:
         envs: REPO_DIR_PATH  # Pass REPO_DIR_PATH as an environment variable
         script: |
           cd "$REPO_DIR_PATH"
+          echo pwd
+          echo ls -la
           git config --global --add safe.directory "$REPO_DIR_PATH"
           git pull origin master
 
