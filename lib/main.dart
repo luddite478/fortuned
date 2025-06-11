@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'miniaudio_library.dart';
 import 'dart:async';
+import 'screens/chat_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -690,6 +691,27 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           ),
         ),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ChatTestScreen(clientId: 'flutter_user_123'),
+            ),
+          );
+        },
+        backgroundColor: Colors.purple,
+        icon: const Icon(Icons.chat, color: Colors.white),
+        label: const Text(
+          'CHAT TEST',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+          ),
+        ),
+      ),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
     );
   }
 }

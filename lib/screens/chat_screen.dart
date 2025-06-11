@@ -87,35 +87,132 @@ class _ChatTestScreenState extends State<ChatTestScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.purple.shade900,
       appBar: AppBar(
-        title: Text('Chat Test: ${widget.clientId}'),
+        title: Text(
+          '🚀 WEBSOCKET CHAT TEST 🚀',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: 2,
+          ),
+        ),
+        backgroundColor: Colors.purple,
+        elevation: 10,
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.chat_bubble_outline,
-              size: 100,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Chat Client Service Running',
-              style: Theme.of(context).textTheme.headlineSmall,
-            ),
-            SizedBox(height: 10),
-            Text(
-              'Client ID: ${widget.clientId}',
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Connection status will show as popup',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-          ],
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.purple.shade900,
+              Colors.purple.shade700,
+              Colors.purple.shade500,
+            ],
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // Animated chat icon
+              AnimatedContainer(
+                duration: Duration(seconds: 2),
+                curve: Curves.elasticOut,
+                child: Icon(
+                  Icons.chat_bubble,
+                  size: 150,
+                  color: Colors.white,
+                ),
+              ),
+              SizedBox(height: 30),
+              
+              // Bright title
+              Container(
+                padding: EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.purple.withOpacity(0.5),
+                      blurRadius: 20,
+                      spreadRadius: 5,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      '✅ CHAT CLIENT ACTIVE!',
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.purple,
+                        letterSpacing: 2,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Client ID: ${widget.clientId}',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.purple.shade700,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 15),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.shade100,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '🔌 WebSocket connection will show popup',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: Colors.purple.shade800,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              SizedBox(height: 40),
+              
+              // Pulsing indicator
+              AnimatedContainer(
+                duration: Duration(milliseconds: 1000),
+                curve: Curves.easeInOut,
+                child: Container(
+                  width: 100,
+                  height: 100,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.yellow,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.yellow.withOpacity(0.6),
+                        blurRadius: 30,
+                        spreadRadius: 10,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.wifi,
+                    size: 50,
+                    color: Colors.purple.shade900,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
