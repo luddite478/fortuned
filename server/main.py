@@ -4,7 +4,6 @@ import json
 import time
 import logging
 from collections import defaultdict
-from aiohttp import web
 
 # Configure logging
 logging.basicConfig(
@@ -289,39 +288,6 @@ async def handler(websocket, path):
         except Exception as e:
             logger.error(f"Error during cleanup for {client_id}: {e}")
 
-# Health check HTTP server
-async def health_check(request):
-    """Health check endpoint"""
-    try:
-        return web.json_response({
-            "status": "healthy",
-            "active_clients": len(clients),
-            "timestamp": int(time.time())
-        })
-    except Exception as e:
-        logger.error(f"Health check error: {e}")
-        return web.json_response({
-            "status": "error",
-            "timestamp": int(time.time())
-        }, status=500)
-
-async def create_http_server():
-    """Create HTTP server for health checks"""
-    try:
-        app = web.Application()
-        app.router.add_get('/health', health_check)
-        app.router.add_get('/', health_check)  # Default route for basic checks
-        
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, '0.0.0.0', 8080)
-        await site.start()
-        logger.info("HTTP health check server started on port 8080")
-        return runner
-    except Exception as e:
-        logger.error(f"Failed to start HTTP server: {e}")
-        raise
-
 async def main():
     logger.info("Starting secure WebSocket server at ws://0.0.0.0:8765")
     logger.info(f"Authentication token: {HARDCODED_TOKEN}")
@@ -329,11 +295,7 @@ async def main():
     logger.info(f"Maximum concurrent clients: {MAX_TOTAL_CLIENTS}")
     logger.info(f"Message rate limit: {MAX_MESSAGE_RATE} messages per minute per client")
     
-    http_runner = None
     try:
-        # Start HTTP health check server
-        http_runner = await create_http_server()
-        
         # Create WebSocket server with proper error handling
         async with websockets.serve(
             handler, 
@@ -352,12 +314,6 @@ async def main():
     except Exception as e:
         logger.error(f"Server error: {e}")
         # Don't let the server crash, just log and continue
-    finally:
-        if http_runner:
-            try:
-                await http_runner.cleanup()
-            except Exception as e:
-                logger.error(f"Error cleaning up HTTP server: {e}")
 
 if __name__ == "__main__":
     try:
