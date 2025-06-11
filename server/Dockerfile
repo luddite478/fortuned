@@ -7,20 +7,19 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 WORKDIR /app
 
-# Install dependencies
+# Copy dependency files
 COPY pyproject.toml .
 COPY uv.lock .
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --locked --no-install-project --no-editable
+# Install dependencies
+RUN uv sync --locked --no-install-project --no-editable
 
+# Copy source code
 COPY main.py /app/
 COPY src/ /app/src/
 
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync --locked --no-editable
+# Install the project
+RUN uv sync --locked --no-editable
 
 FROM python:3.13-alpine
 
