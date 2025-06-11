@@ -2,7 +2,7 @@ name: Deploy new version
 
 on:
   push:
-    paths-ignore:
+    paths:
       - 'server/**'
     # branches:
     #   - master
