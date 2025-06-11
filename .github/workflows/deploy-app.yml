@@ -21,7 +21,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y gettext-base
 
     - name: Sync latest changes on remote server
-      uses: appleboy/ssh-action@v1.1.0
+      uses: appleboy/ssh-action@v1
       env:
         REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
       with:
