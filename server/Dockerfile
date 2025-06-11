@@ -20,6 +20,9 @@ FROM python:3.13-alpine
 
 ENV PYTHONUNBUFFERED=1
 
+# Install wget for health checks
+RUN apk add --no-cache wget
+
 WORKDIR /app
 
 RUN addgroup -S app && adduser -S app -G app
@@ -31,6 +34,6 @@ COPY --from=builder --chown=app:app /app/src ./src
 
 USER app
 
-EXPOSE 8765
+EXPOSE 8765 8080
 
 CMD ["/app/.venv/bin/python", "main.py"]
