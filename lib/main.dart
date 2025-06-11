@@ -1,10 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'miniaudio_library.dart';
 import 'dart:async';
 import 'screens/chat_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Load environment variables
+  try {
+    await dotenv.load(fileName: ".env");
+    print('✅ Environment loaded: ${dotenv.env['ENVIRONMENT'] ?? 'development'}');
+  } catch (e) {
+    print('⚠️ Could not load .env file, using defaults: $e');
+  }
+  
   runApp(const MyApp());
 }
 
@@ -696,7 +707,9 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => const ChatTestScreen(clientId: 'flutter_user_123'),
+              builder: (context) => ChatTestScreen(
+                clientId: '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
+              ),
             ),
           );
         },

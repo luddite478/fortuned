@@ -221,7 +221,7 @@ async def process_message(websocket, client_id, message):
         logger.error(f"Error processing message from {client_id}: {e}")
         await send_error(websocket, "Error processing message")
 
-async def handler(websocket, path):
+async def handler(websocket):
     """Main WebSocket connection handler"""
     client_id = None
     client_ip = websocket.remote_address[0] if websocket.remote_address else "unknown"

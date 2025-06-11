@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ChatClient {
   WebSocket? _socket;
@@ -12,9 +13,15 @@ class ChatClient {
   final _connectionController = StreamController<bool>.broadcast();
   final _errorController = StreamController<String>.broadcast();
   
-  // Server configuration
-  static const String serverUrl = 'ws://localhost:8765'; // Change for production
-  static const String authToken = 'secure_chat_token_9999';
+  // Simple server configuration from environment
+  static String get serverUrl {
+    final host = dotenv.env['WEBSOCKET_HOST'] ?? 'localhost';
+    final port = dotenv.env['WEBSOCKET_PORT'] ?? '8765';
+    return 'ws://$host:$port';
+  }
+  
+  static String get authToken => dotenv.env['WEBSOCKET_TOKEN'] ?? 'secure_chat_token_9999';
+  static String get clientIdPrefix => dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user';
   
   // Getters for streams (for listening in UI)
   Stream<ChatMessage> get messageStream => _messageController.stream;
