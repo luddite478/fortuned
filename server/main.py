@@ -28,7 +28,10 @@ async def handler(websocket, path):
     finally:
         clients.pop(client_id, None)
 
-start_server = websockets.serve(handler, "0.0.0.0", 8765)
-asyncio.get_event_loop().run_until_complete(start_server)
-print("Server running at ws://0.0.0.0:8765")
-asyncio.get_event_loop().run_forever()
+async def main():
+    print("Starting WebSocket server at ws://0.0.0.0:8765")
+    async with websockets.serve(handler, "0.0.0.0", 8765):
+        await asyncio.Future()  # run forever
+
+if __name__ == "__main__":
+    asyncio.run(main())
