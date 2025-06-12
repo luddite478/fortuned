@@ -20,6 +20,9 @@ clients = {}  # Maps user IDs to WebSocket connections
 client_message_rates = defaultdict(lambda: {'count': 0, 'reset_time': time.time() + 60})
 connection_attempts = defaultdict(lambda: {'count': 0, 'reset_time': time.time() + 60})
 
+# Chat storage: maps (user1, user2) tuple to list of messages
+chats = defaultdict(list)
+
 # --- Utility Functions ---
 
 def is_valid_token(token):
@@ -115,6 +118,24 @@ async def authenticate_client(websocket, client_ip):
         await send_error(websocket, "Authentication error")
         return None
 
+# --- Chat Utilities ---
+
+def chat_key(user1, user2):
+    return tuple(sorted([user1, user2]))
+
+def store_message(sender, recipient, message):
+    key = chat_key(sender, recipient)
+    chats[key].append({
+        "from": sender,
+        "to": recipient,
+        "message": message,
+        "timestamp": int(time.time())
+    })
+
+def get_chat_history(user1, user2):
+    key = chat_key(user1, user2)
+    return chats.get(key, [])
+
 # --- Message Handling ---
 
 async def handle_direct_message(websocket, client_id, message):
@@ -127,26 +148,25 @@ async def handle_direct_message(websocket, client_id, message):
         await send_error(websocket, "Target ID and message cannot be empty")
         return
 
-    target_ws = clients.get(target_id)
-    if not target_ws:
-        await send_error(websocket, f"Target '{target_id}' is not connected")
-        return
+    store_message(client_id, target_id, real_msg)
 
-    try:
-        await send_json(target_ws, {
-            "type": "message",
-            "from": client_id,
-            "message": real_msg,
-            "timestamp": int(time.time())
-        })
-        await send_json(websocket, {
-            "type": "delivered",
-            "to": target_id,
-            "message": "Message delivered successfully"
-        })
-    except Exception as e:
-        logger.error(f"Delivery error from {client_id} to {target_id}: {e}")
-        await send_error(websocket, "Message delivery failed")
+    target_ws = clients.get(target_id)
+    if target_ws:
+        try:
+            await send_json(target_ws, {
+                "type": "message",
+                "from": client_id,
+                "message": real_msg,
+                "timestamp": int(time.time())
+            })
+        except Exception as e:
+            logger.error(f"Delivery error from {client_id} to {target_id}: {e}")
+
+    await send_json(websocket, {
+        "type": "delivered",
+        "to": target_id,
+        "message": "Message stored and sent (if user online)"
+    })
 
 async def handle_special_command(websocket, client_id, message_obj):
     msg_type = message_obj.get("type")
@@ -154,6 +174,18 @@ async def handle_special_command(websocket, client_id, message_obj):
         await send_json(websocket, {
             "type": "online_users",
             "users": list(clients.keys())
+        })
+        return True
+    elif msg_type == "chat_history":
+        with_user = sanitize_input(message_obj.get("with", ""))
+        if not with_user:
+            await send_error(websocket, "Missing 'with' field in chat_history request")
+            return True
+        history = get_chat_history(client_id, with_user)
+        await send_json(websocket, {
+            "type": "chat_history",
+            "with": with_user,
+            "messages": history
         })
         return True
     return False
@@ -168,7 +200,6 @@ async def process_message(websocket, client_id, message):
         return
 
     try:
-        # Handle JSON message (e.g., {"type": "list_users"})
         parsed = json.loads(message)
         if isinstance(parsed, dict):
             handled = await handle_special_command(websocket, client_id, parsed)
