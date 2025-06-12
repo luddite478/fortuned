@@ -228,17 +228,13 @@ xcrun simctl list devices
 ```
 Look for your running simulator (e.g., "iPhone 15 (E84AFBA4-AB0D-4EEE-9C13-5D7F0004BFFF) (Booted)")
 
-**Step 2: Add Test Audio Files to Simulator**
+**Step 2: Launch Simulator**
 ```bash
-# Replace DEVICE_ID with your actual device ID
+rm -rf ~/Library/Developer/CoreSimulator/Caches/*
+xcrun simctl boot "iPhone 15" 
+flutter run ios --debug
 xcrun simctl addmedia E84AFBA4-AB0D-4EEE-9C13-5D7F0004BFFF ~/path/to/your/audio.wav
 ```
-
-**Step 3: Verify File Access**
-Files will be accessible in:
-- **Files app → On My iPhone → [Your App Name]**
-- **Files app → iCloud Drive** (if iCloud is enabled)
-- **Documents directory** of your app
 
 #### **Physical Device Deployment**
 

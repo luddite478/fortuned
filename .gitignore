@@ -95,3 +95,10 @@ android/java_pid*.hprof
 # Uncomment if you don't want to track VS Code settings
 # .vscode/
 working_example
+
+# Environment files
+.env
+
+# Keep example file for reference
+!env.example
+samples/
