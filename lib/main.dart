@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'miniaudio_library.dart';
 import 'dart:async';
 import 'screens/chat_screen.dart';
+import 'screens/contacts_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -675,6 +676,18 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.people, color: Colors.cyanAccent),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ContactsScreen(),
+                ),
+              );
+            },
+            tooltip: 'Contacts',
+          ),
           IconButton(
             icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
             onPressed: _startSequencer,
