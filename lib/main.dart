@@ -3,8 +3,13 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'miniaudio_library.dart';
 import 'dart:async';
-import 'screens/chat_screen.dart';
+import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as path;
+
 import 'screens/contacts_screen.dart';
+import 'screens/sample_browser_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -134,34 +139,72 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Future<void> _pickFileForSlot(int slot) async {
+  Future<String> _copyAssetToTemp(String assetPath, String fileName) async {
     try {
-      FilePickerResult? result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['mp3', 'wav', 'flac', 'aac', 'm4a', 'ogg'],
-        allowMultiple: false,
-      );
-
-      if (result != null && result.files.single.path != null) {
-        setState(() {
-          _filePaths[slot] = result.files.single.path;
-          _fileNames[slot] = result.files.single.name;
-          _slotLoaded[slot] = false;
-        });
-        
-        // Always load sample to memory immediately
-        _loadSlot(slot);
-      }
+      // Load the asset data
+      final ByteData data = await rootBundle.load(assetPath);
+      final Uint8List bytes = data.buffer.asUint8List();
+      
+      // Use system temp directory
+      final Directory tempDir = Directory.systemTemp;
+      
+      // Create a unique temporary file name to avoid conflicts
+      final String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      final String tempFileName = '${timestamp}_$fileName';
+      final String tempPath = path.join(tempDir.path, tempFileName);
+      final File tempFile = File(tempPath);
+      
+      // Write the asset data to the temporary file
+      await tempFile.writeAsBytes(bytes);
+      
+      print('📁 Created temp file: $tempPath');
+      return tempPath;
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error picking file: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
+      throw Exception('Failed to copy asset to temp file: $e');
     }
+  }
+
+  Future<void> _pickFileForSlot(int slot) async {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SampleBrowserScreen(
+          slotIndex: slot,
+          onSampleSelected: (String path, String name) async {
+            try {
+              String finalPath = path;
+              
+              // Check if this is a bundled asset path (starts with "samples/")
+              if (path.startsWith('samples/')) {
+                print('🎵 Loading bundled asset: $path');
+                finalPath = await _copyAssetToTemp(path, name);
+                print('📁 Copied to temp file: $finalPath');
+              }
+              
+              setState(() {
+                _filePaths[slot] = finalPath;
+                _fileNames[slot] = name;
+                _slotLoaded[slot] = false;
+              });
+              
+              // Always load sample to memory immediately
+              _loadSlot(slot);
+              
+            } catch (e) {
+              print('❌ Error loading sample: $e');
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error loading sample: $e'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            }
+          },
+        ),
+      ),
+    );
   }
 
   void _loadSlot(int slot) {
@@ -715,29 +758,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => ChatTestScreen(
-                clientId: '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}',
-              ),
-            ),
-          );
-        },
-        backgroundColor: Colors.purple,
-        icon: const Icon(Icons.chat, color: Colors.white),
-        label: const Text(
-          'CHAT TEST',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 1,
-          ),
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+
     );
   }
 }

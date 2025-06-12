@@ -95,3 +95,15 @@ flutter:
 
   assets:
     - .env
+    # Moog Minimoog samples
+    - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/
+    - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/
+    - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/
+    - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/
+    - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/FX/
+    # Roland SH-09 samples  
+    - samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/
+    # ARP Odyssey samples
+    - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/
+    # Korg MS-20 samples
+    - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/
