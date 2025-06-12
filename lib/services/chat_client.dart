@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../state/app_state.dart';
 
 class ChatClient {
   WebSocket? _socket;
@@ -263,24 +264,6 @@ class ChatClient {
       _deliveryController.close();
     }
   }
-}
-
-// Data model for chat messages
-class ChatMessage {
-  final String from;
-  final String message;
-  final DateTime timestamp;
-  final String? to; // Added for outgoing messages
-  
-  ChatMessage({
-    required this.from,
-    required this.message,
-    required this.timestamp,
-    this.to,
-  });
-  
-  @override
-  String toString() => '$from: $message (${timestamp.toLocal()})';
 }
 
 // Data model for chat history response

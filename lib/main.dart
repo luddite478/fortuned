@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:provider/provider.dart';
 import 'miniaudio_library.dart';
 import 'dart:async';
 import 'dart:io';
@@ -10,6 +11,9 @@ import 'package:path/path.dart' as path;
 
 import 'screens/contacts_screen.dart';
 import 'screens/sample_browser_screen.dart';
+import 'state/app_state.dart';
+import 'services/app_state_service.dart';
+import 'services/chat_client.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -30,17 +34,33 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Niyya Audio Tracker',
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: Colors.black,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => AppState()),
+        ProxyProvider<AppState, AppStateService>(
+          update: (context, appState, previous) {
+            // Dispose previous service if it exists
+            previous?.dispose();
+            return AppStateService(
+              appState: appState,
+              chatClient: ChatClient(),
+            );
+          },
+          dispose: (context, service) => service.dispose(),
         ),
+      ],
+      child: MaterialApp(
+        title: 'Niyya Audio Tracker',
+        theme: ThemeData.dark().copyWith(
+          scaffoldBackgroundColor: Colors.black,
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.blue,
+            brightness: Brightness.dark,
+          ),
+        ),
+        home: const TrackerPage(),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const TrackerPage(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -56,7 +76,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   late final MiniaudioLibrary _miniaudioLibrary;
   late final int _slotCount;
 
-  // Audio state
+  // Audio state (keeping original structure for now)
   late List<String?> _filePaths;
   late List<String?> _fileNames;
   late List<bool> _slotLoaded;
@@ -279,13 +299,13 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     final hasFile = _fileNames[bankIndex] != null;
     
     if (!hasFile) {
-      // Empty slot - immediately open file picker
+      // Empty slot - open sample browser (use existing method)
       _pickFileForSlot(bankIndex);
     } else {
-      // Loaded slot - select it for placement
+      // Loaded slot - just update active bank for status display
+      // The actual dragging is handled by the Draggable widget
       setState(() {
-        _selectedSampleSlot = bankIndex;
-        _activeBank = bankIndex; // Keep active bank in sync for status display
+        _activeBank = bankIndex;
       });
     }
   }
@@ -386,7 +406,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
         
         // Play the new sound (all sounds on this line will play simultaneously)
         _playSlot(cellSample);
-        _columnPlayingSample[col] = cellSample;
+        _columnPlayingSample[col] = cellSample; // Store the sample slot, not the cell index
       }
       // If there's no sample in this cell, do nothing - let previous sound continue
       // This allows sounds from previous steps to continue until replaced
@@ -403,51 +423,118 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           final hasFile = _fileNames[bank] != null;
           final isPlaying = _slotPlaying[bank];
           
-          return Expanded(
-            child: GestureDetector(
-              onTap: () => _handleBankChange(bank),
-              onLongPress: () => _pickFileForSlot(bank),
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 1),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Colors.yellowAccent.withOpacity(0.8) // Selected for placement
-                      : isActive
-                          ? Colors.white
-                          : hasFile
-                              ? _bankColors[bank].withOpacity(0.8)
-                              : const Color(0xFF404040),
-                  borderRadius: BorderRadius.circular(6),
-                  border: isPlaying
-                      ? Border.all(color: Colors.greenAccent, width: 2)
-                      : isSelected
-                          ? Border.all(color: Colors.yellowAccent, width: 2)
-                          : null,
+          Widget sampleButton = Container(
+            margin: const EdgeInsets.symmetric(horizontal: 1),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? Colors.yellowAccent.withOpacity(0.8) // Selected for placement
+                  : isActive
+                      ? Colors.white
+                      : hasFile
+                          ? _bankColors[bank].withOpacity(0.8)
+                          : const Color(0xFF404040),
+              borderRadius: BorderRadius.circular(6),
+              border: isPlaying
+                  ? Border.all(color: Colors.greenAccent, width: 2)
+                  : isSelected
+                      ? Border.all(color: Colors.yellowAccent, width: 2)
+                      : null,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  String.fromCharCode(65 + bank), // A, B, C, etc.
+                  style: TextStyle(
+                    color: isSelected || isActive ? Colors.black : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14,
+                  ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      String.fromCharCode(65 + bank), // A, B, C, etc.
-                      style: TextStyle(
-                        color: isSelected || isActive ? Colors.black : Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
+                if (hasFile) ...[
+                  const SizedBox(height: 2),
+                  Icon(
+                    Icons.audiotrack,
+                    size: 12,
+                    color: isSelected || isActive ? Colors.black54 : Colors.white70,
+                  ),
+                ],
+              ],
+            ),
+          );
+
+          return Expanded(
+            child: hasFile 
+                ? Draggable<int>(
+                    data: bank,
+                    feedback: Container(
+                      width: 40,
+                      height: 60,
+                      decoration: BoxDecoration(
+                        color: _bankColors[bank].withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            String.fromCharCode(65 + bank),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const Icon(
+                            Icons.audiotrack,
+                            size: 12,
+                            color: Colors.white70,
+                          ),
+                        ],
                       ),
                     ),
-                    if (hasFile) ...[
-                      const SizedBox(height: 2),
-                      Icon(
-                        Icons.audiotrack,
-                        size: 12,
-                        color: isSelected || isActive ? Colors.black54 : Colors.white70,
+                    childWhenDragging: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 1),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _bankColors[bank].withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: Colors.grey, width: 1),
                       ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            String.fromCharCode(65 + bank),
+                            style: const TextStyle(
+                              color: Colors.grey,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Icon(
+                            Icons.audiotrack,
+                            size: 12,
+                            color: Colors.grey,
+                          ),
+                        ],
+                      ),
+                    ),
+                    child: GestureDetector(
+                      onTap: () => _handleBankChange(bank),
+                      onLongPress: () => _pickFileForSlot(bank),
+                      child: sampleButton,
+                    ),
+                  )
+                : GestureDetector(
+                    onTap: () => _handleBankChange(bank),
+                    onLongPress: () => _pickFileForSlot(bank),
+                    child: sampleButton,
+                  ),
           );
         }),
       ),
@@ -491,56 +578,79 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
               cellColor = const Color(0xFF404040); // Default gray for empty cells
             }
             
-            return GestureDetector(
-              onTap: () => _handlePadPress(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 100),
-                decoration: BoxDecoration(
-                  color: cellColor,
-                  borderRadius: BorderRadius.circular(4),
-                  border: isCurrentStep
-                      ? Border.all(color: Colors.yellowAccent, width: 2)
-                      : hasPlacedSample && !isActivePad
-                          ? Border.all(color: Colors.white38, width: 1)
-                          : null,
-                  boxShadow: isActivePad
-                      ? [
-                          BoxShadow(
-                            color: Colors.white.withOpacity(0.5),
-                            blurRadius: 8,
-                            spreadRadius: 2,
-                          )
-                        ]
-                      : null,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        hasPlacedSample 
-                            ? String.fromCharCode(65 + placedSample!)
-                            : '${row + 1}',
-                        style: TextStyle(
-                          color: isActivePad ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 12,
-                        ),
+            return DragTarget<int>(
+              onAccept: (int sampleSlot) {
+                setState(() {
+                  _gridSamples[index] = sampleSlot;
+                });
+              },
+              builder: (context, candidateData, rejectedData) {
+                final bool isDragHovering = candidateData.isNotEmpty;
+                
+                return GestureDetector(
+                  onTap: () => _handlePadPress(index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 100),
+                    decoration: BoxDecoration(
+                      color: isDragHovering 
+                          ? Colors.greenAccent.withOpacity(0.6)
+                          : cellColor,
+                      borderRadius: BorderRadius.circular(4),
+                      border: isDragHovering
+                          ? Border.all(color: Colors.greenAccent, width: 3)
+                          : isCurrentStep
+                              ? Border.all(color: Colors.yellowAccent, width: 2)
+                              : hasPlacedSample && !isActivePad
+                                  ? Border.all(color: Colors.white38, width: 1)
+                                  : null,
+                      boxShadow: isActivePad
+                          ? [
+                              BoxShadow(
+                                color: Colors.white.withOpacity(0.5),
+                                blurRadius: 8,
+                                spreadRadius: 2,
+                              )
+                            ]
+                          : isDragHovering
+                              ? [
+                                  BoxShadow(
+                                    color: Colors.greenAccent.withOpacity(0.5),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  )
+                                ]
+                              : null,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            hasPlacedSample 
+                                ? String.fromCharCode(65 + placedSample!)
+                                : '${row + 1}',
+                            style: TextStyle(
+                              color: isActivePad || isDragHovering ? Colors.black : Colors.white,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                            ),
+                          ),
+                          Text(
+                            'C-4',
+                            style: TextStyle(
+                              color: isActivePad || isDragHovering
+                                  ? Colors.black54
+                                  : Colors.white70,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        'C-4',
-                        style: TextStyle(
-                          color: isActivePad
-                              ? Colors.black54
-                              : Colors.white70,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             );
           },
         ),
