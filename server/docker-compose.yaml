@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8765:8765"  # WebSocket port
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped 
