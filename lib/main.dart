@@ -95,6 +95,12 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   // 4 columns (sample slots) × 16 rows (steps) = 64 cells
   late List<int?> _gridSamples;
   
+  // Grid selection state
+  Set<int> _selectedGridCells = {};
+  bool _isSelecting = false;
+  int? _selectionStartCell;
+  int? _currentSelectionCell;
+  
   // Sequencer state
   int _bpm = 120;
   int _currentStep = -1; // -1 means not playing, 0-15 for current step
@@ -315,32 +321,76 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   }
 
   void _handlePadPress(int padIndex) {
-    if (_selectedSampleSlot == null) {
-      // No sample selected - play the sample in this cell if any
-      final cellSample = _gridSamples[padIndex];
-      if (cellSample != null && _slotLoaded[cellSample]) {
-        _playSlot(cellSample);
-        
-        // Visual feedback
+    if (_selectedGridCells.isNotEmpty) {
+      // Clear all selections when pressing with active selection
+      setState(() {
+        _selectedGridCells.clear();
+        _selectionStartCell = null;
+        _currentSelectionCell = null;
+      });
+      return;
+    }
+
+    // Single tap - select just this cell
+    setState(() {
+      _selectedGridCells = {padIndex};
+      _selectionStartCell = padIndex;
+      _currentSelectionCell = padIndex;
+    });
+  }
+
+  void _handleGridCellSelection(int cellIndex, bool isInside) {
+    if (!isInside) {
+      setState(() {
+        _isSelecting = false;
+      });
+      return;
+    }
+
+    if (!_isSelecting) {
+      // Start selection
+      setState(() {
+        _isSelecting = true;
+        _selectionStartCell = cellIndex;
+        _currentSelectionCell = cellIndex;
+        _selectedGridCells = {cellIndex};
+      });
+    } else {
+      // Update selection rectangle
+      if (_currentSelectionCell != cellIndex && _selectionStartCell != null) {
         setState(() {
-          _activePad = padIndex;
-        });
-        
-        Future.delayed(const Duration(milliseconds: 200), () {
-          if (mounted) {
-            setState(() {
-              _activePad = null;
-            });
-          }
+          _currentSelectionCell = cellIndex;
+          _updateRectangularSelection();
         });
       }
-    } else {
-      // Place selected sample in this cell
-      setState(() {
-        _gridSamples[padIndex] = _selectedSampleSlot;
-        _selectedSampleSlot = null; // Deselect after placing
-      });
     }
+  }
+
+  void _updateRectangularSelection() {
+    if (_selectionStartCell == null || _currentSelectionCell == null) return;
+
+    // Convert cell indices to row,col coordinates
+    final startRow = _selectionStartCell! ~/ 4;
+    final startCol = _selectionStartCell! % 4;
+    final currentRow = _currentSelectionCell! ~/ 4;
+    final currentCol = _currentSelectionCell! % 4;
+
+    // Calculate rectangle bounds
+    final minRow = startRow < currentRow ? startRow : currentRow;
+    final maxRow = startRow > currentRow ? startRow : currentRow;
+    final minCol = startCol < currentCol ? startCol : currentCol;
+    final maxCol = startCol > currentCol ? startCol : currentCol;
+
+    // Select all cells in the rectangle
+    Set<int> newSelection = {};
+    for (int row = minRow; row <= maxRow; row++) {
+      for (int col = minCol; col <= maxCol; col++) {
+        final cellIndex = row * 4 + col;
+        newSelection.add(cellIndex);
+      }
+    }
+
+    _selectedGridCells = newSelection;
   }
 
   // Sequencer control methods
@@ -553,112 +603,194 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           color: const Color(0xFF1f2937),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: GridView.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 4, // 4 columns
-            crossAxisSpacing: 4,
-            mainAxisSpacing: 4,
-            childAspectRatio: 2.5,
-          ),
-          itemCount: 64, // 4 columns × 16 rows
-          itemBuilder: (context, index) {
-            final row = index ~/ 4;
-            final col = index % 4;
-            final isActivePad = _activePad == index;
-            final isCurrentStep = _currentStep == row && _isSequencerPlaying;
-            final placedSample = _gridSamples[index];
-            final hasPlacedSample = placedSample != null;
-            
-            Color cellColor;
-            if (isActivePad) {
-              cellColor = Colors.white;
-            } else if (isCurrentStep) {
-              cellColor = hasPlacedSample 
-                  ? _bankColors[placedSample!].withOpacity(0.8)
-                  : Colors.grey.withOpacity(0.6); // Highlight current step
-            } else if (hasPlacedSample) {
-              cellColor = _bankColors[placedSample!];
-            } else {
-              cellColor = const Color(0xFF404040); // Default gray for empty cells
+        child: GestureDetector(
+          onPanStart: (details) {
+            // Find which cell we started in
+            final localPosition = details.localPosition;
+            final cellIndex = _getCellIndexFromPosition(localPosition);
+            if (cellIndex != null) {
+              _handleGridCellSelection(cellIndex, true);
             }
-            
-            return DragTarget<int>(
-              onAccept: (int sampleSlot) {
-                setState(() {
-                  _gridSamples[index] = sampleSlot;
-                });
-              },
-              builder: (context, candidateData, rejectedData) {
-                final bool isDragHovering = candidateData.isNotEmpty;
-                
-                return GestureDetector(
-                  onTap: () => _handlePadPress(index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 100),
-                    decoration: BoxDecoration(
-                      color: isDragHovering 
-                          ? Colors.greenAccent.withOpacity(0.6)
-                          : cellColor,
-                      borderRadius: BorderRadius.circular(4),
-                      border: isDragHovering
-                          ? Border.all(color: Colors.greenAccent, width: 3)
-                          : isCurrentStep
-                              ? Border.all(color: Colors.yellowAccent, width: 2)
-                              : hasPlacedSample && !isActivePad
-                                  ? Border.all(color: Colors.white38, width: 1)
-                                  : null,
-                      boxShadow: isActivePad
-                          ? [
-                              BoxShadow(
-                                color: Colors.white.withOpacity(0.5),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              )
-                            ]
-                          : isDragHovering
-                              ? [
-                                  BoxShadow(
-                                    color: Colors.greenAccent.withOpacity(0.5),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
-                                  )
-                                ]
-                              : null,
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            hasPlacedSample 
-                                ? String.fromCharCode(65 + placedSample!)
-                                : '${row + 1}',
-                            style: TextStyle(
-                              color: isActivePad || isDragHovering ? Colors.black : Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 12,
-                            ),
-                          ),
-                          Text(
-                            'C-4',
-                            style: TextStyle(
-                              color: isActivePad || isDragHovering
-                                  ? Colors.black54
-                                  : Colors.white70,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
           },
+          onPanUpdate: (details) {
+            // Find which cell we're currently over
+            final localPosition = details.localPosition;
+            final cellIndex = _getCellIndexFromPosition(localPosition);
+            if (cellIndex != null) {
+              _handleGridCellSelection(cellIndex, true);
+            }
+          },
+          onPanEnd: (details) {
+            setState(() {
+              _isSelecting = false;
+            });
+          },
+          child: GridView.builder(
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4, // 4 columns
+              crossAxisSpacing: 4,
+              mainAxisSpacing: 4,
+              childAspectRatio: 2.5,
+            ),
+            itemCount: 64, // 4 columns × 16 rows
+            itemBuilder: (context, index) {
+              return _buildGridCell(index);
+            },
+          ),
         ),
       ),
+    );
+  }
+
+  int? _getCellIndexFromPosition(Offset localPosition) {
+    // Calculate grid cell dimensions
+    const crossAxisCount = 4;
+    const crossAxisSpacing = 4.0;
+    const mainAxisSpacing = 4.0;
+    const childAspectRatio = 2.5;
+    
+    // Get the available space (subtract padding)
+    final availableWidth = MediaQuery.of(context).size.width - 64; // 32 padding on each side
+    final availableHeight = 400.0; // Approximate grid height
+    
+    // Calculate cell dimensions
+    final cellWidth = (availableWidth - (crossAxisSpacing * (crossAxisCount - 1))) / crossAxisCount;
+    final cellHeight = cellWidth / childAspectRatio;
+    
+    // Calculate which cell was touched
+    final column = (localPosition.dx / (cellWidth + crossAxisSpacing)).floor();
+    final row = (localPosition.dy / (cellHeight + mainAxisSpacing)).floor();
+    
+    // Validate bounds
+    if (column >= 0 && column < 4 && row >= 0 && row < 16) {
+      return row * 4 + column;
+    }
+    
+    return null;
+  }
+
+  Widget _buildGridCell(int index) {
+    final row = index ~/ 4;
+    final col = index % 4;
+    final isActivePad = _activePad == index;
+    final isCurrentStep = _currentStep == row && _isSequencerPlaying;
+    final placedSample = _gridSamples[index];
+    final hasPlacedSample = placedSample != null;
+    final isSelected = _selectedGridCells.contains(index);
+    
+    // Keep original colors for cells, selection only affects border
+    Color cellColor;
+    if (isActivePad) {
+      cellColor = Colors.white;
+    } else if (isCurrentStep) {
+      cellColor = hasPlacedSample 
+          ? _bankColors[placedSample!].withOpacity(0.8)
+          : Colors.grey.withOpacity(0.6); // Highlight current step
+    } else if (hasPlacedSample) {
+      cellColor = _bankColors[placedSample!];
+    } else {
+      cellColor = const Color(0xFF404040); // Default gray for empty cells
+    }
+    
+    return DragTarget<int>(
+      onAccept: (int sampleSlot) {
+        if (_selectedGridCells.isNotEmpty) {
+          // Place sample in all selected cells
+          setState(() {
+            for (int selectedIndex in _selectedGridCells) {
+              _gridSamples[selectedIndex] = sampleSlot;
+            }
+            _selectedGridCells.clear();
+          });
+        } else {
+          // Place sample in just this cell
+          setState(() {
+            _gridSamples[index] = sampleSlot;
+          });
+        }
+      },
+      builder: (context, candidateData, rejectedData) {
+        final bool isDragHovering = candidateData.isNotEmpty;
+        
+        return GestureDetector(
+          onTap: () {
+            if (_selectedGridCells.isNotEmpty && !_selectedGridCells.contains(index)) {
+              // Clear all selections if tapping on unselected cell
+              setState(() {
+                _selectedGridCells.clear();
+              });
+            } else {
+              // Normal tap behavior - always prioritize selection
+              _handlePadPress(index);
+            }
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 100),
+            decoration: BoxDecoration(
+              color: isDragHovering 
+                  ? Colors.greenAccent.withOpacity(0.6)
+                  : cellColor,
+              borderRadius: BorderRadius.circular(4),
+              border: isSelected 
+                  ? Border.all(color: Colors.yellowAccent, width: 2)
+                  : isCurrentStep 
+                      ? Border.all(color: Colors.yellowAccent, width: 2)
+                      : isDragHovering
+                          ? Border.all(color: Colors.greenAccent, width: 2)
+                          : hasPlacedSample && !isActivePad
+                              ? Border.all(color: Colors.white24, width: 1)
+                              : Border.all(color: Colors.transparent, width: 1),
+              boxShadow: isSelected 
+                  ? [
+                      BoxShadow(
+                        color: Colors.yellowAccent.withOpacity(0.3),
+                        blurRadius: 4,
+                        spreadRadius: 0,
+                      )
+                    ]
+                  : null,
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    hasPlacedSample 
+                        ? String.fromCharCode(65 + placedSample!)
+                        : '${row + 1}',
+                    style: TextStyle(
+                      color: (isActivePad || isDragHovering) ? Colors.black : Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                  if (isSelected) ...[
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: Colors.yellowAccent,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ] else ...[
+                    Text(
+                      'C-4',
+                      style: TextStyle(
+                        color: (isActivePad || isDragHovering)
+                            ? Colors.black54
+                            : Colors.white70,
+                        fontSize: 10,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -725,6 +857,30 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
             ],
           ),
           const SizedBox(height: 8),
+          
+          // Grid selection status
+          if (_selectedGridCells.isNotEmpty) ...[
+            Text(
+              'SELECTED: ${_selectedGridCells.length} cell${_selectedGridCells.length == 1 ? '' : 's'}',
+              style: const TextStyle(
+                color: Colors.yellowAccent,
+                fontFamily: 'monospace',
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'DRAG SAMPLE TO SELECTED CELLS OR TAP TO CLEAR',
+              style: const TextStyle(
+                color: Colors.yellowAccent,
+                fontFamily: 'monospace',
+                fontSize: 9,
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          
           Text(
             'SAMPLE: ${hasFile ? _fileNames[_activeBank]! : 'NO FILE'}',
             style: const TextStyle(
@@ -759,38 +915,19 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
           ),
           if (hasFile) ...[
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'STATUS: ${_slotLoaded[_activeBank] ? 'LOADED' : 'LOADING...'}',
-                      style: const TextStyle(
-                        color: Colors.cyanAccent,
-                        fontFamily: 'monospace',
-                        fontSize: 10,
-                      ),
-                    ),
-                    if (_slotLoaded[_activeBank] && activeSlotMemory > 0) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        'SIZE: ${_miniaudioLibrary.formatMemorySize(activeSlotMemory)}',
-                        style: const TextStyle(
-                          color: Colors.cyanAccent,
-                          fontFamily: 'monospace',
-                          fontSize: 9,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
+            Text(
+              'SLOT SIZE: ${_miniaudioLibrary.formatMemorySize(activeSlotMemory)}',
+              style: const TextStyle(
+                color: Colors.cyanAccent,
+                fontFamily: 'monospace',
+                fontSize: 10,
+              ),
             ),
           ],
           
-          // Show sample selection status
+          // Selected sample slot status
           if (_selectedSampleSlot != null) ...[
+            const SizedBox(height: 8),
             Text(
               'SELECTED: ${String.fromCharCode(65 + _selectedSampleSlot!)} - ${_fileNames[_selectedSampleSlot!] ?? 'NO FILE'}',
               style: const TextStyle(
@@ -810,7 +947,6 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
                 fontSize: 9,
               ),
             ),
-            const SizedBox(height: 8),
           ],
         ],
       ),
