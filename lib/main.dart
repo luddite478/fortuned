@@ -99,6 +99,10 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
   // Track which samples are currently playing in each column
   late List<int?> _columnPlayingSample; // Track which specific sample slot is playing in each column
 
+  // Copy/Paste clipboard
+  Map<int, int?> _clipboard = {}; // Maps relative position to sample slot
+  bool _hasClipboardData = false;
+
   // Grid colors for each bank
   final List<Color> _bankColors = [
     Colors.blue,
@@ -942,6 +946,153 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
     );
   }
 
+  // Copy/Paste methods
+  void _copySelectedCells() {
+    if (_selectedGridCells.isEmpty) return;
+
+    _clipboard.clear();
+    
+    // Find the top-left corner of the selection to use as origin
+    int minRow = 16;
+    int minCol = 4;
+    
+    for (int cellIndex in _selectedGridCells) {
+      final row = cellIndex ~/ 4;
+      final col = cellIndex % 4;
+      if (row < minRow) minRow = row;
+      if (col < minCol) minCol = col;
+    }
+    
+    // Store relative positions and their sample data
+    for (int cellIndex in _selectedGridCells) {
+      final row = cellIndex ~/ 4;
+      final col = cellIndex % 4;
+      final relativeRow = row - minRow;
+      final relativeCol = col - minCol;
+      final relativeIndex = relativeRow * 4 + relativeCol;
+      
+      _clipboard[relativeIndex] = _gridSamples[cellIndex];
+    }
+    
+    setState(() {
+      _hasClipboardData = true;
+    });
+  }
+
+  void _pasteToSelectedCells() {
+    if (!_hasClipboardData || _selectedGridCells.isEmpty) return;
+
+    // Find the top-left corner of the current selection
+    int minRow = 16;
+    int minCol = 4;
+    
+    for (int cellIndex in _selectedGridCells) {
+      final row = cellIndex ~/ 4;
+      final col = cellIndex % 4;
+      if (row < minRow) minRow = row;
+      if (col < minCol) minCol = col;
+    }
+    
+    // Paste clipboard data starting from the top-left of selection
+    setState(() {
+      for (MapEntry<int, int?> entry in _clipboard.entries) {
+        final relativeIndex = entry.key;
+        final sampleSlot = entry.value;
+        
+        final relativeRow = relativeIndex ~/ 4;
+        final relativeCol = relativeIndex % 4;
+        final targetRow = minRow + relativeRow;
+        final targetCol = minCol + relativeCol;
+        
+        // Check bounds
+        if (targetRow >= 0 && targetRow < 16 && 
+            targetCol >= 0 && targetCol < 4) {
+          final targetIndex = targetRow * 4 + targetCol;
+          if (targetIndex >= 0 && targetIndex < _gridSamples.length) {
+            _gridSamples[targetIndex] = sampleSlot;
+          }
+        }
+      }
+    });
+  }
+
+  void _deleteSelectedCells() {
+    if (_selectedGridCells.isEmpty) return;
+
+    setState(() {
+      for (int cellIndex in _selectedGridCells) {
+        if (cellIndex >= 0 && cellIndex < _gridSamples.length) {
+          _gridSamples[cellIndex] = null;
+        }
+      }
+      // Clear selection after deletion
+      _selectedGridCells.clear();
+      _selectionStartCell = null;
+      _currentSelectionCell = null;
+    });
+  }
+
+  Widget _buildEditButtons() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1f2937),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Copy button
+          IconButton(
+            icon: Icon(
+              Icons.copy, 
+              color: _selectedGridCells.isNotEmpty 
+                  ? Colors.cyanAccent 
+                  : Colors.grey,
+            ),
+            onPressed: _selectedGridCells.isNotEmpty
+                ? _copySelectedCells
+                : null,
+            tooltip: 'Copy Selected Cells',
+          ),
+          // Placeholder button 1
+          IconButton(
+            icon: const Icon(Icons.content_cut, color: Colors.grey),
+            onPressed: null, // TODO: Implement cut functionality
+            tooltip: 'Cut (Coming Soon)',
+          ),
+          // Delete button
+          IconButton(
+            icon: Icon(
+              Icons.delete,
+              color: _selectedGridCells.isNotEmpty
+                  ? Colors.redAccent
+                  : Colors.grey,
+            ),
+            onPressed: _selectedGridCells.isNotEmpty
+                ? _deleteSelectedCells
+                : null,
+            tooltip: 'Delete Selected Cells',
+          ),
+          // Paste button
+          IconButton(
+            icon: Icon(
+              Icons.paste,
+              color: _hasClipboardData && _selectedGridCells.isNotEmpty
+                  ? Colors.cyanAccent
+                  : Colors.grey,
+            ),
+            onPressed: _hasClipboardData && _selectedGridCells.isNotEmpty
+                ? _pasteToSelectedCells
+                : null,
+            tooltip: 'Paste to Selected Cells',
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -992,6 +1143,7 @@ class _TrackerPageState extends State<TrackerPage> with WidgetsBindingObserver {
               _buildSampleBanks(),
               _buildStatusDisplay(),
               _buildSampleGrid(),
+              _buildEditButtons(),
               const SizedBox(height: 16),
             ],
           ),
