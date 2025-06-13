@@ -118,8 +118,8 @@ class ChatConversation {
   }
 }
 
-// EditorState - Independent ChangeNotifier for all audio/DAW functionality
-class EditorState extends ChangeNotifier {
+// TrackerState - Independent ChangeNotifier for all audio/DAW functionality
+class TrackerState extends ChangeNotifier {
   static const int maxSlots = 8;
   
   final Map<int, SampleSlot> _slots = {};
@@ -127,7 +127,7 @@ class EditorState extends ChangeNotifier {
   int _activeBank = 0;
 
   // Initialize with empty slots
-  EditorState() {
+  TrackerState() {
     for (int i = 0; i < maxSlots; i++) {
       _slots[i] = SampleSlot(index: i);
     }

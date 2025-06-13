@@ -12,7 +12,7 @@ import 'package:path/path.dart' as path;
 import 'screens/contacts_screen.dart';
 import 'screens/sample_browser_screen.dart';
 import 'models/app_state.dart';
-import 'services/app_state_service.dart';
+
 import 'services/chat_client.dart';
 
 void main() async {
@@ -37,21 +37,10 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // Separate domain-specific providers
-        ChangeNotifierProvider(create: (context) => EditorState()),
+        ChangeNotifierProvider(create: (context) => TrackerState()),
         ChangeNotifierProvider(create: (context) => ChatsState()),
-        // AppStateService now depends on both states
-        ProxyProvider2<EditorState, ChatsState, AppStateService>(
-          update: (context, editorState, chatsState, previous) {
-            // Dispose previous service if it exists
-            previous?.dispose();
-            return AppStateService(
-              editorState: editorState,
-              chatsState: chatsState,
-              chatClient: ChatClient(),
-            );
-          },
-          dispose: (context, service) => service.dispose(),
-        ),
+        // Service providers
+        Provider(create: (context) => ChatClient()),
       ],
       child: MaterialApp(
         title: 'Niyya Audio Tracker',
