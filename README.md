@@ -232,7 +232,7 @@ Look for your running simulator (e.g., "iPhone 15 (E84AFBA4-AB0D-4EEE-9C13-5D7F0
 ```bash
 rm -rf ~/Library/Developer/CoreSimulator/Caches/*
 xcrun simctl boot "iPhone 15" 
-flutter run ios --debug
+cd ios && flutter run --debug
 xcrun simctl addmedia E84AFBA4-AB0D-4EEE-9C13-5D7F0004BFFF ~/path/to/your/audio.wav
 ```
 

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:collection';
 
-// Models for Sample Slots
+// Models for Sample Slots (Editor domain)
 class SampleSlot {
   final int index;
   final String? filePath;
@@ -45,7 +45,7 @@ class SampleSlot {
   bool get hasFile => filePath != null;
 }
 
-// Models for Chat System
+// Models for Chat System (Chats domain)
 class ChatMessage {
   final String from;
   final String? to;
@@ -118,8 +118,8 @@ class ChatConversation {
   }
 }
 
-// Main State Management Classes
-class SampleSlotsState extends ChangeNotifier {
+// EditorState - Independent ChangeNotifier for all audio/DAW functionality
+class EditorState extends ChangeNotifier {
   static const int maxSlots = 8;
   
   final Map<int, SampleSlot> _slots = {};
@@ -127,7 +127,7 @@ class SampleSlotsState extends ChangeNotifier {
   int _activeBank = 0;
 
   // Initialize with empty slots
-  SampleSlotsState() {
+  EditorState() {
     for (int i = 0; i < maxSlots; i++) {
       _slots[i] = SampleSlot(index: i);
     }
@@ -217,7 +217,8 @@ class SampleSlotsState extends ChangeNotifier {
   }
 }
 
-class ChatState extends ChangeNotifier {
+// ChatsState - Independent ChangeNotifier for all chat functionality
+class ChatsState extends ChangeNotifier {
   final Map<String, ChatConversation> _conversations = {};
   final Set<String> _onlineUsers = {};
   bool _isConnected = false;
@@ -318,7 +319,6 @@ class ChatState extends ChangeNotifier {
       lastActivity: message.timestamp,
       unreadCount: shouldIncreaseUnread ? conversation.unreadCount + 1 : conversation.unreadCount,
     );
-    
     notifyListeners();
   }
 
@@ -356,7 +356,6 @@ class ChatState extends ChangeNotifier {
         messages: allMessages,
         lastActivity: allMessages.last.timestamp,
       );
-      
       notifyListeners();
     }
   }
@@ -394,30 +393,5 @@ class ChatState extends ChangeNotifier {
       }
       notifyListeners();
     }
-  }
-}
-
-// Combined App State
-class AppState extends ChangeNotifier {
-  final SampleSlotsState _sampleSlots = SampleSlotsState();
-  final ChatState _chat = ChatState();
-
-  // Getters
-  SampleSlotsState get sampleSlots => _sampleSlots;
-  ChatState get chat => _chat;
-
-  AppState() {
-    // Listen to changes in child states and bubble them up
-    _sampleSlots.addListener(notifyListeners);
-    _chat.addListener(notifyListeners);
-  }
-
-  @override
-  void dispose() {
-    _sampleSlots.removeListener(notifyListeners);
-    _chat.removeListener(notifyListeners);
-    _sampleSlots.dispose();
-    _chat.dispose();
-    super.dispose();
   }
 } 

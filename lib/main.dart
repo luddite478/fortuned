@@ -11,7 +11,7 @@ import 'package:path/path.dart' as path;
 
 import 'screens/contacts_screen.dart';
 import 'screens/sample_browser_screen.dart';
-import 'state/app_state.dart';
+import 'models/app_state.dart';
 import 'services/app_state_service.dart';
 import 'services/chat_client.dart';
 
@@ -36,13 +36,17 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => AppState()),
-        ProxyProvider<AppState, AppStateService>(
-          update: (context, appState, previous) {
+        // Separate domain-specific providers
+        ChangeNotifierProvider(create: (context) => EditorState()),
+        ChangeNotifierProvider(create: (context) => ChatsState()),
+        // AppStateService now depends on both states
+        ProxyProvider2<EditorState, ChatsState, AppStateService>(
+          update: (context, editorState, chatsState, previous) {
             // Dispose previous service if it exists
             previous?.dispose();
             return AppStateService(
-              appState: appState,
+              editorState: editorState,
+              chatsState: chatsState,
               chatClient: ChatClient(),
             );
           },
