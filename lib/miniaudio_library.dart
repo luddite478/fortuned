@@ -218,5 +218,69 @@ class MiniaudioLibrary {
     }
   }
 
+  // -------------- OUTPUT RECORDING FUNCTIONS (Based on miniaudio simple_capture example) --------------
+  
+  /// Start recording mixed grid output to a WAV file
+  /// Records the combined audio of all playing samples in real-time
+  bool startOutputRecording(String outputFilePath) {
+    print('🎙️ Starting output recording to: $outputFilePath');
+    
+    final utf8Bytes = utf8.encode(outputFilePath);
+    final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
+    
+    try {
+      for (int i = 0; i < utf8Bytes.length; i++) {
+        cString[i] = utf8Bytes[i];
+      }
+      cString[utf8Bytes.length] = 0;
+      
+      int result = _bindings.miniaudio_start_output_recording(cString.cast());
+      bool success = result == 0;
+      
+      if (success) {
+        print('✅ Output recording started successfully');
+      } else {
+        print('❌ Failed to start output recording');
+      }
+      
+      return success;
+    } finally {
+      free(cString.cast());
+    }
+  }
+  
+  /// Stop the current output recording
+  bool stopOutputRecording() {
+    print('⏹️ Stopping output recording...');
+    
+    int result = _bindings.miniaudio_stop_output_recording();
+    bool success = result == 0;
+    
+    if (success) {
+      print('✅ Output recording stopped successfully');
+    } else {
+      print('❌ Failed to stop recording (maybe not recording?)');
+    }
+    
+    return success;
+  }
+  
+  /// Check if currently recording output
+  bool get isOutputRecording => _bindings.miniaudio_is_output_recording() == 1;
+  
+  /// Get current recording duration in milliseconds
+  int get outputRecordingDurationMs {
+    return _bindings.miniaudio_get_recording_duration_ms();
+  }
+  
+  /// Get formatted recording duration as MM:SS
+  String get formattedOutputRecordingDuration {
+    final durationMs = outputRecordingDurationMs;
+    final totalSeconds = durationMs ~/ 1000;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = totalSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
   // Debug functions removed - Bluetooth audio working correctly
 } 

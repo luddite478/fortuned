@@ -78,6 +78,65 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                 },
                 tooltip: 'Contacts',
               ),
+              // Recording controls
+              Consumer<TrackerState>(
+                builder: (context, tracker, child) {
+                  return Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (tracker.isRecording) ...[
+                        // Recording indicator and duration
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.red, width: 1),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                tracker.formattedRecordingDuration,
+                                style: const TextStyle(
+                                  color: Colors.red,
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        // Stop recording button
+                        IconButton(
+                          icon: const Icon(Icons.stop, color: Colors.red),
+                          onPressed: () => tracker.stopRecording(),
+                          tooltip: 'Stop Recording',
+                        ),
+                      ] else ...[
+                        // Start recording button
+                        IconButton(
+                          icon: const Icon(Icons.fiber_manual_record, color: Colors.red),
+                          onPressed: () => tracker.startRecording(),
+                          tooltip: 'Start Recording',
+                        ),
+                      ],
+                    ],
+                  );
+                },
+              ),
+              // Sequencer controls
               IconButton(
                 icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
                 onPressed: () {

@@ -6,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import '../miniaudio_library.dart';
 import '../screens/sample_browser_screen.dart';
 import 'patterns_state.dart';
@@ -91,6 +92,10 @@ class TrackerState extends ChangeNotifier {
   bool _isSequencerPlaying = false;
   Timer? _sequencerTimer;
   
+  // Recording state
+  bool _isRecording = false;
+  String? _currentRecordingPath;
+  
   // Track which samples are currently playing in each column
   late List<int?> _columnPlayingSample;
 
@@ -140,6 +145,9 @@ class TrackerState extends ChangeNotifier {
   int get bpm => _bpm;
   int get currentStep => _currentStep;
   bool get isSequencerPlaying => _isSequencerPlaying;
+  bool get isRecording => _isRecording;
+  String? get currentRecordingPath => _currentRecordingPath;
+  String get formattedRecordingDuration => _miniaudioLibrary.formattedOutputRecordingDuration;
   List<Color> get bankColors => List.unmodifiable(_bankColors);
   bool get hasClipboardData => _hasClipboardData;
   int get slotCount => _slotCount;
@@ -542,6 +550,48 @@ class TrackerState extends ChangeNotifier {
     }
   }
 
+  // Recording functionality
+  Future<void> startRecording() async {
+    if (_isRecording) return;
+    
+    try {
+      // Generate unique filename with timestamp
+      final now = DateTime.now();
+      final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
+      final filename = 'niyya_recording_$timestamp.wav';
+      
+      // Get app's documents directory
+      final directory = await getApplicationDocumentsDirectory();
+      _currentRecordingPath = path.join(directory.path, filename);
+      
+      bool success = _miniaudioLibrary.startOutputRecording(_currentRecordingPath!);
+      if (success) {
+        _isRecording = true;
+        notifyListeners();
+        print('🎙️ Recording started: $_currentRecordingPath');
+      } else {
+        print('❌ Failed to start recording');
+      }
+    } catch (e) {
+      print('❌ Error starting recording: $e');
+    }
+  }
+  
+  void stopRecording() {
+    if (!_isRecording) return;
+    
+    bool success = _miniaudioLibrary.stopOutputRecording();
+    if (success) {
+      _isRecording = false;
+      final path = _currentRecordingPath;
+      _currentRecordingPath = null;
+      notifyListeners();
+      
+      // Could show a success message or share the recording
+      print('🎙️ Recording saved to: $path');
+    }
+  }
+
   // Utility methods
   int? getCellIndexFromPosition(Offset localPosition, BuildContext context) {
     // Calculate grid cell dimensions
@@ -675,6 +725,9 @@ Made with NIYYA Tracker 🚀
   @override
   void dispose() {
     _sequencerTimer?.cancel();
+    if (_isRecording) {
+      stopRecording();
+    }
     _miniaudioLibrary.cleanup();
     super.dispose();
   }

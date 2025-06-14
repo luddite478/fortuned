@@ -63,6 +63,12 @@ uint64_t miniaudio_get_total_memory_usage(void);
 uint64_t miniaudio_get_slot_memory_usage(int slot);
 int miniaudio_get_memory_slot_count(void);
 
+// Output recording/rendering functions (captures mixed grid output to WAV file)
+int miniaudio_start_output_recording(const char* output_file_path);
+int miniaudio_stop_output_recording(void);
+int miniaudio_is_output_recording(void);
+uint64_t miniaudio_get_recording_duration_ms(void);
+
 #ifdef __cplusplus
 }
 #endif

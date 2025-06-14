@@ -85,6 +85,12 @@ static audio_slot_t g_slots[MINIAUDIO_MAX_SLOTS];
 static int g_is_initialized = 0;
 static uint64_t g_total_memory_used = 0;
 
+// Output recording state (following simple_capture example pattern)
+static ma_encoder g_output_encoder;
+static int g_is_output_recording = 0;
+static uint64_t g_recording_start_time = 0;
+static uint64_t g_total_frames_written = 0;
+
 // Note: Thread safety removed for simplicity - miniaudio handles internal synchronization
 
 // Helper function to load entire audio file into memory buffer
@@ -275,6 +281,12 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
         }
 
         mix_slot_audio(s, pOutputF32, frameCount);
+    }
+    
+    // If recording, write the mixed output to the encoder (following simple_capture example)
+    if (g_is_output_recording) {
+        ma_encoder_write_pcm_frames(&g_output_encoder, pOutputF32, frameCount, NULL);
+        g_total_frames_written += frameCount;
     }
     
     (void)pInput;
@@ -645,12 +657,87 @@ void miniaudio_log_audio_route(void) {
     prnt("ℹ️ [MINIAUDIO] Audio route logging not implemented in Simple Mixing");
 }
 
+// Output recording functions (following simple_capture example pattern)
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_start_output_recording(const char* output_file_path) {
+    if (!g_is_initialized) {
+        prnt_err("🔴 [RECORDING] Device not initialized");
+        return -1;
+    }
+    
+    if (g_is_output_recording) {
+        prnt_err("🔴 [RECORDING] Already recording, stop first");
+        return -1;
+    }
+    
+    prnt("🎙️ [RECORDING] Starting output recording to: %s", output_file_path);
+    
+    // Configure encoder for WAV output (following simple_capture example)
+    ma_encoder_config encoderConfig = ma_encoder_config_init(ma_encoding_format_wav, SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
+    
+    ma_result result = ma_encoder_init_file(output_file_path, &encoderConfig, &g_output_encoder);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [RECORDING] Failed to initialize encoder: %s", ma_result_description(result));
+        return -1;
+    }
+    
+    g_is_output_recording = 1;
+    g_recording_start_time = 0; // Will use frame-based timing instead
+    g_total_frames_written = 0;
+    
+    prnt("✅ [RECORDING] Output recording started successfully");
+    return 0;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_stop_output_recording(void) {
+    if (!g_is_output_recording) {
+        prnt_err("🔴 [RECORDING] Not currently recording");
+        return -1;
+    }
+    
+    prnt("⏹️ [RECORDING] Stopping output recording...");
+    
+    // Get duration before cleanup
+    uint64_t duration_ms = miniaudio_get_recording_duration_ms();
+    
+    // Finalize and cleanup encoder
+    ma_encoder_uninit(&g_output_encoder);
+    g_is_output_recording = 0;
+    g_recording_start_time = 0;
+    g_total_frames_written = 0;
+    
+    prnt("✅ [RECORDING] Output recording stopped (duration: %llu ms)", duration_ms);
+    return 0;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_is_output_recording(void) {
+    return g_is_output_recording;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+uint64_t miniaudio_get_recording_duration_ms(void) {
+    if (!g_is_output_recording || !g_is_initialized) {
+        return 0;
+    }
+    
+    // Calculate duration from frames written
+    // Duration = (frames_written / sample_rate) * 1000 (for milliseconds)
+    return (g_total_frames_written * 1000) / SAMPLE_RATE;
+}
+
 // Cleanup function
 __attribute__((visibility("default"))) __attribute__((used))
 void miniaudio_cleanup(void) {
     if (!g_is_initialized) return;
     
     prnt("🧹 [MINIAUDIO] Starting cleanup...");
+    
+    // Stop recording if active
+    if (g_is_output_recording) {
+        miniaudio_stop_output_recording();
+    }
     
     // Stop device first
     ma_device_stop(&g_device);
@@ -662,8 +749,6 @@ void miniaudio_cleanup(void) {
     
     // Uninitialize device
     ma_device_uninit(&g_device);
-    
-    // Threading removed for simplicity
     
     g_total_memory_used = 0;
     g_is_initialized = 0;
