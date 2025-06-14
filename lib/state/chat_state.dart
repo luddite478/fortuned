@@ -1,51 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'dart:collection';
 
-// Models for Sample Slots (Editor domain)
-class SampleSlot {
-  final int index;
-  final String? filePath;
-  final String? fileName;
-  final bool isLoaded;
-  final bool isPlaying;
-  final int memoryUsage; // in bytes
-  final DateTime? loadedAt;
-
-  const SampleSlot({
-    required this.index,
-    this.filePath,
-    this.fileName,
-    this.isLoaded = false,
-    this.isPlaying = false,
-    this.memoryUsage = 0,
-    this.loadedAt,
-  });
-
-  SampleSlot copyWith({
-    int? index,
-    String? filePath,
-    String? fileName,
-    bool? isLoaded,
-    bool? isPlaying,
-    int? memoryUsage,
-    DateTime? loadedAt,
-  }) {
-    return SampleSlot(
-      index: index ?? this.index,
-      filePath: filePath ?? this.filePath,
-      fileName: fileName ?? this.fileName,
-      isLoaded: isLoaded ?? this.isLoaded,
-      isPlaying: isPlaying ?? this.isPlaying,
-      memoryUsage: memoryUsage ?? this.memoryUsage,
-      loadedAt: loadedAt ?? this.loadedAt,
-    );
-  }
-
-  bool get isEmpty => filePath == null;
-  bool get hasFile => filePath != null;
-}
-
-// Models for Chat System (Chats domain)
+// Chat message data model
 class ChatMessage {
   final String from;
   final String? to;
@@ -82,6 +38,7 @@ class ChatMessage {
   }
 }
 
+// Chat conversation data model
 class ChatConversation {
   final String contactId;
   final String contactName;
@@ -118,107 +75,8 @@ class ChatConversation {
   }
 }
 
-// TrackerState - Independent ChangeNotifier for all audio/DAW functionality
-class TrackerState extends ChangeNotifier {
-  static const int maxSlots = 8;
-  
-  final Map<int, SampleSlot> _slots = {};
-  int _selectedSlotIndex = 0;
-  int _activeBank = 0;
-
-  // Initialize with empty slots
-  TrackerState() {
-    for (int i = 0; i < maxSlots; i++) {
-      _slots[i] = SampleSlot(index: i);
-    }
-  }
-
-  // Getters
-  UnmodifiableMapView<int, SampleSlot> get slots => UnmodifiableMapView(_slots);
-  SampleSlot getSlot(int index) => _slots[index] ?? SampleSlot(index: index);
-  int get selectedSlotIndex => _selectedSlotIndex;
-  int get activeBank => _activeBank;
-  
-  List<SampleSlot> get loadedSlots => _slots.values.where((slot) => slot.isLoaded).toList();
-  List<SampleSlot> get playingSlots => _slots.values.where((slot) => slot.isPlaying).toList();
-  int get totalMemoryUsage => _slots.values.fold(0, (sum, slot) => sum + slot.memoryUsage);
-  int get loadedSlotsCount => _slots.values.where((slot) => slot.isLoaded).length;
-
-  // Sample Slot Operations
-  void loadSample(int slotIndex, String filePath, String fileName) {
-    if (slotIndex < 0 || slotIndex >= maxSlots) return;
-    
-    _slots[slotIndex] = _slots[slotIndex]!.copyWith(
-      filePath: filePath,
-      fileName: fileName,
-      isLoaded: false, // Will be set to true when actually loaded by miniaudio
-      loadedAt: DateTime.now(),
-    );
-    notifyListeners();
-  }
-
-  void updateSlotLoadStatus(int slotIndex, bool isLoaded, {int? memoryUsage}) {
-    if (slotIndex < 0 || slotIndex >= maxSlots) return;
-    
-    _slots[slotIndex] = _slots[slotIndex]!.copyWith(
-      isLoaded: isLoaded,
-      memoryUsage: memoryUsage ?? _slots[slotIndex]!.memoryUsage,
-    );
-    notifyListeners();
-  }
-
-  void updateSlotPlayStatus(int slotIndex, bool isPlaying) {
-    if (slotIndex < 0 || slotIndex >= maxSlots) return;
-    
-    _slots[slotIndex] = _slots[slotIndex]!.copyWith(isPlaying: isPlaying);
-    notifyListeners();
-  }
-
-  void clearSlot(int slotIndex) {
-    if (slotIndex < 0 || slotIndex >= maxSlots) return;
-    
-    _slots[slotIndex] = SampleSlot(index: slotIndex);
-    notifyListeners();
-  }
-
-  void stopAllSlots() {
-    for (int i = 0; i < maxSlots; i++) {
-      if (_slots[i]!.isPlaying) {
-        _slots[i] = _slots[i]!.copyWith(isPlaying: false);
-      }
-    }
-    notifyListeners();
-  }
-
-  void setSelectedSlot(int slotIndex) {
-    if (slotIndex < 0 || slotIndex >= maxSlots) return;
-    
-    _selectedSlotIndex = slotIndex;
-    _activeBank = slotIndex; // Keep in sync for now
-    notifyListeners();
-  }
-
-  void setActiveBank(int bankIndex) {
-    if (bankIndex < 0 || bankIndex >= maxSlots) return;
-    
-    _activeBank = bankIndex;
-    notifyListeners();
-  }
-
-  // Memory management helpers
-  String formatMemorySize(int bytes) {
-    if (bytes < 1024) {
-      return '${bytes}B';
-    } else if (bytes < 1024 * 1024) {
-      return '${(bytes / 1024).toStringAsFixed(1)}KB';
-    } else {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
-    }
-  }
-}
-
-// ChatsState - Independent ChangeNotifier for all chat functionality
-class ChatsState extends ChangeNotifier {
+// Chat state management - Independent ChangeNotifier for all chat functionality
+class ChatState extends ChangeNotifier {
   final Map<String, ChatConversation> _conversations = {};
   final Set<String> _onlineUsers = {};
   bool _isConnected = false;

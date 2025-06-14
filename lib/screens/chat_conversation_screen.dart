@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/chat_client.dart';
-import '../models/app_state.dart';
+import '../state/chat_state.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final String otherUserId;

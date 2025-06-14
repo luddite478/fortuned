@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../models/app_state.dart';
+import '../state/chat_state.dart';
 
 class ChatClient {
   WebSocket? _socket;
