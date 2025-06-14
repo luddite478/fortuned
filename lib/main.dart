@@ -25,22 +25,12 @@ class NiyyaApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MyApp(),
-    );
-  }
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        ChangeNotifierProvider(create: (context) => PatternsState()),
-        ChangeNotifierProvider(create: (context) => TrackerState()),
-      ],
-      child: const MainPage(),
+      home: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (context) => PatternsState()),
+        ],
+        child: const MainPage(),
+      ),
     );
   }
 }
@@ -75,12 +65,7 @@ class _MainPageState extends State<MainPage> {
           );
         }
         
-        // If we have a current pattern, show the pattern screen
-        if (patternsState.currentPattern != null) {
-          return const PatternScreen();
-        }
-        
-        // Otherwise show pattern selection
+        // Show pattern selection screen by default
         return const PatternSelectionScreen();
       },
     );

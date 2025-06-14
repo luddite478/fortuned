@@ -59,13 +59,13 @@
 // -----------------------------------------------------------------------------
 // Simplified Mixing Implementation (Following Official miniaudio Pattern)
 // -----------------------------------------------------------------------------
-#define MINIAUDIO_MAX_SLOTS 96
+#define MINIAUDIO_MAX_SLOTS 1024
 #define SAMPLE_FORMAT   ma_format_f32
 #define CHANNEL_COUNT   2
 #define SAMPLE_RATE     48000
 
 // Memory safety limits
-#define MAX_MEMORY_SLOTS 32                           // Max 32 memory slots out of 96 total
+#define MAX_MEMORY_SLOTS 128                          // Up to 128 fully memory-loaded sounds
 #define MAX_MEMORY_FILE_SIZE (50 * 1024 * 1024)      // 50MB per individual file
 #define MAX_TOTAL_MEMORY_USAGE (500 * 1024 * 1024)   // 500MB total memory usage limit
 

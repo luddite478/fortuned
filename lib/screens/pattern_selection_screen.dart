@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/patterns_state.dart';
+import '../state/tracker_state.dart';
 import 'tracker_screen.dart';
 
 class PatternSelectionScreen extends StatefulWidget {
@@ -245,9 +246,9 @@ class _PatternSelectionScreenState extends State<PatternSelectionScreen> {
 
   Future<void> _createNewPattern(PatternsState patternsState) async {
     final pattern = await patternsState.createNewPattern();
-    if (pattern != null) {
+    if (pattern != null && mounted) {
       _selectPattern(pattern);
-    } else {
+    } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Failed to create pattern'),
@@ -260,7 +261,19 @@ class _PatternSelectionScreenState extends State<PatternSelectionScreen> {
   void _selectPattern(Pattern pattern) async {
     final patternsState = context.read<PatternsState>();
     await patternsState.setCurrentPattern(pattern);
-    // No need for navigation - MainPage will automatically show PatternScreen
+    if (mounted && context.mounted) {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MultiProvider(
+            providers: [
+              ChangeNotifierProvider.value(value: patternsState),
+              ChangeNotifierProvider(create: (context) => TrackerState()),
+            ],
+            child: const PatternScreen(),
+          ),
+        ),
+      );
+    }
   }
 
   void _showPatternMenu(Pattern pattern, PatternsState patternsState) {
