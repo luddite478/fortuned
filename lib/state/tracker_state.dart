@@ -7,6 +7,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../miniaudio_library.dart';
 import '../screens/sample_browser_screen.dart';
 import 'patterns_state.dart';
@@ -95,6 +96,8 @@ class TrackerState extends ChangeNotifier {
   // Recording state
   bool _isRecording = false;
   String? _currentRecordingPath;
+  String? _lastRecordingPath;
+  DateTime? _lastRecordingTime;
   
   // Track which samples are currently playing in each column
   late List<int?> _columnPlayingSample;
@@ -147,6 +150,8 @@ class TrackerState extends ChangeNotifier {
   bool get isSequencerPlaying => _isSequencerPlaying;
   bool get isRecording => _isRecording;
   String? get currentRecordingPath => _currentRecordingPath;
+  String? get lastRecordingPath => _lastRecordingPath;
+  DateTime? get lastRecordingTime => _lastRecordingTime;
   String get formattedRecordingDuration => _miniaudioLibrary.formattedOutputRecordingDuration;
   List<Color> get bankColors => List.unmodifiable(_bankColors);
   bool get hasClipboardData => _hasClipboardData;
@@ -583,12 +588,14 @@ class TrackerState extends ChangeNotifier {
     bool success = _miniaudioLibrary.stopOutputRecording();
     if (success) {
       _isRecording = false;
-      final path = _currentRecordingPath;
+      // Store the completed recording info
+      _lastRecordingPath = _currentRecordingPath;
+      _lastRecordingTime = DateTime.now();
       _currentRecordingPath = null;
       notifyListeners();
       
       // Could show a success message or share the recording
-      print('🎙️ Recording saved to: $path');
+      print('🎙️ Recording saved to: $_lastRecordingPath');
     }
   }
 
@@ -720,6 +727,38 @@ Made with NIYYA Tracker 🚀
       'data': structuredData,
       'hashtags': ['#NiyyaTracker', '#MusicProduction', '#Beats', '#Pattern'],
     };
+  }
+
+  // Share the recorded audio file
+  Future<void> shareRecordedAudio() async {
+    if (_lastRecordingPath == null) {
+      print('❌ No recording to share');
+      return;
+    }
+
+    try {
+      final file = File(_lastRecordingPath!);
+      if (await file.exists()) {
+        final fileName = path.basename(_lastRecordingPath!);
+        await Share.shareXFiles(
+          [XFile(_lastRecordingPath!)],
+          text: 'Check out this beat I made with NIYYA Tracker! 🎵\n\n#NiyyaTracker #BeatMaking #MusicProduction',
+          subject: 'NIYYA Tracker Recording - $fileName',
+        );
+        print('🎵 Shared recording: $fileName');
+      } else {
+        print('❌ Recording file not found: $_lastRecordingPath');
+      }
+    } catch (e) {
+      print('❌ Error sharing recording: $e');
+    }
+  }
+
+  // Clear the last recording
+  void clearLastRecording() {
+    _lastRecordingPath = null;
+    _lastRecordingTime = null;
+    notifyListeners();
   }
 
   @override
