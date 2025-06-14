@@ -78,9 +78,15 @@ typedef struct {
     int at_end;
     int loaded;
     char* file_path;
+
+    // Node-graph specific members.
+    ma_data_source_node node;   // Node wrapping this decoder for graph-based mixing.
+    int node_initialized;       // 1 when the node has been successfully initialised and attached.
 } audio_slot_t;
 
 static ma_device g_device;
+// Node graph which will handle mixing of all slot nodes.
+static ma_node_graph g_nodeGraph;
 static audio_slot_t g_slots[MINIAUDIO_MAX_SLOTS];
 static int g_is_initialized = 0;
 static uint64_t g_total_memory_used = 0;
@@ -208,6 +214,31 @@ static int load_sound_to_memory(audio_slot_t* slot, const char* file_path, ma_de
     g_total_memory_used += slot->memory_size;
     slot->loaded = 1;
     
+    // -------------------------------------------------------------
+    // Create a data_source_node for this decoder and attach it to
+    // the graph endpoint. The node starts muted (volume 0) and will
+    // be unmuted when the slot is explicitly played.
+    // -------------------------------------------------------------
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->decoder);
+    ma_result nodeRes = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &slot->node);
+    if (nodeRes != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create data source node for slot %d: %s", slot_index, ma_result_description(nodeRes));
+        // Roll back everything
+        slot->loaded = 0;
+        g_total_memory_used -= slot->memory_size;
+        ma_decoder_uninit(&slot->decoder);
+        free(slot->memory_data);
+        slot->memory_data = NULL;
+        slot->memory_size = 0;
+        return -1;
+    }
+
+    // Attach output bus 0 of this node to the endpoint (input bus 0)
+    ma_node_attach_output_bus(&slot->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    // Start muted
+    ma_node_set_output_bus_volume(&slot->node, 0, 0.0f);
+    slot->node_initialized = 1;
+    
     prnt("✅ [MINIAUDIO] Slot %d loaded to memory (%.2f MB) [%d/%d memory slots, %.2f/%.2f MB total]", 
          slot_index, slot->memory_size / (1024.0 * 1024.0),
          get_current_memory_slot_count(), MAX_MEMORY_SLOTS,
@@ -226,6 +257,19 @@ static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_de
     }
     
     slot->loaded = 1;
+    // Create and attach data source node to the graph (muted initially)
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->decoder);
+    ma_result nodeRes = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &slot->node);
+    if (nodeRes != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create data source node for slot %d (streaming): %s", slot_index, ma_result_description(nodeRes));
+        ma_decoder_uninit(&slot->decoder);
+        slot->loaded = 0;
+        return -1;
+    }
+    ma_node_attach_output_bus(&slot->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&slot->node, 0, 0.0f);
+    slot->node_initialized = 1;
+    
     prnt("✅ [MINIAUDIO] Slot %d loaded for streaming", slot_index);
     return 0;
 }
@@ -266,41 +310,38 @@ static void mix_slot_audio(audio_slot_t* slot, float* output, ma_uint32 frameCou
     }
 }
 
-// Official miniaudio Simple Mixing data callback (exactly like the example)
+// Node-graph based data callback. We simply read samples from the endpoint of
+// our global graph which implicitly mixes all connected slot nodes.
 static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
-    float* pOutputF32 = (float*)pOutput;
-    memset(pOutputF32, 0, sizeof(float) * frameCount * CHANNEL_COUNT);
+    // Read directly from the graph. The graph guarantees the correct channel
+    // count and sample format because we configured it to match the device.
+    ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 
-    // Mix all active slots
-    for (int slot = 0; slot < MINIAUDIO_MAX_SLOTS; ++slot) {
-        audio_slot_t* s = &g_slots[slot];
-        
-        // Skip inactive, unloaded, or finished slots
-        if (!s->active || !s->loaded || s->at_end) {
-            continue;
-        }
-
-        mix_slot_audio(s, pOutputF32, frameCount);
-    }
-    
-    // If recording, write the mixed output to the encoder (following simple_capture example)
+    // If recording is active, capture the same buffer to the encoder.
     if (g_is_output_recording) {
-        ma_encoder_write_pcm_frames(&g_output_encoder, pOutputF32, frameCount, NULL);
+        ma_encoder_write_pcm_frames(&g_output_encoder, pOutput, frameCount, NULL);
         g_total_frames_written += frameCount;
     }
-    
+
     (void)pInput;
     (void)pDevice;
 }
 
 static void free_slot_resources(int slot) {
     audio_slot_t* s = &g_slots[slot];
-    
+
+    // First detach/uninit the node so it no longer references the decoder.
+    if (s->node_initialized) {
+        ma_data_source_node_uninit(&s->node, NULL);
+        s->node_initialized = 0;
+    }
+
+    // Now it is safe to uninit the decoder.
     if (s->loaded) {
         ma_decoder_uninit(&s->decoder);
         s->loaded = 0;
     }
-    
+
     if (s->memory_data) {
         g_total_memory_used -= s->memory_size;
         free(s->memory_data);
@@ -308,12 +349,12 @@ static void free_slot_resources(int slot) {
         prnt("🗑️ [RAM] Freed %.2f MB from slot %d", s->memory_size / (1024.0 * 1024.0), slot);
         s->memory_size = 0;
     }
-    
+
     if (s->file_path) {
         free(s->file_path);
         s->file_path = NULL;
     }
-    
+
     s->active = 0;
     s->at_end = 0;
 }
@@ -426,6 +467,20 @@ int miniaudio_init(void) {
         memset(&g_slots[i], 0, sizeof(audio_slot_t));
     }
     g_total_memory_used = 0;
+    
+    // ---------------------------------------------------------------------
+    // Initialize the node graph which will perform automatic mixing of all
+    // slot nodes. Every slot's data_source_node will connect directly to
+    // the endpoint of this graph so their outputs are implicitly mixed.
+    // ---------------------------------------------------------------------
+    {
+        ma_node_graph_config nodeGraphConfig = ma_node_graph_config_init(CHANNEL_COUNT);
+        ma_result resultGraph = ma_node_graph_init(&nodeGraphConfig, NULL, &g_nodeGraph);
+        if (resultGraph != MA_SUCCESS) {
+            prnt_err("🔴 [MINIAUDIO] Failed to initialise node graph: %s", ma_result_description(resultGraph));
+            return -1;
+        }
+    }
     
     // Threading removed for simplicity
     
@@ -541,6 +596,9 @@ int miniaudio_play_slot(int slot) {
     // Success - start playing
     s->active = 1;
     s->at_end = 0;
+    if (s->node_initialized) {
+        ma_node_set_output_bus_volume(&s->node, 0, 1.0f);
+    }
     prnt("✅ [MINIAUDIO] Slot %d started playing (%s)", slot, s->memory_data ? "memory" : "file");
     
     return 0;
@@ -557,7 +615,11 @@ void miniaudio_stop_slot(int slot) {
         return;
     }
     
-    g_slots[slot].active = 0;
+    audio_slot_t* s = &g_slots[slot];
+    s->active = 0;
+    if (s->node_initialized) {
+        ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
+    }
     prnt("⏹️ [MINIAUDIO] Slot %d stopped", slot);
 }
 
@@ -583,7 +645,11 @@ void miniaudio_stop_all_sounds(void) {
     prnt("⏹️ [MINIAUDIO] Stopping all sounds");
     
     for (int i = 0; i < MINIAUDIO_MAX_SLOTS; ++i) {
-        g_slots[i].active = 0;
+        audio_slot_t* s = &g_slots[i];
+        s->active = 0;
+        if (s->node_initialized) {
+            ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
+        }
     }
 }
 
@@ -749,6 +815,9 @@ void miniaudio_cleanup(void) {
     
     // Uninitialize device
     ma_device_uninit(&g_device);
+    
+    // Uninitialize the node graph (after all nodes have been freed)
+    ma_node_graph_uninit(&g_nodeGraph, NULL);
     
     g_total_memory_used = 0;
     g_is_initialized = 0;

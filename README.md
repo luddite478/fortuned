@@ -87,6 +87,29 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
 - **Scalable**: Easily handles 1-8 simultaneous samples
 - **Standard Pattern**: Follows miniaudio's recommended approach exactly
 
+### 🎛️ Node Graph Based Mixing (v2 ‑ 2025-06)
+**Why upgrade?** The simple-mixing callback works but limits us when we want many independent voices that can keep playing while others are replaced.  Miniaudio's *node-graph* API solves this by giving every sound its own node whose output is automatically mixed by the graph.
+
+**What changed natively**
+1. A global `ma_node_graph` is created during `miniaudio_init()`.
+2. Every slot (now up to **96** instead of 8) receives its own `ma_data_source_node` that wraps the slot's decoder.
+3. The device callback became one line – it just calls `ma_node_graph_read_pcm_frames()` which reads the mixed result from the graph's endpoint (it also keeps the same capture logic for recording).
+4. Play/stop now just **un-mute / mute** the node (volume 1.0 ↔ 0.0).  That means:
+   • A sound keeps playing across steps until explicitly stopped or naturally ends.  
+   • Re-triggering a slot simply rewinds the decoder and unmutes the node – perfectly sample-accurate restarts with no clicks.
+5. All slots' resources (decoder, memory, node) are cleaned up in the correct order.  The graph itself is torn down in `miniaudio_cleanup()`.
+
+**Dart / Flutter API impact**
+• Good news – **no API changes**.  The public FFI functions remain the same (`miniaudio_load_sound_to_slot`, `play_slot`, `stop_slot`, etc.).  The sequencer logic in `tracker_state.dart` already calls `playSlot()` every step and only stops a column when a new sample is triggered, which is exactly what the node-graph backend expects.
+• `MiniaudioLibrary.slotCount` now returns 96, giving enough room for 4×16 grid plus extras.
+
+**Benefits achieved**
+• Unlimited simultaneous voices (practically 96) with individual volume control.
+• Built-in clipping prevention and high-quality mixing handled by miniaudio.
+• Cleaner, shorter data callback and easier future DSP insertions (filters, delays, etc.) – just insert more nodes!
+
+If you are upgrading an existing app you only need to rebuild the native project.  No Dart code changes are required, but you can query `slotCount` to show the new limit in the UI if you like.
+
 ### **🎙️ Output Recording & Rendering**
 **Based on Simple Capture Example**: Implements [miniaudio's simple_capture pattern](https://miniaud.io/docs/examples/simple_capture.html) to record the mixed output from our single device architecture.
 

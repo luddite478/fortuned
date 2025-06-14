@@ -35,7 +35,7 @@ int miniaudio_reconfigure_audio_session(void);
 void miniaudio_cleanup(void);
 
 // MAX number of simultaneous playback slots
-#define MINIAUDIO_MAX_SLOTS 8
+#define MINIAUDIO_MAX_SLOTS 96
 
 // Returns the number of available playback slots (always MINIAUDIO_MAX_SLOTS)
 int miniaudio_get_slot_count(void);
