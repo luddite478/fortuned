@@ -7,6 +7,7 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **⚡ Low latency audio playbook** using miniaudio
 - **💾 Memory-loaded samples** - All samples are loaded into memory for instant triggering
 - **🎛️ DAW-style step sequencer** - 4-column × 16-step grid with BPM-based timing
+- **🎙️ Output recording & rendering** - Record grid combinations to WAV files
 - **📊 Memory usage tracking** - Real-time display of memory consumption per slot and total usage
 - **🔄 Instant restart capability** - Trigger samples from beginning on each play press
 - **📱 Cross-platform support** (iOS focus)
@@ -25,7 +26,8 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 ✅ **WORKING:** **Real-time memory usage tracking and display**  
 ✅ **WORKING:** **DAW-style step sequencer (4×16 grid, BPM timing)**  
 ✅ **WORKING:** **Thread-safe slot operations**  
-✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**
+✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**  
+✅ **WORKING:** **Output recording & rendering (single device architecture)**
 
 ## 🚀 **Key Features**
 
@@ -44,10 +46,78 @@ A Flutter project demonstrating FFI (Foreign Function Interface) integration wit
 - **Fast Triggering**: Safe to press play/stop rapidly without crashes
 
 ### **🎵 Audio Engineering Features**
-- **Based on Official Miniaudio Examples**: Implements the "simple mixing" pattern from [miniaudio docs](https://miniaud.io/docs/examples/simple_mixing.html)
-- **Single Device Architecture**: Uses one `ma_engine` for optimal performance, no multiple device overhead
-- **Automatic Mixing**: Samples are naturally mixed by the audio engine
+**Based on Official Miniaudio Simple Mixing Example**: Our audio playback system implements the exact pattern from [miniaudio's simple_mixing example](https://miniaud.io/docs/examples/simple_mixing.html).
+
+**Single Device Architecture for Playback:**
+- **One `ma_device`**: All audio mixing happens through a single device instance
+- **Single Data Callback**: One unified callback mixes all active audio slots
+- **Floating Point Mixing**: Uses `ma_format_f32` for precise sample addition
+- **No Engine Overhead**: Direct device approach eliminates multiple engine complexity
+
+**Simple Mixing Implementation:**
+```c
+// Official miniaudio Simple Mixing data callback (exactly like the example)
+static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+    float* pOutputF32 = (float*)pOutput;
+    memset(pOutputF32, 0, sizeof(float) * frameCount * CHANNEL_COUNT);
+
+    // Mix all active slots
+    for (int slot = 0; slot < MINIAUDIO_MAX_SLOTS; ++slot) {
+        audio_slot_t* s = &g_slots[slot];
+        
+        // Skip inactive, unloaded, or finished slots
+        if (!s->active || !s->loaded || s->at_end) {
+            continue;
+        }
+
+        mix_slot_audio(s, pOutputF32, frameCount);
+    }
+}
+```
+
+**How Mixing Works:**
+- **Zero Output Buffer**: Starts with silence (`memset(pOutputF32, 0, ...)`)
+- **Additive Mixing**: Each slot adds its samples to the output buffer
+- **Natural Blending**: Multiple samples playing simultaneously blend together
+- **No Clipping Protection**: Relies on proper sample levels (like the official example)
+
+**Key Technical Benefits:**
 - **Low-Latency Path**: Memory-loaded samples bypass file I/O for instant triggering
+- **Efficient Mixing**: Simple float addition, no complex DSP processing
+- **Scalable**: Easily handles 1-8 simultaneous samples
+- **Standard Pattern**: Follows miniaudio's recommended approach exactly
+
+### **🎙️ Output Recording & Rendering**
+**Based on Simple Capture Example**: Implements [miniaudio's simple_capture pattern](https://miniaud.io/docs/examples/simple_capture.html) to record the mixed output from our single device architecture.
+
+**Recording Approach:**
+- **Relies on Simple Mixing**: Uses the same single `ma_device` that handles playback mixing
+- **Data Callback Extension**: Adds recording to the existing mixing callback
+- **Zero-Copy Recording**: Mixed output is captured directly without additional processing
+- **WAV Format Output**: Records to standard WAV files for maximum compatibility
+
+**Recording Implementation:**
+```c
+// In the same data_callback that handles mixing:
+// 1. Mix all samples first (simple_mixing pattern)
+// 2. Then optionally record the mixed result
+if (g_is_output_recording) {
+    ma_encoder_write_pcm_frames(&g_output_encoder, pOutputF32, frameCount, NULL);
+}
+```
+
+**Recording Controls:**
+- **Record Button** (red dot): Start capturing grid output to WAV file
+- **Live Duration Display**: Shows MM:SS recording time with red pulsing indicator
+- **Stop Recording**: Saves file to device Documents folder
+- **Automatic Naming**: Files named `niyya_recording_YYYYMMDD_HHMMSS.wav`
+
+**Usage Workflow:**
+1. Create your beat/pattern in the 16-step grid sequencer
+2. Press record button (red dot) to start capturing
+3. Press play to start sequencer - everything is recorded live
+4. Stop recording when finished - file automatically saved
+5. Share or export your recorded creations
 
 ### **📊 Memory Usage Tracking**
 **Real-time Memory Monitoring:**
