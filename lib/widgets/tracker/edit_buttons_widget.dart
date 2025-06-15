@@ -19,11 +19,14 @@ class EditButtonsWidget extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              // Test button (placeholder)
+              // Selection Mode Toggle button
               IconButton(
-                icon: const Icon(Icons.science, color: Colors.grey),
-                onPressed: null, // No logic for now
-                tooltip: 'Test (Coming Soon)',
+                icon: Icon(
+                  tracker.isInSelectionMode ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: tracker.isInSelectionMode ? Colors.cyanAccent : Colors.grey,
+                ),
+                onPressed: () => tracker.toggleSelectionMode(),
+                tooltip: tracker.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
               ),
               // Delete button
               IconButton(

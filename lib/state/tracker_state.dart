@@ -84,6 +84,8 @@ class TrackerState extends ChangeNotifier {
   // Grid selection state
   Set<int> _selectedGridCells = {};
   bool _isSelecting = false;
+  bool _isInSelectionMode = false; // New: Track if we're in selection mode
+  bool _isDragging = false; // New: Track if user is currently dragging
   int? _selectionStartCell;
   int? _currentSelectionCell;
   
@@ -118,6 +120,11 @@ class TrackerState extends ChangeNotifier {
     Colors.teal,
   ];
 
+  // Track double-tap timing
+  DateTime? _lastTapTime;
+  int? _lastTappedCell;
+  static const Duration _doubleTapThreshold = Duration(milliseconds: 300);
+
   // Initialize tracker
   TrackerState() {
     _miniaudioLibrary = MiniaudioLibrary.instance;
@@ -145,6 +152,7 @@ class TrackerState extends ChangeNotifier {
   List<int?> get gridSamples => List.unmodifiable(_gridSamples);
   Set<int> get selectedGridCells => Set.unmodifiable(_selectedGridCells);
   bool get isSelecting => _isSelecting;
+  bool get isInSelectionMode => _isInSelectionMode;
   int get bpm => _bpm;
   int get currentStep => _currentStep;
   bool get isSequencerPlaying => _isSequencerPlaying;
@@ -320,41 +328,111 @@ class TrackerState extends ChangeNotifier {
   }
 
   void handlePadPress(int padIndex) {
-    if (_selectedGridCells.isNotEmpty) {
-      // Clear all selections when pressing with active selection
-      _selectedGridCells.clear();
-      _selectionStartCell = null;
-      _currentSelectionCell = null;
-      notifyListeners();
+    // Ignore tap events if user is currently dragging
+    if (_isDragging) {
       return;
     }
-
-    // Single tap - select just this cell
-    _selectedGridCells = {padIndex};
-    _selectionStartCell = padIndex;
-    _currentSelectionCell = padIndex;
+    
+    final now = DateTime.now();
+    
+    // Check for double-tap
+    if (_lastTapTime != null && 
+        _lastTappedCell == padIndex &&
+        now.difference(_lastTapTime!) <= _doubleTapThreshold) {
+      // Double-tap detected - clear all selections and exit selection mode
+      _clearAllSelections();
+      _lastTapTime = null;
+      _lastTappedCell = null;
+      return;
+    }
+    
+    // Update last tap info for double-tap detection
+    _lastTapTime = now;
+    _lastTappedCell = padIndex;
+    
+    // Normal single tap behavior (not in selection mode)
+    if (!_isInSelectionMode) {
+      if (_selectedGridCells.contains(padIndex)) {
+        // Tapping on an already selected cell - just remove the selection without adding new
+        _selectedGridCells.clear();
+        _selectionStartCell = null;
+        _currentSelectionCell = null;
+      } else {
+        // Step 1: Always unselect any previous selections first
+        _selectedGridCells.clear();
+        _selectionStartCell = null;
+        _currentSelectionCell = null;
+        
+        // Step 2: Select the new cell
+        _selectedGridCells.add(padIndex);
+        _selectionStartCell = padIndex;
+        _currentSelectionCell = padIndex;
+      }
+    } else {
+      // In selection mode
+      if (_selectedGridCells.isEmpty) {
+        // No cells selected - select the tapped cell
+        _selectedGridCells.add(padIndex);
+        _selectionStartCell = padIndex;
+        _currentSelectionCell = padIndex;
+      } else if (_selectedGridCells.contains(padIndex)) {
+        // Tapping on an already selected cell - just remove the selection without adding new
+        _selectedGridCells.clear();
+        _selectionStartCell = null;
+        _currentSelectionCell = null;
+      } else if (_selectedGridCells.length == 1) {
+        // Exactly one cell selected and tapping a different cell - unselect previous and select new
+        _selectedGridCells.clear();
+        _selectedGridCells.add(padIndex);
+        _selectionStartCell = padIndex;
+        _currentSelectionCell = padIndex;
+      } else {
+        // Multiple cells selected and tapping an unselected cell - clear all selections
+        _selectedGridCells.clear();
+        _selectionStartCell = null;
+        _currentSelectionCell = null;
+      }
+    }
+    
+    notifyListeners();
+  }
+  
+  void _clearAllSelections() {
+    _selectedGridCells.clear();
+    _selectionStartCell = null;
+    _currentSelectionCell = null;
+    _isInSelectionMode = false; // Exit selection mode
+    _isSelecting = false;
     notifyListeners();
   }
 
   void handleGridCellSelection(int cellIndex, bool isInside) {
+    // Only handle grid cell selection if we're in selection mode
+    if (!_isInSelectionMode) {
+      return;
+    }
+    
     if (!isInside) {
+      // End of drag - reset dragging state
       _isSelecting = false;
+      _isDragging = false;
       notifyListeners();
       return;
     }
 
     if (!_isSelecting) {
-      // Start selection
+      // Start drag selection immediately when touching down
       _isSelecting = true;
+      _isDragging = true; // Mark as dragging
       _selectionStartCell = cellIndex;
       _currentSelectionCell = cellIndex;
+      
+      // Start with just the touched cell selected
       _selectedGridCells = {cellIndex};
     } else {
-      // Update selection rectangle
-      if (_currentSelectionCell != cellIndex && _selectionStartCell != null) {
-        _currentSelectionCell = cellIndex;
-        _updateRectangularSelection();
-      }
+      // Update selection rectangle during drag
+      _currentSelectionCell = cellIndex;
+      _updateRectangularSelection();
     }
     notifyListeners();
   }
@@ -368,7 +446,7 @@ class TrackerState extends ChangeNotifier {
     final currentRow = _currentSelectionCell! ~/ _gridColumns;
     final currentCol = _currentSelectionCell! % _gridColumns;
 
-    // Calculate rectangle bounds
+    // Calculate rectangle bounds (inclusive)
     final minRow = startRow < currentRow ? startRow : currentRow;
     final maxRow = startRow > currentRow ? startRow : currentRow;
     final minCol = startCol < currentCol ? startCol : currentCol;
@@ -379,11 +457,18 @@ class TrackerState extends ChangeNotifier {
     for (int row = minRow; row <= maxRow; row++) {
       for (int col = minCol; col <= maxCol; col++) {
         final cellIndex = row * _gridColumns + col;
-        newSelection.add(cellIndex);
+        // Ensure we don't go out of bounds
+        if (cellIndex >= 0 && cellIndex < _gridSamples.length) {
+          newSelection.add(cellIndex);
+        }
       }
     }
 
-    _selectedGridCells = newSelection;
+    // Only update if selection actually changed (optimization)
+    if (newSelection.length != _selectedGridCells.length || 
+        !newSelection.every((cell) => _selectedGridCells.contains(cell))) {
+      _selectedGridCells = newSelection;
+    }
   }
 
   // OLD Drag & drop sample placement (replaced by version with sequencer sync below)
@@ -674,27 +759,50 @@ class TrackerState extends ChangeNotifier {
   }
 
   // Utility methods
-  int? getCellIndexFromPosition(Offset localPosition, BuildContext context) {
+  int? getCellIndexFromPosition(Offset localPosition, BuildContext context, {double scrollOffset = 0.0}) {
     // Calculate grid cell dimensions
     const crossAxisCount = 4;
     const crossAxisSpacing = 4.0;
     const mainAxisSpacing = 4.0;
     const childAspectRatio = 2.5;
+    const containerPadding = 16.0; // Account for Container padding in SampleGridWidget
     
-    // Get the available space (subtract padding)
-    final availableWidth = MediaQuery.of(context).size.width - 64; // 32 padding on each side
+    // Get the available space (subtract outer padding: 32px each side + inner container padding: 16px each side)
+    final availableWidth = MediaQuery.of(context).size.width - 64 - (containerPadding * 2);
     
     // Calculate cell dimensions
     final cellWidth = (availableWidth - (crossAxisSpacing * (crossAxisCount - 1))) / crossAxisCount;
     final cellHeight = cellWidth / childAspectRatio;
     
-    // Calculate which cell was touched
-    final column = (localPosition.dx / (cellWidth + crossAxisSpacing)).floor();
-    final row = (localPosition.dy / (cellHeight + mainAxisSpacing)).floor();
+    // Adjust local position to account for container padding and scroll offset
+    final adjustedX = localPosition.dx - containerPadding;
+    final adjustedY = localPosition.dy - containerPadding + scrollOffset;
     
-    // Validate bounds
-    if (column >= 0 && column < _gridColumns && row >= 0 && row < _gridRows) {
-      return row * _gridColumns + column;
+    // Calculate which cell was touched with generous boundary detection
+    // Add 2px margin to make edge selection more forgiving
+    const edgeMargin = 2.0;
+    
+    final columnFloat = (adjustedX + edgeMargin) / (cellWidth + crossAxisSpacing);
+    final rowFloat = (adjustedY + edgeMargin) / (cellHeight + mainAxisSpacing);
+    
+    final column = columnFloat.floor();
+    final row = rowFloat.floor();
+    
+    // More forgiving bounds check - allow slight overshoot
+    final isInColumnBounds = column >= 0 && column < _gridColumns;
+    final isInRowBounds = row >= 0 && row < _gridRows;
+    
+    // Additional check: if we're close to a cell boundary, include it
+    final isNearRightEdge = column == _gridColumns && adjustedX <= availableWidth + edgeMargin;
+    final isNearBottomEdge = row == _gridRows && adjustedY <= (_gridRows * (cellHeight + mainAxisSpacing)) + edgeMargin;
+    
+    if ((isInColumnBounds || (column == _gridColumns && isNearRightEdge)) && 
+        (isInRowBounds || (row == _gridRows && isNearBottomEdge))) {
+      // Clamp to valid indices if we're at the edge
+      final validColumn = column >= _gridColumns ? _gridColumns - 1 : column;
+      final validRow = row >= _gridRows ? _gridRows - 1 : row;
+      
+      return validRow * _gridColumns + validColumn;
     }
     
     return null;
@@ -765,8 +873,8 @@ ${sampleInfo.isEmpty ? 'No samples loaded' : sampleInfo.map((s) => '${s['slot']}
 🎹 PATTERN:
 ${gridVisualization.join('\n')}
 
-Made with NIYYA Tracker 🚀
-#NiyyaTracker #MusicProduction #Beats''';
+Made with Demo Tracker 🚀
+''';
 
     // Build structured data for future API integrations
     Map<String, dynamic> structuredData = {
@@ -929,6 +1037,30 @@ Made with NIYYA Tracker 🚀
     }
     
     notifyListeners();
+  }
+
+  // New method: Toggle selection mode on/off
+  void toggleSelectionMode() {
+    _isInSelectionMode = !_isInSelectionMode;
+    
+    // If exiting selection mode, clear all selections
+    if (!_isInSelectionMode) {
+      _selectedGridCells.clear();
+      _selectionStartCell = null;
+      _currentSelectionCell = null;
+      _isSelecting = false;
+    }
+    
+    notifyListeners();
+  }
+
+  // New method: Handle end of drag selection
+  void handlePanEnd() {
+    if (_isInSelectionMode) {
+      _isSelecting = false;
+      _isDragging = false;
+      notifyListeners();
+    }
   }
 
   @override
