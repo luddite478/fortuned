@@ -61,8 +61,8 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
               IconButton(
                 icon: const Icon(Icons.arrow_back, color: Colors.orangeAccent),
                 onPressed: () {
-                  // Clear current pattern to return to pattern selection
-                  context.read<PatternsState>().clearCurrentPattern();
+                  // Navigate back to pattern selection screen
+                  Navigator.of(context).pop();
                 },
                 tooltip: 'Back to Patterns',
               ),
@@ -145,6 +145,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
               IconButton(
                 icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
                 onPressed: () {
+                  // 🚀 Using sample-accurate sequencer for perfect timing
                   context.read<TrackerState>().startSequencer();
                 },
                 tooltip: 'Start Sequencer',
@@ -152,6 +153,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
               IconButton(
                 icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
                 onPressed: () {
+                  // 🚀 Using sample-accurate sequencer
                   context.read<TrackerState>().stopSequencer();
                 },
                 tooltip: 'Stop Sequencer',

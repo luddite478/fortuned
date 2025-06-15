@@ -78,7 +78,8 @@ class SampleGridWidget extends StatelessWidget {
     
     return DragTarget<int>(
       onAccept: (int sampleSlot) {
-        tracker.placeSampleInGrid(sampleSlot, index);
+                                  // 🚀 Use version with sequencer sync
+                          tracker.placeSampleInGrid(sampleSlot, index);
       },
       builder: (context, candidateData, rejectedData) {
         final bool isDragHovering = candidateData.isNotEmpty;

@@ -34,6 +34,16 @@ int miniaudio_reconfigure_audio_session(void);
 // Cleanup the miniaudio engine
 void miniaudio_cleanup(void);
 
+// Sequencer functions (sample-accurate timing)
+int miniaudio_start_sequencer(int bpm, int steps);
+void miniaudio_stop_sequencer(void);
+int miniaudio_is_sequencer_playing(void);
+int miniaudio_get_current_step(void);
+void miniaudio_set_sequencer_bpm(int bpm);
+void miniaudio_set_grid_cell(int step, int column, int sample_slot);
+void miniaudio_clear_grid_cell(int step, int column);
+void miniaudio_clear_all_grid_cells(void);
+
 // MAX number of simultaneous playback slots
 #define MINIAUDIO_MAX_SLOTS 1024
 

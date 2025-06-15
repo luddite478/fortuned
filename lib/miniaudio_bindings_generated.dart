@@ -134,6 +134,111 @@ class MiniaudioBindings {
   late final _miniaudio_cleanup =
       _miniaudio_cleanupPtr.asFunction<void Function()>();
 
+  /// Sequencer functions (sample-accurate timing)
+  int miniaudio_start_sequencer(
+    int bpm,
+    int steps,
+  ) {
+    return _miniaudio_start_sequencer(
+      bpm,
+      steps,
+    );
+  }
+
+  late final _miniaudio_start_sequencerPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
+          'miniaudio_start_sequencer');
+  late final _miniaudio_start_sequencer =
+      _miniaudio_start_sequencerPtr.asFunction<int Function(int, int)>();
+
+  void miniaudio_stop_sequencer() {
+    return _miniaudio_stop_sequencer();
+  }
+
+  late final _miniaudio_stop_sequencerPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>(
+          'miniaudio_stop_sequencer');
+  late final _miniaudio_stop_sequencer =
+      _miniaudio_stop_sequencerPtr.asFunction<void Function()>();
+
+  int miniaudio_is_sequencer_playing() {
+    return _miniaudio_is_sequencer_playing();
+  }
+
+  late final _miniaudio_is_sequencer_playingPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'miniaudio_is_sequencer_playing');
+  late final _miniaudio_is_sequencer_playing =
+      _miniaudio_is_sequencer_playingPtr.asFunction<int Function()>();
+
+  int miniaudio_get_current_step() {
+    return _miniaudio_get_current_step();
+  }
+
+  late final _miniaudio_get_current_stepPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'miniaudio_get_current_step');
+  late final _miniaudio_get_current_step =
+      _miniaudio_get_current_stepPtr.asFunction<int Function()>();
+
+  void miniaudio_set_sequencer_bpm(
+    int bpm,
+  ) {
+    return _miniaudio_set_sequencer_bpm(
+      bpm,
+    );
+  }
+
+  late final _miniaudio_set_sequencer_bpmPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+          'miniaudio_set_sequencer_bpm');
+  late final _miniaudio_set_sequencer_bpm =
+      _miniaudio_set_sequencer_bpmPtr.asFunction<void Function(int)>();
+
+  void miniaudio_set_grid_cell(
+    int step,
+    int column,
+    int sample_slot,
+  ) {
+    return _miniaudio_set_grid_cell(
+      step,
+      column,
+      sample_slot,
+    );
+  }
+
+  late final _miniaudio_set_grid_cellPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int, ffi.Int, ffi.Int)>>(
+          'miniaudio_set_grid_cell');
+  late final _miniaudio_set_grid_cell =
+      _miniaudio_set_grid_cellPtr.asFunction<void Function(int, int, int)>();
+
+  void miniaudio_clear_grid_cell(
+    int step,
+    int column,
+  ) {
+    return _miniaudio_clear_grid_cell(
+      step,
+      column,
+    );
+  }
+
+  late final _miniaudio_clear_grid_cellPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int, ffi.Int)>>(
+          'miniaudio_clear_grid_cell');
+  late final _miniaudio_clear_grid_cell =
+      _miniaudio_clear_grid_cellPtr.asFunction<void Function(int, int)>();
+
+  void miniaudio_clear_all_grid_cells() {
+    return _miniaudio_clear_all_grid_cells();
+  }
+
+  late final _miniaudio_clear_all_grid_cellsPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>(
+          'miniaudio_clear_all_grid_cells');
+  late final _miniaudio_clear_all_grid_cells =
+      _miniaudio_clear_all_grid_cellsPtr.asFunction<void Function()>();
+
   /// Returns the number of available playback slots (always MINIAUDIO_MAX_SLOTS)
   int miniaudio_get_slot_count() {
     return _miniaudio_get_slot_count();
@@ -575,4 +680,4 @@ const int SIG_ATOMIC_MIN = -2147483648;
 
 const int SIG_ATOMIC_MAX = 2147483647;
 
-const int MINIAUDIO_MAX_SLOTS = 8;
+const int MINIAUDIO_MAX_SLOTS = 1024;

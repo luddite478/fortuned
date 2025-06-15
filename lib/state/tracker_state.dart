@@ -386,20 +386,7 @@ class TrackerState extends ChangeNotifier {
     _selectedGridCells = newSelection;
   }
 
-  // Drag & drop sample placement
-  void placeSampleInGrid(int sampleSlot, int cellIndex) {
-    if (_selectedGridCells.isNotEmpty) {
-      // Place sample in all selected cells
-      for (int selectedIndex in _selectedGridCells) {
-        _gridSamples[selectedIndex] = sampleSlot;
-      }
-      _selectedGridCells.clear();
-    } else {
-      // Place sample in just this cell
-      _gridSamples[cellIndex] = sampleSlot;
-    }
-    notifyListeners();
-  }
+  // OLD Drag & drop sample placement (replaced by version with sequencer sync below)
 
   // Copy/paste/delete operations
   void copySelectedCells() {
@@ -475,6 +462,10 @@ class TrackerState extends ChangeNotifier {
     for (int cellIndex in _selectedGridCells) {
       if (cellIndex >= 0 && cellIndex < _gridSamples.length) {
         _gridSamples[cellIndex] = null;
+        // Sync deletion to native sequencer
+        final row = cellIndex ~/ _gridColumns;
+        final col = cellIndex % _gridColumns;
+        _miniaudioLibrary.clearGridCell(row, col);
       }
     }
     // Clear selection after deletion
@@ -484,18 +475,101 @@ class TrackerState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Sequencer functionality
+  // OLD Flutter Timer-based sequencer (replaced by sample-accurate version below)
+
+  // Sequencer functionality with sample-accurate timing
   void startSequencer() {
-    if (_isSequencerPlaying) return;
+    if (_miniaudioLibrary.isSequencerPlaying) return;
     
-    _isSequencerPlaying = true;
-    _currentStep = 0;
+    // First, transfer current grid to sequencer
+    _syncGridToSequencer();
+    
+    // Start sequencer with current BPM and grid size
+    bool success = _miniaudioLibrary.startSequencer(_bpm, _gridRows);
+    if (success) {
+      _isSequencerPlaying = true;
+      // Start a timer just for UI updates (not audio timing)
+      _startUIUpdateTimer();
+    }
     notifyListeners();
+  }
+  
+  void stopSequencer() {
+    _miniaudioLibrary.stopSequencer();
+    _isSequencerPlaying = false;
+    _currentStep = -1;
     
-    _scheduleNextStep();
+    _sequencerTimer?.cancel();
+    _sequencerTimer = null;
+    
+    // Reset column tracking
+    for (int i = 0; i < _gridColumns; i++) {
+      _columnPlayingSample[i] = null;
+    }
+    notifyListeners();
+  }
+  
+  void _syncGridToSequencer() {
+    // Clear sequencer grid first
+    _miniaudioLibrary.clearAllGridCells();
+    
+    // Transfer current grid to sequencer
+    for (int row = 0; row < _gridRows; row++) {
+      for (int col = 0; col < _gridColumns; col++) {
+        final cellIndex = row * _gridColumns + col;
+        final sampleSlot = _gridSamples[cellIndex];
+        if (sampleSlot != null) {
+          _miniaudioLibrary.setGridCell(row, col, sampleSlot);
+        }
+      }
+    }
+  }
+  
+  void _startUIUpdateTimer() {
+    // This timer is ONLY for UI updates, not audio timing
+    // Audio timing is handled by sequencer in audio callback
+    const uiUpdateIntervalMs = 50; // 20 FPS UI updates
+    
+    _sequencerTimer = Timer.periodic(Duration(milliseconds: uiUpdateIntervalMs), (timer) {
+      if (!_miniaudioLibrary.isSequencerPlaying) {
+        timer.cancel();
+        _sequencerTimer = null;
+        return;
+      }
+      
+      // Get current step from sequencer
+      final currentStep = _miniaudioLibrary.currentStep;
+      if (currentStep != _currentStep) {
+        _currentStep = currentStep;
+        notifyListeners(); // Only update UI when step actually changes
+      }
+    });
+  }
+  
+  // Update grid cell and sync to sequencer
+  void placeSampleInGrid(int sampleSlot, int cellIndex) {
+    if (_selectedGridCells.isNotEmpty) {
+      // Place sample in all selected cells
+      for (int selectedIndex in _selectedGridCells) {
+        _gridSamples[selectedIndex] = sampleSlot;
+        // Sync to sequencer
+        final row = selectedIndex ~/ _gridColumns;
+        final col = selectedIndex % _gridColumns;
+        _miniaudioLibrary.setGridCell(row, col, sampleSlot);
+      }
+      _selectedGridCells.clear();
+    } else {
+      // Place sample in just this cell
+      _gridSamples[cellIndex] = sampleSlot;
+      // Sync to sequencer
+      final row = cellIndex ~/ _gridColumns;
+      final col = cellIndex % _gridColumns;
+      _miniaudioLibrary.setGridCell(row, col, sampleSlot);
+    }
+    notifyListeners();
   }
 
-  void stopSequencer() {
+  void stopSequencerOld() {
     _isSequencerPlaying = false;
     _currentStep = -1;
     notifyListeners();
@@ -758,6 +832,102 @@ Made with NIYYA Tracker 🚀
   void clearLastRecording() {
     _lastRecordingPath = null;
     _lastRecordingTime = null;
+    notifyListeners();
+  }
+
+  // 🧪 TEST METHOD: Easy way to test native sequencer
+  void testNativeSequencer() {
+    print('🧪 Testing Native Sequencer...');
+    
+    // Stop any current sequencer
+    if (_isSequencerPlaying) {
+      stopSequencer();
+    }
+    
+    // Make sure we have some loaded samples to test with
+    bool hasLoadedSamples = false;
+    for (int i = 0; i < _slotCount; i++) {
+      if (_slotLoaded[i]) {
+        hasLoadedSamples = true;
+        break;
+      }
+    }
+    
+    if (!hasLoadedSamples) {
+      print('❌ No samples loaded - load some samples first to test sequencer');
+      return;
+    }
+    
+    // Create a simple test pattern
+    print('🎵 Creating test pattern...');
+    
+    // Clear current grid
+    for (int i = 0; i < _gridSamples.length; i++) {
+      _gridSamples[i] = null;
+    }
+    
+    // Add a simple pattern using the first loaded sample
+    int? firstLoadedSlot;
+    for (int i = 0; i < _slotCount; i++) {
+      if (_slotLoaded[i]) {
+        firstLoadedSlot = i;
+        break;
+      }
+    }
+    
+    if (firstLoadedSlot != null) {
+      // Create a simple kick pattern on steps 1, 5, 9, 13 (every 4 steps)
+      for (int step = 0; step < 16; step += 4) {
+        final cellIndex = step * _gridColumns + 0; // First column
+        _gridSamples[cellIndex] = firstLoadedSlot;
+      }
+      
+      // If we have a second loaded sample, add it on off-beats
+      int? secondLoadedSlot;
+      for (int i = firstLoadedSlot + 1; i < _slotCount; i++) {
+        if (_slotLoaded[i]) {
+          secondLoadedSlot = i;
+          break;
+        }
+      }
+      
+      if (secondLoadedSlot != null) {
+        // Add second sample on steps 2, 6, 10, 14
+        for (int step = 2; step < 16; step += 4) {
+          final cellIndex = step * _gridColumns + 1; // Second column
+          _gridSamples[cellIndex] = secondLoadedSlot;
+        }
+      }
+      
+      print('🎹 Test pattern created with samples $firstLoadedSlot${secondLoadedSlot != null ? ' and $secondLoadedSlot' : ''}');
+      
+      // Now start the sequencer
+      print('🚀 Starting sequencer at ${_bpm} BPM...');
+      startSequencer();
+      
+      print('✅ Sequencer test started! You should hear the pattern playing.');
+      print('   Call testStopSequencer() to stop it.');
+    }
+  }
+  
+  // 🧪 TEST METHOD: Stop the sequencer test
+  void testStopSequencer() {
+    print('⏹️ Stopping sequencer test...');
+    stopSequencer();
+    print('✅ Sequencer stopped.');
+  }
+
+  // Update BPM and sync with native sequencer
+  void setBpm(int newBpm) {
+    if (newBpm < 60 || newBpm > 300) return;
+    
+    _bpm = newBpm;
+    
+    // Update sequencer BPM if it's running
+    if (_miniaudioLibrary.isSequencerPlaying) {
+      _miniaudioLibrary.setSequencerBpm(newBpm);
+    }
+    
     notifyListeners();
   }
 

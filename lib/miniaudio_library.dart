@@ -283,4 +283,95 @@ class MiniaudioLibrary {
   }
 
   // Debug functions removed - Bluetooth audio working correctly
+
+  // -------------- SEQUENCER FUNCTIONS (Sample-accurate timing) --------------
+  
+  /// Start the sequencer with sample-accurate timing
+  /// This moves timing logic from Flutter Timer to the audio callback
+  bool startSequencer(int bpm, int steps) {
+    if (!isInitialized()) {
+      print('❌ Audio not initialized');
+      return false;
+    }
+    
+    try {
+      int result = _bindings.miniaudio_start_sequencer(bpm, steps);
+      bool success = result == 0;
+      if (success) {
+        print('🎵 Sequencer started: $bpm BPM, $steps steps');
+      } else {
+        print('❌ Failed to start sequencer');
+      }
+      return success;
+    } catch (e) {
+      print('❌ Error starting sequencer: $e');
+      return false;
+    }
+  }
+  
+  /// Stop the sequencer
+  void stopSequencer() {
+    try {
+      _bindings.miniaudio_stop_sequencer();
+      print('⏹️ Sequencer stopped');
+    } catch (e) {
+      print('❌ Error stopping sequencer: $e');
+    }
+  }
+  
+  /// Check if sequencer is playing
+  bool get isSequencerPlaying {
+    try {
+      return _bindings.miniaudio_is_sequencer_playing() == 1;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  /// Get current sequencer step (0-based)
+  int get currentStep {
+    try {
+      return _bindings.miniaudio_get_current_step();
+    } catch (e) {
+      return -1;
+    }
+  }
+  
+  /// Set sequencer BPM (updates timing instantly)
+  void setSequencerBpm(int bpm) {
+    try {
+      _bindings.miniaudio_set_sequencer_bpm(bpm);
+    } catch (e) {
+      print('❌ Error setting sequencer BPM: $e');
+    }
+  }
+  
+  /// Set a grid cell to play a specific sample slot
+  /// step: 0-31, column: 0-7, sampleSlot: 0-1023 (or -1 to clear)
+  void setGridCell(int step, int column, int sampleSlot) {
+    try {
+      _bindings.miniaudio_set_grid_cell(step, column, sampleSlot);
+    } catch (e) {
+      print('❌ Error setting grid cell: $e');
+    }
+  }
+  
+  /// Clear a specific grid cell
+  void clearGridCell(int step, int column) {
+    try {
+      _bindings.miniaudio_clear_grid_cell(step, column);
+    } catch (e) {
+      print('❌ Error clearing grid cell: $e');
+    }
+  }
+  
+  /// Clear all grid cells
+  void clearAllGridCells() {
+    try {
+      _bindings.miniaudio_clear_all_grid_cells();
+      print('🗑️ All grid cells cleared');
+    } catch (e) {
+      print('❌ Error clearing all grid cells: $e');
+    }
+  }
 } 

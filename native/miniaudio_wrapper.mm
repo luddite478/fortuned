@@ -97,6 +97,19 @@ static int g_is_output_recording = 0;
 static uint64_t g_recording_start_time = 0;
 static uint64_t g_total_frames_written = 0;
 
+// Sequencer state for sample-accurate timing
+#define MAX_SEQUENCER_STEPS 32
+#define MAX_SEQUENCER_COLUMNS 8
+static int g_sequencer_playing = 0;
+static int g_sequencer_bpm = 120;
+static int g_sequencer_steps = 16;
+static int g_current_step = 0;
+static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_SEQUENCER_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
+static uint64_t g_frames_per_step = 0;
+static uint64_t g_step_frame_counter = 0;
+static int g_column_playing_sample[MAX_SEQUENCER_COLUMNS]; // Track which sample is playing in each column
+static int g_step_just_changed = 0; // Flag to handle immediate step playback
+
 // Note: Thread safety removed for simplicity - miniaudio handles internal synchronization
 
 // Helper function to load entire audio file into memory buffer
@@ -310,14 +323,98 @@ static void mix_slot_audio(audio_slot_t* slot, float* output, ma_uint32 frameCou
     }
 }
 
-// Node-graph based data callback. We simply read samples from the endpoint of
-// our global graph which implicitly mixes all connected slot nodes.
-static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
-    // Read directly from the graph. The graph guarantees the correct channel
-    // count and sample format because we configured it to match the device.
+// Play all samples that should trigger on this step
+static void play_samples_for_step(int step) {
+    if (step < 0 || step >= g_sequencer_steps) return;
+    
+    prnt("🎵 [SEQUENCER] Playing step %d", step);
+    
+    // Check each column (track) for this step
+    for (int column = 0; column < MAX_SEQUENCER_COLUMNS; column++) {
+        int sample_to_play = g_sequencer_grid[step][column];
+        
+        // Is there a sample in this grid cell?
+        if (sample_to_play >= 0 && sample_to_play < MINIAUDIO_MAX_SLOTS) {
+            audio_slot_t* sample = &g_slots[sample_to_play];
+            if (sample->loaded && sample->node_initialized) {
+                prnt("🎹 [SEQUENCER] Step %d, Column %d: Want sample %d, Currently playing: %d", 
+                     step, column, sample_to_play, g_column_playing_sample[column]);
+                
+                // Different sample than what's currently playing in this column?
+                if (g_column_playing_sample[column] != sample_to_play) {
+                    // Stop the old sample in this column
+                    if (g_column_playing_sample[column] >= 0) {
+                        audio_slot_t* old_sample = &g_slots[g_column_playing_sample[column]];
+                        if (old_sample->node_initialized) {
+                            ma_node_set_output_bus_volume(&old_sample->node, 0, 0.0f);
+                            prnt("⏹️ [SEQUENCER] Stopped sample %d in column %d", g_column_playing_sample[column], column);
+                        }
+                    }
+                    
+                    // Start the new sample
+                    ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);  // Restart from beginning
+                    ma_node_set_output_bus_volume(&sample->node, 0, 1.0f);  // Turn volume on
+                    g_column_playing_sample[column] = sample_to_play;  // Remember what's playing
+                    prnt("▶️ [SEQUENCER] Started sample %d in column %d", sample_to_play, column);
+                } else {
+                    // Same sample - restart it from the beginning
+                    ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);
+                    prnt("🔄 [SEQUENCER] Restarted sample %d in column %d", sample_to_play, column);
+                }
+            }
+        } else {
+            prnt("➖ [SEQUENCER] Step %d, Column %d: Empty (currently playing: %d)", 
+                 step, column, g_column_playing_sample[column]);
+        }
+        // IMPORTANT: If grid cell is empty, do NOTHING
+        // Let previous samples continue playing until replaced
+    }
+}
+
+// Run the sequencer: count frames, advance steps, and trigger samples
+static void run_sequencer(ma_uint32 frameCount) {
+    if (!g_sequencer_playing || g_frames_per_step == 0) return;
+    
+    // If sequencer just started, play step 0 immediately
+    if (g_step_just_changed) {
+        g_step_just_changed = 0;
+        play_samples_for_step(g_current_step);
+    }
+    
+    // Count audio frames to determine when to advance to next step
+    for (ma_uint32 frame = 0; frame < frameCount; frame++) {
+        g_step_frame_counter++;
+        
+        // Time to move to the next step?
+        if (g_step_frame_counter >= g_frames_per_step) {
+            g_step_frame_counter = 0;  // Reset frame counter
+            int previous_step = g_current_step;
+            g_current_step = (g_current_step + 1) % g_sequencer_steps;  // Advance step (with loop)
+            
+            // Did we loop back from last step to step 0?
+            if (previous_step > g_current_step) {
+                prnt("🔄 [SEQUENCER] Looping back to step 0 - clearing column memory");
+                // Clear memory of what was playing in each column
+                for (int i = 0; i < MAX_SEQUENCER_COLUMNS; i++) {
+                    g_column_playing_sample[i] = -1;
+                }
+            }
+            
+            // Play samples for the new step
+            play_samples_for_step(g_current_step);
+        }
+    }
+}
+
+// Main audio callback - called by miniaudio every ~11ms to fill the audio buffer
+static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+    // 1. Run the sequencer (timing + sample triggering)
+    run_sequencer(frameCount);
+    
+    // 2. Mix all playing samples into the output buffer
     ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 
-    // If recording is active, capture the same buffer to the encoder.
+    // 3. If recording, save the mixed audio to file
     if (g_is_output_recording) {
         ma_encoder_write_pcm_frames(&g_output_encoder, pOutput, frameCount, NULL);
         g_total_frames_written += frameCount;
@@ -468,6 +565,27 @@ int miniaudio_init(void) {
     }
     g_total_memory_used = 0;
     
+    // Initialize sequencer state
+    g_sequencer_playing = 0;
+    g_sequencer_bpm = 120;
+    g_sequencer_steps = 16;
+    g_current_step = 0;
+    g_step_frame_counter = 0;
+    g_step_just_changed = 0;
+    g_frames_per_step = (SAMPLE_RATE * 60) / (g_sequencer_bpm * 4); // 1/16 note frames
+    
+    // Initialize sequencer grid (all empty)
+    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
+        for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+            g_sequencer_grid[step][col] = -1; // -1 means empty
+        }
+    }
+    
+    // Initialize column tracking
+    for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+        g_column_playing_sample[col] = -1;
+    }
+    
     // ---------------------------------------------------------------------
     // Initialize the node graph which will perform automatic mixing of all
     // slot nodes. Every slot's data_source_node will connect directly to
@@ -489,8 +607,18 @@ int miniaudio_init(void) {
     deviceConfig.playback.format = SAMPLE_FORMAT;
     deviceConfig.playback.channels = CHANNEL_COUNT;
     deviceConfig.sampleRate = SAMPLE_RATE;
-    deviceConfig.dataCallback = data_callback;
+    deviceConfig.dataCallback = audio_callback;
     deviceConfig.pUserData = NULL;
+    
+    // Optimize buffer settings for lower latency and better performance
+    deviceConfig.periodSizeInFrames = 512;     // Reduce buffer size for lower latency
+    deviceConfig.periodSizeInMilliseconds = 0; // Use frames instead of milliseconds
+    deviceConfig.periods = 2;                  // Double buffering for smooth playback
+    
+    // iOS-specific optimizations
+    #ifdef __APPLE__
+    deviceConfig.coreaudio.allowNominalSampleRateChange = MA_FALSE; // Prevent rate changes
+    #endif
     
     ma_result result = ma_device_init(NULL, &deviceConfig, &g_device);
     if (result != MA_SUCCESS) {
@@ -793,12 +921,137 @@ uint64_t miniaudio_get_recording_duration_ms(void) {
     return (g_total_frames_written * 1000) / SAMPLE_RATE;
 }
 
+// Sequencer functions (sample-accurate timing)
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_start_sequencer(int bpm, int steps) {
+    if (!g_is_initialized) {
+        prnt_err("🔴 [SEQUENCER] Device not initialized");
+        return -1;
+    }
+    
+    if (bpm <= 0 || bpm > 300) {
+        prnt_err("🔴 [SEQUENCER] Invalid BPM: %d", bpm);
+        return -1;
+    }
+    
+    if (steps <= 0 || steps > MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [SEQUENCER] Invalid steps: %d (max: %d)", steps, MAX_SEQUENCER_STEPS);
+        return -1;
+    }
+    
+    // Stop any currently playing samples
+    for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+        if (g_column_playing_sample[col] >= 0) {
+            audio_slot_t* s = &g_slots[g_column_playing_sample[col]];
+            if (s->node_initialized) {
+                ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
+            }
+            g_column_playing_sample[col] = -1;
+        }
+    }
+    
+    // Configure sequencer
+    g_sequencer_bpm = bpm;
+    g_sequencer_steps = steps;
+    g_frames_per_step = (SAMPLE_RATE * 60) / (bpm * 4); // 1/16 note frames
+    g_current_step = 0;
+    g_step_frame_counter = 0;
+    g_step_just_changed = 1; // Flag to play step 0 immediately
+    g_sequencer_playing = 1;
+    
+    prnt("🎵 [SEQUENCER] Started: %d BPM, %d steps, %llu frames per step", bpm, steps, g_frames_per_step);
+    return 0;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+void miniaudio_stop_sequencer(void) {
+    g_sequencer_playing = 0;
+    g_current_step = 0;
+    g_step_frame_counter = 0;
+    g_step_just_changed = 0;
+    
+    // Stop all currently playing samples
+    for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+        if (g_column_playing_sample[col] >= 0) {
+            audio_slot_t* s = &g_slots[g_column_playing_sample[col]];
+            if (s->node_initialized) {
+                ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
+            }
+            g_column_playing_sample[col] = -1;
+        }
+    }
+    
+    prnt("⏹️ [SEQUENCER] Stopped");
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_is_sequencer_playing(void) {
+    return g_sequencer_playing;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+int miniaudio_get_current_step(void) {
+    return g_current_step;
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+void miniaudio_set_sequencer_bpm(int bpm) {
+    if (bpm > 0 && bpm <= 300) {
+        g_sequencer_bpm = bpm;
+        g_frames_per_step = (SAMPLE_RATE * 60) / (bpm * 4); // 1/16 note frames
+        prnt("🎵 [SEQUENCER] BPM changed to %d (%llu frames per step)", bpm, g_frames_per_step);
+    } else {
+        prnt_err("🔴 [SEQUENCER] Invalid BPM: %d", bpm);
+    }
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+void miniaudio_set_grid_cell(int step, int column, int sample_slot) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [SEQUENCER] Invalid step: %d", step);
+        return;
+    }
+    if (column < 0 || column >= MAX_SEQUENCER_COLUMNS) {
+        prnt_err("🔴 [SEQUENCER] Invalid column: %d", column);
+        return;
+    }
+    if (sample_slot < -1 || sample_slot >= MINIAUDIO_MAX_SLOTS) {
+        prnt_err("🔴 [SEQUENCER] Invalid sample slot: %d", sample_slot);
+        return;
+    }
+    
+    g_sequencer_grid[step][column] = sample_slot;
+    prnt("🎹 [SEQUENCER] Set cell [%d,%d] = %d", step, column, sample_slot);
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+void miniaudio_clear_grid_cell(int step, int column) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) return;
+    if (column < 0 || column >= MAX_SEQUENCER_COLUMNS) return;
+    
+    g_sequencer_grid[step][column] = -1;
+    prnt("🗑️ [SEQUENCER] Cleared cell [%d,%d]", step, column);
+}
+
+__attribute__((visibility("default"))) __attribute__((used))
+void miniaudio_clear_all_grid_cells(void) {
+    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
+        for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+            g_sequencer_grid[step][col] = -1;
+        }
+    }
+    prnt("🗑️ [SEQUENCER] Cleared all grid cells");
+}
+
 // Cleanup function
 __attribute__((visibility("default"))) __attribute__((used))
 void miniaudio_cleanup(void) {
     if (!g_is_initialized) return;
     
     prnt("🧹 [MINIAUDIO] Starting cleanup...");
+    
+    // Stop sequencer
+    miniaudio_stop_sequencer();
     
     // Stop recording if active
     if (g_is_output_recording) {
