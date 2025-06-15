@@ -38,19 +38,6 @@ class EditButtonsWidget extends StatelessWidget {
                     : null,
                 tooltip: 'Delete Selected Cells',
               ),
-              // Paste button
-              IconButton(
-                icon: Icon(
-                  Icons.paste,
-                  color: tracker.hasClipboardData && tracker.selectedGridCells.isNotEmpty
-                      ? Colors.greenAccent
-                      : Colors.grey,
-                ),
-                onPressed: tracker.hasClipboardData && tracker.selectedGridCells.isNotEmpty
-                    ? () => tracker.pasteToSelectedCells()
-                    : null,
-                tooltip: 'Paste to Selected Cells',
-              ),
               // Copy button
               IconButton(
                 icon: Icon(
@@ -63,6 +50,19 @@ class EditButtonsWidget extends StatelessWidget {
                     ? () => tracker.copySelectedCells()
                     : null,
                 tooltip: 'Copy Selected Cells',
+              ),
+              // Paste button
+              IconButton(
+                icon: Icon(
+                  Icons.paste,
+                  color: tracker.hasClipboardData && tracker.selectedGridCells.isNotEmpty
+                      ? Colors.greenAccent
+                      : Colors.grey,
+                ),
+                onPressed: tracker.hasClipboardData && tracker.selectedGridCells.isNotEmpty
+                    ? () => tracker.pasteToSelectedCells()
+                    : null,
+                tooltip: 'Paste to Selected Cells',
               ),
             ],
           ),
