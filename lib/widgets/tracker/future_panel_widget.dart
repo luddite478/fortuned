@@ -17,15 +17,19 @@ class FuturePanelWidget extends StatelessWidget {
             color: const Color(0xFF1f2937),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: trackerState.lastRecordingPath != null 
-                ? Colors.purpleAccent.withOpacity(0.3)
-                : Colors.transparent,
+              color: trackerState.isSelectingSample
+                ? Colors.cyanAccent.withOpacity(0.3)
+                : trackerState.lastRecordingPath != null 
+                  ? Colors.purpleAccent.withOpacity(0.3)
+                  : Colors.transparent,
               width: 1,
             ),
           ),
-          child: trackerState.lastRecordingPath != null
-              ? _buildRecordingVisualization(context, trackerState)
-              : _buildPlaceholder(),
+          child: trackerState.isSelectingSample
+              ? _buildSampleBrowser(context, trackerState)
+              : trackerState.lastRecordingPath != null
+                  ? _buildRecordingVisualization(context, trackerState)
+                  : _buildPlaceholder(),
         );
       },
     );
@@ -227,6 +231,184 @@ class FuturePanelWidget extends StatelessWidget {
           ),
                  ],
        ),
+      ),
+    );
+  }
+
+  Widget _buildSampleBrowser(BuildContext context, TrackerState trackerState) {
+    final slotLetter = trackerState.sampleSelectionSlot != null 
+        ? String.fromCharCode(65 + trackerState.sampleSelectionSlot!)
+        : '';
+    
+    return Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with sample selection info
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: Colors.cyan.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.audiotrack, color: Colors.cyanAccent, size: 12),
+                    const SizedBox(width: 4),
+                    Text(
+                      'SLOT $slotLetter',
+                      style: const TextStyle(
+                        color: Colors.cyanAccent,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              if (trackerState.currentSamplePath.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () => trackerState.navigateBackInSamples(),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.arrow_back, color: Colors.grey, size: 12),
+                        SizedBox(width: 4),
+                        Text(
+                          'BACK',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: Text(
+                  trackerState.currentSamplePath.isEmpty 
+                      ? 'samples/' 
+                      : 'samples/${trackerState.currentSamplePath.join('/')}/',
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 10,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              GestureDetector(
+                onTap: () => trackerState.cancelSampleSelection(),
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Icon(
+                    Icons.close,
+                    color: Colors.red,
+                    size: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          
+          // Horizontal scrollable sample list
+          Expanded(
+            child: trackerState.currentSampleItems.isEmpty
+                ? const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.folder_open,
+                          color: Colors.grey,
+                          size: 32,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Loading samples...',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: trackerState.currentSampleItems.map((item) {
+                        return GestureDetector(
+                          onTap: () => trackerState.selectSampleItem(item),
+                          child: Container(
+                            width: 100,
+                            height: double.infinity,
+                            margin: const EdgeInsets.only(right: 8),
+                            decoration: BoxDecoration(
+                              color: item.isFolder 
+                                  ? Colors.blue.withOpacity(0.2)
+                                  : Colors.green.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: item.isFolder 
+                                    ? Colors.blue.withOpacity(0.4)
+                                    : Colors.green.withOpacity(0.4),
+                                width: 1,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    item.isFolder ? Icons.folder : Icons.audiotrack,
+                                    color: item.isFolder ? Colors.blue : Colors.green,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    item.name,
+                                    style: TextStyle(
+                                      color: item.isFolder ? Colors.blue : Colors.green,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+          ),
+        ],
       ),
     );
   }

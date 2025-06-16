@@ -5,12 +5,27 @@ import 'dart:collection';
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../miniaudio_library.dart';
-import '../screens/sample_browser_screen.dart';
 import 'patterns_state.dart';
+
+// Sample browser item model
+class SampleBrowserItem {
+  final String name;
+  final String path;
+  final bool isFolder;
+  final int size;
+
+  const SampleBrowserItem({
+    required this.name,
+    required this.path,
+    required this.isFolder,
+    this.size = 0,
+  });
+}
 
 // Sample slot data model
 class SampleSlot {
@@ -125,6 +140,12 @@ class TrackerState extends ChangeNotifier {
   int? _lastTappedCell;
   static const Duration _doubleTapThreshold = Duration(milliseconds: 300);
 
+  // Sample selection state
+  bool _isSelectingSample = false;
+  int? _sampleSelectionSlot;
+  List<String> _currentSamplePath = [];
+  List<SampleBrowserItem> _currentSampleItems = [];
+
   // Initialize tracker
   TrackerState() {
     _miniaudioLibrary = MiniaudioLibrary.instance;
@@ -164,6 +185,10 @@ class TrackerState extends ChangeNotifier {
   List<Color> get bankColors => List.unmodifiable(_bankColors);
   bool get hasClipboardData => _hasClipboardData;
   int get slotCount => _slotCount;
+  bool get isSelectingSample => _isSelectingSample;
+  int? get sampleSelectionSlot => _sampleSelectionSlot;
+  List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
+  List<SampleBrowserItem> get currentSampleItems => List.unmodifiable(_currentSampleItems);
   
   List<SampleSlot> get loadedSlots {
     List<SampleSlot> slots = [];
@@ -214,37 +239,133 @@ class TrackerState extends ChangeNotifier {
   }
 
   Future<void> pickFileForSlot(int slot, BuildContext context) async {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SampleBrowserScreen(
-          slotIndex: slot,
-          onSampleSelected: (String path, String name) async {
-            try {
-              String finalPath = path;
-              
-              // Check if this is a bundled asset path (starts with "samples/")
-              if (path.startsWith('samples/')) {
-                print('🎵 Loading bundled asset: $path');
-                finalPath = await _copyAssetToTemp(path, name);
-                print('📁 Copied to temp file: $finalPath');
-              }
-              
-              _filePaths[slot] = finalPath;
-              _fileNames[slot] = name;
-              _slotLoaded[slot] = false;
-              notifyListeners();
-              
-              // Always load sample to memory immediately
-              loadSlot(slot);
-              
-            } catch (e) {
-              print('❌ Error loading sample: $e');
-            }
-          },
-        ),
-      ),
-    );
+    _isSelectingSample = true;
+    _sampleSelectionSlot = slot;
+    _currentSamplePath.clear();
+    await _loadSamples();
+    notifyListeners();
+  }
+
+  void cancelSampleSelection() {
+    _isSelectingSample = false;
+    _sampleSelectionSlot = null;
+    _currentSamplePath.clear();
+    _currentSampleItems.clear();
+    notifyListeners();
+  }
+
+  Future<void> selectSampleItem(SampleBrowserItem item) async {
+    if (item.isFolder) {
+      _currentSamplePath.add(item.name);
+      await _loadSamples();
+      notifyListeners();
+    } else {
+      // Select the sample file
+      await _selectSampleFile(item.path, item.name);
+    }
+  }
+
+  void navigateBackInSamples() {
+    if (_currentSamplePath.isNotEmpty) {
+      _currentSamplePath.removeLast();
+      _loadSamples();
+      notifyListeners();
+    }
+  }
+
+  Future<void> _selectSampleFile(String path, String name) async {
+    if (_sampleSelectionSlot == null) return;
+    
+    try {
+      String finalPath = path;
+      
+      // Check if this is a bundled asset path (starts with "samples/")
+      if (path.startsWith('samples/')) {
+        print('🎵 Loading bundled asset: $path');
+        finalPath = await _copyAssetToTemp(path, name);
+        print('📁 Copied to temp file: $finalPath');
+      }
+      
+      _filePaths[_sampleSelectionSlot!] = finalPath;
+      _fileNames[_sampleSelectionSlot!] = name;
+      _slotLoaded[_sampleSelectionSlot!] = false;
+      
+      // Always load sample to memory immediately
+      loadSlot(_sampleSelectionSlot!);
+      
+      // Close sample selection
+      cancelSampleSelection();
+      
+    } catch (e) {
+      print('❌ Error loading sample: $e');
+    }
+  }
+
+  Future<void> _loadSamples() async {
+    try {
+      // Load and parse the asset manifest to discover all sample files
+      final manifestContent = await rootBundle.loadString('AssetManifest.json');
+      final Map<String, dynamic> manifestMap = json.decode(manifestContent);
+      
+      // Get all sample file paths (only audio files)
+      final samplePaths = manifestMap.keys
+          .where((path) => path.startsWith('samples/') && _isAudioFile(path))
+          .toList();
+      
+      // Build dynamic folder structure
+      _currentSampleItems = _buildDynamicStructure(samplePaths, _currentSamplePath);
+      
+    } catch (e) {
+      print('Error loading samples: $e');
+      _currentSampleItems = [];
+    }
+  }
+
+  List<SampleBrowserItem> _buildDynamicStructure(List<String> allSamplePaths, List<String> currentPath) {
+    final currentPathPrefix = currentPath.isEmpty ? 'samples/' : 'samples/${currentPath.join('/')}/';
+    
+    final folders = <String>{};
+    final files = <SampleBrowserItem>[];
+    
+    for (final samplePath in allSamplePaths) {
+      if (samplePath.startsWith(currentPathPrefix)) {
+        // Remove the current path prefix to get relative path
+        final relativePath = samplePath.substring(currentPathPrefix.length);
+        final pathParts = relativePath.split('/');
+        
+        if (pathParts.length == 1 && pathParts[0].isNotEmpty) {
+          // It's a file in the current directory
+          files.add(SampleBrowserItem(
+            name: pathParts[0],
+            path: samplePath,
+            isFolder: false,
+            size: 0,
+          ));
+        } else if (pathParts.length > 1 && pathParts[0].isNotEmpty) {
+          // It's a file in a subdirectory, so we add the subdirectory as a folder
+          folders.add(pathParts[0]);
+        }
+      }
+    }
+    
+    // Convert folders to SampleBrowserItems
+    final folderItems = folders.map((folderName) => SampleBrowserItem(
+      name: folderName,
+      path: '', // Folders don't have file paths
+      isFolder: true,
+      size: 0,
+    )).toList();
+    
+    // Sort everything alphabetically
+    folderItems.sort((a, b) => a.name.compareTo(b.name));
+    files.sort((a, b) => a.name.compareTo(b.name));
+    
+    return [...folderItems, ...files];
+  }
+
+  bool _isAudioFile(String filename) {
+    final ext = filename.toLowerCase().split('.').last;
+    return ['wav', 'mp3', 'aac', 'm4a', 'flac', 'ogg'].contains(ext);
   }
 
   void loadSlot(int slot) {
