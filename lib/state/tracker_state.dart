@@ -10,6 +10,7 @@ import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../miniaudio_library.dart';
+import '../services/audio_conversion_service.dart';
 import 'patterns_state.dart';
 
 // Sample browser item model
@@ -116,6 +117,12 @@ class TrackerState extends ChangeNotifier {
   String? _lastRecordingPath;
   DateTime? _lastRecordingTime;
   
+  // MP3 conversion state
+  bool _isConverting = false;
+  double _conversionProgress = 0.0;
+  String? _lastMp3Path;
+  String? _conversionError;
+  
   // Track which samples are currently playing in each column
   late List<int?> _columnPlayingSample;
 
@@ -182,6 +189,10 @@ class TrackerState extends ChangeNotifier {
   String? get lastRecordingPath => _lastRecordingPath;
   DateTime? get lastRecordingTime => _lastRecordingTime;
   String get formattedRecordingDuration => _miniaudioLibrary.formattedOutputRecordingDuration;
+  bool get isConverting => _isConverting;
+  double get conversionProgress => _conversionProgress;
+  String? get lastMp3Path => _lastMp3Path;
+  String? get conversionError => _conversionError;
   List<Color> get bankColors => List.unmodifiable(_bankColors);
   bool get hasClipboardData => _hasClipboardData;
   int get slotCount => _slotCount;
@@ -366,6 +377,26 @@ class TrackerState extends ChangeNotifier {
   bool _isAudioFile(String filename) {
     final ext = filename.toLowerCase().split('.').last;
     return ['wav', 'mp3', 'aac', 'm4a', 'flac', 'ogg'].contains(ext);
+  }
+
+  Future<void> previewSample(String assetPath) async {
+    try {
+      // Stop any currently playing sounds first
+      stopAll();
+      
+      // Copy asset to temp file for preview
+      final fileName = path.basename(assetPath);
+      final tempPath = await _copyAssetToTemp(assetPath, fileName);
+      
+      // Load and play the preview sample in slot 0 temporarily
+      bool loadSuccess = _miniaudioLibrary.loadSoundToSlot(0, tempPath, loadToMemory: true);
+      if (loadSuccess) {
+        _miniaudioLibrary.reconfigureAudioSession();
+        _miniaudioLibrary.playSlot(0);
+      }
+    } catch (e) {
+      print('❌ Error previewing sample: $e');
+    }
   }
 
   void loadSlot(int slot) {
@@ -1045,7 +1076,7 @@ Made with Demo Tracker 🚀
         final fileName = path.basename(_lastRecordingPath!);
         await Share.shareXFiles(
           [XFile(_lastRecordingPath!)],
-          text: 'Check out this beat I made with NIYYA Tracker! 🎵\n\n#NiyyaTracker #BeatMaking #MusicProduction',
+          text: 'Check out this beat I made with N! 🎵\n\n#NiyyaTracker #BeatMaking #MusicProduction',
           subject: 'NIYYA Tracker Recording - $fileName',
         );
         print('🎵 Shared recording: $fileName');
@@ -1061,7 +1092,120 @@ Made with Demo Tracker 🚀
   void clearLastRecording() {
     _lastRecordingPath = null;
     _lastRecordingTime = null;
+    _lastMp3Path = null;
+    _conversionError = null;
     notifyListeners();
+  }
+
+  // Convert the last recorded WAV to MP3 320kbps
+  Future<void> convertLastRecordingToMp3() async {
+    if (_lastRecordingPath == null) {
+      print('❌ No recording to convert');
+      return;
+    }
+
+    if (_isConverting) {
+      print('❌ Already converting audio');
+      return;
+    }
+
+    try {
+      _isConverting = true;
+      _conversionProgress = 0.0;
+      _conversionError = null;
+      notifyListeners();
+
+      print('🎵 Starting MP3 conversion...');
+      
+      final mp3Path = await AudioConversionService.convertWavToMp3WithProgress(
+        inputWavPath: _lastRecordingPath!,
+        onProgress: (progress) {
+          _conversionProgress = progress;
+          notifyListeners();
+        },
+        onError: (error) {
+          _conversionError = error;
+          print('❌ Conversion error: $error');
+        },
+      );
+
+      if (mp3Path != null) {
+        _lastMp3Path = mp3Path;
+        _conversionProgress = 1.0;
+        print('✅ MP3 conversion completed: $mp3Path');
+        
+        // Get file sizes for comparison
+        final wavFile = File(_lastRecordingPath!);
+        final mp3File = File(mp3Path);
+        if (await wavFile.exists() && await mp3File.exists()) {
+          final wavSize = await wavFile.length();
+          final mp3Size = await mp3File.length();
+          final compressionRatio = (1 - (mp3Size / wavSize)) * 100;
+          print('📊 WAV: ${_formatFileSize(wavSize)} → MP3: ${_formatFileSize(mp3Size)} (${compressionRatio.toStringAsFixed(1)}% smaller)');
+        }
+      } else {
+        print('❌ MP3 conversion failed');
+        _conversionError ??= 'Conversion failed for unknown reason';
+      }
+    } catch (e) {
+      print('❌ Error during MP3 conversion: $e');
+      _conversionError = 'Conversion error: $e';
+    } finally {
+      _isConverting = false;
+      notifyListeners();
+    }
+  }
+
+  // Share the MP3 version if available, otherwise share WAV
+  Future<void> shareRecordedAudioAsMp3() async {
+    String? shareFilePath;
+    String fileType;
+    
+    if (_lastMp3Path != null) {
+      shareFilePath = _lastMp3Path;
+      fileType = 'MP3';
+    } else if (_lastRecordingPath != null) {
+      shareFilePath = _lastRecordingPath;
+      fileType = 'WAV';
+    } else {
+      print('❌ No recording to share');
+      return;
+    }
+
+    try {
+      final file = File(shareFilePath!);
+      if (await file.exists()) {
+        final fileName = path.basename(shareFilePath);
+        final fileSize = await file.length();
+        
+        await Share.shareXFiles(
+          [XFile(shareFilePath)],
+          text: 'Check out this beat I made with NIYYA! 🎵\n\nFormat: $fileType (${_formatFileSize(fileSize)})\n\n#NiyyaTracker #BeatMaking #MusicProduction',
+          subject: 'NIYYA Tracker Recording - $fileName',
+        );
+        print('🎵 Shared $fileType recording: $fileName');
+      } else {
+        print('❌ Recording file not found: $shareFilePath');
+      }
+    } catch (e) {
+      print('❌ Error sharing recording: $e');
+    }
+  }
+
+  // Check if conversion is available
+  Future<bool> isConversionAvailable() async {
+    return await AudioConversionService.checkLameAvailability();
+  }
+
+  // Format file size helper
+  String _formatFileSize(int bytes) {
+    if (bytes < 1024) {
+      return '${bytes}B';
+    } else if (bytes < 1024 * 1024) {
+      return '${(bytes / 1024).toStringAsFixed(1)}KB';
+    } else {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)}MB';
+    }
   }
 
   // 🧪 TEST METHOD: Easy way to test native sequencer

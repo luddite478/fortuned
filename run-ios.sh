@@ -43,7 +43,7 @@ if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   #open -a Simulator
 else
   echo "Building for physical device..."
-  flutter build ios --debug
+  flutter build ios --release
 
   echo "Deploying to physical device..."
   ios-deploy --bundle build/ios/iphoneos/Runner.app --id 00008110-000251422E02601E

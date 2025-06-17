@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../widgets/tracker/future_panel_widget.dart';
+import '../widgets/tracker/top_multitask_panel_widget.dart';
 import '../widgets/tracker/sample_banks_widget.dart';
 import '../widgets/tracker/sound_grid_widget.dart';
 import '../widgets/tracker/edit_buttons_widget.dart';

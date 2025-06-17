@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../widgets/tracker/future_panel_widget.dart';
+import '../widgets/tracker/top_multitask_panel_widget.dart';
 import '../widgets/tracker/sample_banks_widget.dart';
 import '../widgets/tracker/sound_grid_widget.dart';
 import '../widgets/tracker/edit_buttons_widget.dart';
@@ -166,10 +166,10 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
               margin: const EdgeInsets.symmetric(horizontal: 16),
               child: const Column(
                 children: [
-                  // Blank panel for future use (25% of available space)
+                  // Multitask panel (25% of available space)
                   Expanded(
                     flex: 25,
-                    child: FuturePanelWidget(),
+                    child: MultitaskPanelWidget(),
                   ),
                   // Sample banks panel
                   SampleBanksWidget(),

@@ -15,6 +15,26 @@
 		55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E362DF4041800D2AA40 /* AudioToolbox.framework */; };
 		55433E3F2DF40A7F00D2AA40 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */; };
 		5571F8BD2DF776970025EF91 /* miniaudio_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */; };
+		5571F8C02DF776A00025EF91 /* lame_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BE2DF776980025EF91 /* lame_wrapper.mm */; };
+		5571F8D42DF777200025EF91 /* lame.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C12DF777000025EF91 /* lame.c */; };
+		5571F8D52DF777210025EF91 /* bitstream.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C22DF777010025EF91 /* bitstream.c */; };
+		5571F8D62DF777220025EF91 /* encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C32DF777020025EF91 /* encoder.c */; };
+		5571F8D72DF777230025EF91 /* fft.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C42DF777030025EF91 /* fft.c */; };
+		5571F8D82DF777240025EF91 /* id3tag.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C52DF777040025EF91 /* id3tag.c */; };
+		5571F8D92DF777250025EF91 /* newmdct.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C62DF777050025EF91 /* newmdct.c */; };
+		5571F8DA2DF777260025EF91 /* presets.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C72DF777060025EF91 /* presets.c */; };
+		5571F8DB2DF777270025EF91 /* psymodel.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C82DF777070025EF91 /* psymodel.c */; };
+		5571F8DC2DF777280025EF91 /* quantize.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C92DF777080025EF91 /* quantize.c */; };
+		5571F8DD2DF777290025EF91 /* quantize_pvt.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8CA2DF777090025EF91 /* quantize_pvt.c */; };
+		5571F8DE2DF7772A0025EF91 /* reservoir.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8CB2DF7770A0025EF91 /* reservoir.c */; };
+		5571F8DF2DF7772B0025EF91 /* set_get.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8CC2DF7770B0025EF91 /* set_get.c */; };
+		5571F8E02DF7772C0025EF91 /* tables.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8CD2DF7770C0025EF91 /* tables.c */; };
+		5571F8E12DF7772D0025EF91 /* takehiro.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8CE2DF7770D0025EF91 /* takehiro.c */; };
+		5571F8E22DF7772E0025EF91 /* util.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8CF2DF7770E0025EF91 /* util.c */; };
+		5571F8E32DF7772F0025EF91 /* vbrquantize.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D02DF7770F0025EF91 /* vbrquantize.c */; };
+		5571F8E42DF777300025EF91 /* VbrTag.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D12DF777100025EF91 /* VbrTag.c */; };
+		5571F8E52DF777310025EF91 /* version.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D22DF777110025EF91 /* version.c */; };
+		5571F8E62DF777320025EF91 /* gain_analysis.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D32DF777120025EF91 /* gain_analysis.c */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
@@ -62,6 +82,27 @@
 		55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		5571F8BA2DF775080025EF91 /* miniaudio_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = miniaudio_wrapper.cpp; path = ../native/miniaudio_wrapper.cpp; sourceTree = "<group>"; };
 		5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_wrapper.mm; path = ../native/miniaudio_wrapper.mm; sourceTree = "<group>"; };
+		5571F8BE2DF776980025EF91 /* lame_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = lame_wrapper.mm; path = ../native/lame_wrapper.mm; sourceTree = "<group>"; };
+		5571F8BF2DF776990025EF91 /* lame_wrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lame_wrapper.h; path = ../native/lame_wrapper.h; sourceTree = "<group>"; };
+		5571F8C12DF777000025EF91 /* lame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = lame.c; path = ../native/lame/lame.c; sourceTree = "<group>"; };
+		5571F8C22DF777010025EF91 /* bitstream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bitstream.c; path = ../native/lame/bitstream.c; sourceTree = "<group>"; };
+		5571F8C32DF777020025EF91 /* encoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encoder.c; path = ../native/lame/encoder.c; sourceTree = "<group>"; };
+		5571F8C42DF777030025EF91 /* fft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = fft.c; path = ../native/lame/fft.c; sourceTree = "<group>"; };
+		5571F8C52DF777040025EF91 /* id3tag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = id3tag.c; path = ../native/lame/id3tag.c; sourceTree = "<group>"; };
+		5571F8C62DF777050025EF91 /* newmdct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = newmdct.c; path = ../native/lame/newmdct.c; sourceTree = "<group>"; };
+		5571F8C72DF777060025EF91 /* presets.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = presets.c; path = ../native/lame/presets.c; sourceTree = "<group>"; };
+		5571F8C82DF777070025EF91 /* psymodel.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = psymodel.c; path = ../native/lame/psymodel.c; sourceTree = "<group>"; };
+		5571F8C92DF777080025EF91 /* quantize.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = quantize.c; path = ../native/lame/quantize.c; sourceTree = "<group>"; };
+		5571F8CA2DF777090025EF91 /* quantize_pvt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = quantize_pvt.c; path = ../native/lame/quantize_pvt.c; sourceTree = "<group>"; };
+		5571F8CB2DF7770A0025EF91 /* reservoir.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = reservoir.c; path = ../native/lame/reservoir.c; sourceTree = "<group>"; };
+		5571F8CC2DF7770B0025EF91 /* set_get.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = set_get.c; path = ../native/lame/set_get.c; sourceTree = "<group>"; };
+		5571F8CD2DF7770C0025EF91 /* tables.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = tables.c; path = ../native/lame/tables.c; sourceTree = "<group>"; };
+		5571F8CE2DF7770D0025EF91 /* takehiro.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = takehiro.c; path = ../native/lame/takehiro.c; sourceTree = "<group>"; };
+		5571F8CF2DF7770E0025EF91 /* util.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = util.c; path = ../native/lame/util.c; sourceTree = "<group>"; };
+		5571F8D02DF7770F0025EF91 /* vbrquantize.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = vbrquantize.c; path = ../native/lame/vbrquantize.c; sourceTree = "<group>"; };
+		5571F8D12DF777100025EF91 /* VbrTag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = VbrTag.c; path = ../native/lame/VbrTag.c; sourceTree = "<group>"; };
+		5571F8D22DF777110025EF91 /* version.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = version.c; path = ../native/lame/version.c; sourceTree = "<group>"; };
+		5571F8D32DF777120025EF91 /* gain_analysis.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = gain_analysis.c; path = ../native/lame/gain_analysis.c; sourceTree = "<group>"; };
 		73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -142,6 +183,27 @@
 				55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */,
 				55433E382DF4047800D2AA40 /* miniaudio_wrapper.c */,
 				55433E392DF4047800D2AA40 /* miniaudio.c */,
+				5571F8BE2DF776980025EF91 /* lame_wrapper.mm */,
+				5571F8BF2DF776990025EF91 /* lame_wrapper.h */,
+				5571F8C12DF777000025EF91 /* lame.c */,
+				5571F8C22DF777010025EF91 /* bitstream.c */,
+				5571F8C32DF777020025EF91 /* encoder.c */,
+				5571F8C42DF777030025EF91 /* fft.c */,
+				5571F8C52DF777040025EF91 /* id3tag.c */,
+				5571F8C62DF777050025EF91 /* newmdct.c */,
+				5571F8C72DF777060025EF91 /* presets.c */,
+				5571F8C82DF777070025EF91 /* psymodel.c */,
+				5571F8C92DF777080025EF91 /* quantize.c */,
+				5571F8CA2DF777090025EF91 /* quantize_pvt.c */,
+				5571F8CB2DF7770A0025EF91 /* reservoir.c */,
+				5571F8CC2DF7770B0025EF91 /* set_get.c */,
+				5571F8CD2DF7770C0025EF91 /* tables.c */,
+				5571F8CE2DF7770D0025EF91 /* takehiro.c */,
+				5571F8CF2DF7770E0025EF91 /* util.c */,
+				5571F8D02DF7770F0025EF91 /* vbrquantize.c */,
+				5571F8D12DF777100025EF91 /* VbrTag.c */,
+				5571F8D22DF777110025EF91 /* version.c */,
+				5571F8D32DF777120025EF91 /* gain_analysis.c */,
 				9740EEB11CF90186004384FC /* Flutter */,
 				97C146F01CF9000F007C117D /* Runner */,
 				97C146EF1CF9000F007C117D /* Products */,
@@ -400,6 +462,26 @@
 			buildActionMask = 2147483647;
 			files = (
 				5571F8BD2DF776970025EF91 /* miniaudio_wrapper.mm in Sources */,
+				5571F8C02DF776A00025EF91 /* lame_wrapper.mm in Sources */,
+				5571F8D42DF777200025EF91 /* lame.c in Sources */,
+				5571F8D52DF777210025EF91 /* bitstream.c in Sources */,
+				5571F8D62DF777220025EF91 /* encoder.c in Sources */,
+				5571F8D72DF777230025EF91 /* fft.c in Sources */,
+				5571F8D82DF777240025EF91 /* id3tag.c in Sources */,
+				5571F8D92DF777250025EF91 /* newmdct.c in Sources */,
+				5571F8DA2DF777260025EF91 /* presets.c in Sources */,
+				5571F8DB2DF777270025EF91 /* psymodel.c in Sources */,
+				5571F8DC2DF777280025EF91 /* quantize.c in Sources */,
+				5571F8DD2DF777290025EF91 /* quantize_pvt.c in Sources */,
+				5571F8DE2DF7772A0025EF91 /* reservoir.c in Sources */,
+				5571F8DF2DF7772B0025EF91 /* set_get.c in Sources */,
+				5571F8E02DF7772C0025EF91 /* tables.c in Sources */,
+				5571F8E12DF7772D0025EF91 /* takehiro.c in Sources */,
+				5571F8E22DF7772E0025EF91 /* util.c in Sources */,
+				5571F8E32DF7772F0025EF91 /* vbrquantize.c in Sources */,
+				5571F8E42DF777300025EF91 /* VbrTag.c in Sources */,
+				5571F8E52DF777310025EF91 /* version.c in Sources */,
+				5571F8E62DF777320025EF91 /* gain_analysis.c in Sources */,
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);
@@ -478,7 +560,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
@@ -504,13 +586,18 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/SwiftyGif/SwiftyGif.framework/Headers\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
+					"$(SRCROOT)/../native/lame",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_CFLAGS = "-DMINIAUDIO_IMPLEMENTATION";
+				OTHER_CFLAGS = (
+					"-DMINIAUDIO_IMPLEMENTATION",
+					"-DHAVE_CONFIG_H",
+				);
+				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.niyya;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIP_STYLE = "non-global";
@@ -620,7 +707,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -671,7 +758,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 12.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = iphoneos;
@@ -699,14 +786,22 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/SwiftyGif/SwiftyGif.framework/Headers\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
+					"$(SRCROOT)/../native/lame",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_CFLAGS = "-DMINIAUDIO_IMPLEMENTATION";
-				"OTHER_CFLAGS[arch=*]" = "-DMINIAUDIO_IMPLEMENTATION";
+				OTHER_CFLAGS = (
+					"-DMINIAUDIO_IMPLEMENTATION",
+					"-DHAVE_CONFIG_H",
+				);
+				"OTHER_CFLAGS[arch=*]" = (
+					"-DMINIAUDIO_IMPLEMENTATION",
+					"-DHAVE_CONFIG_H",
+				);
+				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.niyya;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIP_STYLE = "non-global";
@@ -734,13 +829,18 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/SwiftyGif/SwiftyGif.framework/Headers\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
+					"$(SRCROOT)/../native/lame",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_CFLAGS = "-DMINIAUDIO_IMPLEMENTATION";
+				OTHER_CFLAGS = (
+					"-DMINIAUDIO_IMPLEMENTATION",
+					"-DHAVE_CONFIG_H",
+				);
+				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 				PRODUCT_BUNDLE_IDENTIFIER = com.roman.niyya;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIP_STYLE = "non-global";
