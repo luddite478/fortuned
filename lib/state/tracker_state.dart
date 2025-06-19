@@ -147,6 +147,10 @@ class TrackerState extends ChangeNotifier {
   int? _lastTappedCell;
   static const Duration _doubleTapThreshold = Duration(milliseconds: 300);
 
+  // Card stack state
+  int _currentCardIndex = 0;
+  List<int> _cardOrder = []; // Order of cards from back to front (initialized dynamically)
+
   // Sample selection state
   bool _isSelectingSample = false;
   int? _sampleSelectionSlot;
@@ -200,6 +204,8 @@ class TrackerState extends ChangeNotifier {
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
   List<SampleBrowserItem> get currentSampleItems => List.unmodifiable(_currentSampleItems);
+  int get currentCardIndex => _currentCardIndex;
+  List<int> get cardOrder => List.unmodifiable(_cardOrder);
   
   List<SampleSlot> get loadedSlots {
     List<SampleSlot> slots = [];
@@ -1324,6 +1330,31 @@ Made with Demo Tracker 🚀
     if (_isInSelectionMode) {
       _isSelecting = false;
       _isDragging = false;
+      notifyListeners();
+    }
+  }
+
+  // Card stack methods
+  void initializeCards(int numCards) {
+    _cardOrder = List.generate(numCards, (index) => index);
+    _currentCardIndex = _cardOrder.last; // Front card
+    notifyListeners();
+  }
+
+  void setCurrentCardIndex(int index) {
+    _currentCardIndex = index;
+    notifyListeners();
+  }
+
+  void shuffleToNextCard() {
+    // Move the front card (last in array) to the back (first in array)
+    // This simulates taking the top card and putting it at the bottom
+    if (_cardOrder.isNotEmpty) {
+      final frontCard = _cardOrder.removeLast(); // Remove front card
+      _cardOrder.insert(0, frontCard); // Put it at the back
+      
+      // Update current card index to represent the new front card
+      _currentCardIndex = _cardOrder.last;
       notifyListeners();
     }
   }

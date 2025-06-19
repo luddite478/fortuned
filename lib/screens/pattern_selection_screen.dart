@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../state/patterns_state.dart';
 import '../state/tracker_state.dart';
 import 'tracker_screen.dart';
+import '../test_card_stack.dart';
 
 class PatternSelectionScreen extends StatefulWidget {
   const PatternSelectionScreen({super.key});
@@ -28,6 +29,18 @@ class _PatternSelectionScreenState extends State<PatternSelectionScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.layers, color: Colors.orangeAccent),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TestCardStackPage(),
+                ),
+              );
+            },
+            tooltip: 'Test Card Stack',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.cyanAccent),
             onPressed: () {

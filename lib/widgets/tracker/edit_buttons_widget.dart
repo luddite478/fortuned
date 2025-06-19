@@ -19,6 +19,40 @@ class EditButtonsWidget extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
+              // Card Switch button
+              IconButton(
+                icon: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(Icons.layers, color: Colors.orangeAccent),
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: Colors.yellowAccent,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.orange, width: 1),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '${tracker.currentCardIndex + 1}',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                onPressed: () => tracker.shuffleToNextCard(),
+                tooltip: 'Shuffle Cards (Front: Card ${tracker.currentCardIndex + 1}/${tracker.cardOrder.length})',
+              ),
               // Selection Mode Toggle button
               IconButton(
                 icon: Icon(
