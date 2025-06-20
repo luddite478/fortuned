@@ -5,7 +5,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from http_api.router import router
-import websockets.router as ws_module
+from websockets import router as ws_module
 
 from dotenv import load_dotenv
 load_dotenv()
