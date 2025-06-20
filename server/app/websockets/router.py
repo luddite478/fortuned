@@ -10,7 +10,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # Constants
-HARDCODED_TOKEN = "secure_chat_token_9999"
+API_TOKEN = os.getenv("API_TOKEN")
 MAX_CONNECTIONS_PER_MINUTE = 10
 MAX_TOTAL_CLIENTS = 100
 MAX_MESSAGE_RATE = 60
@@ -26,7 +26,7 @@ chats = defaultdict(list)
 # --- Utility Functions ---
 
 def is_valid_token(token):
-    return token == HARDCODED_TOKEN
+    return token == API_TOKEN
 
 def sanitize_input(text):
     if not isinstance(text, str):
@@ -264,7 +264,4 @@ async def main():
         ping_interval=20,
         ping_timeout=10
     ):
-        await asyncio.Future()  # Run forever
-
-if __name__ == "__main__":
-    asyncio.run(main())
+        await asyncio.Future()
