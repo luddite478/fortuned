@@ -10,7 +10,7 @@ on:
       - 'docs/**'
 
 env:
-  REPO_DIR_PATH: /home/user/niyya
+  REPO_DIR_PATH: /home/luddite478/niyya
 
 jobs:
   redeploy:
