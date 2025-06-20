@@ -43,9 +43,11 @@ jobs:
         key: ${{ secrets.DROPLET_SSH_KEY }}
         envs: REPO_DIR_PATH
         script: |
-          cd "$REPO_DIR_PATH/server"
-          docker-compose down
-          docker-compose up -d --build --force-recreate
+          cd "$REPO_DIR_PATH"
+          docker-compose -f docker-compose.envsubst.yaml down
+          rm docker-compose.envsubst.yaml || true
+          envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
+          docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
 
     - name: Wait for server to be ready
       timeout-minutes: 3
