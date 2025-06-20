@@ -43,7 +43,7 @@ class GridPainter extends CustomPainter {
     for (int i = 1; i < rows; i++) {
       final dy = i * rowHeight;
       canvas.drawLine(Offset(0, dy), Offset(size.width, dy), paint);
-    }
+  }
 
     for (int i = 1; i < columns; i++) {
       final dx = i * colWidth;

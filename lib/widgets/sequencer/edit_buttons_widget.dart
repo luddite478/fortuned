@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../state/tracker_state.dart';
+import '../../state/sequencer_state.dart';
 
 class EditButtonsWidget extends StatelessWidget {
   const EditButtonsWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<TrackerState>(
-      builder: (context, tracker, child) {
+    return Consumer<SequencerState>(
+      builder: (context, sequencer, child) {
         return Container(
           padding: const EdgeInsets.all(12),
           margin: const EdgeInsets.only(bottom: 16),
@@ -37,41 +37,41 @@ class EditButtonsWidget extends StatelessWidget {
                           border: Border.all(color: Colors.orange, width: 1),
                         ),
                         child: Center(
-                                                  child: Text(
-                          '${tracker.currentSoundGridIndex + 1}',
-                          style: const TextStyle(
-                            color: Colors.black,
-                            fontSize: 8,
-                            fontWeight: FontWeight.bold,
+                          child: Text(
+                            '${sequencer.currentSoundGridIndex + 1}',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                onPressed: () => tracker.shuffleToNextSoundGrid(),
-                tooltip: 'Shuffle SoundGrids (Front: Grid ${tracker.currentSoundGridIndex + 1}/${tracker.soundGridOrder.length})',
+                onPressed: () => sequencer.shuffleToNextSoundGrid(),
+                tooltip: 'Shuffle SoundGrids (Front: Grid ${sequencer.currentSoundGridIndex + 1}/${sequencer.soundGridOrder.length})',
               ),
               // Selection Mode Toggle button
               IconButton(
                 icon: Icon(
-                  tracker.isInSelectionMode ? Icons.check_box : Icons.check_box_outline_blank,
-                  color: tracker.isInSelectionMode ? Colors.cyanAccent : Colors.grey,
+                  sequencer.isInSelectionMode ? Icons.check_box : Icons.check_box_outline_blank,
+                  color: sequencer.isInSelectionMode ? Colors.cyanAccent : Colors.grey,
                 ),
-                onPressed: () => tracker.toggleSelectionMode(),
-                tooltip: tracker.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
+                onPressed: () => sequencer.toggleSelectionMode(),
+                tooltip: sequencer.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
               ),
               // Delete button
               IconButton(
                 icon: Icon(
                   Icons.delete,
-                  color: tracker.selectedGridCells.isNotEmpty
+                  color: sequencer.selectedGridCells.isNotEmpty
                       ? Colors.redAccent
                       : Colors.grey,
                 ),
-                onPressed: tracker.selectedGridCells.isNotEmpty
-                    ? () => tracker.deleteSelectedCells()
+                onPressed: sequencer.selectedGridCells.isNotEmpty
+                    ? () => sequencer.deleteSelectedCells()
                     : null,
                 tooltip: 'Delete Selected Cells',
               ),
@@ -79,12 +79,12 @@ class EditButtonsWidget extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   Icons.copy,
-                  color: tracker.selectedGridCells.isNotEmpty
+                  color: sequencer.selectedGridCells.isNotEmpty
                       ? Colors.cyanAccent
                       : Colors.grey,
                 ),
-                onPressed: tracker.selectedGridCells.isNotEmpty
-                    ? () => tracker.copySelectedCells()
+                onPressed: sequencer.selectedGridCells.isNotEmpty
+                    ? () => sequencer.copySelectedCells()
                     : null,
                 tooltip: 'Copy Selected Cells',
               ),
@@ -92,12 +92,12 @@ class EditButtonsWidget extends StatelessWidget {
               IconButton(
                 icon: Icon(
                   Icons.paste,
-                  color: tracker.hasClipboardData && tracker.selectedGridCells.isNotEmpty
+                  color: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
                       ? Colors.greenAccent
                       : Colors.grey,
                 ),
-                onPressed: tracker.hasClipboardData && tracker.selectedGridCells.isNotEmpty
-                    ? () => tracker.pasteToSelectedCells()
+                onPressed: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
+                    ? () => sequencer.pasteToSelectedCells()
                     : null,
                 tooltip: 'Paste to Selected Cells',
               ),

@@ -3,9 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/pattern_selection_screen.dart';
-import 'screens/tracker_screen.dart';
 import 'state/patterns_state.dart';
-import 'state/tracker_state.dart';
+import 'state/sequencer_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,6 +27,7 @@ class NiyyaApp extends StatelessWidget {
       home: MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (context) => PatternsState()),
+          ChangeNotifierProvider(create: (context) => SequencerState()),
         ],
         child: const MainPage(),
       ),

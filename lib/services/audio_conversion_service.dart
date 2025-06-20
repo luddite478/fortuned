@@ -3,22 +3,23 @@ import 'dart:async';
 import 'dart:isolate';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
-import '../lame_library.dart';
+import '../conversion_library.dart';
 
 class AudioConversionService {
   static const int mp3BitrateKbps = 320;
   
-  /// Initialize LAME library
+  /// Initialize conversion library
   static Future<bool> initialize() async {
     try {
-      return LameLibrary.instance.initialize();
+      ConversionLibrary().initialize();
+      return ConversionLibrary().init();
     } catch (e) {
-      print('❌ Failed to initialize LAME: $e');
+      print('❌ Failed to initialize conversion library: $e');
       return false;
     }
   }
   
-  /// Converts WAV file to MP3 320kbps using native LAME encoder
+  /// Converts WAV file to MP3 320kbps using native conversion library
   /// Returns the path to the converted MP3 file if successful, null if failed
   static Future<String?> convertWavToMp3({
     required String inputWavPath,
@@ -27,11 +28,11 @@ class AudioConversionService {
     Function(String)? onError,
   }) async {
     try {
-      // Ensure LAME is initialized
-      if (!LameLibrary.instance.isAvailable) {
+      // Ensure conversion library is initialized
+      if (!ConversionLibrary().isAvailable) {
         final initialized = await initialize();
         if (!initialized) {
-          onError?.call('LAME library is not available');
+          onError?.call('Conversion library is not available');
           return null;
         }
       }
@@ -51,10 +52,10 @@ class AudioConversionService {
       }
       
       final inputSize = await inputFile.length();
-      print('🎵 Converting WAV to MP3 320kbps using LAME...');
+      print('🎵 Converting WAV to MP3 320kbps using conversion library...');
       print('📁 Input: $inputWavPath (${_formatFileSize(inputSize)})');
       print('📁 Output: $outputMp3Path');
-      print('📦 LAME version: ${LameLibrary.instance.version}');
+      print('📦 Conversion version: ${ConversionLibrary().version}');
       
       // Delete output file if it already exists
       final outputFile = File(outputMp3Path);
@@ -64,11 +65,11 @@ class AudioConversionService {
       
       onProgress?.call('Starting MP3 conversion...');
       
-      // Perform native LAME conversion
-      final success = LameLibrary.instance.convertWavToMp3(
-        wavPath: inputWavPath,
-        mp3Path: outputMp3Path,
-        bitrateKbps: mp3BitrateKbps,
+      // Perform native conversion
+      final success = ConversionLibrary().convertWavToMp3(
+        inputWavPath,
+        outputMp3Path,
+        mp3BitrateKbps,
       );
       
       if (success) {
@@ -86,7 +87,7 @@ class AudioConversionService {
           return null;
         }
       } else {
-        onError?.call('LAME conversion failed');
+        onError?.call('Conversion failed');
         return null;
       }
     } catch (e) {
@@ -104,11 +105,11 @@ class AudioConversionService {
     Function(String)? onError,
   }) async {
     try {
-      // Ensure LAME is initialized
-      if (!LameLibrary.instance.isAvailable) {
+      // Ensure conversion library is initialized
+      if (!ConversionLibrary().isAvailable) {
         final initialized = await initialize();
         if (!initialized) {
-          onError?.call('LAME library is not available');
+          onError?.call('Conversion library is not available');
           return null;
         }
       }
@@ -135,7 +136,7 @@ class AudioConversionService {
         await outputFile.delete();
       }
       
-      // Progress simulation (since LAME conversion is typically very fast)
+      // Progress simulation (since conversion is typically very fast)
       onProgress?.call(0.1); // Starting
       
       // Run conversion in isolate to prevent UI blocking
@@ -166,7 +167,7 @@ class AudioConversionService {
     }
   }
   
-  /// Run LAME conversion in isolate to prevent UI blocking
+  /// Run conversion in isolate to prevent UI blocking
   static Future<bool> _runConversionInIsolate(
     String inputPath,
     String outputPath,
@@ -218,10 +219,11 @@ class AudioConversionService {
     final bitrate = params['bitrate'] as int;
     
     try {
-      // Initialize LAME in isolate
-      final lame = LameLibrary.instance;
-      if (!lame.initialize()) {
-        sendPort.send({'type': 'error', 'message': 'Failed to initialize LAME'});
+      // Initialize conversion library in isolate
+      final conversion = ConversionLibrary();
+      conversion.initialize();
+      if (!conversion.init()) {
+        sendPort.send({'type': 'error', 'message': 'Failed to initialize conversion library'});
         return;
       }
       
@@ -229,10 +231,10 @@ class AudioConversionService {
       sendPort.send({'type': 'progress', 'value': 0.3});
       
       // Perform conversion
-      final success = lame.convertWavToMp3(
-        wavPath: inputPath,
-        mp3Path: outputPath,
-        bitrateKbps: bitrate,
+      final success = conversion.convertWavToMp3(
+        inputPath,
+        outputPath,
+        bitrate,
       );
       
       sendPort.send({'type': 'progress', 'value': 0.9});
@@ -255,13 +257,13 @@ class AudioConversionService {
       final stats = await file.stat();
       final size = await file.length();
       
-      // Use LAME to get file size for comparison
-      final lameSize = LameLibrary.instance.getFileSize(filePath);
+      // Use conversion library to get file size for comparison
+      final conversionSize = ConversionLibrary().getFileSize(filePath);
       
       return {
         'file_path': filePath,
         'file_size': size,
-        'lame_size': lameSize,
+        'conversion_size': conversionSize,
         'modified': stats.modified.toIso8601String(),
         'format': path.extension(filePath).toLowerCase(),
         'readable': true,
@@ -283,34 +285,34 @@ class AudioConversionService {
     }
   }
   
-  /// Check if LAME is available and working
-  static Future<bool> checkLameAvailability() async {
+  /// Check if conversion library is available and working
+  static Future<bool> checkConversionAvailability() async {
     try {
-      if (!LameLibrary.instance.isAvailable) {
+      if (!ConversionLibrary().isAvailable) {
         return await initialize();
       }
       return true;
     } catch (e) {
-      print('❌ LAME not available: $e');
+      print('❌ Conversion library not available: $e');
       return false;
     }
   }
   
-  /// Get LAME version information
-  static String getLameVersion() {
+  /// Get conversion library version information
+  static String getConversionVersion() {
     try {
-      return LameLibrary.instance.version;
+      return ConversionLibrary().version;
     } catch (e) {
       return 'Error getting version';
     }
   }
   
-  /// Cleanup LAME resources
+  /// Cleanup conversion resources
   static void cleanup() {
     try {
-      LameLibrary.instance.cleanup();
+      ConversionLibrary().cleanup();
     } catch (e) {
-      print('❌ Error during LAME cleanup: $e');
+      print('❌ Error during conversion cleanup: $e');
     }
   }
 } 

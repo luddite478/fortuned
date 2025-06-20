@@ -1,4 +1,4 @@
-// Generated bindings for LAME MP3 encoder.
+// Generated bindings for conversion.
 // ignore_for_file: always_specify_types
 // ignore_for_file: camel_case_types
 // ignore_for_file: comment_references
@@ -15,98 +15,98 @@
 // ignore_for_file: type=lint
 import 'dart:ffi' as ffi;
 
-class LameBindings {
+class ConversionBindings {
   /// Holds the symbol lookup function.
   final ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
       _lookup;
 
   /// The symbols are looked up in [dynamicLibrary].
-  LameBindings(ffi.DynamicLibrary dynamicLibrary)
+  ConversionBindings(ffi.DynamicLibrary dynamicLibrary)
       : _lookup = dynamicLibrary.lookup;
 
   /// The symbols are looked up with [lookup].
-  LameBindings.fromLookup(
+  ConversionBindings.fromLookup(
       ffi.Pointer<T> Function<T extends ffi.NativeType>(String symbolName)
           lookup)
       : _lookup = lookup;
 
-  /// Initialize LAME library
-  int lame_wrapper_init() {
-    return _lame_wrapper_init();
+  /// Initialize conversion library
+  int conversion_init() {
+    return _conversion_init();
   }
 
-  late final _lame_wrapper_initPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('lame_wrapper_init');
-  late final _lame_wrapper_init =
-      _lame_wrapper_initPtr.asFunction<int Function()>();
+  late final _conversion_initPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('conversion_init');
+  late final _conversion_init =
+      _conversion_initPtr.asFunction<int Function()>();
 
   /// Convert WAV file to MP3 with specified bitrate
-  int lame_wrapper_convert_wav_to_mp3(
+  int conversion_convert_wav_to_mp3(
     ffi.Pointer<ffi.Char> wav_path,
     ffi.Pointer<ffi.Char> mp3_path,
     int bitrate_kbps,
   ) {
-    return _lame_wrapper_convert_wav_to_mp3(
+    return _conversion_convert_wav_to_mp3(
       wav_path,
       mp3_path,
       bitrate_kbps,
     );
   }
 
-  late final _lame_wrapper_convert_wav_to_mp3Ptr = _lookup<
+  late final _conversion_convert_wav_to_mp3Ptr = _lookup<
       ffi.NativeFunction<
           ffi.Int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>,
-              ffi.Int)>>('lame_wrapper_convert_wav_to_mp3');
-  late final _lame_wrapper_convert_wav_to_mp3 =
-      _lame_wrapper_convert_wav_to_mp3Ptr.asFunction<
+              ffi.Int)>>('conversion_convert_wav_to_mp3');
+  late final _conversion_convert_wav_to_mp3 =
+      _conversion_convert_wav_to_mp3Ptr.asFunction<
           int Function(ffi.Pointer<ffi.Char>, ffi.Pointer<ffi.Char>, int)>();
 
   /// Get file size in bytes
-  int lame_wrapper_get_file_size(
+  int conversion_get_file_size(
     ffi.Pointer<ffi.Char> file_path,
   ) {
-    return _lame_wrapper_get_file_size(
+    return _conversion_get_file_size(
       file_path,
     );
   }
 
-  late final _lame_wrapper_get_file_sizePtr =
+  late final _conversion_get_file_sizePtr =
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
-          'lame_wrapper_get_file_size');
-  late final _lame_wrapper_get_file_size = _lame_wrapper_get_file_sizePtr
+          'conversion_get_file_size');
+  late final _conversion_get_file_size = _conversion_get_file_sizePtr
       .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
-  /// Check if LAME is available
-  int lame_wrapper_is_available() {
-    return _lame_wrapper_is_available();
+  /// Check if conversion library is available
+  int conversion_is_available() {
+    return _conversion_is_available();
   }
 
-  late final _lame_wrapper_is_availablePtr =
+  late final _conversion_is_availablePtr =
       _lookup<ffi.NativeFunction<ffi.Int Function()>>(
-          'lame_wrapper_is_available');
-  late final _lame_wrapper_is_available =
-      _lame_wrapper_is_availablePtr.asFunction<int Function()>();
+          'conversion_is_available');
+  late final _conversion_is_available =
+      _conversion_is_availablePtr.asFunction<int Function()>();
 
-  /// Get LAME version string
-  ffi.Pointer<ffi.Char> lame_wrapper_get_version() {
-    return _lame_wrapper_get_version();
+  /// Get conversion library version string
+  ffi.Pointer<ffi.Char> conversion_get_version() {
+    return _conversion_get_version();
   }
 
-  late final _lame_wrapper_get_versionPtr =
+  late final _conversion_get_versionPtr =
       _lookup<ffi.NativeFunction<ffi.Pointer<ffi.Char> Function()>>(
-          'lame_wrapper_get_version');
-  late final _lame_wrapper_get_version = _lame_wrapper_get_versionPtr
-      .asFunction<ffi.Pointer<ffi.Char> Function()>();
+          'conversion_get_version');
+  late final _conversion_get_version =
+      _conversion_get_versionPtr.asFunction<ffi.Pointer<ffi.Char> Function()>();
 
-  /// Cleanup LAME resources
-  void lame_wrapper_cleanup() {
-    return _lame_wrapper_cleanup();
+  /// Cleanup conversion resources
+  void conversion_cleanup() {
+    return _conversion_cleanup();
   }
 
-  late final _lame_wrapper_cleanupPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('lame_wrapper_cleanup');
-  late final _lame_wrapper_cleanup =
-      _lame_wrapper_cleanupPtr.asFunction<void Function()>();
+  late final _conversion_cleanupPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('conversion_cleanup');
+  late final _conversion_cleanup =
+      _conversion_cleanupPtr.asFunction<void Function()>();
 }
 
 /// mbstate_t is an opaque object to keep conversion state, during multibyte

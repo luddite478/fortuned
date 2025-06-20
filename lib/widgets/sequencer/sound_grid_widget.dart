@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:async';
-import '../../state/tracker_state.dart';
+import '../../state/sequencer_state.dart';
 import '../stacked_cards_widget.dart';
 
 class SampleGridWidget extends StatefulWidget {
@@ -32,7 +32,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     super.dispose();
   }
 
-  void _startAutoScroll(double direction, Offset initialPosition, TrackerState tracker) {
+  void _startAutoScroll(double direction, Offset initialPosition, SequencerState sequencer) {
     if (_autoScrollTimer != null) {
       return;
     }
@@ -53,9 +53,9 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         _scrollController.jumpTo(clampedOffset);
         
         final positionToUse = _currentPanPosition ?? initialPosition;
-        final cellIndex = tracker.getCellIndexFromPosition(positionToUse, context, scrollOffset: clampedOffset);
+        final cellIndex = sequencer.getCellIndexFromPosition(positionToUse, context, scrollOffset: clampedOffset);
         if (cellIndex != null) {
-          tracker.handleGridCellSelection(cellIndex, true);
+          sequencer.handleGridCellSelection(cellIndex, true);
         }
       } else {
         timer.cancel();
@@ -69,7 +69,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     _autoScrollTimer = null;
   }
 
-  void _handlePanUpdate(DragUpdateDetails details, TrackerState tracker) {
+  void _handlePanUpdate(DragUpdateDetails details, SequencerState sequencer) {
     final localPosition = details.localPosition;
     _currentPanPosition = localPosition;
     
@@ -79,7 +79,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       if (delta.distance > _gestureThreshold) {
         final isVertical = delta.dy.abs() > delta.dx.abs();
         
-        if (tracker.isInSelectionMode) {
+        if (sequencer.isInSelectionMode) {
           _gestureMode = GestureMode.selecting;
         } else if (isVertical) {
           _gestureMode = GestureMode.scrolling;
@@ -90,13 +90,13 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     }
     
     if (_gestureMode == GestureMode.selecting) {
-      _handleSelectionGesture(localPosition, tracker);
+      _handleSelectionGesture(localPosition, sequencer);
     }
   }
   
-  void _handleSelectionGesture(Offset localPosition, TrackerState tracker) {
+  void _handleSelectionGesture(Offset localPosition, SequencerState sequencer) {
     final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    final cellIndex = tracker.getCellIndexFromPosition(localPosition, context, scrollOffset: scrollOffset);
+    final cellIndex = sequencer.getCellIndexFromPosition(localPosition, context, scrollOffset: scrollOffset);
     
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox != null) {
@@ -104,15 +104,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       final yPosition = localPosition.dy;
       
       if (yPosition < _edgeThreshold && _scrollController.hasClients && _scrollController.offset > 0) {
-        _startAutoScroll(-1.0, localPosition, tracker);
+        _startAutoScroll(-1.0, localPosition, sequencer);
         if (cellIndex != null) {
-          tracker.handleGridCellSelection(cellIndex, true);
+          sequencer.handleGridCellSelection(cellIndex, true);
         }
         return;
       } else if (yPosition > containerHeight - _edgeThreshold && _scrollController.hasClients && _scrollController.offset < _scrollController.position.maxScrollExtent) {
-        _startAutoScroll(1.0, localPosition, tracker);
+        _startAutoScroll(1.0, localPosition, sequencer);
         if (cellIndex != null) {
-          tracker.handleGridCellSelection(cellIndex, true);
+          sequencer.handleGridCellSelection(cellIndex, true);
         }
         return;
       } else {
@@ -121,20 +121,20 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     }
     
     if (cellIndex != null) {
-      tracker.handleGridCellSelection(cellIndex, true);
+      sequencer.handleGridCellSelection(cellIndex, true);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<TrackerState>(
-      builder: (context, tracker, child) {
+    return Consumer<SequencerState>(
+      builder: (context, sequencer, child) {
         const int numSoundGrids = 3; // Can be changed to any number
         
         // Initialize sound grids if not already done or if number changed
-        if (tracker.soundGridOrder.length != numSoundGrids) {
+        if (sequencer.soundGridOrder.length != numSoundGrids) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            tracker.initializeSoundGrids(numSoundGrids);
+            sequencer.initializeSoundGrids(numSoundGrids);
           });
           return const Center(child: CircularProgressIndicator());
         }
@@ -150,10 +150,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             Color(0xFF1f2937),
             Color(0xFF374151),
           ],
-          activeCardIndex: tracker.currentSoundGridIndex,
+          activeCardIndex: sequencer.currentSoundGridIndex,
           cardBuilder: (index, width, height, depth) {
             // Get the actual sound grid ID for this position using the sound grid order
-            final actualSoundGridId = tracker.soundGridOrder[index];
+            final actualSoundGridId = sequencer.soundGridOrder[index];
             
             // Define unique colors for each card ID (expandable list)
             final availableColors = [
@@ -193,16 +193,16 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                     ),
                   ],
                 ),
-                                  child: Container(
-                    margin: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: cardColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: cardColor.withOpacity(0.3),
-                        width: 2,
-                      ),
+                child: Container(
+                  margin: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: cardColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: cardColor.withOpacity(0.3),
+                      width: 2,
                     ),
+                  ),
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -232,7 +232,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Front Grid: ${tracker.currentSoundGridIndex + 1}',
+                          'Front Grid: ${sequencer.currentSoundGridIndex + 1}',
                           style: TextStyle(
                             color: Colors.cyan.withOpacity(0.7),
                             fontSize: 10,
@@ -262,7 +262,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                 color: const Color(0xFF1f2937),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: tracker.isInSelectionMode 
+                  color: sequencer.isInSelectionMode 
                       ? Colors.cyanAccent 
                       : cardColor,
                   width: 4,
@@ -302,48 +302,48 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                     // Sound grid
                     Expanded(
                       child: GestureDetector(
-                  onPanStart: (details) {
-                    _gestureStartPosition = details.localPosition;
-                    _gestureMode = GestureMode.undetermined;
-                    
-                    if (tracker.isInSelectionMode) {
-                      final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-                      final cellIndex = tracker.getCellIndexFromPosition(details.localPosition, context, scrollOffset: scrollOffset);
-                      if (cellIndex != null) {
-                        tracker.handleGridCellSelection(cellIndex, true);
-                      }
-                    }
-                  },
-                  onPanUpdate: (details) {
-                    _handlePanUpdate(details, tracker);
-                  },
-                  onPanEnd: (details) {
-                    _gestureStartPosition = null;
-                    _currentPanPosition = null;
-                    _gestureMode = GestureMode.undetermined;
-                    _stopAutoScroll();
-                    
-                    if (tracker.isInSelectionMode) {
-                      tracker.handlePanEnd();
-                    }
-                  },
-                  child: GridView.builder(
-                    controller: _scrollController,
-                    physics: (tracker.isInSelectionMode || _gestureMode == GestureMode.selecting)
-                        ? const NeverScrollableScrollPhysics()
-                        : const AlwaysScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: tracker.gridColumns,
-                      crossAxisSpacing: 4,
-                      mainAxisSpacing: 4,
-                      childAspectRatio: 2.5,
-                    ),
-                    itemCount: tracker.gridSamples.length,
-                    itemBuilder: (context, index) {
-                      return _buildGridCell(context, tracker, index);
-                    },
-                  ),
-                ),
+                        onPanStart: (details) {
+                          _gestureStartPosition = details.localPosition;
+                          _gestureMode = GestureMode.undetermined;
+                          
+                          if (sequencer.isInSelectionMode) {
+                            final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+                            final cellIndex = sequencer.getCellIndexFromPosition(details.localPosition, context, scrollOffset: scrollOffset);
+                            if (cellIndex != null) {
+                              sequencer.handleGridCellSelection(cellIndex, true);
+                            }
+                          }
+                        },
+                        onPanUpdate: (details) {
+                          _handlePanUpdate(details, sequencer);
+                        },
+                        onPanEnd: (details) {
+                          _gestureStartPosition = null;
+                          _currentPanPosition = null;
+                          _gestureMode = GestureMode.undetermined;
+                          _stopAutoScroll();
+                          
+                          if (sequencer.isInSelectionMode) {
+                            sequencer.handlePanEnd();
+                          }
+                        },
+                        child: GridView.builder(
+                          controller: _scrollController,
+                          physics: (sequencer.isInSelectionMode || _gestureMode == GestureMode.selecting)
+                              ? const NeverScrollableScrollPhysics()
+                              : const AlwaysScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: sequencer.gridColumns,
+                            crossAxisSpacing: 4,
+                            mainAxisSpacing: 4,
+                            childAspectRatio: 2.5,
+                          ),
+                          itemCount: sequencer.gridSamples.length,
+                          itemBuilder: (context, index) {
+                            return _buildGridCell(context, sequencer, index);
+                          },
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -355,38 +355,38 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
-  Widget _buildGridCell(BuildContext context, TrackerState tracker, int index) {
-    final row = index ~/ tracker.gridColumns;
-    final col = index % tracker.gridColumns;
-    final isActivePad = tracker.activePad == index;
-    final isCurrentStep = tracker.currentStep == row && tracker.isSequencerPlaying;
-    final placedSample = tracker.gridSamples[index];
+  Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index) {
+    final row = index ~/ sequencer.gridColumns;
+    final col = index % sequencer.gridColumns;
+    final isActivePad = sequencer.activePad == index;
+    final isCurrentStep = sequencer.currentStep == row && sequencer.isSequencerPlaying;
+    final placedSample = sequencer.gridSamples[index];
     final hasPlacedSample = placedSample != null;
-    final isSelected = tracker.selectedGridCells.contains(index);
+    final isSelected = sequencer.selectedGridCells.contains(index);
     
     Color cellColor;
     if (isActivePad) {
       cellColor = Colors.white.withOpacity(0.3);
     } else if (isCurrentStep) {
       cellColor = hasPlacedSample 
-          ? tracker.bankColors[placedSample!].withOpacity(0.4)
+          ? sequencer.bankColors[placedSample!].withOpacity(0.4)
           : Colors.grey.withOpacity(0.3);
     } else if (hasPlacedSample) {
-      cellColor = tracker.bankColors[placedSample!].withOpacity(0.3);
+      cellColor = sequencer.bankColors[placedSample!].withOpacity(0.3);
     } else {
       cellColor = const Color(0xFF404040).withOpacity(0.2);
     }
     
     return DragTarget<int>(
       onAccept: (int sampleSlot) {
-        tracker.placeSampleInGrid(sampleSlot, index);
+        sequencer.placeSampleInGrid(sampleSlot, index);
       },
       builder: (context, candidateData, rejectedData) {
         final bool isDragHovering = candidateData.isNotEmpty;
         
         return GestureDetector(
           onTap: () {
-            tracker.handlePadPress(index);
+            sequencer.handlePadPress(index);
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 100),

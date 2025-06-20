@@ -1,4 +1,4 @@
-#include "miniaudio_wrapper.h"
+#include "sequencer.h"
 
 // Platform-specific includes and definitions
 #ifdef __APPLE__
@@ -50,7 +50,7 @@
 // Configure miniaudio implementation (common for all platforms)
 // -----------------------------------------------------------------------------
 #define MINIAUDIO_IMPLEMENTATION
-#include "miniaudio.h"
+#include "miniaudio/miniaudio.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -59,7 +59,7 @@
 // -----------------------------------------------------------------------------
 // Simplified Mixing Implementation (Following Official miniaudio Pattern)
 // -----------------------------------------------------------------------------
-#define MINIAUDIO_MAX_SLOTS 1024
+#define MAX_SLOTS 1024
 #define SAMPLE_FORMAT   ma_format_f32
 #define CHANNEL_COUNT   2
 #define SAMPLE_RATE     48000
@@ -87,7 +87,7 @@ typedef struct {
 static ma_device g_device;
 // Node graph which will handle mixing of all slot nodes.
 static ma_node_graph g_nodeGraph;
-static audio_slot_t g_slots[MINIAUDIO_MAX_SLOTS];
+static audio_slot_t g_slots[MAX_SLOTS];
 static int g_is_initialized = 0;
 static uint64_t g_total_memory_used = 0;
 
@@ -97,17 +97,18 @@ static int g_is_output_recording = 0;
 static uint64_t g_recording_start_time = 0;
 static uint64_t g_total_frames_written = 0;
 
-// Sequencer state for sample-accurate timing
+// Sequencer state
 #define MAX_SEQUENCER_STEPS 32
-#define MAX_SEQUENCER_COLUMNS 8
+#define MAX_TOTAL_COLUMNS 64
 static int g_sequencer_playing = 0;
 static int g_sequencer_bpm = 120;
 static int g_sequencer_steps = 16;
 static int g_current_step = 0;
-static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_SEQUENCER_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
+static int g_columns = 4; // Current number of columns in sequencer (starts with 1 grid × 4 columns)
+static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
 static uint64_t g_frames_per_step = 0;
 static uint64_t g_step_frame_counter = 0;
-static int g_column_playing_sample[MAX_SEQUENCER_COLUMNS]; // Track which sample is playing in each column
+static int g_column_playing_sample[MAX_TOTAL_COLUMNS]; // Track which sample is playing in each column
 static int g_step_just_changed = 0; // Flag to handle immediate step playback
 
 // Note: Thread safety removed for simplicity - miniaudio handles internal synchronization
@@ -159,7 +160,7 @@ static int load_file_to_memory_buffer(const char* file_path, void** memory_data,
 // Helper functions for memory limit checking
 static int get_current_memory_slot_count(void) {
     int count = 0;
-    for (int i = 0; i < MINIAUDIO_MAX_SLOTS; ++i) {
+    for (int i = 0; i < MAX_SLOTS; ++i) {
         if (g_slots[i].memory_data) {
             count++;
         }
@@ -179,7 +180,7 @@ static int check_memory_limits(size_t file_size) {
     int current_memory_slots = get_current_memory_slot_count();
     if (current_memory_slots >= MAX_MEMORY_SLOTS) {
         prnt_err("🔴 [MEMORY LIMIT] Too many memory slots: %d/%d (max: %d)", 
-                 current_memory_slots, MINIAUDIO_MAX_SLOTS, MAX_MEMORY_SLOTS);
+                 current_memory_slots, MAX_SLOTS, MAX_MEMORY_SLOTS);
         return -1;
     }
     
@@ -323,18 +324,18 @@ static void mix_slot_audio(audio_slot_t* slot, float* output, ma_uint32 frameCou
     }
 }
 
-// Play all samples that should trigger on this step
+// Play all samples that should trigger on this step across all columns
 static void play_samples_for_step(int step) {
     if (step < 0 || step >= g_sequencer_steps) return;
     
-    prnt("🎵 [SEQUENCER] Playing step %d", step);
+    prnt("🎵 [SEQUENCER] Playing step %d across %d columns", step, g_columns);
     
-    // Check each column (track) for this step
-    for (int column = 0; column < MAX_SEQUENCER_COLUMNS; column++) {
+    // Process all columns (which represent all UI grids concatenated horizontally)
+    for (int column = 0; column < g_columns; column++) {
         int sample_to_play = g_sequencer_grid[step][column];
         
         // Is there a sample in this grid cell?
-        if (sample_to_play >= 0 && sample_to_play < MINIAUDIO_MAX_SLOTS) {
+        if (sample_to_play >= 0 && sample_to_play < MAX_SLOTS) {
             audio_slot_t* sample = &g_slots[sample_to_play];
             if (sample->loaded && sample->node_initialized) {
                 prnt("🎹 [SEQUENCER] Step %d, Column %d: Want sample %d, Currently playing: %d", 
@@ -395,8 +396,8 @@ static void run_sequencer(ma_uint32 frameCount) {
             if (previous_step > g_current_step) {
                 prnt("🔄 [SEQUENCER] Looping back to step 0 - clearing column memory");
                 // Clear memory of what was playing in each column
-                for (int i = 0; i < MAX_SEQUENCER_COLUMNS; i++) {
-                    g_column_playing_sample[i] = -1;
+                for (int col = 0; col < g_columns; col++) {
+                    g_column_playing_sample[col] = -1;
                 }
             }
             
@@ -521,8 +522,7 @@ static int configure_ios_audio_session(void) {
     }
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_reconfigure_audio_session(void) {
+int reconfigure_audio_session(void) {
     prnt("🔄 [AUDIO SESSION] Re-configuring audio session for Bluetooth...");
     return configure_ios_audio_session();
 }
@@ -531,8 +531,7 @@ static int configure_ios_audio_session(void) {
     return 0; // No-op on non-iOS platforms
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_reconfigure_audio_session(void) {
+int reconfigure_audio_session(void) {
     return 0; // No-op on non-iOS platforms
 }
 #endif
@@ -540,8 +539,7 @@ int miniaudio_reconfigure_audio_session(void) {
 // -----------------------------------------------------------------------------
 // Public FFI API
 // -----------------------------------------------------------------------------
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_init(void) {
+int init(void) {
     if (g_is_initialized) {
         prnt("ℹ️ [MINIAUDIO] Engine already initialized");
         return 0;
@@ -560,7 +558,7 @@ int miniaudio_init(void) {
 #endif
     
     // Initialize slot arrays
-    for (int i = 0; i < MINIAUDIO_MAX_SLOTS; ++i) {
+    for (int i = 0; i < MAX_SLOTS; ++i) {
         memset(&g_slots[i], 0, sizeof(audio_slot_t));
     }
     g_total_memory_used = 0;
@@ -576,13 +574,13 @@ int miniaudio_init(void) {
     
     // Initialize sequencer grid (all empty)
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
-        for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+        for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1; // -1 means empty
         }
     }
     
     // Initialize column tracking
-    for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+    for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
         g_column_playing_sample[col] = -1;
     }
     
@@ -599,9 +597,7 @@ int miniaudio_init(void) {
             return -1;
         }
     }
-    
-    // Threading removed for simplicity
-    
+        
     // Configure and initialize device
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
     deviceConfig.playback.format = SAMPLE_FORMAT;
@@ -638,27 +634,24 @@ int miniaudio_init(void) {
     return 0;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_get_slot_count(void) {
-    return MINIAUDIO_MAX_SLOTS;
+int get_slot_count(void) {
+    return MAX_SLOTS;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_is_slot_loaded(int slot) {
-    if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) {
+int is_slot_loaded(int slot) {
+    if (slot < 0 || slot >= MAX_SLOTS) {
         prnt_err("🔴 [MINIAUDIO] Invalid slot index: %d", slot);
         return 0;
     }
     return g_slots[slot].loaded;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemory) {
+int load_sound_to_slot(int slot, const char* file_path, int loadToMemory) {
     if (!g_is_initialized) {
         prnt_err("🔴 [MINIAUDIO] Device not initialized");
         return -1;
     }
-    if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) {
+    if (slot < 0 || slot >= MAX_SLOTS) {
         prnt_err("🔴 [MINIAUDIO] Invalid slot index: %d", slot);
         return -1;
     }
@@ -695,13 +688,12 @@ int miniaudio_load_sound_to_slot(int slot, const char* file_path, int loadToMemo
     return result;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_play_slot(int slot) {
+int play_slot(int slot) {
     if (!g_is_initialized) {
         prnt_err("🔴 [MINIAUDIO] Device not initialized");
         return -1;
     }
-    if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) {
+    if (slot < 0 || slot >= MAX_SLOTS) {
         prnt_err("🔴 [MINIAUDIO] Invalid slot index: %d", slot);
         return -1;
     }
@@ -732,13 +724,12 @@ int miniaudio_play_slot(int slot) {
     return 0;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_stop_slot(int slot) {
+void stop_slot(int slot) {
     if (!g_is_initialized) {
         prnt_err("🔴 [MINIAUDIO] Device not initialized");
         return;
     }
-    if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) {
+    if (slot < 0 || slot >= MAX_SLOTS) {
         prnt_err("🔴 [MINIAUDIO] Invalid slot index: %d", slot);
         return;
     }
@@ -751,10 +742,9 @@ void miniaudio_stop_slot(int slot) {
     prnt("⏹️ [MINIAUDIO] Slot %d stopped", slot);
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_unload_slot(int slot) {
+void unload_slot(int slot) {
     if (!g_is_initialized) return;
-    if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) {
+    if (slot < 0 || slot >= MAX_SLOTS) {
         prnt_err("🔴 [MINIAUDIO] Invalid slot index: %d", slot);
         return;
     }
@@ -763,8 +753,7 @@ void miniaudio_unload_slot(int slot) {
     prnt("🗑️ [MINIAUDIO] Slot %d unloaded", slot);
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_stop_all_sounds(void) {
+void stop_all_sounds(void) {
     if (!g_is_initialized) {
         prnt_err("🔴 [MINIAUDIO] Device not initialized");
         return;
@@ -772,7 +761,7 @@ void miniaudio_stop_all_sounds(void) {
     
     prnt("⏹️ [MINIAUDIO] Stopping all sounds");
     
-    for (int i = 0; i < MINIAUDIO_MAX_SLOTS; ++i) {
+    for (int i = 0; i < MAX_SLOTS; ++i) {
         audio_slot_t* s = &g_slots[i];
         s->active = 0;
         if (s->node_initialized) {
@@ -781,46 +770,38 @@ void miniaudio_stop_all_sounds(void) {
     }
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_is_initialized(void) {
+int is_initialized(void) {
     return g_is_initialized;
 }
 
 // Memory tracking functions
-__attribute__((visibility("default"))) __attribute__((used))
-uint64_t miniaudio_get_total_memory_usage(void) {
+uint64_t get_total_memory_usage(void) {
     return g_total_memory_used;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-uint64_t miniaudio_get_slot_memory_usage(int slot) {
-    if (slot < 0 || slot >= MINIAUDIO_MAX_SLOTS) return 0;
+uint64_t get_slot_memory_usage(int slot) {
+    if (slot < 0 || slot >= MAX_SLOTS) return 0;
     return g_slots[slot].memory_data ? g_slots[slot].memory_size : 0;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_get_memory_slot_count(void) {
+int get_memory_slot_count(void) {
     return get_current_memory_slot_count();
 }
 
 // Memory limit information functions
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_get_max_memory_slots(void) {
+int get_max_memory_slots(void) {
     return MAX_MEMORY_SLOTS;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-uint64_t miniaudio_get_max_memory_file_size(void) {
+uint64_t get_max_memory_file_size(void) {
     return MAX_MEMORY_FILE_SIZE;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-uint64_t miniaudio_get_max_total_memory_usage(void) {
+uint64_t get_max_total_memory_usage(void) {
     return MAX_TOTAL_MEMORY_USAGE;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-uint64_t miniaudio_get_available_memory_capacity(void) {
+uint64_t get_available_memory_capacity(void) {
     if (g_total_memory_used >= MAX_TOTAL_MEMORY_USAGE) {
         return 0;
     }
@@ -828,32 +809,27 @@ uint64_t miniaudio_get_available_memory_capacity(void) {
 }
 
 // Legacy compatibility functions (no longer used but kept for compatibility)
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_play_sound(const char* file_path) {
+int play_sound(const char* file_path) {
     prnt("ℹ️ [MINIAUDIO] Legacy play_sound called, use slot-based API instead");
     return -1;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_load_sound(const char* file_path) {
+int load_sound(const char* file_path) {
     prnt("ℹ️ [MINIAUDIO] Legacy load_sound called, use slot-based API instead");
     return -1;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_play_loaded_sound(void) {
+int play_loaded_sound(void) {
     prnt("ℹ️ [MINIAUDIO] Legacy play_loaded_sound called, use slot-based API instead");
     return -1;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_log_audio_route(void) {
+void log_route(void) {
     prnt("ℹ️ [MINIAUDIO] Audio route logging not implemented in Simple Mixing");
 }
 
 // Output recording functions (following simple_capture example pattern)
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_start_output_recording(const char* output_file_path) {
+int start_recording(const char* output_file_path) {
     if (!g_is_initialized) {
         prnt_err("🔴 [RECORDING] Device not initialized");
         return -1;
@@ -883,8 +859,7 @@ int miniaudio_start_output_recording(const char* output_file_path) {
     return 0;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_stop_output_recording(void) {
+int stop_recording(void) {
     if (!g_is_output_recording) {
         prnt_err("🔴 [RECORDING] Not currently recording");
         return -1;
@@ -893,7 +868,7 @@ int miniaudio_stop_output_recording(void) {
     prnt("⏹️ [RECORDING] Stopping output recording...");
     
     // Get duration before cleanup
-    uint64_t duration_ms = miniaudio_get_recording_duration_ms();
+    uint64_t duration_ms = get_recording_duration();
     
     // Finalize and cleanup encoder
     ma_encoder_uninit(&g_output_encoder);
@@ -905,13 +880,11 @@ int miniaudio_stop_output_recording(void) {
     return 0;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_is_output_recording(void) {
+int is_recording(void) {
     return g_is_output_recording;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-uint64_t miniaudio_get_recording_duration_ms(void) {
+uint64_t get_recording_duration(void) {
     if (!g_is_output_recording || !g_is_initialized) {
         return 0;
     }
@@ -922,8 +895,7 @@ uint64_t miniaudio_get_recording_duration_ms(void) {
 }
 
 // Sequencer functions (sample-accurate timing)
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_start_sequencer(int bpm, int steps) {
+int start(int bpm, int steps) {
     if (!g_is_initialized) {
         prnt_err("🔴 [SEQUENCER] Device not initialized");
         return -1;
@@ -940,7 +912,7 @@ int miniaudio_start_sequencer(int bpm, int steps) {
     }
     
     // Stop any currently playing samples
-    for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+    for (int col = 0; col < g_columns; col++) {
         if (g_column_playing_sample[col] >= 0) {
             audio_slot_t* s = &g_slots[g_column_playing_sample[col]];
             if (s->node_initialized) {
@@ -963,15 +935,14 @@ int miniaudio_start_sequencer(int bpm, int steps) {
     return 0;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_stop_sequencer(void) {
+void stop(void) {
     g_sequencer_playing = 0;
     g_current_step = 0;
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     
     // Stop all currently playing samples
-    for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+    for (int col = 0; col < g_columns; col++) {
         if (g_column_playing_sample[col] >= 0) {
             audio_slot_t* s = &g_slots[g_column_playing_sample[col]];
             if (s->node_initialized) {
@@ -984,18 +955,15 @@ void miniaudio_stop_sequencer(void) {
     prnt("⏹️ [SEQUENCER] Stopped");
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_is_sequencer_playing(void) {
+int is_playing(void) {
     return g_sequencer_playing;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-int miniaudio_get_current_step(void) {
+int get_current_step(void) {
     return g_current_step;
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_set_sequencer_bpm(int bpm) {
+void set_bpm(int bpm) {
     if (bpm > 0 && bpm <= 300) {
         g_sequencer_bpm = bpm;
         g_frames_per_step = (SAMPLE_RATE * 60) / (bpm * 4); // 1/16 note frames
@@ -1005,18 +973,23 @@ void miniaudio_set_sequencer_bpm(int bpm) {
     }
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_set_grid_cell(int step, int column, int sample_slot) {
+void set_cell(int step, int column, int sample_slot) {
     if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
         prnt_err("🔴 [SEQUENCER] Invalid step: %d", step);
         return;
     }
-    if (column < 0 || column >= MAX_SEQUENCER_COLUMNS) {
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
         prnt_err("🔴 [SEQUENCER] Invalid column: %d", column);
         return;
     }
-    if (sample_slot < -1 || sample_slot >= MINIAUDIO_MAX_SLOTS) {
+    if (sample_slot < -1 || sample_slot >= MAX_SLOTS) {
         prnt_err("🔴 [SEQUENCER] Invalid sample slot: %d", sample_slot);
+        return;
+    }
+    
+    // Only set the cell if within current column range
+    if (column >= g_columns) {
+        prnt_err("🔴 [SEQUENCER] Column %d beyond current range (max: %d). Use set_columns() first.", column, g_columns - 1);
         return;
     }
     
@@ -1024,45 +997,53 @@ void miniaudio_set_grid_cell(int step, int column, int sample_slot) {
     prnt("🎹 [SEQUENCER] Set cell [%d,%d] = %d", step, column, sample_slot);
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_clear_grid_cell(int step, int column) {
+void clear_cell(int step, int column) {
     if (step < 0 || step >= MAX_SEQUENCER_STEPS) return;
-    if (column < 0 || column >= MAX_SEQUENCER_COLUMNS) return;
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) return;
     
     g_sequencer_grid[step][column] = -1;
     prnt("🗑️ [SEQUENCER] Cleared cell [%d,%d]", step, column);
 }
 
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_clear_all_grid_cells(void) {
+void clear_all_cells(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
-        for (int col = 0; col < MAX_SEQUENCER_COLUMNS; col++) {
+        for (int col = 0; col < g_columns; col++) {
             g_sequencer_grid[step][col] = -1;
         }
     }
     prnt("🗑️ [SEQUENCER] Cleared all grid cells");
 }
 
+// Multi-grid sequencer support
+void set_columns(int columns) {
+    if (columns < 1 || columns > MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [SEQUENCER] Invalid columns: %d (max: %d)", columns, MAX_TOTAL_COLUMNS);
+        return;
+    }
+    
+    g_columns = columns;
+    prnt("🎛️ [SEQUENCER] Set columns to %d", columns);
+}
+
 // Cleanup function
-__attribute__((visibility("default"))) __attribute__((used))
-void miniaudio_cleanup(void) {
+void cleanup(void) {
     if (!g_is_initialized) return;
     
     prnt("🧹 [MINIAUDIO] Starting cleanup...");
     
     // Stop sequencer
-    miniaudio_stop_sequencer();
+    stop();
     
     // Stop recording if active
     if (g_is_output_recording) {
-        miniaudio_stop_output_recording();
+        stop_recording();
     }
     
     // Stop device first
     ma_device_stop(&g_device);
     
     // Free all slot resources
-    for (int i = 0; i < MINIAUDIO_MAX_SLOTS; ++i) {
+    for (int i = 0; i < MAX_SLOTS; ++i) {
         free_slot_resources(i);
     }
     

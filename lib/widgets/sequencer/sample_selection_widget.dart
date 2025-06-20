@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../state/tracker_state.dart';
+import '../../state/sequencer_state.dart';
 
 class SampleSelectionWidget extends StatelessWidget {
   const SampleSelectionWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<TrackerState>(
-      builder: (context, trackerState, child) {
+    return Consumer<SequencerState>(
+      builder: (context, sequencerState, child) {
         return Container(
           margin: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
@@ -19,13 +19,13 @@ class SampleSelectionWidget extends StatelessWidget {
               width: 1,
             ),
           ),
-          child: _buildSampleBrowser(context, trackerState),
+          child: _buildSampleBrowser(context, sequencerState),
         );
       },
     );
   }
 
-  Widget _buildSampleBrowser(BuildContext context, TrackerState trackerState) {
+  Widget _buildSampleBrowser(BuildContext context, SequencerState sequencerState) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -34,9 +34,9 @@ class SampleSelectionWidget extends StatelessWidget {
           // Header with sample selection info
           Row(
             children: [
-              if (trackerState.currentSamplePath.isNotEmpty) ...[
+              if (sequencerState.currentSamplePath.isNotEmpty) ...[
                 GestureDetector(
-                  onTap: () => trackerState.navigateBackInSamples(),
+                  onTap: () => sequencerState.navigateBackInSamples(),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -65,9 +65,9 @@ class SampleSelectionWidget extends StatelessWidget {
               ],
               Expanded(
                 child: Text(
-                  trackerState.currentSamplePath.isEmpty 
+                  sequencerState.currentSamplePath.isEmpty 
                       ? 'samples/' 
-                      : 'samples/${trackerState.currentSamplePath.join('/')}/',
+                      : 'samples/${sequencerState.currentSamplePath.join('/')}/',
                   style: const TextStyle(
                     color: Colors.grey,
                     fontSize: 10,
@@ -76,7 +76,7 @@ class SampleSelectionWidget extends StatelessWidget {
                 ),
               ),
               GestureDetector(
-                onTap: () => trackerState.cancelSampleSelection(),
+                onTap: () => sequencerState.cancelSampleSelection(),
                 child: Container(
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
@@ -96,7 +96,7 @@ class SampleSelectionWidget extends StatelessWidget {
           
           // Horizontal scrollable sample list
           Expanded(
-            child: trackerState.currentSampleItems.isEmpty
+            child: sequencerState.currentSampleItems.isEmpty
                 ? const Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -120,9 +120,9 @@ class SampleSelectionWidget extends StatelessWidget {
                 : SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: trackerState.currentSampleItems.map((item) {
+                      children: sequencerState.currentSampleItems.map((item) {
                         return GestureDetector(
-                          onTap: () => trackerState.selectSampleItem(item),
+                          onTap: () => sequencerState.selectSampleItem(item),
                           child: Container(
                             width: 100,
                             height: double.infinity,
@@ -180,7 +180,7 @@ class SampleSelectionWidget extends StatelessWidget {
                                         right: 0,
                                         child: Center(
                                           child: GestureDetector(
-                                            onTap: () => trackerState.previewSample(item.path),
+                                            onTap: () => sequencerState.previewSample(item.path),
                                             child: Container(
                                               padding: const EdgeInsets.all(8),
                                               decoration: BoxDecoration(
