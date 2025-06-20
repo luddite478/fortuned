@@ -45,7 +45,6 @@ jobs:
         script: |
           cd "$REPO_DIR_PATH"
           docker-compose down
-          rm docker-compose.envsubst.yaml || true
           envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
           docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
 
