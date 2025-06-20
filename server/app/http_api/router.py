@@ -1,6 +1,7 @@
 # routes/router.py
 from fastapi import APIRouter, Request
 from http_api.rate_limiter import check_rate_limit
+import os
 
 router = APIRouter()
 
