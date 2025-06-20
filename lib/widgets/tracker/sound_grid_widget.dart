@@ -129,18 +129,18 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   Widget build(BuildContext context) {
     return Consumer<TrackerState>(
       builder: (context, tracker, child) {
-        const int numCards = 3; // Can be changed to any number
+        const int numSoundGrids = 3; // Can be changed to any number
         
-        // Initialize cards if not already done or if number changed
-        if (tracker.cardOrder.length != numCards) {
+        // Initialize sound grids if not already done or if number changed
+        if (tracker.soundGridOrder.length != numSoundGrids) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            tracker.initializeCards(numCards);
+            tracker.initializeSoundGrids(numSoundGrids);
           });
           return const Center(child: CircularProgressIndicator());
         }
         
         return StackedCardsWidget(
-          numCards: numCards,
+          numCards: numSoundGrids,
           cardWidthFactor: 0.9,
           cardHeightFactor: 0.9,
           offsetPerDepth: const Offset(0, -10),
@@ -150,10 +150,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             Color(0xFF1f2937),
             Color(0xFF374151),
           ],
-          activeCardIndex: tracker.currentCardIndex,
+          activeCardIndex: tracker.currentSoundGridIndex,
           cardBuilder: (index, width, height, depth) {
-            // Get the actual card ID for this position using the card order
-            final actualCardId = tracker.cardOrder[index];
+            // Get the actual sound grid ID for this position using the sound grid order
+            final actualSoundGridId = tracker.soundGridOrder[index];
             
             // Define unique colors for each card ID (expandable list)
             final availableColors = [
@@ -168,10 +168,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               Colors.amber,
               Colors.indigo,
             ];
-            final cardColor = availableColors[actualCardId % availableColors.length];
+            final cardColor = availableColors[actualSoundGridId % availableColors.length];
             
             // The front card (highest index, depth 0) always shows the sound grid
-            final isFrontCard = index == (numCards - 1); // Front card is at highest index (depth 0)
+            final isFrontCard = index == (numSoundGrids - 1); // Front card is at highest index (depth 0)
             
             // Non-front cards are just visual placeholders
             if (!isFrontCard) {
@@ -214,7 +214,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          'Pattern ${actualCardId + 1}', // Show the actual card ID
+                          'SoundGrid ${actualSoundGridId + 1}', // Show the actual sound grid ID
                           style: TextStyle(
                             color: Colors.white.withOpacity(0.5),
                             fontSize: 16,
@@ -223,7 +223,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Card ID: $actualCardId, Pos: $index, Depth: $depth',
+                          'Grid ID: $actualSoundGridId, Pos: $index, Depth: $depth',
                           style: TextStyle(
                             color: Colors.yellow.withOpacity(0.7),
                             fontSize: 9,
@@ -232,7 +232,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Front Card: ${tracker.currentCardIndex + 1}',
+                          'Front Grid: ${tracker.currentSoundGridIndex + 1}',
                           style: TextStyle(
                             color: Colors.cyan.withOpacity(0.7),
                             fontSize: 10,
@@ -289,7 +289,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         border: Border.all(color: Colors.yellowAccent, width: 1),
                       ),
                       child: Text(
-                        'FRONT CARD: ID $actualCardId (Pattern ${actualCardId + 1}) - Pos $index, Depth $depth',
+                        'FRONT SOUND GRID: ID $actualSoundGridId (SoundGrid ${actualSoundGridId + 1}) - Pos $index, Depth $depth',
                         style: const TextStyle(
                           color: Colors.yellowAccent,
                           fontSize: 10,

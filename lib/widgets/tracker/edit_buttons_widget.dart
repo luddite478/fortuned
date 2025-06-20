@@ -37,21 +37,21 @@ class EditButtonsWidget extends StatelessWidget {
                           border: Border.all(color: Colors.orange, width: 1),
                         ),
                         child: Center(
-                          child: Text(
-                            '${tracker.currentCardIndex + 1}',
-                            style: const TextStyle(
-                              color: Colors.black,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
+                                                  child: Text(
+                          '${tracker.currentSoundGridIndex + 1}',
+                          style: const TextStyle(
+                            color: Colors.black,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
                           ),
+                        ),
                         ),
                       ),
                     ),
                   ],
                 ),
-                onPressed: () => tracker.shuffleToNextCard(),
-                tooltip: 'Shuffle Cards (Front: Card ${tracker.currentCardIndex + 1}/${tracker.cardOrder.length})',
+                onPressed: () => tracker.shuffleToNextSoundGrid(),
+                tooltip: 'Shuffle SoundGrids (Front: Grid ${tracker.currentSoundGridIndex + 1}/${tracker.soundGridOrder.length})',
               ),
               // Selection Mode Toggle button
               IconButton(
