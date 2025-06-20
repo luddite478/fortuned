@@ -43,9 +43,7 @@ jobs:
         key: ${{ secrets.DROPLET_SSH_KEY }}
         envs: REPO_DIR_PATH
         script: |
-          cd "$REPO_DIR_PATH"
-          pwd
-          ls -la
+          cd "$REPO_DIR_PATH/server"
           docker-compose down
           envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
           docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
