@@ -9,7 +9,7 @@ import 'dart:convert';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../miniaudio_library.dart';
+import '../sequencer_library.dart';
 import '../services/audio_conversion_service.dart';
 import 'patterns_state.dart';
 
@@ -72,11 +72,11 @@ class SampleSlot {
   bool get hasFile => filePath != null;
 }
 
-// Tracker state management - Complete tracker functionality
-class TrackerState extends ChangeNotifier {
+// Sequencer state management - Complete sequencer functionality
+class SequencerState extends ChangeNotifier {
   static const int maxSlots = 8;
   
-  late final MiniaudioLibrary _miniaudioLibrary;
+  late final SequencerLibrary _sequencerLibrary;
   late final int _slotCount;
 
   // Audio state
@@ -94,8 +94,8 @@ class TrackerState extends ChangeNotifier {
   int _gridColumns = 4;
   int _gridRows = 16;
   
-  // Grid state - tracks which sample slot is assigned to each grid cell
-  late List<int?> _gridSamples;
+  // Grid state - tracks which sample slot is assigned to each grid cell for each sound grid
+  late List<List<int?>> _soundGridSamples; // Each sound grid has its own grid samples
   
   // Grid selection state
   Set<int> _selectedGridCells = {};
@@ -147,23 +147,27 @@ class TrackerState extends ChangeNotifier {
   int? _lastTappedCell;
   static const Duration _doubleTapThreshold = Duration(milliseconds: 300);
 
+  // Sound Grid stack state
+  int _currentSoundGridIndex = 0;
+  List<int> _soundGridOrder = []; // Order of sound grids from back to front (initialized dynamically)
+
   // Sample selection state
   bool _isSelectingSample = false;
   int? _sampleSelectionSlot;
   List<String> _currentSamplePath = [];
   List<SampleBrowserItem> _currentSampleItems = [];
 
-  // Initialize tracker
-  TrackerState() {
-    _miniaudioLibrary = MiniaudioLibrary.instance;
+  // Initialize sequencer
+  SequencerState() {
+    _sequencerLibrary = SequencerLibrary.instance;
     _initializeAudio();
 
-    _slotCount = _miniaudioLibrary.slotCount;
+    _slotCount = _sequencerLibrary.slotCount;
     _filePaths = List.filled(_slotCount, null);
     _fileNames = List.filled(_slotCount, null);
     _slotLoaded = List.filled(_slotCount, false);
     _slotPlaying = List.filled(_slotCount, false);
-    _gridSamples = List.filled(_gridColumns * _gridRows, null);
+    _soundGridSamples = []; // Will be initialized when sound grids are created
     _columnPlayingSample = List.filled(_gridColumns, null);
   }
 
@@ -177,7 +181,9 @@ class TrackerState extends ChangeNotifier {
   int? get selectedSampleSlot => _selectedSampleSlot;
   int get gridColumns => _gridColumns;
   int get gridRows => _gridRows;
-  List<int?> get gridSamples => List.unmodifiable(_gridSamples);
+  List<int?> get gridSamples => _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length 
+      ? List.unmodifiable(_soundGridSamples[_currentSoundGridIndex]) 
+      : List.filled(_gridColumns * _gridRows, null);
   Set<int> get selectedGridCells => Set.unmodifiable(_selectedGridCells);
   bool get isSelecting => _isSelecting;
   bool get isInSelectionMode => _isInSelectionMode;
@@ -188,7 +194,7 @@ class TrackerState extends ChangeNotifier {
   String? get currentRecordingPath => _currentRecordingPath;
   String? get lastRecordingPath => _lastRecordingPath;
   DateTime? get lastRecordingTime => _lastRecordingTime;
-  String get formattedRecordingDuration => _miniaudioLibrary.formattedOutputRecordingDuration;
+  String get formattedRecordingDuration => _sequencerLibrary.formattedOutputRecordingDuration;
   bool get isConverting => _isConverting;
   double get conversionProgress => _conversionProgress;
   String? get lastMp3Path => _lastMp3Path;
@@ -200,6 +206,10 @@ class TrackerState extends ChangeNotifier {
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
   List<SampleBrowserItem> get currentSampleItems => List.unmodifiable(_currentSampleItems);
+  int get currentSoundGridIndex => _currentSoundGridIndex;
+  List<int> get soundGridOrder => List.unmodifiable(_soundGridOrder);
+  int get columnsPerGrid => _gridColumns;
+  int get numSoundGrids => _soundGridSamples.length;
   
   List<SampleSlot> get loadedSlots {
     List<SampleSlot> slots = [];
@@ -218,7 +228,7 @@ class TrackerState extends ChangeNotifier {
   }
 
   Future<void> _initializeAudio() async {
-    bool success = _miniaudioLibrary.initialize();
+    bool success = _sequencerLibrary.initialize();
     if (!success) {
       debugPrint('Failed to initialize audio engine');
     }
@@ -389,10 +399,10 @@ class TrackerState extends ChangeNotifier {
       final tempPath = await _copyAssetToTemp(assetPath, fileName);
       
       // Load and play the preview sample in slot 0 temporarily
-      bool loadSuccess = _miniaudioLibrary.loadSoundToSlot(0, tempPath, loadToMemory: true);
+      bool loadSuccess = _sequencerLibrary.loadSoundToSlot(0, tempPath, loadToMemory: true);
       if (loadSuccess) {
-        _miniaudioLibrary.reconfigureAudioSession();
-        _miniaudioLibrary.playSlot(0);
+        _sequencerLibrary.reconfigureAudioSession();
+        _sequencerLibrary.playSlot(0);
       }
     } catch (e) {
       print('❌ Error previewing sample: $e');
@@ -402,7 +412,7 @@ class TrackerState extends ChangeNotifier {
   void loadSlot(int slot) {
     final path = _filePaths[slot];
     if (path == null) return;
-    bool success = _miniaudioLibrary.loadSoundToSlot(
+    bool success = _sequencerLibrary.loadSoundToSlot(
       slot,
       path,
       loadToMemory: true,
@@ -420,9 +430,9 @@ class TrackerState extends ChangeNotifier {
     }
     
     // Ensure Bluetooth audio routing is active before playback
-    _miniaudioLibrary.reconfigureAudioSession();
+    _sequencerLibrary.reconfigureAudioSession();
     
-    bool success = _miniaudioLibrary.playSlot(slot);
+    bool success = _sequencerLibrary.playSlot(slot);
     if (success) {
       _slotPlaying[slot] = true;
       notifyListeners();
@@ -430,13 +440,13 @@ class TrackerState extends ChangeNotifier {
   }
 
   void stopSlot(int slot) {
-    _miniaudioLibrary.stopSlot(slot);
+    _sequencerLibrary.stopSlot(slot);
     _slotPlaying[slot] = false;
     notifyListeners();
   }
 
   void stopAll() {
-    _miniaudioLibrary.stopAllSounds();
+    _sequencerLibrary.stopAllSounds();
     for (int i = 0; i < _slotCount; ++i) {
       _slotPlaying[i] = false;
     }
@@ -452,10 +462,10 @@ class TrackerState extends ChangeNotifier {
     }
 
     // Ensure Bluetooth audio routing is active before playback
-    _miniaudioLibrary.reconfigureAudioSession();
+    _sequencerLibrary.reconfigureAudioSession();
 
     // Then play all loaded slots
-    _miniaudioLibrary.playAllLoadedSlots();
+    _sequencerLibrary.playAllLoadedSlots();
 
     // Update UI state for all loaded slots
     for (int i = 0; i < _slotCount; i++) {
@@ -610,7 +620,8 @@ class TrackerState extends ChangeNotifier {
       for (int col = minCol; col <= maxCol; col++) {
         final cellIndex = row * _gridColumns + col;
         // Ensure we don't go out of bounds
-        if (cellIndex >= 0 && cellIndex < _gridSamples.length) {
+        final currentGrid = _getCurrentGridSamples();
+        if (cellIndex >= 0 && cellIndex < currentGrid.length) {
           newSelection.add(cellIndex);
         }
       }
@@ -630,6 +641,7 @@ class TrackerState extends ChangeNotifier {
     if (_selectedGridCells.isEmpty) return;
 
     _clipboard.clear();
+    final currentGrid = _getCurrentGridSamples();
     
     // Find the top-left corner of the selection to use as origin
     int minRow = _gridRows;
@@ -650,7 +662,9 @@ class TrackerState extends ChangeNotifier {
       final relativeCol = col - minCol;
       final relativeIndex = relativeRow * _gridColumns + relativeCol;
       
-      _clipboard[relativeIndex] = _gridSamples[cellIndex];
+      if (cellIndex >= 0 && cellIndex < currentGrid.length) {
+        _clipboard[relativeIndex] = currentGrid[cellIndex];
+      }
     }
     
     _hasClipboardData = true;
@@ -685,9 +699,7 @@ class TrackerState extends ChangeNotifier {
       if (targetRow >= 0 && targetRow < _gridRows && 
           targetCol >= 0 && targetCol < _gridColumns) {
         final targetIndex = targetRow * _gridColumns + targetCol;
-        if (targetIndex >= 0 && targetIndex < _gridSamples.length) {
-          _gridSamples[targetIndex] = sampleSlot;
-        }
+        _setCurrentGridSample(targetIndex, sampleSlot);
       }
     }
     notifyListeners();
@@ -696,13 +708,15 @@ class TrackerState extends ChangeNotifier {
   void deleteSelectedCells() {
     if (_selectedGridCells.isEmpty) return;
 
+    final currentGrid = _getCurrentGridSamples();
     for (int cellIndex in _selectedGridCells) {
-      if (cellIndex >= 0 && cellIndex < _gridSamples.length) {
-        _gridSamples[cellIndex] = null;
-        // Sync deletion to native sequencer
+      if (cellIndex >= 0 && cellIndex < currentGrid.length) {
+        _setCurrentGridSample(cellIndex, null);
+        // Sync deletion to native sequencer using absolute column calculation
         final row = cellIndex ~/ _gridColumns;
         final col = cellIndex % _gridColumns;
-        _miniaudioLibrary.clearGridCell(row, col);
+        final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+        _sequencerLibrary.clearGridCell(row, absoluteColumn);
       }
     }
     // Clear selection after deletion
@@ -712,17 +726,15 @@ class TrackerState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // OLD Flutter Timer-based sequencer (replaced by sample-accurate version below)
-
   // Sequencer functionality with sample-accurate timing
   void startSequencer() {
-    if (_miniaudioLibrary.isSequencerPlaying) return;
+    if (_sequencerLibrary.isSequencerPlaying) return;
     
     // First, transfer current grid to sequencer
     _syncGridToSequencer();
     
     // Start sequencer with current BPM and grid size
-    bool success = _miniaudioLibrary.startSequencer(_bpm, _gridRows);
+    bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows);
     if (success) {
       _isSequencerPlaying = true;
       // Start a timer just for UI updates (not audio timing)
@@ -732,7 +744,7 @@ class TrackerState extends ChangeNotifier {
   }
   
   void stopSequencer() {
-    _miniaudioLibrary.stopSequencer();
+    _sequencerLibrary.stopSequencer();
     _isSequencerPlaying = false;
     _currentStep = -1;
     
@@ -748,15 +760,20 @@ class TrackerState extends ChangeNotifier {
   
   void _syncGridToSequencer() {
     // Clear sequencer grid first
-    _miniaudioLibrary.clearAllGridCells();
+    _sequencerLibrary.clearAllGridCells();
     
-    // Transfer current grid to sequencer
-    for (int row = 0; row < _gridRows; row++) {
-      for (int col = 0; col < _gridColumns; col++) {
-        final cellIndex = row * _gridColumns + col;
-        final sampleSlot = _gridSamples[cellIndex];
-        if (sampleSlot != null) {
-          _miniaudioLibrary.setGridCell(row, col, sampleSlot);
+    // Transfer ALL sound grids to sequencer as one horizontally concatenated table
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      final gridSamples = _soundGridSamples[gridIndex];
+      for (int row = 0; row < _gridRows; row++) {
+        for (int col = 0; col < _gridColumns; col++) {
+          final cellIndex = row * _gridColumns + col;
+          final sampleSlot = gridSamples[cellIndex];
+          if (sampleSlot != null) {
+            // Calculate absolute column index: gridIndex * columnsPerGrid + column
+            final absoluteColumn = gridIndex * _gridColumns + col;
+            _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+          }
         }
       }
     }
@@ -768,14 +785,14 @@ class TrackerState extends ChangeNotifier {
     const uiUpdateIntervalMs = 50; // 20 FPS UI updates
     
     _sequencerTimer = Timer.periodic(Duration(milliseconds: uiUpdateIntervalMs), (timer) {
-      if (!_miniaudioLibrary.isSequencerPlaying) {
+      if (!_sequencerLibrary.isSequencerPlaying) {
         timer.cancel();
         _sequencerTimer = null;
         return;
       }
       
       // Get current step from sequencer
-      final currentStep = _miniaudioLibrary.currentStep;
+      final currentStep = _sequencerLibrary.currentStep;
       if (currentStep != _currentStep) {
         _currentStep = currentStep;
         notifyListeners(); // Only update UI when step actually changes
@@ -788,20 +805,22 @@ class TrackerState extends ChangeNotifier {
     if (_selectedGridCells.isNotEmpty) {
       // Place sample in all selected cells
       for (int selectedIndex in _selectedGridCells) {
-        _gridSamples[selectedIndex] = sampleSlot;
-        // Sync to sequencer
+        _setCurrentGridSample(selectedIndex, sampleSlot);
+        // Sync to sequencer using absolute column calculation
         final row = selectedIndex ~/ _gridColumns;
         final col = selectedIndex % _gridColumns;
-        _miniaudioLibrary.setGridCell(row, col, sampleSlot);
+        final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+        _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
       }
       _selectedGridCells.clear();
     } else {
       // Place sample in just this cell
-      _gridSamples[cellIndex] = sampleSlot;
-      // Sync to sequencer
+      _setCurrentGridSample(cellIndex, sampleSlot);
+      // Sync to sequencer using absolute column calculation
       final row = cellIndex ~/ _gridColumns;
       final col = cellIndex % _gridColumns;
-      _miniaudioLibrary.setGridCell(row, col, sampleSlot);
+      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
     }
     notifyListeners();
   }
@@ -845,9 +864,10 @@ class TrackerState extends ChangeNotifier {
   void _playCurrentStep() {
     // Play all sounds on the current line simultaneously
     // Only stop sounds where there's a new sound in the same column
+    final currentGrid = _getCurrentGridSamples();
     for (int col = 0; col < _gridColumns; col++) {
       final cellIndex = _currentStep * _gridColumns + col;
-      final cellSample = _gridSamples[cellIndex];
+      final cellSample = currentGrid[cellIndex];
       
       // Check if there's a sample in this cell on the current line
       if (cellSample != null && _slotLoaded[cellSample]) {
@@ -880,7 +900,7 @@ class TrackerState extends ChangeNotifier {
       final directory = await getApplicationDocumentsDirectory();
       _currentRecordingPath = path.join(directory.path, filename);
       
-      bool success = _miniaudioLibrary.startOutputRecording(_currentRecordingPath!);
+      bool success = _sequencerLibrary.startOutputRecording(_currentRecordingPath!);
       if (success) {
         _isRecording = true;
         notifyListeners();
@@ -896,7 +916,7 @@ class TrackerState extends ChangeNotifier {
   void stopRecording() {
     if (!_isRecording) return;
     
-    bool success = _miniaudioLibrary.stopOutputRecording();
+    bool success = _sequencerLibrary.stopOutputRecording();
     if (success) {
       _isRecording = false;
       // Store the completed recording info
@@ -991,12 +1011,13 @@ class TrackerState extends ChangeNotifier {
     }
     
     // Build grid pattern visualization
+    final currentGrid = _getCurrentGridSamples();
     List<String> gridVisualization = [];
     for (int row = 0; row < _gridRows; row++) {
       String rowString = '';
       for (int col = 0; col < _gridColumns; col++) {
         final cellIndex = row * _gridColumns + col;
-        final sampleSlot = _gridSamples[cellIndex];
+        final sampleSlot = currentGrid[cellIndex];
         if (sampleSlot != null) {
           rowString += String.fromCharCode(65 + sampleSlot); // A, B, C, etc.
         } else {
@@ -1008,10 +1029,10 @@ class TrackerState extends ChangeNotifier {
     }
     
     // Count placed samples
-    int placedSamples = _gridSamples.where((sample) => sample != null).length;
+    int placedSamples = currentGrid.where((sample) => sample != null).length;
     
     // Build human-readable text
-    String shareText = '''🎵 NIYYA TRACKER PATTERN 🎵
+    String shareText = '''🎵 NIYYA SEQUENCER PATTERN 🎵
 
 Pattern: $patternName
 BPM: $_bpm
@@ -1025,7 +1046,7 @@ ${sampleInfo.isEmpty ? 'No samples loaded' : sampleInfo.map((s) => '${s['slot']}
 🎹 PATTERN:
 ${gridVisualization.join('\n')}
 
-Made with Demo Tracker 🚀
+Made with Demo Sequencer 🚀
 ''';
 
     // Build structured data for future API integrations
@@ -1039,7 +1060,7 @@ Made with Demo Tracker 🚀
         'grid': {
           'columns': _gridColumns,
           'rows': _gridRows,
-          'samples': _gridSamples,
+          'samples': currentGrid,
         },
         'samples': sampleInfo,
         'metadata': {
@@ -1050,16 +1071,16 @@ Made with Demo Tracker 🚀
         }
       },
       'app': {
-        'name': 'NIYYA Tracker',
+        'name': 'NIYYA Sequencer',
         'version': '1.0.0',
       }
     };
     
     return {
       'text': shareText,
-      'subject': 'NIYYA Tracker Pattern: $patternName',
+              'subject': 'NIYYA Sequencer Pattern: $patternName',
       'data': structuredData,
-      'hashtags': ['#NiyyaTracker', '#MusicProduction', '#Beats', '#Pattern'],
+              'hashtags': ['#NiyyaSequencer', '#MusicProduction', '#Beats', '#Pattern'],
     };
   }
 
@@ -1076,8 +1097,8 @@ Made with Demo Tracker 🚀
         final fileName = path.basename(_lastRecordingPath!);
         await Share.shareXFiles(
           [XFile(_lastRecordingPath!)],
-          text: 'Check out this beat I made with N! 🎵\n\n#NiyyaTracker #BeatMaking #MusicProduction',
-          subject: 'NIYYA Tracker Recording - $fileName',
+                  text: 'Check out this beat I made with N! 🎵\n\n#NiyyaSequencer #BeatMaking #MusicProduction',
+        subject: 'NIYYA Sequencer Recording - $fileName',
         );
         print('🎵 Shared recording: $fileName');
       } else {
@@ -1180,8 +1201,8 @@ Made with Demo Tracker 🚀
         
         await Share.shareXFiles(
           [XFile(shareFilePath)],
-          text: 'Check out this beat I made with NIYYA! 🎵\n\nFormat: $fileType (${_formatFileSize(fileSize)})\n\n#NiyyaTracker #BeatMaking #MusicProduction',
-          subject: 'NIYYA Tracker Recording - $fileName',
+                  text: 'Check out this beat I made with NIYYA! 🎵\n\nFormat: $fileType (${_formatFileSize(fileSize)})\n\n#NiyyaSequencer #BeatMaking #MusicProduction',
+        subject: 'NIYYA Sequencer Recording - $fileName',
         );
         print('🎵 Shared $fileType recording: $fileName');
       } else {
@@ -1194,7 +1215,7 @@ Made with Demo Tracker 🚀
 
   // Check if conversion is available
   Future<bool> isConversionAvailable() async {
-    return await AudioConversionService.checkLameAvailability();
+    return await AudioConversionService.checkConversionAvailability();
   }
 
   // Format file size helper
@@ -1235,8 +1256,9 @@ Made with Demo Tracker 🚀
     print('🎵 Creating test pattern...');
     
     // Clear current grid
-    for (int i = 0; i < _gridSamples.length; i++) {
-      _gridSamples[i] = null;
+    final currentGrid = _getCurrentGridSamples();
+    for (int i = 0; i < currentGrid.length; i++) {
+      _setCurrentGridSample(i, null);
     }
     
     // Add a simple pattern using the first loaded sample
@@ -1252,7 +1274,7 @@ Made with Demo Tracker 🚀
       // Create a simple kick pattern on steps 1, 5, 9, 13 (every 4 steps)
       for (int step = 0; step < 16; step += 4) {
         final cellIndex = step * _gridColumns + 0; // First column
-        _gridSamples[cellIndex] = firstLoadedSlot;
+        _setCurrentGridSample(cellIndex, firstLoadedSlot);
       }
       
       // If we have a second loaded sample, add it on off-beats
@@ -1268,7 +1290,7 @@ Made with Demo Tracker 🚀
         // Add second sample on steps 2, 6, 10, 14
         for (int step = 2; step < 16; step += 4) {
           final cellIndex = step * _gridColumns + 1; // Second column
-          _gridSamples[cellIndex] = secondLoadedSlot;
+          _setCurrentGridSample(cellIndex, secondLoadedSlot);
         }
       }
       
@@ -1297,8 +1319,8 @@ Made with Demo Tracker 🚀
     _bpm = newBpm;
     
     // Update sequencer BPM if it's running
-    if (_miniaudioLibrary.isSequencerPlaying) {
-      _miniaudioLibrary.setSequencerBpm(newBpm);
+    if (_sequencerLibrary.isSequencerPlaying) {
+      _sequencerLibrary.setSequencerBpm(newBpm);
     }
     
     notifyListeners();
@@ -1328,13 +1350,125 @@ Made with Demo Tracker 🚀
     }
   }
 
+  // Sound Grid stack methods
+  void initializeSoundGrids(int numGrids) {
+    _soundGridOrder = List.generate(numGrids, (index) => index);
+    _currentSoundGridIndex = _soundGridOrder.last; // Front sound grid
+    
+    // Initialize grid samples for each sound grid
+    _soundGridSamples = List.generate(numGrids, (index) => 
+        List.filled(_gridColumns * _gridRows, null));
+    
+    // Configure native sequencer columns (native calculates: numGrids × columnsPerGrid)
+    final nativeTableColumns = numGrids * _gridColumns;
+    _sequencerLibrary.configureColumns(nativeTableColumns);
+    print('🎛️ Initialized $numGrids sound grids × $_gridColumns columns = $nativeTableColumns native table columns');
+    
+    notifyListeners();
+  }
+
+  void setCurrentSoundGridIndex(int index) {
+    _currentSoundGridIndex = index;
+    notifyListeners();
+  }
+
+  // Helper method to get current sound grid's samples
+  List<int?> _getCurrentGridSamples() {
+    if (_soundGridSamples.isEmpty || _currentSoundGridIndex >= _soundGridSamples.length) {
+      return List.filled(_gridColumns * _gridRows, null);
+    }
+    return _soundGridSamples[_currentSoundGridIndex];
+  }
+
+  // Helper method to set sample in current sound grid
+  void _setCurrentGridSample(int index, int? value) {
+    if (_soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length) {
+      _soundGridSamples[_currentSoundGridIndex][index] = value;
+    }
+  }
+
+  void shuffleToNextSoundGrid() {
+    // Move the front sound grid (last in array) to the back (first in array)
+    // This simulates taking the top sound grid and putting it at the bottom
+    if (_soundGridOrder.isNotEmpty) {
+      final frontGrid = _soundGridOrder.removeLast(); // Remove front sound grid
+      _soundGridOrder.insert(0, frontGrid); // Put it at the back
+      
+      // Update current sound grid index to represent the new front sound grid
+      _currentSoundGridIndex = _soundGridOrder.last;
+      notifyListeners();
+    }
+  }
+
+  void addSoundGrid() {
+    final newGridIndex = _soundGridSamples.length;
+    
+    // Add new empty grid
+    _soundGridSamples.add(List.filled(_gridColumns * _gridRows, null));
+    _soundGridOrder.add(newGridIndex);
+    
+    // Reconfigure native columns
+    final nativeTableColumns = numSoundGrids * _gridColumns;
+    _sequencerLibrary.configureColumns(nativeTableColumns);
+    
+    print('➕ Added sound grid $newGridIndex (total: $numSoundGrids grids = $nativeTableColumns native columns)');
+    notifyListeners();
+  }
+
+  void removeSoundGrid() {
+    if (_soundGridSamples.length <= 1) {
+      print('❌ Cannot remove grid - minimum 1 grid required');
+      return;
+    }
+    
+    final removedGridIndex = _soundGridSamples.length - 1;
+    
+    // Remove the last grid
+    _soundGridSamples.removeLast();
+    _soundGridOrder.removeWhere((index) => index == removedGridIndex);
+    
+    // Adjust current grid index if necessary
+    if (_currentSoundGridIndex >= _soundGridSamples.length) {
+      _currentSoundGridIndex = _soundGridSamples.length - 1;
+    }
+    
+    // Reconfigure native columns
+    final nativeTableColumns = numSoundGrids * _gridColumns;
+    _sequencerLibrary.configureColumns(nativeTableColumns);
+    
+    print('➖ Removed sound grid $removedGridIndex (total: $numSoundGrids grids = $nativeTableColumns native columns)');
+    notifyListeners();
+  }
+
+  void clearAllCells() {
+    final currentGrid = _getCurrentGridSamples();
+    for (int i = 0; i < currentGrid.length; i++) {
+      _setCurrentGridSample(i, null);
+    }
+    notifyListeners();
+  }
+
+  void setupDemo() {
+    // Demo setup logic
+    if (_slotCount >= 2) {
+      // Only modify current sound grid
+      final demoGridIndex = (_gridRows ~/ 2) * _gridColumns;
+      _setCurrentGridSample(demoGridIndex, 0); // First loaded slot
+      
+      final secondDemoIndex = demoGridIndex + 2;
+      if (secondDemoIndex < _getCurrentGridSamples().length) {
+        _setCurrentGridSample(secondDemoIndex, 1); // Second loaded slot
+      }
+    }
+  }
+
   @override
   void dispose() {
     _sequencerTimer?.cancel();
     if (_isRecording) {
       stopRecording();
     }
-    _miniaudioLibrary.cleanup();
+    _sequencerLibrary.cleanup();
     super.dispose();
   }
 } 

@@ -2,7 +2,7 @@ import 'dart:ffi';
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'miniaudio_bindings_generated.dart';
+import 'sequencer_bindings_generated.dart';
 
 // Import malloc from dart:ffi
 final DynamicLibrary stdlib = Platform.isWindows 
@@ -17,18 +17,18 @@ final free = stdlib.lookupFunction<
     Void Function(Pointer<Void>),
     void Function(Pointer<Void>)>('free');
 
-class MiniaudioLibrary {
-  static MiniaudioLibrary? _instance;
+class SequencerLibrary {
+  static SequencerLibrary? _instance;
   late final DynamicLibrary _dylib;
-  late final MiniaudioBindings _bindings;
+  late final SequencerBindings _bindings;
 
-  MiniaudioLibrary._() {
+  SequencerLibrary._() {
     _dylib = _loadLibrary();
-    _bindings = MiniaudioBindings(_dylib);
+    _bindings = SequencerBindings(_dylib);
   }
 
-  static MiniaudioLibrary get instance {
-    _instance ??= MiniaudioLibrary._();
+  static SequencerLibrary get instance {
+    _instance ??= SequencerLibrary._();
     return _instance!;
   }
 
@@ -38,13 +38,13 @@ class MiniaudioLibrary {
         // On iOS, the library is statically linked into the app bundle
         return DynamicLibrary.executable();
       } else if (Platform.isAndroid) {
-        return DynamicLibrary.open('libminiaudio.so');
+        return DynamicLibrary.open('libsequencer.so');
       } else if (Platform.isMacOS) {
-        return DynamicLibrary.open('libminiaudio.dylib');
+        return DynamicLibrary.open('libsequencer.dylib');
       } else if (Platform.isWindows) {
-        return DynamicLibrary.open('miniaudio.dll');
+        return DynamicLibrary.open('sequencer.dll');
       } else if (Platform.isLinux) {
-        return DynamicLibrary.open('libminiaudio.so');
+        return DynamicLibrary.open('libsequencer.so');
       } else {
         throw UnsupportedError('Platform not supported');
       }
@@ -56,7 +56,7 @@ class MiniaudioLibrary {
 
   // Wrapper methods for easier access
   bool initialize() {
-    int result = _bindings.miniaudio_init();
+    int result = _bindings.init();
     return result == 0;  // 0 means success in C code
   }
 
@@ -76,7 +76,7 @@ class MiniaudioLibrary {
       cString[utf8Bytes.length] = 0; // null terminator
       
       // Call the native function
-      int result = _bindings.miniaudio_play_sound(cString.cast());
+      int result = _bindings.play_sound(cString.cast());
       print('🎵 FFI RESULT: $result (0=success, -1=failure)');
       bool success = result == 0;  // 0 means success in C code
       if (success) {
@@ -104,7 +104,7 @@ class MiniaudioLibrary {
       }
       cString[utf8Bytes.length] = 0;
       
-      int result = _bindings.miniaudio_load_sound(cString.cast());
+      int result = _bindings.load_sound(cString.cast());
       print('📥 FFI RESULT: $result (0=success, -1=failure)');
       bool success = result == 0;
       if (success) {
@@ -122,7 +122,7 @@ class MiniaudioLibrary {
   bool playLoadedSound() {
     print('Playing loaded sound from memory');
     
-    int result = _bindings.miniaudio_play_loaded_sound();
+    int result = _bindings.play_loaded_sound();
     print('▶️ FFI RESULT: $result (0=success, -1=failure)');
     bool success = result == 0;
     if (success) {
@@ -134,34 +134,34 @@ class MiniaudioLibrary {
   }
 
   void stopAllSounds() {
-    _bindings.miniaudio_stop_all_sounds();
+    _bindings.stop_all_sounds();
   }
 
   bool isInitialized() {
-    return _bindings.miniaudio_is_initialized() == 1;
+    return _bindings.is_initialized() == 1;
   }
 
   void cleanup() {
-    _bindings.miniaudio_cleanup();
+    _bindings.cleanup();
   }
 
   // Re-activate Bluetooth audio session (call when Bluetooth routing stops working)
   bool reconfigureAudioSession() {
-    int result = _bindings.miniaudio_reconfigure_audio_session();
+    int result = _bindings.reconfigure_audio_session();
     return result == 0;
   }
 
   // Memory tracking methods
   int getTotalMemoryUsage() {
-    return _bindings.audio_get_total_memory_usage();
+    return _bindings.get_total_memory_usage();
   }
 
   int getSlotMemoryUsage(int slot) {
-    return _bindings.audio_get_slot_memory_usage(slot);
+    return _bindings.get_slot_memory_usage(slot);
   }
 
   int getMemorySlotCount() {
-    return _bindings.audio_get_memory_slot_count();
+    return _bindings.get_memory_slot_count();
   }
 
   String formatMemorySize(int bytes) {
@@ -175,7 +175,7 @@ class MiniaudioLibrary {
   }
 
   // -------------- MULTI SLOT --------------
-  int get slotCount => _bindings.audio_get_slot_count();
+  int get slotCount => _bindings.get_slot_count();
 
   bool loadSoundToSlot(int slot, String filePath, {bool loadToMemory = false}) {
     final utf8Bytes = utf8.encode(filePath);
@@ -185,7 +185,7 @@ class MiniaudioLibrary {
         cString[i] = utf8Bytes[i];
       }
       cString[utf8Bytes.length] = 0;
-      int result = _bindings.miniaudio_load_sound_to_slot(slot, cString.cast(), loadToMemory ? 1 : 0);
+      int result = _bindings.load_sound_to_slot(slot, cString.cast(), loadToMemory ? 1 : 0);
       return result == 0;
     } finally {
       free(cString.cast());
@@ -193,20 +193,20 @@ class MiniaudioLibrary {
   }
 
   bool playSlot(int slot) {
-    int result = _bindings.miniaudio_play_slot(slot);
+    int result = _bindings.play_slot(slot);
     return result == 0;
   }
 
   void stopSlot(int slot) {
-    _bindings.miniaudio_stop_slot(slot);
+    _bindings.stop_slot(slot);
   }
 
   void unloadSlot(int slot) {
-    _bindings.miniaudio_unload_slot(slot);
+    _bindings.unload_slot(slot);
   }
 
   bool isSlotLoaded(int slot) {
-    return _bindings.miniaudio_is_slot_loaded(slot) == 1;
+    return _bindings.is_slot_loaded(slot) == 1;
   }
 
   // Helper to play all loaded slots at once
@@ -234,7 +234,7 @@ class MiniaudioLibrary {
       }
       cString[utf8Bytes.length] = 0;
       
-      int result = _bindings.recording_start_output(cString.cast());
+      int result = _bindings.start_recording(cString.cast());
       bool success = result == 0;
       
       if (success) {
@@ -253,7 +253,7 @@ class MiniaudioLibrary {
   bool stopOutputRecording() {
     print('⏹️ Stopping output recording...');
     
-    int result = _bindings.recording_stop_output();
+    int result = _bindings.stop_recording();
     bool success = result == 0;
     
     if (success) {
@@ -266,11 +266,11 @@ class MiniaudioLibrary {
   }
   
   /// Check if currently recording output
-  bool get isOutputRecording => _bindings.recording_is_active() == 1;
+  bool get isOutputRecording => _bindings.is_recording() == 1;
   
   /// Get current recording duration in milliseconds
   int get outputRecordingDurationMs {
-    return _bindings.recording_get_duration_ms();
+    return _bindings.get_recording_duration();
   }
   
   /// Get formatted recording duration as MM:SS
@@ -295,7 +295,7 @@ class MiniaudioLibrary {
     }
     
     try {
-      int result = _bindings.sequencer_start(bpm, steps);
+      int result = _bindings.start(bpm, steps);
       bool success = result == 0;
       if (success) {
         print('🎵 Sequencer started: $bpm BPM, $steps steps');
@@ -312,7 +312,7 @@ class MiniaudioLibrary {
   /// Stop the sequencer
   void stopSequencer() {
     try {
-      _bindings.sequencer_stop();
+      _bindings.stop();
       print('⏹️ Sequencer stopped');
     } catch (e) {
       print('❌ Error stopping sequencer: $e');
@@ -322,7 +322,7 @@ class MiniaudioLibrary {
   /// Check if sequencer is playing
   bool get isSequencerPlaying {
     try {
-      return _bindings.sequencer_is_playing() == 1;
+      return _bindings.is_playing() == 1;
     } catch (e) {
       return false;
     }
@@ -331,7 +331,7 @@ class MiniaudioLibrary {
   /// Get current sequencer step (0-based)
   int get currentStep {
     try {
-      return _bindings.sequencer_get_current_step();
+      return _bindings.get_current_step();
     } catch (e) {
       return -1;
     }
@@ -340,7 +340,7 @@ class MiniaudioLibrary {
   /// Set sequencer BPM (updates timing instantly)
   void setSequencerBpm(int bpm) {
     try {
-      _bindings.sequencer_set_bpm(bpm);
+      _bindings.set_bpm(bpm);
     } catch (e) {
       print('❌ Error setting sequencer BPM: $e');
     }
@@ -350,7 +350,7 @@ class MiniaudioLibrary {
   /// step: 0-31, column: 0-7, sampleSlot: 0-1023 (or -1 to clear)
   void setGridCell(int step, int column, int sampleSlot) {
     try {
-      _bindings.grid_set_cell(step, column, sampleSlot);
+      _bindings.set_cell(step, column, sampleSlot);
     } catch (e) {
       print('❌ Error setting grid cell: $e');
     }
@@ -359,7 +359,7 @@ class MiniaudioLibrary {
   /// Clear a specific grid cell
   void clearGridCell(int step, int column) {
     try {
-      _bindings.grid_clear_cell(step, column);
+      _bindings.clear_cell(step, column);
     } catch (e) {
       print('❌ Error clearing grid cell: $e');
     }
@@ -368,7 +368,7 @@ class MiniaudioLibrary {
   /// Clear all grid cells
   void clearAllGridCells() {
     try {
-      _bindings.grid_clear_all_cells();
+      _bindings.clear_all_cells();
       print('🗑️ All grid cells cleared');
     } catch (e) {
       print('❌ Error clearing all grid cells: $e');
@@ -393,7 +393,7 @@ class MiniaudioLibrary {
   /// Directly sets the columns in native sequencer
   void configureColumns(int columns) {
     try {
-      _bindings.grid_set_columns(columns);
+      _bindings.set_columns(columns);
       print('🎛️ Set sequencer columns to $columns');
     } catch (e) {
       print('❌ Error setting columns: $e');

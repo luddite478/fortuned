@@ -195,6 +195,13 @@ if (g_is_output_recording) {
 4. Each step plays all placed samples simultaneously
 5. Column sounds sustain until replaced by new sound in same column
 
+**Native Implementation:**
+- **UI Grid Merging**: Multiple UI sound grids are merged into a single unified table in native code
+- **Grid Abstraction**: The Flutter UI manages multiple visual grids (e.g., 3 stacked cards), but the native audio engine sees one consolidated sequencer table
+- **Simplified Audio Logic**: Native sequencer code operates on a single grid data structure, regardless of UI complexity
+- **Efficient Data Transfer**: FFI calls pass the merged grid state to avoid multiple native calls per UI grid
+- **Single Audio Timeline**: All UI grids contribute to one unified audio playback sequence in the native mixer
+
 ### **🎧 Bluetooth Audio Integration**
 **Hybrid Framework Approach:**
 - **AVFoundation** (iOS audio session management) 

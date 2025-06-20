@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../state/tracker_state.dart';
+import '../../state/sequencer_state.dart';
 
 class SampleBanksWidget extends StatelessWidget {
   const SampleBanksWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<TrackerState>(
-      builder: (context, tracker, child) {
+    return Consumer<SequencerState>(
+      builder: (context, sequencer, child) {
         return Container(
           padding: const EdgeInsets.all(8),
           margin: const EdgeInsets.only(bottom: 8),
@@ -19,10 +19,10 @@ class SampleBanksWidget extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: List.generate(8, (bank) {
-              final isActive = tracker.activeBank == bank;
-              final isSelected = tracker.selectedSampleSlot == bank;
-              final hasFile = tracker.fileNames[bank] != null;
-              final isPlaying = tracker.slotPlaying[bank];
+              final isActive = sequencer.activeBank == bank;
+              final isSelected = sequencer.selectedSampleSlot == bank;
+              final hasFile = sequencer.fileNames[bank] != null;
+              final isPlaying = sequencer.slotPlaying[bank];
               
               Widget sampleButton = Container(
                 margin: const EdgeInsets.symmetric(horizontal: 1),
@@ -33,7 +33,7 @@ class SampleBanksWidget extends StatelessWidget {
                       : isActive
                           ? Colors.white
                           : hasFile
-                              ? tracker.bankColors[bank].withOpacity(0.8)
+                              ? sequencer.bankColors[bank].withOpacity(0.8)
                               : const Color(0xFF404040),
                   borderRadius: BorderRadius.circular(6),
                   border: isPlaying
@@ -74,7 +74,7 @@ class SampleBanksWidget extends StatelessWidget {
                           width: 40,
                           height: 60,
                           decoration: BoxDecoration(
-                            color: tracker.bankColors[bank].withOpacity(0.9),
+                            color: sequencer.bankColors[bank].withOpacity(0.9),
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: Colors.white, width: 2),
                           ),
@@ -102,7 +102,7 @@ class SampleBanksWidget extends StatelessWidget {
                           margin: const EdgeInsets.symmetric(horizontal: 1),
                           padding: const EdgeInsets.symmetric(vertical: 8),
                           decoration: BoxDecoration(
-                            color: tracker.bankColors[bank].withOpacity(0.3),
+                            color: sequencer.bankColors[bank].withOpacity(0.3),
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(color: Colors.grey, width: 1),
                           ),
@@ -128,14 +128,14 @@ class SampleBanksWidget extends StatelessWidget {
                           ),
                         ),
                         child: GestureDetector(
-                          onTap: () => tracker.handleBankChange(bank, context),
-                          onLongPress: () => tracker.pickFileForSlot(bank, context),
+                          onTap: () => sequencer.handleBankChange(bank, context),
+                          onLongPress: () => sequencer.pickFileForSlot(bank, context),
                           child: sampleButton,
                         ),
                       )
                     : GestureDetector(
-                        onTap: () => tracker.handleBankChange(bank, context),
-                        onLongPress: () => tracker.pickFileForSlot(bank, context),
+                        onTap: () => sequencer.handleBankChange(bank, context),
+                        onLongPress: () => sequencer.pickFileForSlot(bank, context),
                         child: sampleButton,
                       ),
               );

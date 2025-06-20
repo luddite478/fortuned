@@ -1,5 +1,5 @@
-#ifndef LAME_WRAPPER_H
-#define LAME_WRAPPER_H
+#ifndef CONVERSION_H
+#define CONVERSION_H
 
 #include <stdint.h>
 
@@ -7,32 +7,32 @@
 extern "C" {
 #endif
 
-// Initialize LAME library
+// Initialize conversion library
 __attribute__((visibility("default"))) __attribute__((used))
-int lame_wrapper_init(void);
+int conversion_init(void);
 
 // Convert WAV file to MP3 with specified bitrate
 __attribute__((visibility("default"))) __attribute__((used))
-int lame_wrapper_convert_wav_to_mp3(const char* wav_path, const char* mp3_path, int bitrate_kbps);
+int conversion_convert_wav_to_mp3(const char* wav_path, const char* mp3_path, int bitrate_kbps);
 
 // Get file size in bytes
 __attribute__((visibility("default"))) __attribute__((used))
-int lame_wrapper_get_file_size(const char* file_path);
+int conversion_get_file_size(const char* file_path);
 
-// Check if LAME is available
+// Check if conversion library is available
 __attribute__((visibility("default"))) __attribute__((used))
-int lame_wrapper_is_available(void);
+int conversion_is_available(void);
 
-// Get LAME version string
+// Get conversion library version string
 __attribute__((visibility("default"))) __attribute__((used))
-const char* lame_wrapper_get_version(void);
+const char* conversion_get_version(void);
 
-// Cleanup LAME resources
+// Cleanup conversion resources
 __attribute__((visibility("default"))) __attribute__((used))
-void lame_wrapper_cleanup(void);
+void conversion_cleanup(void);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif // LAME_WRAPPER_H 
+#endif // CONVERSION_H 

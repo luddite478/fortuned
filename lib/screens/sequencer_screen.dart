@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import '../widgets/tracker/top_multitask_panel_widget.dart';
-import '../widgets/tracker/sample_banks_widget.dart';
-import '../widgets/tracker/sound_grid_widget.dart';
-import '../widgets/tracker/edit_buttons_widget.dart';
+import '../widgets/sequencer/top_multitask_panel_widget.dart';
+import '../widgets/sequencer/sample_banks_widget.dart';
+import '../widgets/sequencer/sound_grid_widget.dart';
+import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../state/patterns_state.dart';
-import '../state/tracker_state.dart';
+import '../state/sequencer_state.dart';
 import 'contacts_screen.dart';
 
 class PatternScreen extends StatefulWidget {
@@ -50,7 +50,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
             backgroundColor: const Color(0xFF111827),
             elevation: 0,
             title: Text(
-              patternsState.currentPattern?.name ?? 'NIYYA TRACKER',
+              patternsState.currentPattern?.name ?? 'NIYYA SEQUENCER',
               style: const TextStyle(
                 fontFamily: 'monospace',
                 fontWeight: FontWeight.bold,
@@ -84,12 +84,12 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                 tooltip: 'Contacts',
               ),
               // Recording controls
-              Consumer<TrackerState>(
-                builder: (context, tracker, child) {
+              Consumer<SequencerState>(
+                builder: (context, sequencer, child) {
                   return Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      if (tracker.isRecording) ...[
+                      if (sequencer.isRecording) ...[
                         // Recording indicator and duration
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -111,7 +111,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                tracker.formattedRecordingDuration,
+                                sequencer.formattedRecordingDuration,
                                 style: const TextStyle(
                                   color: Colors.red,
                                   fontSize: 12,
@@ -126,14 +126,14 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                         // Stop recording button
                         IconButton(
                           icon: const Icon(Icons.stop, color: Colors.red),
-                          onPressed: () => tracker.stopRecording(),
+                          onPressed: () => sequencer.stopRecording(),
                           tooltip: 'Stop Recording',
                         ),
                       ] else ...[
                         // Start recording button
                         IconButton(
                           icon: const Icon(Icons.fiber_manual_record, color: Colors.red),
-                          onPressed: () => tracker.startRecording(),
+                          onPressed: () => sequencer.startRecording(),
                           tooltip: 'Start Recording',
                         ),
                       ],
@@ -146,7 +146,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                 icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
                 onPressed: () {
                   // 🚀 Using sample-accurate sequencer for perfect timing
-                  context.read<TrackerState>().startSequencer();
+                  context.read<SequencerState>().startSequencer();
                 },
                 tooltip: 'Start Sequencer',
               ),
@@ -154,7 +154,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                 icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
                 onPressed: () {
                   // 🚀 Using sample-accurate sequencer
-                  context.read<TrackerState>().stopSequencer();
+                  context.read<SequencerState>().stopSequencer();
                 },
                 tooltip: 'Stop Sequencer',
               ),
@@ -191,10 +191,10 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
 
   Future<void> _sharePattern(BuildContext context) async {
     final patternsState = context.read<PatternsState>();
-    final trackerState = context.read<TrackerState>();
+    final sequencerState = context.read<SequencerState>();
     
     try {
-      final shareData = await trackerState.generateShareData(patternsState.currentPattern);
+      final shareData = await sequencerState.generateShareData(patternsState.currentPattern);
       
       await Share.share(
         shareData['text'] as String,

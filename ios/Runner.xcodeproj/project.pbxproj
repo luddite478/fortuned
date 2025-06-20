@@ -14,8 +14,8 @@
 		55433E352DF4040A00D2AA40 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E342DF4040A00D2AA40 /* CoreAudio.framework */; };
 		55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E362DF4041800D2AA40 /* AudioToolbox.framework */; };
 		55433E3F2DF40A7F00D2AA40 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */; };
-		5571F8BD2DF776970025EF91 /* miniaudio_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */; };
-		5571F8C02DF776A00025EF91 /* lame_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BE2DF776980025EF91 /* lame_wrapper.mm */; };
+		5571F8BD2DF776970025EF91 /* sequencer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BC2DF776970025EF91 /* sequencer.mm */; };
+		5571F8C02DF776A00025EF91 /* conversion.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BE2DF776980025EF91 /* conversion.mm */; };
 		5571F8D42DF777200025EF91 /* lame.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C12DF777000025EF91 /* lame.c */; };
 		5571F8D52DF777210025EF91 /* bitstream.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C22DF777010025EF91 /* bitstream.c */; };
 		5571F8D62DF777220025EF91 /* encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C32DF777020025EF91 /* encoder.c */; };
@@ -76,14 +76,14 @@
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		55433E342DF4040A00D2AA40 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		55433E362DF4041800D2AA40 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
-		55433E382DF4047800D2AA40 /* miniaudio_wrapper.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio_wrapper.c; path = ../native/miniaudio_wrapper.c; sourceTree = "<group>"; };
-		55433E392DF4047800D2AA40 /* miniaudio.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = miniaudio.c; path = ../native/miniaudio.c; sourceTree = "<group>"; };
-		55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_wrapper.mm; path = ../native/miniaudio_wrapper.mm; sourceTree = "<group>"; };
+
+
+
 		55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
-		5571F8BA2DF775080025EF91 /* miniaudio_wrapper.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; name = miniaudio_wrapper.cpp; path = ../native/miniaudio_wrapper.cpp; sourceTree = "<group>"; };
-		5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_wrapper.mm; path = ../native/miniaudio_wrapper.mm; sourceTree = "<group>"; };
-		5571F8BE2DF776980025EF91 /* lame_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = lame_wrapper.mm; path = ../native/lame_wrapper.mm; sourceTree = "<group>"; };
-		5571F8BF2DF776990025EF91 /* lame_wrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = lame_wrapper.h; path = ../native/lame_wrapper.h; sourceTree = "<group>"; };
+
+		5571F8BC2DF776970025EF91 /* sequencer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sequencer.mm; path = ../native/sequencer.mm; sourceTree = "<group>"; };
+		5571F8BE2DF776980025EF91 /* conversion.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = conversion.mm; path = ../native/conversion.mm; sourceTree = "<group>"; };
+		5571F8BF2DF776990025EF91 /* conversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = conversion.h; path = ../native/conversion.h; sourceTree = "<group>"; };
 		5571F8C12DF777000025EF91 /* lame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = lame.c; path = ../native/lame/lame.c; sourceTree = "<group>"; };
 		5571F8C22DF777010025EF91 /* bitstream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bitstream.c; path = ../native/lame/bitstream.c; sourceTree = "<group>"; };
 		5571F8C32DF777020025EF91 /* encoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encoder.c; path = ../native/lame/encoder.c; sourceTree = "<group>"; };
@@ -178,13 +178,11 @@
 		97C146E51CF9000F007C117D = {
 			isa = PBXGroup;
 			children = (
-				5571F8BC2DF776970025EF91 /* miniaudio_wrapper.mm */,
-				5571F8BA2DF775080025EF91 /* miniaudio_wrapper.cpp */,
-				55433E3C2DF4055400D2AA40 /* miniaudio_wrapper.mm */,
-				55433E382DF4047800D2AA40 /* miniaudio_wrapper.c */,
-				55433E392DF4047800D2AA40 /* miniaudio.c */,
-				5571F8BE2DF776980025EF91 /* lame_wrapper.mm */,
-				5571F8BF2DF776990025EF91 /* lame_wrapper.h */,
+				5571F8BC2DF776970025EF91 /* sequencer.mm */,
+
+
+				5571F8BE2DF776980025EF91 /* conversion.mm */,
+				5571F8BF2DF776990025EF91 /* conversion.h */,
 				5571F8C12DF777000025EF91 /* lame.c */,
 				5571F8C22DF777010025EF91 /* bitstream.c */,
 				5571F8C32DF777020025EF91 /* encoder.c */,
@@ -461,8 +459,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5571F8BD2DF776970025EF91 /* miniaudio_wrapper.mm in Sources */,
-				5571F8C02DF776A00025EF91 /* lame_wrapper.mm in Sources */,
+				5571F8BD2DF776970025EF91 /* sequencer.mm in Sources */,
+				5571F8C02DF776A00025EF91 /* conversion.mm in Sources */,
 				5571F8D42DF777200025EF91 /* lame.c in Sources */,
 				5571F8D52DF777210025EF91 /* bitstream.c in Sources */,
 				5571F8D62DF777220025EF91 /* encoder.c in Sources */,

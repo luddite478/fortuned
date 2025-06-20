@@ -1,10 +1,8 @@
 cmake_minimum_required(VERSION 3.10)
-project(miniaudio_wrapper LANGUAGES C CXX)
+project(niyya_native LANGUAGES C CXX)
 
-set(SOURCES
-  miniaudio_wrapper.mm
-  lame_wrapper.mm
-  # LAME source files
+# LAME source files (shared between libraries)
+set(LAME_SOURCES
   lame/lame.c
   lame/bitstream.c
   lame/encoder.c
@@ -26,22 +24,31 @@ set(SOURCES
   lame/gain_analysis.c
 )
 
+# Sequencer library sources (includes conversion functionality)
+set(SEQUENCER_SOURCES
+  sequencer.mm
+  conversion.mm
+)
+
 set_source_files_properties(
-  miniaudio_wrapper.mm
-  lame_wrapper.mm
+  sequencer.mm
+  conversion.mm
   PROPERTIES
   LANGUAGE CXX
   COMPILE_FLAGS "-x c++"
 )
+
 # Define necessary macros
 add_definitions(-DMA_NO_AAUDIO)
 add_definitions(-DHAVE_CONFIG_H)
 
-# Include directories for LAME
+# Include directories
 include_directories(lame)
+include_directories(miniaudio)
 
-add_library(miniaudio SHARED ${SOURCES})
+# Create sequencer library (includes both sequencer and conversion functionality)
+add_library(sequencer SHARED ${SEQUENCER_SOURCES})
 
 if(ANDROID)
-  target_link_libraries(miniaudio OpenSLES log)
+  target_link_libraries(sequencer OpenSLES log)
 endif()

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/patterns_state.dart';
-import '../state/tracker_state.dart';
-import 'tracker_screen.dart';
+import '../state/sequencer_state.dart';
+import 'sequencer_screen.dart';
+import '../test_card_stack.dart';
 
 class PatternSelectionScreen extends StatefulWidget {
   const PatternSelectionScreen({super.key});
@@ -20,7 +21,7 @@ class _PatternSelectionScreenState extends State<PatternSelectionScreen> {
         backgroundColor: const Color(0xFF111827),
         elevation: 0,
         title: const Text(
-          'NIYYA TRACKER',
+                        'NIYYA SEQUENCER',
           style: TextStyle(
             fontFamily: 'monospace',
             fontWeight: FontWeight.bold,
@@ -28,6 +29,18 @@ class _PatternSelectionScreenState extends State<PatternSelectionScreen> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.layers, color: Colors.orangeAccent),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TestCardStackPage(),
+                ),
+              );
+            },
+            tooltip: 'Test Card Stack',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh, color: Colors.cyanAccent),
             onPressed: () {
@@ -267,7 +280,7 @@ class _PatternSelectionScreenState extends State<PatternSelectionScreen> {
           builder: (context) => MultiProvider(
             providers: [
               ChangeNotifierProvider.value(value: patternsState),
-              ChangeNotifierProvider(create: (context) => TrackerState()),
+                              ChangeNotifierProvider(create: (context) => SequencerState()),
             ],
             child: const PatternScreen(),
           ),
