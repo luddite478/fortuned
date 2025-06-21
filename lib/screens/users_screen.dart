@@ -1,35 +1,28 @@
 import 'package:flutter/material.dart';
 import '../services/chat_client.dart';
+import '../services/user_profile_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'chat_conversation_screen.dart';
 import 'sequencer_screen.dart';
 import 'user_profile_screen.dart';
+import 'pattern_selection_screen.dart';
 
-class ContactsScreen extends StatefulWidget {
-  const ContactsScreen({Key? key}) : super(key: key);
+class UsersScreen extends StatefulWidget {
+  const UsersScreen({Key? key}) : super(key: key);
   
   @override
-  State<ContactsScreen> createState() => _ContactsScreenState();
+  State<UsersScreen> createState() => _UsersScreenState();
 }
 
-class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStateMixin {
+class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin {
   late ChatClient _chatClient;
   List<String> _onlineUserIds = [];
+  List<UserProfile> _userProfiles = [];
   bool _isLoading = true;
   String? _error;
 
   // Animation controllers
   late AnimationController _lampAnimation;
-
-  // Contact names - removed avatars since we'll use play buttons
-  final List<String> _names = [
-    'Alex Beat', 'Maya Synth', 'Jordan Mix', 'Sam Drums', 'Riley Bass',
-    'Casey Keys', 'Morgan Vocal', 'Taylor Horn', 'Quinn Strings', 'River Sax'
-  ];
-  final List<String> _projects = [
-    'Lo-fi Chill', 'Trap Beats', 'House Vibes', 'Jazz Fusion', 'Ambient Flow',
-    'Hip-Hop Classic', 'Electronic Dream', 'Acoustic Soul', 'Synthwave Night', 'Drum & Bass'
-  ];
 
   @override
   void initState() {
@@ -46,36 +39,47 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   }
 
   void _setupChatClient() async {
-    // Setup listeners
+    // Setup listeners for online users
     _chatClient.onlineUsersStream.listen((users) {
       setState(() {
         _onlineUserIds = users;
-        _isLoading = false;
-        _error = null;
       });
     });
 
     _chatClient.errorStream.listen((error) {
-      setState(() {
-        _error = error;
-        _isLoading = false;
-      });
+      if (_error == null) { // Only show error if we haven't loaded API data
+        setState(() {
+          _error = error;
+          _isLoading = false;
+        });
+      }
     });
 
     _chatClient.connectionStream.listen((connected) {
       if (connected) {
-        // Request online users when connected
         _chatClient.requestOnlineUsers();
       }
     });
 
-    // Connect to server
+    // Connect to server (but don't wait for it)
     final clientId = '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    final success = await _chatClient.connect(clientId);
-    
-    if (!success) {
+    _chatClient.connect(clientId);
+
+    // Load user profiles from API
+    await _loadUserProfiles();
+  }
+
+  Future<void> _loadUserProfiles() async {
+    try {
+      final response = await UserProfileService.getUserProfiles(limit: 50);
       setState(() {
-        _error = 'Failed to connect to server';
+        _userProfiles = response.profiles;
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load user profiles: $e';
         _isLoading = false;
       });
     }
@@ -88,42 +92,37 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
     super.dispose();
   }
 
-  List<ContactUser> get _contacts {
-    final contacts = <ContactUser>[];
+  List<User> get _users {
+    final users = <User>[];
     
-          // Add some mock users for demonstration
-      final mockUsers = [
-      ContactUser(id: 'alex_beat', name: 'Alex Beat', isOnline: false, isWorking: false, project: 'Lo-fi Chill'),
-      ContactUser(id: 'maya_synth', name: 'Maya Synth', isOnline: true, isWorking: true, project: ''),
-      ContactUser(id: 'jordan_mix', name: 'Jordan Mix', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'sam_drums', name: 'Sam Drums', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'riley_bass', name: 'Riley Bass', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'casey_keys', name: 'Casey Keys', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'riley_bass', name: 'Riley Bass', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'casey_keys', name: 'Casey Keys', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'riley_bass', name: 'Riley Bass', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'casey_keys', name: 'Casey Keys', isOnline: false, isWorking: false, project: ''),
-    ];
+    // Convert UserProfile from API to User for UI
+    for (final profile in _userProfiles) {
+      final isOnline = profile.isOnline || _onlineUserIds.contains(profile.id);
+      final isWorking = _onlineUserIds.contains(profile.id) && (profile.id.hashCode.abs() % 3 == 0);
+      
+      users.add(User(
+        id: profile.id,
+        name: profile.name,
+        isOnline: isOnline,
+        isWorking: isWorking,
+        project: profile.info, // Use info as project description
+      ));
+    }
     
-          contacts.addAll(mockUsers);
-    
-    // Add online users from chat client
+    // Add additional online users that aren't in our profile list
     for (final userId in _onlineUserIds) {
-      if (!contacts.any((c) => c.id == userId)) {
-        final index = userId.hashCode.abs() % _names.length;
-        final projectIndex = userId.hashCode.abs() % _projects.length;
-        
-        contacts.add(ContactUser(
+      if (!users.any((u) => u.id == userId)) {
+        users.add(User(
           id: userId,
-          name: _names[index],
+          name: 'User ${userId.substring(0, 8)}', // Show partial ID as name
           isOnline: true,
-          isWorking: userId.hashCode.abs() % 3 == 0, // Randomly working
-          project: _projects[projectIndex],
+          isWorking: userId.hashCode.abs() % 3 == 0,
+          project: 'Online User',
         ));
       }
     }
     
-    return contacts;
+    return users;
   }
 
   @override
@@ -140,7 +139,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
               child: _buildMySeriesButton(),
             ),
             
-            // Contacts List
+            // Users List
             Expanded(
               child: _isLoading
                   ? const Center(
@@ -161,7 +160,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                                     _isLoading = true;
                                     _error = null;
                                   });
-                                  _setupChatClient();
+                                  _loadUserProfiles();
                                 },
                                 child: const Text('RETRY'),
                               ),
@@ -170,9 +169,9 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                         )
                       : ListView.builder(
                           padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: _contacts.length,
+                          itemCount: _users.length,
                           itemBuilder: (context, index) {
-                            return _buildUserBar(_contacts[index]);
+                            return _buildUserBar(_users[index]);
                           },
                         ),
             ),
@@ -247,7 +246,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
     );
   }
 
-  Widget _buildUserBar(ContactUser user) {
+  Widget _buildUserBar(User user) {
     return Container(
       height: 56, // Smaller height
       margin: const EdgeInsets.only(bottom: 8),
@@ -424,7 +423,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
     );
   }
 
-  void _startChat(ContactUser user) {
+  void _startChat(User user) {
     // Navigate to user profile instead of chat
     Navigator.push(
       context,
@@ -438,15 +437,15 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   }
 }
 
-// Data model for contacts
-class ContactUser {
+// Data model for users
+class User {
   final String id;
   final String name;
   final bool isOnline;
   final bool isWorking;
   final String project;
 
-  ContactUser({
+  User({
     required this.id,
     required this.name,
     required this.isOnline,

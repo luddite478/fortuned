@@ -103,3 +103,4 @@ working_example
 !env.example
 samples/
 samples-old/
+**/__pycache__/

@@ -597,7 +597,7 @@ int miniaudio_init(void) {
             return -1;
         }
     }
-        
+    
     // Configure and initialize device
     ma_device_config deviceConfig = ma_device_config_init(ma_device_type_playback);
     deviceConfig.playback.format = SAMPLE_FORMAT;

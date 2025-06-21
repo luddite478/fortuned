@@ -40,16 +40,18 @@ class ChatMessage {
 
 // Chat conversation data model
 class ChatConversation {
-  final String contactId;
-  final String contactName;
+  final String conversationId;
+  final String userId;
+  final String userName;
   final List<ChatMessage> messages;
   final DateTime lastActivity;
   final int unreadCount;
   final bool isOnline;
 
   const ChatConversation({
-    required this.contactId,
-    required this.contactName,
+    required this.conversationId,
+    required this.userId,
+    required this.userName,
     this.messages = const [],
     required this.lastActivity,
     this.unreadCount = 0,
@@ -57,16 +59,18 @@ class ChatConversation {
   });
 
   ChatConversation copyWith({
-    String? contactId,
-    String? contactName,
+    String? conversationId,
+    String? userId,
+    String? userName,
     List<ChatMessage>? messages,
     DateTime? lastActivity,
     int? unreadCount,
     bool? isOnline,
   }) {
     return ChatConversation(
-      contactId: contactId ?? this.contactId,
-      contactName: contactName ?? this.contactName,
+      conversationId: conversationId ?? this.conversationId,
+      userId: userId ?? this.userId,
+      userName: userName ?? this.userName,
       messages: messages ?? this.messages,
       lastActivity: lastActivity ?? this.lastActivity,
       unreadCount: unreadCount ?? this.unreadCount,
@@ -161,9 +165,12 @@ class ChatState extends ChangeNotifier {
     // Get or create conversation
     ChatConversation conversation = _conversations[conversationId] ?? 
         ChatConversation(
-          contactId: conversationId,
-          contactName: conversationId, // Use ID as name for now
+          conversationId: conversationId,
+          userId: conversationId,
+          userName: conversationId, // Use ID as name for now
+          messages: const [],
           lastActivity: message.timestamp,
+          unreadCount: 0,
           isOnline: _onlineUsers.contains(conversationId),
         );
 
@@ -186,9 +193,12 @@ class ChatState extends ChangeNotifier {
     // Get or create conversation
     ChatConversation conversation = _conversations[conversationId] ?? 
         ChatConversation(
-          contactId: conversationId,
-          contactName: conversationId,
+          conversationId: conversationId,
+          userId: conversationId,
+          userName: conversationId,
+          messages: const [],
           lastActivity: messages.last.timestamp,
+          unreadCount: 0,
           isOnline: _onlineUsers.contains(conversationId),
         );
 

@@ -7,7 +7,7 @@ import '../widgets/sequencer/sound_grid_widget.dart';
 import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../state/patterns_state.dart';
 import '../state/sequencer_state.dart';
-import 'contacts_screen.dart';
+import 'users_screen.dart';
 
 class PatternScreen extends StatefulWidget {
   const PatternScreen({super.key});
@@ -77,11 +77,11 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const ContactsScreen(),
+                      builder: (context) => const UsersScreen(),
                     ),
                   );
                 },
-                tooltip: 'Contacts',
+                tooltip: 'Users',
               ),
               // Recording controls
               Consumer<SequencerState>(
