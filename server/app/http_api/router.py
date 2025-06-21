@@ -13,10 +13,18 @@ router = APIRouter()
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
 DATABASE_NAME = os.getenv("DATABASE_NAME", "niyya")
 
+# API Token for authentication
+API_TOKEN = os.getenv("API_TOKEN")
+
 def get_db():
     """Get database connection"""
     client = MongoClient(MONGO_URL)
     return client[DATABASE_NAME]
+
+def verify_token(token: str):
+    """Verify API token and raise HTTPException if invalid"""
+    if token != API_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 @router.get("/")
 async def api_handler(
@@ -39,9 +47,10 @@ async def api_handler(
     return {"received": result}
 
 @router.get("/users/profile")
-async def get_user_profile(request: Request, id: str = Query(..., description="User ID")):
+async def get_user_profile(request: Request, id: str = Query(..., description="User ID"), token: str = Query(..., description="API Token")):
     """Get clean user profile by ID from database"""
     check_rate_limit(request)
+    verify_token(token)
     
     try:
         db = get_db()
@@ -58,9 +67,10 @@ async def get_user_profile(request: Request, id: str = Query(..., description="U
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.get("/soundseries")
-async def get_soundseries(request: Request, id: str = Query(..., description="Soundseries ID")):
+async def get_soundseries(request: Request, id: str = Query(..., description="Soundseries ID"), token: str = Query(..., description="API Token")):
     """Get individual soundseries data by ID from database"""
     check_rate_limit(request)
+    verify_token(token)
     
     try:
         db = get_db()
@@ -80,11 +90,13 @@ async def get_soundseries(request: Request, id: str = Query(..., description="So
 async def get_user_soundseries(
     request: Request, 
     user_id: str = Query(..., description="User ID"),
+    token: str = Query(..., description="API Token"),
     limit: int = Query(20, description="Number of results"),
     offset: int = Query(0, description="Offset for pagination")
 ):
     """Get all soundseries for a specific user with pagination from database"""
     check_rate_limit(request)
+    verify_token(token)
     
     try:
         db = get_db()
@@ -118,10 +130,12 @@ async def get_user_soundseries(
 @router.get("/soundseries/recent")
 async def get_recent_soundseries(
     request: Request,
+    token: str = Query(..., description="API Token"),
     limit: int = Query(20, description="Number of results")
 ):
     """Get recently created soundseries across all users from database"""
     check_rate_limit(request)
+    verify_token(token)
     
     try:
         db = get_db()
@@ -153,9 +167,10 @@ async def get_recent_soundseries(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 @router.get("/stats")
-async def get_platform_stats(request: Request):
+async def get_platform_stats(request: Request, token: str = Query(..., description="API Token")):
     """Get platform statistics from database"""
     check_rate_limit(request)
+    verify_token(token)
     
     try:
         db = get_db()
