@@ -16,7 +16,7 @@ class UserProfileScreen extends StatefulWidget {
 }
 
 class _UserProfileScreenState extends State<UserProfileScreen> {
-  final UserProfileService _profileService = UserProfileService();
+
   UserProfile? _userProfile;
   List<UserSeries> _userSeries = [];
   bool _isLoading = true;
@@ -35,8 +35,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _error = null;
       });
 
-      final profile = await _profileService.getUserProfile(widget.userId);
-      final series = await _profileService.getUserSeries(widget.userId);
+      final profile = await UserProfileService.getUserProfile(widget.userId);
+      final series = await UserProfileService.getUserSeries(widget.userId);
 
       setState(() {
         _userProfile = profile;
@@ -567,7 +567,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       );
 
       // Make HTTP request to get sound series data
-      final soundSeriesData = await _profileService.getSoundSeries(series.id);
+      final soundSeriesData = await UserProfileService.getSoundSeries(series.id);
       
       // Hide loading snackbar and show success
       ScaffoldMessenger.of(context).hideCurrentSnackBar();

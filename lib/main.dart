@@ -8,6 +8,9 @@ import 'state/sequencer_state.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
+  print('Loaded .env file');
+  print('API_TOKEN: "${dotenv.env['API_TOKEN']}"');
+  print('All env keys: ${dotenv.env.keys.toList()}');
   runApp(const NiyyaApp());
 }
 

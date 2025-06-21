@@ -5,6 +5,7 @@ Creates collections and indexes for application
 """
 
 import os
+import uuid
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from datetime import datetime, timezone
 import logging
@@ -77,7 +78,7 @@ COLLECTIONS_CONFIG = {
 SAMPLE_DATA_TEMPLATES = {
     "profiles": [
         {
-            "id": "user123",
+            "id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "John Producer",
             "registered_at": "2024-01-01T00:00:00Z",
             "last_online": "2024-01-25T15:30:00Z",
@@ -85,7 +86,7 @@ SAMPLE_DATA_TEMPLATES = {
             "info": "Music producer and beat maker"
         },
         {
-            "id": "user456",
+            "id": "550e8400-e29b-41d4-a716-446655440002",
             "name": "Sarah Mixer",
             "registered_at": "2024-01-05T10:15:00Z",
             "last_online": "2024-01-25T12:00:00Z",
@@ -93,18 +94,42 @@ SAMPLE_DATA_TEMPLATES = {
             "info": "Electronic music enthusiast"
         },
         {
-            "id": "user789",
+            "id": "550e8400-e29b-41d4-a716-446655440003",
             "name": "Mike Collaborator",
             "registered_at": "2024-01-10T14:20:00Z",
             "last_online": "2024-01-24T18:45:00Z",
             "email": "mike@example.com",
             "info": "Sound engineer and collaborator"
+        },
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440004",
+            "name": "Alex Beat",
+            "registered_at": "2024-01-12T08:00:00Z",
+            "last_online": "2024-01-25T09:15:00Z",
+            "email": "alex@example.com",
+            "info": "Lo-fi producer and beat maker"
+        },
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440005",
+            "name": "Maya Synth",
+            "registered_at": "2024-01-15T14:30:00Z",
+            "last_online": "2024-01-25T16:45:00Z",
+            "email": "maya@example.com",
+            "info": "Synthesizer enthusiast and electronic music composer"
+        },
+        {
+            "id": "550e8400-e29b-41d4-a716-446655440006",
+            "name": "Jordan Mix",
+            "registered_at": "2024-01-18T11:20:00Z",
+            "last_online": "2024-01-24T20:30:00Z",
+            "email": "jordan@example.com",
+            "info": "Audio engineer and mixing specialist"
         }
     ],
     "soundseries": [
         {
             "id": "ss_001",
-            "user_id": "user123",
+            "user_id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "My First Beat",
             "created": "2024-01-15T10:30:00Z",
             "lastmodified": "2024-01-20T14:15:00Z",
@@ -121,7 +146,7 @@ SAMPLE_DATA_TEMPLATES = {
             },
             "collaborators": [
                 {
-                    "user_id": "user456",
+                    "user_id": "550e8400-e29b-41d4-a716-446655440002",
                     "role": "editor", 
                     "joined_at": "2024-01-16T12:00:00Z"
                 }
@@ -131,7 +156,7 @@ SAMPLE_DATA_TEMPLATES = {
         },
         {
             "id": "ss_002",
-            "user_id": "user123", 
+            "user_id": "550e8400-e29b-41d4-a716-446655440001", 
             "name": "Bass Drop Mix",
             "created": "2024-01-18T09:45:00Z",
             "lastmodified": "2024-01-24T11:20:00Z",
@@ -148,12 +173,12 @@ SAMPLE_DATA_TEMPLATES = {
             },
             "collaborators": [
                 {
-                    "user_id": "user456",
+                    "user_id": "550e8400-e29b-41d4-a716-446655440002",
                     "role": "editor",
                     "joined_at": "2024-01-16T12:00:00Z"
                 },
                 {
-                    "user_id": "user789",
+                    "user_id": "550e8400-e29b-41d4-a716-446655440003",
                     "role": "viewer",
                     "joined_at": "2024-01-18T16:30:00Z"
                 }
@@ -163,7 +188,7 @@ SAMPLE_DATA_TEMPLATES = {
         },
         {
             "id": "ss_003",
-            "user_id": "user123",
+            "user_id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "Latest Beat",
             "created": "2024-01-25T10:00:00Z", 
             "lastmodified": "2024-01-25T10:00:00Z",
@@ -184,7 +209,7 @@ SAMPLE_DATA_TEMPLATES = {
         },
         {
             "id": "ss_004",
-            "user_id": "user456",
+            "user_id": "550e8400-e29b-41d4-a716-446655440002",
             "name": "Ambient Dreams",
             "created": "2024-01-22T16:15:00Z",
             "lastmodified": "2024-01-23T09:30:00Z",
@@ -201,6 +226,75 @@ SAMPLE_DATA_TEMPLATES = {
             },
             "collaborators": [],
             "tags": ["ambient", "chill", "atmospheric"],
+            "visibility": "public"
+        },
+        {
+            "id": "ss_005",
+            "user_id": "550e8400-e29b-41d4-a716-446655440004",
+            "name": "Lo-fi Chill Collection",
+            "created": "2024-01-20T14:00:00Z",
+            "lastmodified": "2024-01-24T16:30:00Z",
+            "plays_num": 67,
+            "forks_num": 5,
+            "edit_lock": False,
+            "parent_id": None,
+            "audio": {
+                "format": "mp3",
+                "duration": 195.7,
+                "sample_rate": 44100,
+                "channels": 2,
+                "url": "https://example.com/audio/ss_005.mp3"
+            },
+            "collaborators": [],
+            "tags": ["lo-fi", "chill", "study"],
+            "visibility": "public"
+        },
+        {
+            "id": "ss_006",
+            "user_id": "550e8400-e29b-41d4-a716-446655440005",
+            "name": "Synth Waves",
+            "created": "2024-01-23T11:45:00Z",
+            "lastmodified": "2024-01-25T08:20:00Z",
+            "plays_num": 34,
+            "forks_num": 2,
+            "edit_lock": False,
+            "parent_id": None,
+            "audio": {
+                "format": "mp3",
+                "duration": 156.3,
+                "sample_rate": 44100,
+                "channels": 2,
+                "url": "https://example.com/audio/ss_006.mp3"
+            },
+            "collaborators": [
+                {
+                    "user_id": "550e8400-e29b-41d4-a716-446655440006",
+                    "role": "editor",
+                    "joined_at": "2024-01-24T10:15:00Z"
+                }
+            ],
+            "tags": ["synthwave", "retro", "electronic"],
+            "visibility": "public"
+        },
+        {
+            "id": "ss_007",
+            "user_id": "550e8400-e29b-41d4-a716-446655440006",
+            "name": "Mix Masters Demo",
+            "created": "2024-01-21T13:30:00Z",
+            "lastmodified": "2024-01-22T09:45:00Z",
+            "plays_num": 89,
+            "forks_num": 12,
+            "edit_lock": False,
+            "parent_id": None,
+            "audio": {
+                "format": "mp3",
+                "duration": 203.1,
+                "sample_rate": 44100,
+                "channels": 2,
+                "url": "https://example.com/audio/ss_007.mp3"
+            },
+            "collaborators": [],
+            "tags": ["mixing", "demo", "professional"],
             "visibility": "public"
         }
     ]
