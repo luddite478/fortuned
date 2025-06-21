@@ -252,7 +252,7 @@ async def handler(websocket):
 
 # --- Entry Point ---
 
-async def main():
+async def start_websocket_server():
     logger.info("Starting WebSocket server at ws://0.0.0.0:8765")
     async with websockets.serve(
         handler,
