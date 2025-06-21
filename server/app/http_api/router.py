@@ -9,12 +9,12 @@ from pymongo import MongoClient
 
 router = APIRouter()
 
-# MongoDB connection
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "niyya")
+# MongoDB connection with authentication
+MONGO_URL = "mongodb://admin:test@mongodb:27017"
+DATABASE_NAME = "admin"
 
-# API Token for authentication
-API_TOKEN = os.getenv("API_TOKEN")
+# API Token for authentication (hardcoded for testing)
+API_TOKEN = "asdfasdasduiu546"
 
 def get_db():
     """Get database connection"""

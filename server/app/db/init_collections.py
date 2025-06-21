@@ -14,9 +14,9 @@ from typing import Dict, List, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# MongoDB connection
-MONGO_URL = os.getenv("MONGO_URL", "mongodb://localhost:27017")
-DATABASE_NAME = os.getenv("DATABASE_NAME", "niyya")
+# MongoDB connection with authentication
+MONGO_URL = "mongodb://admin:test@mongodb:27017"
+DATABASE_NAME = "admin"
 
 # =============================================================================
 # DATA STRUCTURE CONFIGURATION

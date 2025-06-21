@@ -39,15 +39,9 @@ def init_database():
     try:
         logger.info("🗄️  Initializing database...")
         
-        # Get environment variable to control DB reinitialization
-        reinit_db = os.getenv("REINIT_DB_ON_START", "true").lower() == "true"
-        
-        if reinit_db:
-            logger.info("🔄 Reinitializing database (drop existing collections)")
-            init_mongodb(drop_existing=True, insert_samples=True)
-        else:
-            logger.info("📋 Initializing database (keep existing data)")
-            init_mongodb(drop_existing=False, insert_samples=True)
+        # For testing, always reinitialize database
+        logger.info("🔄 Reinitializing database (drop existing collections)")
+        init_mongodb(drop_existing=True, insert_samples=True)
             
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
