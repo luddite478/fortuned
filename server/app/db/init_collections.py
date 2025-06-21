@@ -159,14 +159,14 @@ SAMPLE_DATA_TEMPLATES = {
                                 "layers": [
                                     [
                                         {"sample_id": "kick_01", "sample_name": "Kick Basic"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_01", "sample_name": "Kick Basic"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_01", "sample_name": "Snare Tight"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_01", "sample_name": "Snare Tight"}
                                     ],
                                     [
@@ -176,10 +176,10 @@ SAMPLE_DATA_TEMPLATES = {
                                         {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "bass_01", "sample_name": "Bass Deep"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ]
                                 ],
                                 "metadata": {
@@ -262,32 +262,32 @@ SAMPLE_DATA_TEMPLATES = {
                                 "layers": [
                                     [
                                         {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_02", "sample_name": "Snare Clap"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_02", "sample_name": "Snare Clap"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_02", "sample_name": "Snare Clap"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_02", "sample_name": "Snare Clap"}
                                     ],
                                     [
                                         {"sample_id": "bass_02", "sample_name": "Bass Drop"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "bass_02", "sample_name": "Bass Drop"},
                                         {"sample_id": "bass_02", "sample_name": "Bass Drop"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "bass_02", "sample_name": "Bass Drop"}
                                     ]
                                 ],
@@ -370,15 +370,15 @@ SAMPLE_DATA_TEMPLATES = {
                                 "layers": [
                                     [
                                         {"sample_id": "kick_03", "sample_name": "Kick Experimental"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_03", "sample_name": "Kick Experimental"}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "perc_01", "sample_name": "Perc Weird"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ]
                                 ],
                                 "metadata": {
@@ -450,11 +450,11 @@ SAMPLE_DATA_TEMPLATES = {
                                         {"sample_id": "pad_01", "sample_name": "Pad Ambient"}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "texture_01", "sample_name": "Texture Soft"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "texture_01", "sample_name": "Texture Soft"}
                                     ]
                                 ],
@@ -520,14 +520,14 @@ SAMPLE_DATA_TEMPLATES = {
                                 "layers": [
                                     [
                                         {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"}
                                     ],
                                     [
@@ -605,27 +605,27 @@ SAMPLE_DATA_TEMPLATES = {
                                 "layers": [
                                     [
                                         {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ],
                                     [
                                         {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
                                         {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
                                         {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ],
                                     [
                                         {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ]
                                 ],
                                 "metadata": {
@@ -702,22 +702,22 @@ SAMPLE_DATA_TEMPLATES = {
                                 "layers": [
                                     [
                                         {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": null, "sample_name": null}
+                                        {"sample_id": None, "sample_name": None}
                                     ],
                                     [
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "snare_master", "sample_name": "Snare Mastered"}
                                     ],
                                     [
@@ -732,12 +732,12 @@ SAMPLE_DATA_TEMPLATES = {
                                     ],
                                     [
                                         {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
                                         {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
-                                        {"sample_id": null, "sample_name": null},
-                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": None, "sample_name": None},
+                                        {"sample_id": None, "sample_name": None},
                                         {"sample_id": "bass_master", "sample_name": "Bass Mastered"}
                                     ]
                                 ],
