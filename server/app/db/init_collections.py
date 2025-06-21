@@ -34,12 +34,12 @@ COLLECTIONS_CONFIG = {
             {"fields": "last_online"},
         ],
         "schema": {
-            "id": "string",
-            "name": "string", 
-            "registered_at": "datetime",
-            "last_online": "datetime",
-            "email": "string",
-            "info": "string"
+            "id": "string (UUID)",  # UUID format: 550e8400-e29b-41d4-a716-446655440001
+            "name": "string",  # User display name
+            "registered_at": "datetime",  # When user registered
+            "last_online": "datetime",  # Last activity timestamp
+            "email": "string",  # User email (unique)
+            "info": "string"  # User bio/description
         }
     },
     "soundseries": {
@@ -55,21 +55,86 @@ COLLECTIONS_CONFIG = {
             {"fields": "tags"},
             {"fields": [("plays_num", DESCENDING)]},  # For trending
             {"fields": [("created", DESCENDING)]},   # For recent
+            {"fields": "audio.sources.scenes.metadata.user"},  # For grid creators
+            {"fields": "audio.sources.samples.id"},  # For sample lookups
+            {"fields": "audio.renders.quality"},  # For render quality filtering
         ],
         "schema": {
-            "id": "string",
-            "user_id": "string",  # Reference to profiles.id
+            "id": "string (UUID)",  # UUID format: 660e8400-e29b-41d4-a716-446655440001
+            "user_id": "string (UUID)",  # Reference to profiles.id (UUID format)
             "name": "string",
             "created": "datetime",
-            "lastmodified": "datetime",
+            "lastmodified": "datetime", 
             "plays_num": "number",
             "forks_num": "number",
             "edit_lock": "boolean",
-            "parent_id": "string",
-            "audio": "object",
-            "collaborators": "array",
-            "tags": "array",
-            "visibility": "string"
+            "parent_id": "string (UUID) | null",  # Reference to another soundseries
+            "audio": {
+                "format": "string",  # mp3, wav, etc.
+                "duration": "number",  # seconds
+                "sample_rate": "number",  # 44100, 48000, etc.
+                "channels": "number",  # 1 (mono), 2 (stereo)
+                "url": "string",  # Main audio file URL
+                "renders": [
+                    {
+                        "id": "string",  # render_001, render_002, etc.
+                        "url": "string",  # Rendered audio file URL
+                        "created_at": "datetime",
+                        "version": "string",  # 1.0, 2.1, etc.
+                        "quality": "string"  # low, medium, high, ultra
+                    }
+                ],
+                "sources": [
+                    {
+                        "scenes": [
+                            {
+                                                                 "layers": [
+                                     {
+                                         "id": "string",  # layer_001, layer_002, etc.
+                                         "index": "number",  # 0, 1, 2, 3, etc. (layer position)
+                                         "rows": [
+                                             {
+                                                 "cells": [
+                                                     {
+                                                         "sample": {
+                                                             "sample_id": "string | null",
+                                                             "sample_name": "string | null"
+                                                         }
+                                                     }
+                                                 ]
+                                             }
+                                         ]
+                                     }
+                                 ],
+                                "metadata": {
+                                    "user": "string (UUID)",  # Who created this grid
+                                    "created_at": "datetime",
+                                    "bpm": "number",
+                                    "key": "string",  # C Major, D Minor, etc.
+                                    "time_signature": "string"  # 4/4, 3/4, etc.
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "string",  # kick_01, snare_02, etc.
+                                "name": "string",  # Human readable name
+                                "url": "string",  # Sample audio file URL
+                                "is_public": "boolean"  # Can others use this sample
+                            }
+                        ]
+                    }
+                ]
+            },
+            "collaborators": [
+                {
+                    "user_id": "string (UUID)",
+                    "role": "string",  # editor, viewer, etc.
+                    "joined_at": "datetime"
+                }
+            ],
+            "tags": ["string"],  # Array of tag strings
+            "visibility": "string"  # public, private, unlisted
         }
     }
 }
@@ -154,33 +219,65 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
-                                    [
-                                        {"sample_id": "kick_01", "sample_name": "Kick Basic"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_01", "sample_name": "Kick Basic"},
-                                        {"sample_id": None, "sample_name": None}
-                                    ],
-                                    [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_01", "sample_name": "Snare Tight"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_01", "sample_name": "Snare Tight"}
-                                    ],
-                                    [
-                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"},
-                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"},
-                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"},
-                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}
-                                    ],
-                                    [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "bass_01", "sample_name": "Bass Deep"},
-                                        {"sample_id": None, "sample_name": None}
-                                    ]
+                                    {
+                                        "id": "layer_001",
+                                        "index": 0,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": "kick_01", "sample_name": "Kick Basic"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "kick_01", "sample_name": "Kick Basic"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}}
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "layer_002",
+                                        "index": 1,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "snare_01", "sample_name": "Snare Tight"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "snare_01", "sample_name": "Snare Tight"}}
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "layer_003",
+                                        "index": 2,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}},
+                                                    {"sample": {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}},
+                                                    {"sample": {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}},
+                                                    {"sample": {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}}
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "layer_004",
+                                        "index": 3,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "bass_01", "sample_name": "Bass Deep"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}}
+                                                ]
+                                            }
+                                        ]
+                                    }
                                 ],
                                 "metadata": {
                                     "user": "550e8400-e29b-41d4-a716-446655440001",
@@ -257,39 +354,63 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
-                                    [
-                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
-                                        {"sample_id": None, "sample_name": None}
-                                    ],
-                                    [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"}
-                                    ],
-                                    [
-                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"},
-                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"}
-                                    ]
+                                    {
+                                        "id": "layer_005",
+                                        "index": 0,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": "kick_02", "sample_name": "Kick Heavy"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "kick_02", "sample_name": "Kick Heavy"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "kick_02", "sample_name": "Kick Heavy"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "kick_02", "sample_name": "Kick Heavy"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}}
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "layer_006",
+                                        "index": 1,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "snare_02", "sample_name": "Snare Clap"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "snare_02", "sample_name": "Snare Clap"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "snare_02", "sample_name": "Snare Clap"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "snare_02", "sample_name": "Snare Clap"}}
+                                                ]
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        "id": "layer_007",
+                                        "index": 2,
+                                        "rows": [
+                                            {
+                                                "cells": [
+                                                    {"sample": {"sample_id": "bass_02", "sample_name": "Bass Drop"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "bass_02", "sample_name": "Bass Drop"}},
+                                                    {"sample": {"sample_id": "bass_02", "sample_name": "Bass Drop"}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": None, "sample_name": None}},
+                                                    {"sample": {"sample_id": "bass_02", "sample_name": "Bass Drop"}}
+                                                ]
+                                            }
+                                        ]
+                                    }
                                 ],
                                 "metadata": {
                                     "user": "550e8400-e29b-41d4-a716-446655440001",
@@ -365,20 +486,20 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
                                     [
-                                        {"sample_id": "kick_03", "sample_name": "Kick Experimental"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_03", "sample_name": "Kick Experimental"}
+                                        {"id": "layer_041", "index": 0, "sample": {"sample_id": "kick_03", "sample_name": "Kick Experimental"}},
+                                        {"id": "layer_042", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_043", "index": 2, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_044", "index": 3, "sample": {"sample_id": "kick_03", "sample_name": "Kick Experimental"}}
                                     ],
                                     [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "perc_01", "sample_name": "Perc Weird"},
-                                        {"sample_id": None, "sample_name": None}
+                                        {"id": "layer_045", "index": 0, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_046", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_047", "index": 2, "sample": {"sample_id": "perc_01", "sample_name": "Perc Weird"}},
+                                        {"id": "layer_048", "index": 3, "sample": {"sample_id": None, "sample_name": None}}
                                     ]
                                 ],
                                 "metadata": {
@@ -438,24 +559,24 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
                                     [
-                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
-                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
-                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
-                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
-                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
-                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"}
+                                        {"id": "layer_049", "index": 0, "sample": {"sample_id": "pad_01", "sample_name": "Pad Ambient"}},
+                                        {"id": "layer_050", "index": 1, "sample": {"sample_id": "pad_01", "sample_name": "Pad Ambient"}},
+                                        {"id": "layer_051", "index": 2, "sample": {"sample_id": "pad_01", "sample_name": "Pad Ambient"}},
+                                        {"id": "layer_052", "index": 3, "sample": {"sample_id": "pad_01", "sample_name": "Pad Ambient"}},
+                                        {"id": "layer_053", "index": 4, "sample": {"sample_id": "pad_01", "sample_name": "Pad Ambient"}},
+                                        {"id": "layer_054", "index": 5, "sample": {"sample_id": "pad_01", "sample_name": "Pad Ambient"}}
                                     ],
                                     [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "texture_01", "sample_name": "Texture Soft"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "texture_01", "sample_name": "Texture Soft"}
+                                        {"id": "layer_055", "index": 0, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_056", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_057", "index": 2, "sample": {"sample_id": "texture_01", "sample_name": "Texture Soft"}},
+                                        {"id": "layer_058", "index": 3, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_059", "index": 4, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_060", "index": 5, "sample": {"sample_id": "texture_01", "sample_name": "Texture Soft"}}
                                     ]
                                 ],
                                 "metadata": {
@@ -515,26 +636,26 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
                                     [
-                                        {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"}
+                                        {"id": "layer_061", "index": 0, "sample": {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"}},
+                                        {"id": "layer_062", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_063", "index": 2, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_064", "index": 3, "sample": {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"}}
                                     ],
                                     [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"}
+                                        {"id": "layer_065", "index": 0, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_066", "index": 1, "sample": {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"}},
+                                        {"id": "layer_067", "index": 2, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_068", "index": 3, "sample": {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"}}
                                     ],
                                     [
-                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"},
-                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"},
-                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"},
-                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"}
+                                        {"id": "layer_069", "index": 0, "sample": {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"}},
+                                        {"id": "layer_070", "index": 1, "sample": {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"}},
+                                        {"id": "layer_071", "index": 2, "sample": {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"}},
+                                        {"id": "layer_072", "index": 3, "sample": {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"}}
                                     ]
                                 ],
                                 "metadata": {
@@ -600,32 +721,32 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
                                     [
-                                        {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
-                                        {"sample_id": None, "sample_name": None}
+                                        {"id": "layer_073", "index": 0, "sample": {"sample_id": "synth_lead", "sample_name": "Synth Lead"}},
+                                        {"id": "layer_074", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_075", "index": 2, "sample": {"sample_id": "synth_lead", "sample_name": "Synth Lead"}},
+                                        {"id": "layer_076", "index": 3, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_077", "index": 4, "sample": {"sample_id": "synth_lead", "sample_name": "Synth Lead"}},
+                                        {"id": "layer_078", "index": 5, "sample": {"sample_id": None, "sample_name": None}}
                                     ],
                                     [
-                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
-                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
-                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
-                                        {"sample_id": None, "sample_name": None}
+                                        {"id": "layer_079", "index": 0, "sample": {"sample_id": "synth_bass", "sample_name": "Synth Bass"}},
+                                        {"id": "layer_080", "index": 1, "sample": {"sample_id": "synth_bass", "sample_name": "Synth Bass"}},
+                                        {"id": "layer_081", "index": 2, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_082", "index": 3, "sample": {"sample_id": "synth_bass", "sample_name": "Synth Bass"}},
+                                        {"id": "layer_083", "index": 4, "sample": {"sample_id": "synth_bass", "sample_name": "Synth Bass"}},
+                                        {"id": "layer_084", "index": 5, "sample": {"sample_id": None, "sample_name": None}}
                                     ],
                                     [
-                                        {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
-                                        {"sample_id": None, "sample_name": None}
+                                        {"id": "layer_085", "index": 0, "sample": {"sample_id": "drum_retro", "sample_name": "Drum Retro"}},
+                                        {"id": "layer_086", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_087", "index": 2, "sample": {"sample_id": "drum_retro", "sample_name": "Drum Retro"}},
+                                        {"id": "layer_088", "index": 3, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_089", "index": 4, "sample": {"sample_id": "drum_retro", "sample_name": "Drum Retro"}},
+                                        {"id": "layer_090", "index": 5, "sample": {"sample_id": None, "sample_name": None}}
                                     ]
                                 ],
                                 "metadata": {
@@ -697,48 +818,48 @@ SAMPLE_DATA_TEMPLATES = {
                 ],
                 "sources": [
                     {
-                        "grid_stacks": [
+                        "scenes": [
                             {
                                 "layers": [
                                     [
-                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
-                                        {"sample_id": None, "sample_name": None}
+                                        {"id": "layer_091", "index": 0, "sample": {"sample_id": "kick_master", "sample_name": "Kick Mastered"}},
+                                        {"id": "layer_092", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_093", "index": 2, "sample": {"sample_id": "kick_master", "sample_name": "Kick Mastered"}},
+                                        {"id": "layer_094", "index": 3, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_095", "index": 4, "sample": {"sample_id": "kick_master", "sample_name": "Kick Mastered"}},
+                                        {"id": "layer_096", "index": 5, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_097", "index": 6, "sample": {"sample_id": "kick_master", "sample_name": "Kick Mastered"}},
+                                        {"id": "layer_098", "index": 7, "sample": {"sample_id": None, "sample_name": None}}
                                     ],
                                     [
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"}
+                                        {"id": "layer_099", "index": 0, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_100", "index": 1, "sample": {"sample_id": "snare_master", "sample_name": "Snare Mastered"}},
+                                        {"id": "layer_101", "index": 2, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_102", "index": 3, "sample": {"sample_id": "snare_master", "sample_name": "Snare Mastered"}},
+                                        {"id": "layer_103", "index": 4, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_104", "index": 5, "sample": {"sample_id": "snare_master", "sample_name": "Snare Mastered"}},
+                                        {"id": "layer_105", "index": 6, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_106", "index": 7, "sample": {"sample_id": "snare_master", "sample_name": "Snare Mastered"}}
                                     ],
                                     [
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
-                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}
+                                        {"id": "layer_107", "index": 0, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_108", "index": 1, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_109", "index": 2, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_110", "index": 3, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_111", "index": 4, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_112", "index": 5, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_113", "index": 6, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}},
+                                        {"id": "layer_114", "index": 7, "sample": {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}}
                                     ],
                                     [
-                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
-                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": None, "sample_name": None},
-                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"}
+                                        {"id": "layer_115", "index": 0, "sample": {"sample_id": "bass_master", "sample_name": "Bass Mastered"}},
+                                        {"id": "layer_116", "index": 1, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_117", "index": 2, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_118", "index": 3, "sample": {"sample_id": "bass_master", "sample_name": "Bass Mastered"}},
+                                        {"id": "layer_119", "index": 4, "sample": {"sample_id": "bass_master", "sample_name": "Bass Mastered"}},
+                                        {"id": "layer_120", "index": 5, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_121", "index": 6, "sample": {"sample_id": None, "sample_name": None}},
+                                        {"id": "layer_122", "index": 7, "sample": {"sample_id": "bass_master", "sample_name": "Bass Mastered"}}
                                     ]
                                 ],
                                 "metadata": {

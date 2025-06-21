@@ -391,11 +391,11 @@ class AudioSource {
   });
 
   factory AudioSource.fromJson(Map<String, dynamic> json) {
-    final gridStacksList = json['grid_stacks'] as List<dynamic>? ?? [];
+    final scenes = json['scenes'] as List<dynamic>? ?? [];
     final samplesList = json['samples'] as List<dynamic>? ?? [];
     
     return AudioSource(
-      gridStacks: gridStacksList.map((grid) => GridData.fromJson(grid)).toList(),
+      gridStacks: scenes.map((grid) => GridData.fromJson(grid)).toList(),
       samples: samplesList.map((sample) => SampleData.fromJson(sample)).toList(),
     );
   }

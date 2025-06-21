@@ -39,14 +39,14 @@ USER_EMBEDDING_PATTERN = {
 # APPROACH 2: PURE REFERENCING - Best for scalability
 # =============================================================================
 
-# USER COLLECTION - Clean and lightweight
+# USER COLLECTION - Clean and lightweight with UUID
 USER_REFERENCE_PATTERN = {
-    "id": "user123",
+    "id": "550e8400-e29b-41d4-a716-446655440001",  # UUID format
     "name": "John Producer",
     "email": "john@example.com", 
     "registered_at": "2024-01-01T00:00:00Z",
     "last_online": "2024-01-25T15:30:00Z",
-    "info": "Music producer",
+    "info": "Music producer and beat maker",
     # Just stats, no embedded data
     "stats": {
         "total_soundseries": 15,
@@ -56,24 +56,92 @@ USER_REFERENCE_PATTERN = {
     }
 }
 
-# SOUNDSERIES COLLECTION - Complete data
+# SOUNDSERIES COLLECTION - Complete data with new structure
 SOUNDSERIES_REFERENCE_PATTERN = {
-    "id": "ss_001",
-    "user_id": "user123",  # Reference to user
+    "id": "660e8400-e29b-41d4-a716-446655440001",  # UUID format
+    "user_id": "550e8400-e29b-41d4-a716-446655440001",  # Reference to user (UUID)
     "name": "My First Beat",
     "created": "2024-01-15T10:30:00Z",
     "lastmodified": "2024-01-20T14:15:00Z",
     "plays_num": 42,
     "forks_num": 3,
     "edit_lock": False,
-    "parent_id": None,
+    "parent_id": None,  # Can reference another soundseries UUID
     "audio": {
         "format": "mp3",
         "duration": 120.5,
-        "url": "https://example.com/audio/ss_001.mp3"
+        "sample_rate": 44100,
+        "channels": 2,
+        "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440001.mp3",
+        
+        # RENDERS: Array of rendered audio files
+        "renders": [
+            {
+                "id": "render_001",
+                "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440001_render_001.mp3",
+                "created_at": "2024-01-20T14:15:00Z",
+                "version": "1.0",
+                "quality": "high"  # low, medium, high, ultra
+            }
+        ],
+        
+        # SOURCES: Array of source data for sequencer
+        "sources": [
+            {
+                # scenes: Array of grid objects
+                "scenes": [
+                    {
+                        # LAYERS: 2D array representing sequencer grid
+                        "layers": [
+                            # Each layer is an array of cells (one row in sequencer)
+                            [
+                                {"sample_id": "kick_01", "sample_name": "Kick Basic"},
+                                {"sample_id": None, "sample_name": None},
+                                {"sample_id": "kick_01", "sample_name": "Kick Basic"},
+                                {"sample_id": None, "sample_name": None}
+                            ],
+                            [
+                                {"sample_id": None, "sample_name": None},
+                                {"sample_id": "snare_01", "sample_name": "Snare Tight"},
+                                {"sample_id": None, "sample_name": None},
+                                {"sample_id": "snare_01", "sample_name": "Snare Tight"}
+                            ]
+                        ],
+                        # METADATA: Grid-specific information
+                        "metadata": {
+                            "user": "550e8400-e29b-41d4-a716-446655440001",  # Who created this grid
+                            "created_at": "2024-01-15T10:30:00Z",
+                            "bpm": 120,
+                            "key": "C Major",
+                            "time_signature": "4/4"
+                        }
+                    }
+                ],
+                
+                # SAMPLES: Array of sample definitions used in this source
+                "samples": [
+                    {
+                        "id": "kick_01",
+                        "name": "Kick Basic",
+                        "url": "https://example.com/samples/kick_01.wav",
+                        "is_public": True  # Whether sample can be used by others
+                    },
+                    {
+                        "id": "snare_01", 
+                        "name": "Snare Tight",
+                        "url": "https://example.com/samples/snare_01.wav",
+                        "is_public": True
+                    }
+                ]
+            }
+        ]
     },
     "collaborators": [
-        {"user_id": "user456", "role": "editor"}
+        {
+            "user_id": "550e8400-e29b-41d4-a716-446655440002", 
+            "role": "editor",
+            "joined_at": "2024-01-16T12:00:00Z"
+        }
     ],
     "tags": ["electronic", "beat", "loop"],
     "visibility": "public"  # public, private, unlisted
