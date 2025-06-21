@@ -10,7 +10,7 @@ from pymongo import MongoClient
 router = APIRouter()
 
 # MongoDB connection with authentication
-MONGO_URL = "mongodb://admin:test@mongodb:27017"
+MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
 DATABASE_NAME = "admin"
 
 # API Token for authentication (hardcoded for testing)

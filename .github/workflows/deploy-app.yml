@@ -44,7 +44,7 @@ jobs:
         envs: REPO_DIR_PATH
         script: |
           cd "$REPO_DIR_PATH/server"
-          docker-compose down
+          docker-compose down -v
           envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
           docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
 
@@ -53,7 +53,7 @@ jobs:
       run: |
         echo "Waiting for server to be ready..."
         timeout=180 # 3 minutes
-        while ! curl -s http://${{ secrets.HOST_IP }}:8888/docs > /dev/null; do
+        while ! curl -s http://${{ secrets.HOST_IP }}:8888/get_sound_series > /dev/null; do
           sleep 10
           timeout=$((timeout-10))
           if [ "$timeout" -le 0 ]; then
