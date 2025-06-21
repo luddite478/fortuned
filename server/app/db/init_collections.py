@@ -196,25 +196,25 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "kick_01",
                                 "name": "Kick Basic",
                                 "url": "https://example.com/samples/kick_01.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "snare_01",
                                 "name": "Snare Tight",
                                 "url": "https://example.com/samples/snare_01.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "hihat_01",
                                 "name": "Hi-Hat Closed",
                                 "url": "https://example.com/samples/hihat_01.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "bass_01",
                                 "name": "Bass Deep",
                                 "url": "https://example.com/samples/bass_01.wav",
-                                "is_public": false
+                                "is_public": False
                             }
                         ]
                     }
@@ -305,19 +305,19 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "kick_02",
                                 "name": "Kick Heavy",
                                 "url": "https://example.com/samples/kick_02.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "snare_02",
                                 "name": "Snare Clap",
                                 "url": "https://example.com/samples/snare_02.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "bass_02",
                                 "name": "Bass Drop",
                                 "url": "https://example.com/samples/bass_02.wav",
-                                "is_public": false
+                                "is_public": False
                             }
                         ]
                     }
@@ -395,13 +395,13 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "kick_03",
                                 "name": "Kick Experimental",
                                 "url": "https://example.com/samples/kick_03.wav",
-                                "is_public": false
+                                "is_public": False
                             },
                             {
                                 "id": "perc_01",
                                 "name": "Perc Weird",
                                 "url": "https://example.com/samples/perc_01.wav",
-                                "is_public": true
+                                "is_public": True
                             }
                         ]
                     }
@@ -472,13 +472,13 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "pad_01",
                                 "name": "Pad Ambient",
                                 "url": "https://example.com/samples/pad_01.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "texture_01",
                                 "name": "Texture Soft",
                                 "url": "https://example.com/samples/texture_01.wav",
-                                "is_public": true
+                                "is_public": True
                             }
                         ]
                     }
@@ -551,19 +551,19 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "kick_lofi",
                                 "name": "Kick Lo-fi",
                                 "url": "https://example.com/samples/kick_lofi.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "snare_lofi",
                                 "name": "Snare Dusty",
                                 "url": "https://example.com/samples/snare_lofi.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "vinyl_01",
                                 "name": "Vinyl Crackle",
                                 "url": "https://example.com/samples/vinyl_01.wav",
-                                "is_public": false
+                                "is_public": False
                             }
                         ]
                     }
@@ -642,19 +642,19 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "synth_lead",
                                 "name": "Synth Lead",
                                 "url": "https://example.com/samples/synth_lead.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "synth_bass",
                                 "name": "Synth Bass",
                                 "url": "https://example.com/samples/synth_bass.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "drum_retro",
                                 "name": "Drum Retro",
                                 "url": "https://example.com/samples/drum_retro.wav",
-                                "is_public": false
+                                "is_public": False
                             }
                         ]
                     }
@@ -755,25 +755,25 @@ SAMPLE_DATA_TEMPLATES = {
                                 "id": "kick_master",
                                 "name": "Kick Mastered",
                                 "url": "https://example.com/samples/kick_master.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "snare_master",
                                 "name": "Snare Mastered",
                                 "url": "https://example.com/samples/snare_master.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "hihat_master",
                                 "name": "Hi-Hat Mastered",
                                 "url": "https://example.com/samples/hihat_master.wav",
-                                "is_public": true
+                                "is_public": True
                             },
                             {
                                 "id": "bass_master",
                                 "name": "Bass Mastered",
                                 "url": "https://example.com/samples/bass_master.wav",
-                                "is_public": false
+                                "is_public": False
                             }
                         ]
                     }
@@ -944,9 +944,9 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Initialize MongoDB collections")
-    parser.add_argument("--drop", action="store_true", help="Drop existing collections")
-    parser.add_argument("--no-samples", action="store_true", help="Skip sample data insertion")
-    parser.add_argument("--list-config", action="store_true", help="List current configuration")
+    parser.add_argument("--drop", action="store_True", help="Drop existing collections")
+    parser.add_argument("--no-samples", action="store_True", help="Skip sample data insertion")
+    parser.add_argument("--list-config", action="store_True", help="List current configuration")
     
     args = parser.parse_args()
     
