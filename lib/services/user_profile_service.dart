@@ -275,12 +275,14 @@ class UserSeries {
   });
 
   factory UserSeries.fromJson(Map<String, dynamic> json) {
+    final audioData = json['audio'] as Map<String, dynamic>? ?? {};
+    
     return UserSeries(
       id: json['id'] ?? '',
       title: json['name'] ?? '',
       description: json['description'] ?? '',
       trackCount: json['track_count'] ?? 0,
-      duration: Duration(seconds: json['duration_seconds'] ?? 0),
+      duration: Duration(seconds: (audioData['duration'] ?? 0).round()),
       createdDate: DateTime.parse(json['created'] ?? DateTime.now().toIso8601String()),
       isPublic: json['visibility'] == 'public',
       genre: json['genre'] ?? 'Unknown',
@@ -297,6 +299,8 @@ class SoundSeriesData {
   final int bpm;
   final String key;
   final DateTime createdDate;
+  final List<AudioRender> renders;
+  final List<AudioSource> sources;
 
   SoundSeriesData({
     required this.seriesId,
@@ -305,11 +309,15 @@ class SoundSeriesData {
     required this.bpm,
     required this.key,
     required this.createdDate,
+    required this.renders,
+    required this.sources,
   });
 
   factory SoundSeriesData.fromJson(Map<String, dynamic> json) {
     final audioData = json['audio'] as Map<String, dynamic>? ?? {};
     final soundsList = audioData['sounds'] as List<dynamic>? ?? [];
+    final rendersList = audioData['renders'] as List<dynamic>? ?? [];
+    final sourcesList = audioData['sources'] as List<dynamic>? ?? [];
 
     return SoundSeriesData(
       seriesId: json['id'] ?? '',
@@ -318,6 +326,8 @@ class SoundSeriesData {
       bpm: audioData['bpm'] ?? 120,
       key: audioData['key'] ?? 'C Major',
       createdDate: DateTime.parse(json['created'] ?? DateTime.now().toIso8601String()),
+      renders: rendersList.map((render) => AudioRender.fromJson(render)).toList(),
+      sources: sourcesList.map((source) => AudioSource.fromJson(source)).toList(),
     );
   }
 }
@@ -341,6 +351,142 @@ class SoundTrack {
       name: json['name'] ?? '',
       url: json['url'] ?? '',
       duration: Duration(seconds: json['duration_seconds'] ?? 0),
+    );
+  }
+}
+
+class AudioRender {
+  final String id;
+  final String url;
+  final String createdAt;
+  final String version;
+  final String quality;
+
+  AudioRender({
+    required this.id,
+    required this.url,
+    required this.createdAt,
+    required this.version,
+    required this.quality,
+  });
+
+  factory AudioRender.fromJson(Map<String, dynamic> json) {
+    return AudioRender(
+      id: json['id'] ?? '',
+      url: json['url'] ?? '',
+      createdAt: json['created_at'] ?? '',
+      version: json['version'] ?? '',
+      quality: json['quality'] ?? '',
+    );
+  }
+}
+
+class AudioSource {
+  final List<GridData> gridStacks;
+  final List<SampleData> samples;
+
+  AudioSource({
+    required this.gridStacks,
+    required this.samples,
+  });
+
+  factory AudioSource.fromJson(Map<String, dynamic> json) {
+    final gridStacksList = json['grid_stacks'] as List<dynamic>? ?? [];
+    final samplesList = json['samples'] as List<dynamic>? ?? [];
+    
+    return AudioSource(
+      gridStacks: gridStacksList.map((grid) => GridData.fromJson(grid)).toList(),
+      samples: samplesList.map((sample) => SampleData.fromJson(sample)).toList(),
+    );
+  }
+}
+
+class GridData {
+  final List<List<GridCell>> layers;
+  final GridMetadata metadata;
+
+  GridData({
+    required this.layers,
+    required this.metadata,
+  });
+
+  factory GridData.fromJson(Map<String, dynamic> json) {
+    final layersList = json['layers'] as List<dynamic>? ?? [];
+    
+    return GridData(
+      layers: layersList.map((layer) {
+        final layerCells = layer as List<dynamic>;
+        return layerCells.map((cell) => GridCell.fromJson(cell)).toList();
+      }).toList(),
+      metadata: GridMetadata.fromJson(json['metadata'] ?? {}),
+    );
+  }
+}
+
+class GridMetadata {
+  final String user;
+  final String createdAt;
+  final int bpm;
+  final String key;
+  final String timeSignature;
+
+  GridMetadata({
+    required this.user,
+    required this.createdAt,
+    required this.bpm,
+    required this.key,
+    required this.timeSignature,
+  });
+
+  factory GridMetadata.fromJson(Map<String, dynamic> json) {
+    return GridMetadata(
+      user: json['user'] ?? '',
+      createdAt: json['created_at'] ?? '',
+      bpm: json['bpm'] ?? 120,
+      key: json['key'] ?? 'C Major',
+      timeSignature: json['time_signature'] ?? '4/4',
+    );
+  }
+}
+
+class GridCell {
+  final String? sampleId;
+  final String? sampleName;
+
+  GridCell({
+    this.sampleId,
+    this.sampleName,
+  });
+
+  factory GridCell.fromJson(Map<String, dynamic> json) {
+    return GridCell(
+      sampleId: json['sample_id'],
+      sampleName: json['sample_name'],
+    );
+  }
+
+  bool get isEmpty => sampleId == null || sampleId!.isEmpty;
+}
+
+class SampleData {
+  final String id;
+  final String name;
+  final String url;
+  final bool isPublic;
+
+  SampleData({
+    required this.id,
+    required this.name,
+    required this.url,
+    required this.isPublic,
+  });
+
+  factory SampleData.fromJson(Map<String, dynamic> json) {
+    return SampleData(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      url: json['url'] ?? '',
+      isPublic: json['is_public'] ?? false,
     );
   }
 } 

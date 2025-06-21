@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/user_profile_service.dart';
+import 'user_soundseries_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -243,6 +244,26 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
             ),
           ],
+          
+          const SizedBox(height: 20),
+          
+          // View Soundseries Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: () => _viewAllSoundseries(),
+              icon: const Icon(Icons.library_music_outlined, size: 18),
+              label: const Text('View All Soundseries'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF374151),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -604,6 +625,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         content: Text('Opening series: ${series.title}'),
         backgroundColor: const Color.fromARGB(255, 118, 41, 195),
         duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _viewAllSoundseries() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserSoundseriesScreen(
+          userId: widget.userId,
+          userName: widget.userName,
+        ),
       ),
     );
   }

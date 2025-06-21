@@ -128,7 +128,7 @@ SAMPLE_DATA_TEMPLATES = {
     ],
     "soundseries": [
         {
-            "id": "ss_001",
+            "id": "660e8400-e29b-41d4-a716-446655440001",
             "user_id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "My First Beat",
             "created": "2024-01-15T10:30:00Z",
@@ -142,7 +142,83 @@ SAMPLE_DATA_TEMPLATES = {
                 "duration": 120.5,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_001.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440001.mp3",
+                "renders": [
+                    {
+                        "id": "render_001",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440001_render_001.mp3",
+                        "created_at": "2024-01-20T14:15:00Z",
+                        "version": "1.0",
+                        "quality": "high"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "kick_01", "sample_name": "Kick Basic"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_01", "sample_name": "Kick Basic"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_01", "sample_name": "Snare Tight"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_01", "sample_name": "Snare Tight"}
+                                    ],
+                                    [
+                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"},
+                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"},
+                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"},
+                                        {"sample_id": "hihat_01", "sample_name": "Hi-Hat Closed"}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "bass_01", "sample_name": "Bass Deep"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440001",
+                                    "created_at": "2024-01-15T10:30:00Z",
+                                    "bpm": 120,
+                                    "key": "C Major",
+                                    "time_signature": "4/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "kick_01",
+                                "name": "Kick Basic",
+                                "url": "https://example.com/samples/kick_01.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "snare_01",
+                                "name": "Snare Tight",
+                                "url": "https://example.com/samples/snare_01.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "hihat_01",
+                                "name": "Hi-Hat Closed",
+                                "url": "https://example.com/samples/hihat_01.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "bass_01",
+                                "name": "Bass Deep",
+                                "url": "https://example.com/samples/bass_01.wav",
+                                "is_public": false
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [
                 {
@@ -155,7 +231,7 @@ SAMPLE_DATA_TEMPLATES = {
             "visibility": "public"
         },
         {
-            "id": "ss_002",
+            "id": "660e8400-e29b-41d4-a716-446655440002",
             "user_id": "550e8400-e29b-41d4-a716-446655440001", 
             "name": "Bass Drop Mix",
             "created": "2024-01-18T09:45:00Z",
@@ -163,13 +239,89 @@ SAMPLE_DATA_TEMPLATES = {
             "plays_num": 128,
             "forks_num": 8,
             "edit_lock": True,
-            "parent_id": "ss_001",
+            "parent_id": "660e8400-e29b-41d4-a716-446655440001",
             "audio": {
                 "format": "mp3",
                 "duration": 180.2,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_002.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440002.mp3",
+                "renders": [
+                    {
+                        "id": "render_002",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440002_render_002.mp3",
+                        "created_at": "2024-01-24T11:20:00Z",
+                        "version": "2.1",
+                        "quality": "high"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_02", "sample_name": "Kick Heavy"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_02", "sample_name": "Snare Clap"}
+                                    ],
+                                    [
+                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"},
+                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "bass_02", "sample_name": "Bass Drop"}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440001",
+                                    "created_at": "2024-01-18T09:45:00Z",
+                                    "bpm": 140,
+                                    "key": "D Minor",
+                                    "time_signature": "4/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "kick_02",
+                                "name": "Kick Heavy",
+                                "url": "https://example.com/samples/kick_02.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "snare_02",
+                                "name": "Snare Clap",
+                                "url": "https://example.com/samples/snare_02.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "bass_02",
+                                "name": "Bass Drop",
+                                "url": "https://example.com/samples/bass_02.wav",
+                                "is_public": false
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [
                 {
@@ -187,7 +339,7 @@ SAMPLE_DATA_TEMPLATES = {
             "visibility": "public"
         },
         {
-            "id": "ss_003",
+            "id": "660e8400-e29b-41d4-a716-446655440003",
             "user_id": "550e8400-e29b-41d4-a716-446655440001",
             "name": "Latest Beat",
             "created": "2024-01-25T10:00:00Z", 
@@ -201,14 +353,66 @@ SAMPLE_DATA_TEMPLATES = {
                 "duration": 95.3,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_003.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440003.mp3",
+                "renders": [
+                    {
+                        "id": "render_003",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440003_render_003.mp3",
+                        "created_at": "2024-01-25T10:00:00Z",
+                        "version": "1.0",
+                        "quality": "medium"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "kick_03", "sample_name": "Kick Experimental"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_03", "sample_name": "Kick Experimental"}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "perc_01", "sample_name": "Perc Weird"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440001",
+                                    "created_at": "2024-01-25T10:00:00Z",
+                                    "bpm": 95,
+                                    "key": "F# Minor",
+                                    "time_signature": "3/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "kick_03",
+                                "name": "Kick Experimental",
+                                "url": "https://example.com/samples/kick_03.wav",
+                                "is_public": false
+                            },
+                            {
+                                "id": "perc_01",
+                                "name": "Perc Weird",
+                                "url": "https://example.com/samples/perc_01.wav",
+                                "is_public": true
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [],
             "tags": ["experimental", "new"],
             "visibility": "public"
         },
         {
-            "id": "ss_004",
+            "id": "660e8400-e29b-41d4-a716-446655440004",
             "user_id": "550e8400-e29b-41d4-a716-446655440002",
             "name": "Ambient Dreams",
             "created": "2024-01-22T16:15:00Z",
@@ -222,14 +426,70 @@ SAMPLE_DATA_TEMPLATES = {
                 "duration": 240.8,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_004.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440004.mp3",
+                "renders": [
+                    {
+                        "id": "render_004",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440004_render_004.mp3",
+                        "created_at": "2024-01-23T09:30:00Z",
+                        "version": "1.3",
+                        "quality": "high"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
+                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
+                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
+                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
+                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"},
+                                        {"sample_id": "pad_01", "sample_name": "Pad Ambient"}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "texture_01", "sample_name": "Texture Soft"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "texture_01", "sample_name": "Texture Soft"}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440002",
+                                    "created_at": "2024-01-22T16:15:00Z",
+                                    "bpm": 85,
+                                    "key": "A Major",
+                                    "time_signature": "4/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "pad_01",
+                                "name": "Pad Ambient",
+                                "url": "https://example.com/samples/pad_01.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "texture_01",
+                                "name": "Texture Soft",
+                                "url": "https://example.com/samples/texture_01.wav",
+                                "is_public": true
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [],
             "tags": ["ambient", "chill", "atmospheric"],
             "visibility": "public"
         },
         {
-            "id": "ss_005",
+            "id": "660e8400-e29b-41d4-a716-446655440005",
             "user_id": "550e8400-e29b-41d4-a716-446655440004",
             "name": "Lo-fi Chill Collection",
             "created": "2024-01-20T14:00:00Z",
@@ -243,14 +503,78 @@ SAMPLE_DATA_TEMPLATES = {
                 "duration": 195.7,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_005.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440005.mp3",
+                "renders": [
+                    {
+                        "id": "render_005",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440005_render_005.mp3",
+                        "created_at": "2024-01-24T16:30:00Z",
+                        "version": "2.0",
+                        "quality": "high"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_lofi", "sample_name": "Kick Lo-fi"}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_lofi", "sample_name": "Snare Dusty"}
+                                    ],
+                                    [
+                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"},
+                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"},
+                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"},
+                                        {"sample_id": "vinyl_01", "sample_name": "Vinyl Crackle"}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440004",
+                                    "created_at": "2024-01-20T14:00:00Z",
+                                    "bpm": 75,
+                                    "key": "G Major",
+                                    "time_signature": "4/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "kick_lofi",
+                                "name": "Kick Lo-fi",
+                                "url": "https://example.com/samples/kick_lofi.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "snare_lofi",
+                                "name": "Snare Dusty",
+                                "url": "https://example.com/samples/snare_lofi.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "vinyl_01",
+                                "name": "Vinyl Crackle",
+                                "url": "https://example.com/samples/vinyl_01.wav",
+                                "is_public": false
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [],
             "tags": ["lo-fi", "chill", "study"],
             "visibility": "public"
         },
         {
-            "id": "ss_006",
+            "id": "660e8400-e29b-41d4-a716-446655440006",
             "user_id": "550e8400-e29b-41d4-a716-446655440005",
             "name": "Synth Waves",
             "created": "2024-01-23T11:45:00Z",
@@ -264,7 +588,77 @@ SAMPLE_DATA_TEMPLATES = {
                 "duration": 156.3,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_006.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440006.mp3",
+                "renders": [
+                    {
+                        "id": "render_006",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440006_render_006.mp3",
+                        "created_at": "2024-01-25T08:20:00Z",
+                        "version": "1.1",
+                        "quality": "high"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "synth_lead", "sample_name": "Synth Lead"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ],
+                                    [
+                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
+                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
+                                        {"sample_id": "synth_bass", "sample_name": "Synth Bass"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ],
+                                    [
+                                        {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "drum_retro", "sample_name": "Drum Retro"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440005",
+                                    "created_at": "2024-01-23T11:45:00Z",
+                                    "bpm": 110,
+                                    "key": "E Minor",
+                                    "time_signature": "4/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "synth_lead",
+                                "name": "Synth Lead",
+                                "url": "https://example.com/samples/synth_lead.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "synth_bass",
+                                "name": "Synth Bass",
+                                "url": "https://example.com/samples/synth_bass.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "drum_retro",
+                                "name": "Drum Retro",
+                                "url": "https://example.com/samples/drum_retro.wav",
+                                "is_public": false
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [
                 {
@@ -277,7 +671,7 @@ SAMPLE_DATA_TEMPLATES = {
             "visibility": "public"
         },
         {
-            "id": "ss_007",
+            "id": "660e8400-e29b-41d4-a716-446655440007",
             "user_id": "550e8400-e29b-41d4-a716-446655440006",
             "name": "Mix Masters Demo",
             "created": "2024-01-21T13:30:00Z",
@@ -291,7 +685,99 @@ SAMPLE_DATA_TEMPLATES = {
                 "duration": 203.1,
                 "sample_rate": 44100,
                 "channels": 2,
-                "url": "https://example.com/audio/ss_007.mp3"
+                "url": "https://example.com/audio/660e8400-e29b-41d4-a716-446655440007.mp3",
+                "renders": [
+                    {
+                        "id": "render_007",
+                        "url": "https://example.com/audio/renders/660e8400-e29b-41d4-a716-446655440007_render_007.mp3",
+                        "created_at": "2024-01-22T09:45:00Z",
+                        "version": "3.0",
+                        "quality": "ultra"
+                    }
+                ],
+                "sources": [
+                    {
+                        "grid_stacks": [
+                            {
+                                "layers": [
+                                    [
+                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "kick_master", "sample_name": "Kick Mastered"},
+                                        {"sample_id": null, "sample_name": null}
+                                    ],
+                                    [
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "snare_master", "sample_name": "Snare Mastered"}
+                                    ],
+                                    [
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"},
+                                        {"sample_id": "hihat_master", "sample_name": "Hi-Hat Mastered"}
+                                    ],
+                                    [
+                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
+                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": null, "sample_name": null},
+                                        {"sample_id": "bass_master", "sample_name": "Bass Mastered"}
+                                    ]
+                                ],
+                                "metadata": {
+                                    "user": "550e8400-e29b-41d4-a716-446655440006",
+                                    "created_at": "2024-01-21T13:30:00Z",
+                                    "bpm": 128,
+                                    "key": "C Minor",
+                                    "time_signature": "4/4"
+                                }
+                            }
+                        ],
+                        "samples": [
+                            {
+                                "id": "kick_master",
+                                "name": "Kick Mastered",
+                                "url": "https://example.com/samples/kick_master.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "snare_master",
+                                "name": "Snare Mastered",
+                                "url": "https://example.com/samples/snare_master.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "hihat_master",
+                                "name": "Hi-Hat Mastered",
+                                "url": "https://example.com/samples/hihat_master.wav",
+                                "is_public": true
+                            },
+                            {
+                                "id": "bass_master",
+                                "name": "Bass Mastered",
+                                "url": "https://example.com/samples/bass_master.wav",
+                                "is_public": false
+                            }
+                        ]
+                    }
+                ]
             },
             "collaborators": [],
             "tags": ["mixing", "demo", "professional"],
