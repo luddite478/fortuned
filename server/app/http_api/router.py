@@ -66,6 +66,52 @@ async def get_user_profile(request: Request, id: str = Query(..., description="U
             raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+@router.get("/users/profiles")
+async def get_user_profiles(
+    request: Request, 
+    token: str = Query(..., description="API Token"),
+    limit: int = Query(20, description="Number of results"),
+    offset: int = Query(0, description="Offset for pagination")
+):
+    """Get list of all user profiles from database"""
+    check_rate_limit(request)
+    verify_token(token)
+    
+    try:
+        db = get_db()
+        
+        # Get total count for pagination
+        total = db.profiles.count_documents({})
+        
+        # Get users with pagination, sorted by registration date (newest first)
+        users_cursor = db.profiles.find(
+            {}, 
+            {
+                "_id": 0,
+                "id": 1,
+                "name": 1,
+                "registered_at": 1,
+                "last_online": 1,
+                "email": 1,
+                "info": 1
+            }
+        ).sort("registered_at", -1).limit(limit).skip(offset)
+        
+        users_list = list(users_cursor)
+        
+        return {
+            "profiles": users_list,
+            "pagination": {
+                "limit": limit,
+                "offset": offset,
+                "total": total,
+                "has_more": (offset + limit) < total
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 @router.get("/soundseries")
 async def get_soundseries(request: Request, id: str = Query(..., description="Soundseries ID"), token: str = Query(..., description="API Token")):
     """Get individual soundseries data by ID from database"""
