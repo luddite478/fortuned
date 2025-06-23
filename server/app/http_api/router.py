@@ -68,3 +68,19 @@ async def get_thread(request: Request, thread_id: str, token: str = Query(...)):
 @router.put("/threads/{thread_id}")
 async def update_thread(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
     return await update_thread_handler(request, thread_id, update_data)
+
+# Project endpoints (aliases for threads for backward compatibility)  
+@router.get("/projects/user")
+async def get_user_projects(request: Request, user_id: str = Query(...), token: str = Query(...), limit: int = Query(50), offset: int = Query(0)):
+    """Get projects (threads) for a specific user - alias for threads endpoint"""
+    return await get_threads_handler(request, token, limit, offset, user_id)
+
+@router.get("/projects")
+async def get_projects(request: Request, token: str = Query(...), limit: int = Query(50), offset: int = Query(0), user_id: Optional[str] = Query(None)):
+    """Get projects (threads) - alias for threads endpoint"""
+    return await get_threads_handler(request, token, limit, offset, user_id)
+
+@router.get("/projects/{project_id}")
+async def get_project(request: Request, project_id: str, token: str = Query(...)):
+    """Get specific project (thread) - alias for thread endpoint"""
+    return await get_thread_handler(request, project_id, token)

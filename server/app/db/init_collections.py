@@ -86,11 +86,6 @@ COLLECTIONS_CONFIG = {
                         "createdAt": "datetime",
                         "version": "string",
                         "audio": {
-                            "format": "string",  # mp3, wav, etc.
-                            "duration": "number",  # seconds
-                            "sample_rate": "number",  # 44100, etc.
-                            "channels": "number",  # 1 (mono), 2 (stereo)
-                            "url": "string",  # URL to the rendered audio file
                             "renders": [
                                 {
                                     "id": "string (UUID)",
@@ -264,11 +259,6 @@ SAMPLE_DATA_TEMPLATES = {
                         "createdAt": "2024-03-15T10:00:00Z",
                         "version": "1.0",
                         "audio": {
-                            "format": "mp3",
-                            "duration": 120.5,
-                            "sample_rate": 44100,
-                            "channels": 2,
-                            "url": "https://example.com/renders/thread_001_v1.mp3",
                             "renders": [
                                 {
                                     "id": "render_001",
@@ -342,11 +332,6 @@ SAMPLE_DATA_TEMPLATES = {
                         "createdAt": "2024-03-15T14:30:00Z",
                         "version": "1.1",
                         "audio": {
-                            "format": "mp3",
-                            "duration": 120.5,
-                            "sample_rate": 44100,
-                            "channels": 2,
-                            "url": "https://example.com/renders/thread_001_v1_1.mp3",
                             "renders": [
                                 {
                                     "id": "render_002",

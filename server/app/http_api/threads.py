@@ -158,3 +158,5 @@ async def update_thread_handler(request: Request, thread_id: str, update_data: D
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../state/threads_state.dart';
 
 class UserProfile {
   final String id;
@@ -35,15 +36,28 @@ class UserProfile {
        joinedDate = joinedDate ?? registeredAt;
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
+    // Handle the nested info structure from the server
+    final infoData = json['info'];
+    String bioText = '';
+    String infoText = '';
+    
+    if (infoData is Map<String, dynamic>) {
+      bioText = infoData['bio'] ?? '';
+      infoText = bioText; // Use bio as the main info text
+    } else if (infoData is String) {
+      infoText = infoData;
+      bioText = infoData;
+    }
+    
     return UserProfile(
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       registeredAt: DateTime.parse(json['registered_at'] ?? DateTime.now().toIso8601String()),
       lastOnline: DateTime.parse(json['last_online'] ?? DateTime.now().toIso8601String()),
       email: json['email'] ?? '',
-      info: json['info'] ?? '',
+      info: infoText,
       avatar: json['avatar'] ?? '👤',
-      bio: json['bio'] ?? json['info'] ?? '',
+      bio: bioText,
       isWorking: json['isWorking'] ?? false,
       currentProject: json['currentProject'] ?? '',
       totalSeries: json['totalSeries'] ?? 0,
@@ -186,9 +200,9 @@ class UserProfileService {
     }
   }
 
-  static Future<List<UserSeries>> getUserSeries(String userId) async {
+  static Future<List<Thread>> getUserThreads(String userId) async {
     try {
-      final url = Uri.parse('$_baseUrl/projects/user')
+      final url = Uri.parse('$_baseUrl/threads')
           .replace(queryParameters: {
         'user_id': userId,
         'token': _apiToken,
@@ -196,7 +210,7 @@ class UserProfileService {
         'offset': '0',
       });
 
-      print('Fetching user series from: $url');
+      print('Fetching user threads from: $url');
 
       final response = await http.get(url);
 
@@ -205,29 +219,28 @@ class UserProfileService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-              final projectsList = jsonData['projects'] as List<dynamic>? ?? [];
+        final threadsList = jsonData['threads'] as List<dynamic>? ?? [];
       
-      return projectsList.map((project) => UserSeries.fromJson(project)).toList();
+        return threadsList.map((thread) => Thread.fromJson(thread)).toList();
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid API token');
       } else {
-        throw Exception('Failed to load user series: ${response.statusCode}');
+        throw Exception('Failed to load user threads: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching user series: $e');
+      print('Error fetching user threads: $e');
       throw Exception('Network error: $e');
     }
   }
 
-  static Future<ProjectData> getProject(String projectId) async {
+  static Future<Thread> getThread(String threadId) async {
     try {
-      final url = Uri.parse('$_baseUrl/projects')
+      final url = Uri.parse('$_baseUrl/threads/$threadId')
           .replace(queryParameters: {
-                  'id': projectId,
         'token': _apiToken,
       });
 
-      print('Fetching sound series from: $url');
+      print('Fetching thread from: $url');
 
       final response = await http.get(url);
 
@@ -236,104 +249,23 @@ class UserProfileService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        return ProjectData.fromJson(jsonData);
+        return Thread.fromJson(jsonData);
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid API token');
       } else if (response.statusCode == 404) {
-        throw Exception('Sound series not found');
+        throw Exception('Thread not found');
       } else {
-        throw Exception('Failed to load sound series: ${response.statusCode}');
+        throw Exception('Failed to load thread: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching sound series: $e');
+      print('Error fetching thread: $e');
       throw Exception('Network error: $e');
     }
   }
 }
 
-// Data models
-class UserSeries {
-  final String id;
-  final String title;
-  final String description;
-  final int trackCount;
-  final Duration duration;
-  final DateTime createdDate;
-  final bool isPublic;
-  final String genre;
-  final int coverColor;
-  final bool isLocked;
-
-  UserSeries({
-    required this.id,
-    required this.title,
-    required this.description,
-    required this.trackCount,
-    required this.duration,
-    required this.createdDate,
-    required this.isPublic,
-    required this.genre,
-    required this.coverColor,
-    required this.isLocked,
-  });
-
-  factory UserSeries.fromJson(Map<String, dynamic> json) {
-    final audioData = json['audio'] as Map<String, dynamic>? ?? {};
-    
-    return UserSeries(
-      id: json['id'] ?? '',
-      title: json['name'] ?? '',
-      description: json['description'] ?? '',
-      trackCount: json['track_count'] ?? 0,
-      duration: Duration(seconds: (audioData['duration'] ?? 0).round()),
-      createdDate: DateTime.parse(json['created'] ?? DateTime.now().toIso8601String()),
-      isPublic: json['visibility'] == 'public',
-      genre: json['genre'] ?? 'Unknown',
-      coverColor: json['cover_color'] ?? 0xFF9CA3AF,
-      isLocked: json['edit_lock'] ?? false,
-    );
-  }
-}
-
-class ProjectData {
-  final String seriesId;
-  final String title;
-  final List<SoundTrack> sounds;
-  final int bpm;
-  final String key;
-  final DateTime createdDate;
-  final List<AudioRender> renders;
-  final List<AudioSource> sources;
-
-  ProjectData({
-    required this.seriesId,
-    required this.title,
-    required this.sounds,
-    required this.bpm,
-    required this.key,
-    required this.createdDate,
-    required this.renders,
-    required this.sources,
-  });
-
-  factory ProjectData.fromJson(Map<String, dynamic> json) {
-    final audioData = json['audio'] as Map<String, dynamic>? ?? {};
-    final soundsList = audioData['sounds'] as List<dynamic>? ?? [];
-    final rendersList = audioData['renders'] as List<dynamic>? ?? [];
-    final sourcesList = audioData['sources'] as List<dynamic>? ?? [];
-
-    return ProjectData(
-      seriesId: json['id'] ?? '',
-      title: json['name'] ?? '',
-      sounds: soundsList.map((sound) => SoundTrack.fromJson(sound)).toList(),
-      bpm: audioData['bpm'] ?? 120,
-      key: audioData['key'] ?? 'C Major',
-      createdDate: DateTime.parse(json['created'] ?? DateTime.now().toIso8601String()),
-      renders: rendersList.map((render) => AudioRender.fromJson(render)).toList(),
-      sources: sourcesList.map((source) => AudioSource.fromJson(source)).toList(),
-    );
-  }
-}
+// Data models - Note: Thread, ThreadCheckpoint, etc. are imported from threads_state.dart
+// Legacy data models below are kept for backward compatibility with existing UI components
 
 class SoundTrack {
   final String id;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/user_profile_service.dart';
+import '../state/threads_state.dart';
 
 class UserProjectsScreen extends StatefulWidget {
   final String userId;
@@ -16,7 +17,7 @@ class UserProjectsScreen extends StatefulWidget {
 }
 
 class _UserProjectsScreenState extends State<UserProjectsScreen> {
-  List<UserSeries> _projects = [];
+  List<Thread> _projects = [];
   bool _isLoading = true;
   String? _error;
 
@@ -33,7 +34,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
         _error = null;
       });
 
-      final projects = await UserProfileService.getUserSeries(widget.userId);
+      final projects = await UserProfileService.getUserThreads(widget.userId);
 
       setState(() {
         _projects = projects;
@@ -155,7 +156,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
     );
   }
 
-  Widget _buildProjectCard(UserSeries series) {
+  Widget _buildProjectCard(Thread thread) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -182,12 +183,12 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: Color(series.coverColor),
+                    color: const Color(0xFF9CA3AF), // Default color for threads
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: IconButton(
                     icon: const Icon(Icons.play_arrow, color: Colors.white),
-                    onPressed: () => _playProject(series),
+                    onPressed: () => _playProject(thread),
                   ),
                 ),
                 
@@ -199,7 +200,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        series.title,
+                        thread.title,
                         style: const TextStyle(
                           color: Color(0xFF374151),
                           fontSize: 16,
@@ -210,13 +211,13 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
                       Row(
                         children: [
                           const Icon(
-                            Icons.schedule,
+                            Icons.group,
                             size: 14,
                             color: Color(0xFF9CA3AF),
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            _formatDuration(series.duration),
+                            '${thread.checkpoints.length} checkpoints • ${thread.users.length} users',
                             style: const TextStyle(
                               color: Color(0xFF9CA3AF),
                               fontSize: 12,
@@ -229,7 +230,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
                 ),
                 
                 // Status indicators
-                if (series.isLocked)
+                if (thread.status != ThreadStatus.active)
                   const Icon(
                     Icons.lock_outline,
                     size: 16,
@@ -246,7 +247,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _viewProjectDetails(series),
+                    onPressed: () => _viewProjectDetails(thread),
                     icon: const Icon(Icons.visibility_outlined, size: 16),
                     label: const Text('View Details'),
                     style: OutlinedButton.styleFrom(
@@ -258,7 +259,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _openInSequencer(series),
+                    onPressed: () => _openInSequencer(thread),
                     icon: const Icon(Icons.edit_outlined, size: 16),
                     label: const Text('Open'),
                     style: ElevatedButton.styleFrom(
@@ -275,19 +276,15 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
     );
   }
 
-  String _formatDuration(Duration duration) {
-    final minutes = duration.inMinutes;
-    final seconds = duration.inSeconds % 60;
-    return '${minutes}:${seconds.toString().padLeft(2, '0')}';
-  }
 
-  void _playProject(UserSeries series) {
+
+  void _playProject(Thread thread) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Playing: ${series.title}')),
+      SnackBar(content: Text('Playing: ${thread.title}')),
     );
   }
 
-  void _viewProjectDetails(UserSeries series) async {
+  void _viewProjectDetails(Thread thread) async {
     try {
       // Show loading
       showDialog(
@@ -298,14 +295,14 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
         ),
       );
 
-      // Fetch detailed project data
-      final projectData = await UserProfileService.getProject(series.id);
+      // Fetch detailed thread data
+      final threadData = await UserProfileService.getThread(thread.id);
       
       // Hide loading
       Navigator.of(context).pop();
       
       // Show details dialog
-      _showProjectDetailsDialog(projectData);
+      _showProjectDetailsDialog(threadData);
       
     } catch (e) {
       // Hide loading
@@ -317,66 +314,50 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
     }
   }
 
-  void _showProjectDetailsDialog(ProjectData data) {
+  void _showProjectDetailsDialog(Thread thread) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(data.title),
+        title: Text(thread.title),
         content: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('BPM: ${data.bpm}'),
-              Text('Key: ${data.key}'),
+              Text('Status: ${thread.status.toString().split('.').last}'),
+              Text('Users: ${thread.users.length}'),
+              Text('Checkpoints: ${thread.checkpoints.length}'),
               const SizedBox(height: 16),
-              if (data.sources.isNotEmpty && data.sources.first.gridStacks.isNotEmpty) ...[
+              if (thread.checkpoints.isNotEmpty) ...[
                 const Text(
-                  'Grid Pattern:',
+                  'Latest Checkpoint:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
-                _buildGridVisualization(data.sources.first.gridStacks.first),
-                const SizedBox(height: 12),
-                Text('Created by: ${data.sources.first.gridStacks.first.metadata.user}'),
-                Text('BPM: ${data.sources.first.gridStacks.first.metadata.bpm}'),
-                Text('Key: ${data.sources.first.gridStacks.first.metadata.key}'),
-                Text('Time: ${data.sources.first.gridStacks.first.metadata.timeSignature}'),
+                Text('By: ${thread.checkpoints.last.userName}'),
+                Text('Comment: ${thread.checkpoints.last.comment}'),
+                Text('Time: ${thread.checkpoints.last.timestamp.toString()}'),
               ],
-              if (data.sources.isNotEmpty && data.sources.first.samples.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Samples Used:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
+              const SizedBox(height: 16),
+              const Text(
+                'Collaborators:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...thread.users.map((user) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.person,
+                      size: 14,
+                      color: Colors.blue,
+                    ),
+                    const SizedBox(width: 4),
+                    Text('${user.name} (joined ${user.joinedAt.toString()})'),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                ...data.sources.first.samples.map((sample) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(
-                        sample.isPublic ? Icons.public : Icons.lock,
-                        size: 14,
-                        color: sample.isPublic ? Colors.green : Colors.orange,
-                      ),
-                      const SizedBox(width: 4),
-                      Text('${sample.name} (${sample.id})'),
-                    ],
-                  ),
-                )),
-              ],
-              if (data.renders.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                const Text(
-                  'Available Renders:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                ...data.renders.map((render) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Text('• ${render.quality} quality (v${render.version})'),
-                )),
-              ],
+              )),
             ],
           ),
         ),
@@ -390,49 +371,11 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
     );
   }
 
-  Widget _buildGridVisualization(GridData gridData) {
-    if (gridData.layers.isEmpty) {
-      return const Text('No grid data available');
-    }
-    
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: const Color(0xFFD1D5DB)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        children: gridData.layers.map((layer) {
-          return Row(
-            children: layer.map((cell) {
-              return Expanded(
-                child: Container(
-                  height: 32,
-                  margin: const EdgeInsets.all(1),
-                  decoration: BoxDecoration(
-                    color: cell.isEmpty 
-                        ? const Color(0xFFF9FAFB)
-                        : const Color(0xFF374151),
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: cell.isEmpty 
-                      ? null 
-                      : const Icon(
-                          Icons.music_note,
-                          size: 16,
-                          color: Colors.white,
-                        ),
-                ),
-              );
-            }).toList(),
-          );
-        }).toList(),
-      ),
-    );
-  }
 
-  void _openInSequencer(UserSeries series) {
+
+  void _openInSequencer(Thread thread) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening ${series.title} in sequencer')),
+      SnackBar(content: Text('Opening ${thread.title} in sequencer')),
     );
   }
 } 
