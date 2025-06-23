@@ -23,6 +23,8 @@ services:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: test
       MONGO_INITDB_DATABASE: admin
+    ports:
+      - ${TAILSCALE_IP}:27017:27017
     volumes:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb

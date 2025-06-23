@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../services/threads_service.dart';
+import 'sequencer_state.dart';
 
 enum ThreadStatus { active, paused, completed, archived }
 
@@ -499,6 +500,7 @@ class Thread {
 class ThreadsState extends ChangeNotifier {
   List<Thread> _threads = [];
   String? _currentUserId;
+  String? _currentUserName;
   Thread? _activeThread;
   bool _isLoading = false;
   String? _error;
@@ -506,7 +508,9 @@ class ThreadsState extends ChangeNotifier {
   // Getters
   List<Thread> get threads => _threads;
   String? get currentUserId => _currentUserId;
+  String? get currentUserName => _currentUserName;
   Thread? get activeThread => _activeThread;
+  Thread? get currentThread => _activeThread; // Alias for convenience
   bool get isLoading => _isLoading;
   String? get error => _error;
 
@@ -520,8 +524,9 @@ class ThreadsState extends ChangeNotifier {
     return _threads.where((thread) => thread.author.id == userId).toList();
   }
 
-  void setCurrentUser(String userId) {
+  void setCurrentUser(String userId, [String? userName]) {
     _currentUserId = userId;
+    _currentUserName = userName;
     notifyListeners();
   }
 
@@ -660,6 +665,18 @@ class ThreadsState extends ChangeNotifier {
     } finally {
       setLoading(false);
     }
+  }
+
+  // Convenience method to add checkpoint from current sequencer state
+  Future<void> addCheckpointFromSequencer(String threadId, String comment, SequencerState sequencerState) async {
+    final snapshot = sequencerState.createSnapshot(comment: comment);
+    await addCheckpoint(
+      threadId: threadId,
+      userId: _currentUserId ?? 'unknown',
+      userName: _currentUserName ?? 'Unknown User',
+      comment: comment,
+      snapshot: snapshot,
+    );
   }
 
   // Join an existing thread

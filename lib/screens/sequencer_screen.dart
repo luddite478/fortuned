@@ -6,7 +6,9 @@ import '../widgets/sequencer/sample_banks_widget.dart';
 import '../widgets/sequencer/sound_grid_widget.dart';
 import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../state/sequencer_state.dart';
+import '../state/threads_state.dart';
 import 'users_screen.dart';
+import 'checkpoints_screen.dart';
 
 class PatternScreen extends StatefulWidget {
   const PatternScreen({super.key});
@@ -79,6 +81,28 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
               );
             },
             tooltip: 'Users',
+          ),
+          // Checkpoints button
+          Consumer<ThreadsState>(
+            builder: (context, threadsState, child) {
+              final currentThread = threadsState.currentThread;
+              return IconButton(
+                icon: const Icon(Icons.history, color: Colors.amberAccent),
+                onPressed: currentThread != null 
+                    ? () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => CheckpointsScreen(
+                              threadId: currentThread.id,
+                            ),
+                          ),
+                        );
+                      }
+                    : null,
+                tooltip: 'Project History',
+              );
+            },
           ),
           // Recording controls
           Consumer<SequencerState>(
