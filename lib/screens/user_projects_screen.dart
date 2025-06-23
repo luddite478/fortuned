@@ -1,42 +1,42 @@
 import 'package:flutter/material.dart';
 import '../services/user_profile_service.dart';
 
-class UserSoundseriesScreen extends StatefulWidget {
+class UserProjectsScreen extends StatefulWidget {
   final String userId;
   final String userName;
 
-  const UserSoundseriesScreen({
+  const UserProjectsScreen({
     Key? key,
     required this.userId,
     required this.userName,
   }) : super(key: key);
 
   @override
-  State<UserSoundseriesScreen> createState() => _UserSoundseriesScreenState();
+  State<UserProjectsScreen> createState() => _UserProjectsScreenState();
 }
 
-class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
-  List<UserSeries> _soundseries = [];
+class _UserProjectsScreenState extends State<UserProjectsScreen> {
+  List<UserSeries> _projects = [];
   bool _isLoading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadSoundseries();
+    _loadProjects();
   }
 
-  Future<void> _loadSoundseries() async {
+  Future<void> _loadProjects() async {
     try {
       setState(() {
         _isLoading = true;
         _error = null;
       });
 
-      final soundseries = await UserProfileService.getUserSeries(widget.userId);
+      final projects = await UserProfileService.getUserSeries(widget.userId);
 
       setState(() {
-        _soundseries = soundseries;
+        _projects = projects;
         _isLoading = false;
       });
     } catch (e) {
@@ -59,7 +59,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          '${widget.userName}\'s Soundseries',
+                      '${widget.userName}\'s Projects',
           style: const TextStyle(
             color: Color(0xFF374151),
             fontSize: 18,
@@ -71,7 +71,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? _buildErrorView()
-              : _buildSoundseriesContent(),
+              : _buildProjectsContent(),
     );
   }
 
@@ -87,7 +87,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
           ),
           const SizedBox(height: 16),
           const Text(
-            'Failed to load soundseries',
+            'Failed to load projects',
             style: TextStyle(
               color: Color(0xFF374151),
               fontSize: 18,
@@ -105,7 +105,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
           ),
           const SizedBox(height: 16),
           ElevatedButton(
-            onPressed: _loadSoundseries,
+            onPressed: _loadProjects,
             child: const Text('Retry'),
           ),
         ],
@@ -113,8 +113,8 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
     );
   }
 
-  Widget _buildSoundseriesContent() {
-    if (_soundseries.isEmpty) {
+  Widget _buildProjectsContent() {
+    if (_projects.isEmpty) {
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -126,7 +126,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
             ),
             SizedBox(height: 16),
             Text(
-              'No soundseries found',
+              'No projects found',
               style: TextStyle(
                 color: Color(0xFF374151),
                 fontSize: 18,
@@ -135,7 +135,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
             ),
             SizedBox(height: 8),
             Text(
-              'This user hasn\'t created any soundseries yet.',
+              'This user hasn\'t created any projects yet.',
               style: TextStyle(
                 color: Color(0xFF9CA3AF),
                 fontSize: 14,
@@ -148,14 +148,14 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
 
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _soundseries.length,
+      itemCount: _projects.length,
       itemBuilder: (context, index) {
-        return _buildSoundseriesCard(_soundseries[index]);
+        return _buildProjectCard(_projects[index]);
       },
     );
   }
 
-  Widget _buildSoundseriesCard(UserSeries series) {
+  Widget _buildProjectCard(UserSeries series) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -187,7 +187,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
                   ),
                   child: IconButton(
                     icon: const Icon(Icons.play_arrow, color: Colors.white),
-                    onPressed: () => _playSoundseries(series),
+                    onPressed: () => _playProject(series),
                   ),
                 ),
                 
@@ -246,7 +246,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
               children: [
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => _viewSoundseriesDetails(series),
+                    onPressed: () => _viewProjectDetails(series),
                     icon: const Icon(Icons.visibility_outlined, size: 16),
                     label: const Text('View Details'),
                     style: OutlinedButton.styleFrom(
@@ -281,13 +281,13 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
     return '${minutes}:${seconds.toString().padLeft(2, '0')}';
   }
 
-  void _playSoundseries(UserSeries series) {
+  void _playProject(UserSeries series) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('Playing: ${series.title}')),
     );
   }
 
-  void _viewSoundseriesDetails(UserSeries series) async {
+  void _viewProjectDetails(UserSeries series) async {
     try {
       // Show loading
       showDialog(
@@ -298,14 +298,14 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
         ),
       );
 
-      // Fetch detailed soundseries data
-      final soundseriesData = await UserProfileService.getSoundSeries(series.id);
+      // Fetch detailed project data
+      final projectData = await UserProfileService.getProject(series.id);
       
       // Hide loading
       Navigator.of(context).pop();
       
       // Show details dialog
-      _showSoundseriesDetailsDialog(soundseriesData);
+      _showProjectDetailsDialog(projectData);
       
     } catch (e) {
       // Hide loading
@@ -317,7 +317,7 @@ class _UserSoundseriesScreenState extends State<UserSoundseriesScreen> {
     }
   }
 
-  void _showSoundseriesDetailsDialog(SoundSeriesData data) {
+  void _showProjectDetailsDialog(ProjectData data) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

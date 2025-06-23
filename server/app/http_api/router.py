@@ -112,35 +112,35 @@ async def get_user_profiles(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.get("/soundseries")
-async def get_soundseries(request: Request, id: str = Query(..., description="Soundseries ID"), token: str = Query(..., description="API Token")):
-    """Get individual soundseries data by ID from database"""
+@router.get("/projects")
+async def get_project(request: Request, id: str = Query(..., description="Project ID"), token: str = Query(..., description="API Token")):
+    """Get individual project data by ID from database"""
     check_rate_limit(request)
     verify_token(token)
     
     try:
         db = get_db()
-        soundseries = db.soundseries.find_one({"id": id}, {"_id": 0})
+        project = db.projects.find_one({"id": id}, {"_id": 0})
         
-        if not soundseries:
-            raise HTTPException(status_code=404, detail=f"Soundseries not found: {id}")
-        
-        return soundseries
+            if not project:
+        raise HTTPException(status_code=404, detail=f"Project not found: {id}")
+    
+    return project
         
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.get("/soundseries/user")
-async def get_user_soundseries(
+@router.get("/projects/user")
+async def get_user_projects(
     request: Request, 
     user_id: str = Query(..., description="User ID"),
     token: str = Query(..., description="API Token"),
     limit: int = Query(20, description="Number of results"),
     offset: int = Query(0, description="Offset for pagination")
 ):
-    """Get all soundseries for a specific user with pagination from database"""
+    """Get all projects for a specific user with pagination from database"""
     check_rate_limit(request)
     verify_token(token)
     
@@ -148,19 +148,19 @@ async def get_user_soundseries(
         db = get_db()
         
         # Get total count for pagination
-        total = db.soundseries.count_documents({"user_id": user_id})
+        total = db.projects.count_documents({"user_id": user_id})
         
-        # Get soundseries with pagination, sorted by creation date (newest first)
-        soundseries_cursor = db.soundseries.find(
+            # Get projects with pagination, sorted by creation date (newest first)
+    projects_cursor = db.projects.find(
             {"user_id": user_id}, 
             {"_id": 0}
         ).sort("created", -1).limit(limit).skip(offset)
         
-        soundseries_list = list(soundseries_cursor)
+        projects_list = list(projects_cursor)
         
         return {
             "user_id": user_id,
-            "soundseries": soundseries_list,
+            "projects": projects_list,
             "pagination": {
                 "limit": limit,
                 "offset": offset,
@@ -173,21 +173,21 @@ async def get_user_soundseries(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-@router.get("/soundseries/recent")
-async def get_recent_soundseries(
+@router.get("/projects/recent")
+async def get_recent_projects(
     request: Request,
     token: str = Query(..., description="API Token"),
     limit: int = Query(20, description="Number of results")
 ):
-    """Get recently created soundseries across all users from database"""
+    """Get recently created projects across all users from database"""
     check_rate_limit(request)
     verify_token(token)
     
     try:
         db = get_db()
         
-        # Get recent soundseries sorted by creation date (newest first)
-        recent_cursor = db.soundseries.find(
+            # Get recent projects sorted by creation date (newest first)
+    recent_cursor = db.projects.find(
             {"visibility": "public"}, 
             {
                 "_id": 0,
@@ -223,28 +223,28 @@ async def get_platform_stats(request: Request, token: str = Query(..., descripti
         
         # Get various platform statistics
         total_users = db.profiles.count_documents({})
-        total_soundseries = db.soundseries.count_documents({})
-        public_soundseries = db.soundseries.count_documents({"visibility": "public"})
+        total_projects = db.projects.count_documents({})
+        public_projects = db.projects.count_documents({"visibility": "public"})
         
-        # Get total plays across all soundseries
+        # Get total plays across all projects
         plays_pipeline = [
             {"$group": {"_id": None, "total_plays": {"$sum": "$plays_num"}}}
         ]
-        plays_result = list(db.soundseries.aggregate(plays_pipeline))
+        plays_result = list(db.projects.aggregate(plays_pipeline))
         total_plays = plays_result[0]["total_plays"] if plays_result else 0
         
-        # Get total forks across all soundseries
+        # Get total forks across all projects
         forks_pipeline = [
             {"$group": {"_id": None, "total_forks": {"$sum": "$forks_num"}}}
         ]
-        forks_result = list(db.soundseries.aggregate(forks_pipeline))
+        forks_result = list(db.projects.aggregate(forks_pipeline))
         total_forks = forks_result[0]["total_forks"] if forks_result else 0
         
         return {
             "platform_stats": {
                 "total_users": total_users,
-                "total_soundseries": total_soundseries,
-                "public_soundseries": public_soundseries,
+                        "total_projects": total_projects,
+        "public_projects": public_projects,
                 "total_plays": total_plays,
                 "total_forks": total_forks
             }

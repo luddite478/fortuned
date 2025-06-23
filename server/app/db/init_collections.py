@@ -42,7 +42,7 @@ COLLECTIONS_CONFIG = {
             "info": "string"  # User bio/description
         }
     },
-    "soundseries": {
+    "projects": {
         "indexes": [
             {"fields": "id", "unique": True},
             {"fields": "user_id"},  # Reference to user
@@ -68,7 +68,7 @@ COLLECTIONS_CONFIG = {
             "plays_num": "number",
             "forks_num": "number",
             "edit_lock": "boolean",
-            "parent_id": "string (UUID) | null",  # Reference to another soundseries
+            "parent_id": "string (UUID) | null",  # Reference to another project
             "audio": {
                 "format": "string",  # mp3, wav, etc.
                 "duration": "number",  # seconds
@@ -88,7 +88,7 @@ COLLECTIONS_CONFIG = {
                     {
                         "scenes": [
                             {
-                                                                 "layers": [
+                                "layers": [
                                      {
                                          "id": "string",  # layer_001, layer_002, etc.
                                          "index": "number",  # 0, 1, 2, 3, etc. (layer position)
@@ -191,7 +191,7 @@ SAMPLE_DATA_TEMPLATES = {
             "info": "Audio engineer and mixing specialist"
         }
     ],
-    "soundseries": [
+            "projects": [
         {
             "id": "660e8400-e29b-41d4-a716-446655440001",
             "user_id": "550e8400-e29b-41d4-a716-446655440001",

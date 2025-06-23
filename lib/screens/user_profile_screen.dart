@@ -1,6 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/user_profile_service.dart';
-import 'user_soundseries_screen.dart';
+import '../services/threads_service.dart';
+import '../state/threads_state.dart';
+import '../state/sequencer_state.dart';
+import 'user_projects_screen.dart';
+import 'sequencer_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -247,13 +252,13 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           
           const SizedBox(height: 20),
           
-          // View Soundseries Button
+                          // View Projects Button
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _viewAllSoundseries(),
+                                onPressed: () => _viewAllProjects(),
               icon: const Icon(Icons.library_music_outlined, size: 18),
-              label: const Text('View All Soundseries'),
+                                label: const Text('View All Projects'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF374151),
                 foregroundColor: Colors.white,
@@ -579,7 +584,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('Loading sound series...'),
+              Text('Starting collaborative thread...'),
             ],
           ),
           backgroundColor: const Color.fromARGB(255, 160, 160, 161),
@@ -587,30 +592,75 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ),
       );
 
-      // Make HTTP request to get sound series data
-      final soundSeriesData = await UserProfileService.getSoundSeries(series.id);
+      // Get sequencer and threads state from providers
+      final sequencerState = Provider.of<SequencerState>(context, listen: false);
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      
+      // Set current user (this would typically come from app state)
+      final currentUserId = 'current_user_123'; // TODO: Get from user session
+      final currentUserName = 'Current User'; // TODO: Get from user session
+      threadsState.setCurrentUser(currentUserId);
+      
+      // Load the sound series into sequencer state
+      // Note: This assumes you have a loadProject method in SequencerState
+      // If not, you might need to implement it or load the samples manually
+      try {
+        // For now, create a basic snapshot - you can enhance this to load actual series data
+        final initialSnapshot = sequencerState.createSnapshot();
+        
+        // Start a new collaborative thread with the current sequencer state
+        final threadId = await threadsState.startThread(
+          originalProjectId: series.id,
+          originalUserId: widget.userId,
+          originalUserName: widget.userName,
+          collaboratorUserId: currentUserId,
+          collaboratorUserName: currentUserName,
+          projectTitle: series.title,
+          initialState: initialSnapshot,
+        );
+        
+        print('🚀 Started collaborative thread: $threadId');
+        
+      } catch (seriesLoadError) {
+        print('Note: Could not load series data, using current sequencer state: $seriesLoadError');
+        
+        // Fallback: Use current sequencer state as initial state
+        final initialSnapshot = sequencerState.createSnapshot();
+        
+        final threadId = await threadsState.startThread(
+          originalProjectId: series.id,
+          originalUserId: widget.userId,
+          originalUserName: widget.userName,
+          collaboratorUserId: currentUserId,
+          collaboratorUserName: currentUserName,
+          projectTitle: series.title,
+          initialState: initialSnapshot,
+        );
+        
+        print('🚀 Started collaborative thread with fallback: $threadId');
+      }
       
       // Hide loading snackbar and show success
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🔧 Loaded ${soundSeriesData.sounds.length} sounds from "${soundSeriesData.title}"'),
+          content: Text('🚀 Started collaborative thread for "${series.title}"'),
           backgroundColor: const Color(0xFF10B981),
           duration: const Duration(seconds: 3),
         ),
       );
 
-      // TODO: Navigate to sequencer screen with loaded sound data
-      // Navigator.push(context, MaterialPageRoute(
-      //   builder: (context) => SequencerScreen(soundSeriesData: soundSeriesData),
-      // ));
+      // Navigate to sequencer screen
+      Navigator.push(context, MaterialPageRoute(
+        builder: (context) => const PatternScreen(),
+      ));
       
     } catch (e) {
       // Hide loading snackbar and show error
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('❌ Failed to load sound series: ${e.toString()}'),
+          content: Text('❌ Failed to start thread: ${e.toString()}'),
           backgroundColor: const Color(0xFFEF4444),
           duration: const Duration(seconds: 3),
         ),
@@ -629,11 +679,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     );
   }
 
-  void _viewAllSoundseries() {
+  void _viewAllProjects() {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => UserSoundseriesScreen(
+        builder: (context) => UserProjectsScreen(
           userId: widget.userId,
           userName: widget.userName,
         ),

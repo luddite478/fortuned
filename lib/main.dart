@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 
 import 'screens/users_screen.dart';
 import 'state/sequencer_state.dart';
+import 'state/threads_state.dart';
+// import 'state/patterns_state.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -22,6 +24,7 @@ class NiyyaApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => SequencerState()),
+        ChangeNotifierProvider(create: (context) => ThreadsState()),
       ],
       child: MaterialApp(
         title: 'NIYYA',

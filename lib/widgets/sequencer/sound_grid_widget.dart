@@ -129,7 +129,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   Widget build(BuildContext context) {
     return Consumer<SequencerState>(
       builder: (context, sequencer, child) {
-        const int numSoundGrids = 3; // Can be changed to any number
+        const int numSoundGrids = 4; // Can be changed to any number
         
         // Initialize sound grids if not already done or if number changed
         if (sequencer.soundGridOrder.length != numSoundGrids) {
@@ -139,219 +139,92 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           return const Center(child: CircularProgressIndicator());
         }
         
-        return StackedCardsWidget(
-          numCards: numSoundGrids,
-          cardWidthFactor: 0.9,
-          cardHeightFactor: 0.9,
-          offsetPerDepth: const Offset(0, -10),
-          scaleFactorPerDepth: 0.02,
-          borderRadius: 12.0,
-          cardColors: const [
-            Color(0xFF1f2937),
-            Color(0xFF374151),
-          ],
-          activeCardIndex: sequencer.currentSoundGridIndex,
+        return Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: const Color.fromARGB(255, 51, 51, 51), // Bright red border to make it visible
+              width: 2,
+            ),
+          ),
+          child: StackedCardsWidget(
+            numCards: numSoundGrids,
+            cardWidthFactor: 0.9,
+            cardHeightFactor: 0.9,
+            offsetPerDepth: const Offset(0, -8),
+            scaleFactorPerDepth: 0.02,
+            borderRadius: 12.0,
+            cardColors: const [
+              Color(0xFF1f2937),
+              Color(0xFF374151),
+            ],
+            activeCardIndex: sequencer.currentSoundGridIndex,
           cardBuilder: (index, width, height, depth) {
-            // Get the actual sound grid ID for this position using the sound grid order
-            final actualSoundGridId = sequencer.soundGridOrder[index];
+            // INVERSION LOGIC: Stack index 0 = back card, but we want L1 to be front
+            // So we need to invert: front card (highest stack index) = L1 (first grid)
+            final invertedIndex = numSoundGrids - 1 - index;
+            final actualSoundGridId = sequencer.soundGridOrder[invertedIndex];
             
-            // Define unique colors for each card ID (expandable list)
+            // Define subtle colors for each card ID (non-vibrant, more professional)
             final availableColors = [
-              Colors.red,
-              Colors.blue,
-              Colors.green,
-              Colors.purple,
-              Colors.orange,
-              Colors.pink,
-              Colors.cyan,
-              Colors.lime,
-              Colors.amber,
-              Colors.indigo,
+              const Color(0xFF4B5563), // Gray-600
+              const Color(0xFF6B7280), // Gray-500  
+              const Color(0xFF374151), // Gray-700
+              const Color(0xFF9CA3AF), // Gray-400
+              const Color(0xFF1F2937), // Gray-800
+              const Color(0xFF111827), // Gray-900
+              const Color(0xFFD1D5DB), // Gray-300
+              const Color(0xFFF3F4F6), // Gray-100
+              const Color(0xFF6B7280), // Gray-500 (repeat for more grids)
+              const Color(0xFF374151), // Gray-700 (repeat for more grids)
             ];
             final cardColor = availableColors[actualSoundGridId % availableColors.length];
             
-            // The front card (highest index, depth 0) always shows the sound grid
-            final isFrontCard = index == (numSoundGrids - 1); // Front card is at highest index (depth 0)
+            // The front card is the one that matches the current sound grid index
+            final isFrontCard = actualSoundGridId == sequencer.currentSoundGridIndex;
             
-            // Non-front cards are just visual placeholders
-            if (!isFrontCard) {
-              return Container(
-                width: width,
-                height: height,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF374151).withOpacity(0.8 - 0.1 * depth),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: cardColor.withOpacity(0.8),
-                    width: 3,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.2),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Container(
-                  margin: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: cardColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: cardColor.withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.music_note,
-                          color: Colors.white.withOpacity(0.3),
-                          size: 40,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'SoundGrid ${actualSoundGridId + 1}', // Show the actual sound grid ID
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.5),
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Grid ID: $actualSoundGridId, Pos: $index, Depth: $depth',
-                          style: TextStyle(
-                            color: Colors.yellow.withOpacity(0.7),
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Front Grid: ${sequencer.currentSoundGridIndex + 1}',
-                          style: TextStyle(
-                            color: Colors.cyan.withOpacity(0.7),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Use button to switch',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.3),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            }
-            
-            // Main interactive card - ACTIVE CARD WITH SOUND GRID
-            return Container(
+            // Wrap everything in a container with minimal extra space for the label tab
+            return SizedBox(
               width: width,
-              height: height,
-              decoration: BoxDecoration(
-                color: const Color(0xFF1f2937),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: sequencer.isInSelectionMode 
-                      ? Colors.cyanAccent 
-                      : cardColor,
-                  width: 4,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.4),
-                    blurRadius: 12,
-                    offset: const Offset(0, 6),
+              height: height + 22, // Reduced extra space for tab
+              child: Stack(
+                clipBehavior: Clip.none, // Allow tabs to be positioned outside bounds if needed
+                children: [
+                  // Main card positioned to leave minimal space for tab at top
+                  Positioned(
+                    top: 18, // Reduced space for tab
+                    left: 0,
+                    child: _buildMainCard(
+                      width: width,
+                      height: height,
+                      cardColor: cardColor,
+                      isFrontCard: isFrontCard,
+                      depth: depth,
+                      actualSoundGridId: actualSoundGridId,
+                      index: index,
+                      sequencer: sequencer,
+                    ),
+                  ),
+                  // Clickable tab label positioned above the card
+                  // Use actualSoundGridId for positioning to maintain fixed horizontal positions
+                  Positioned(
+                    top: 0, // At the very top
+                    left: _calculateTabPosition(actualSoundGridId, width, numSoundGrids),
+                    child: _buildClickableTabLabel(
+                      gridIndex: actualSoundGridId,
+                      cardColor: cardColor,
+                      isFrontCard: isFrontCard,
+                      depth: depth,
+                      tabWidth: _calculateTabWidth(width, numSoundGrids),
+                      sequencer: sequencer,
+                    ),
                   ),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  children: [
-                    // Debug header for active card
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.yellowAccent.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(4),
-                        border: Border.all(color: Colors.yellowAccent, width: 1),
-                      ),
-                      child: Text(
-                        'FRONT SOUND GRID: ID $actualSoundGridId (SoundGrid ${actualSoundGridId + 1}) - Pos $index, Depth $depth',
-                        style: const TextStyle(
-                          color: Colors.yellowAccent,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    // Sound grid
-                    Expanded(
-                      child: GestureDetector(
-                        onPanStart: (details) {
-                          _gestureStartPosition = details.localPosition;
-                          _gestureMode = GestureMode.undetermined;
-                          
-                          if (sequencer.isInSelectionMode) {
-                            final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-                            final cellIndex = sequencer.getCellIndexFromPosition(details.localPosition, context, scrollOffset: scrollOffset);
-                            if (cellIndex != null) {
-                              sequencer.handleGridCellSelection(cellIndex, true);
-                            }
-                          }
-                        },
-                        onPanUpdate: (details) {
-                          _handlePanUpdate(details, sequencer);
-                        },
-                        onPanEnd: (details) {
-                          _gestureStartPosition = null;
-                          _currentPanPosition = null;
-                          _gestureMode = GestureMode.undetermined;
-                          _stopAutoScroll();
-                          
-                          if (sequencer.isInSelectionMode) {
-                            sequencer.handlePanEnd();
-                          }
-                        },
-                        child: GridView.builder(
-                          controller: _scrollController,
-                          physics: (sequencer.isInSelectionMode || _gestureMode == GestureMode.selecting)
-                              ? const NeverScrollableScrollPhysics()
-                              : const AlwaysScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: sequencer.gridColumns,
-                            crossAxisSpacing: 4,
-                            mainAxisSpacing: 4,
-                            childAspectRatio: 2.5,
-                          ),
-                          itemCount: sequencer.gridSamples.length,
-                          itemBuilder: (context, index) {
-                            return _buildGridCell(context, sequencer, index);
-                          },
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
             );
           },
-        );
-      },
+        ),
+      );
+    },
     );
   }
 
@@ -456,5 +329,297 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         );
       },
     );
+  }
+
+
+
+  Widget _buildClickableTabLabel({
+    required int gridIndex,
+    required Color cardColor,
+    required bool isFrontCard,
+    required int depth,
+    required double tabWidth,
+    required SequencerState sequencer,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        // Bring this grid to front when its label is tapped
+        sequencer.bringGridToFront(gridIndex);
+      },
+      child: Container(
+        width: tabWidth,
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        decoration: BoxDecoration(
+          color: isFrontCard 
+              ? Colors.white // Solid white for active tab
+              : const Color(0xFFF3F4F6), // Light gray for inactive tabs
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+            color: isFrontCard 
+                ? const Color(0xFF374151) // Dark gray border for active
+                : const Color(0xFF9CA3AF), // Medium gray border for inactive
+            width: isFrontCard ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(isFrontCard ? 0.15 : 0.05),
+              blurRadius: isFrontCard ? 2 : 1,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Text(
+            'L${gridIndex + 1}',
+            style: TextStyle(
+              color: isFrontCard 
+                  ? const Color(0xFF374151) // Dark text for active tab
+                  : const Color(0xFF6B7280), // Gray text for inactive tab
+              fontSize: 12,
+              fontWeight: isFrontCard ? FontWeight.bold : FontWeight.w600,
+              letterSpacing: 1,
+              fontFamily: 'monospace',
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabLabel({
+    required int gridIndex,
+    required Color cardColor,
+    required bool isFrontCard,
+    required int depth,
+    required double tabWidth,
+  }) {
+    return Container(
+      width: tabWidth,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(
+          color: cardColor.withOpacity(0.8),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      ),
+      child: Center(
+        child: Text(
+          'L${gridIndex + 1}',
+          style: TextStyle(
+            color: cardColor,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 1,
+            fontFamily: 'monospace',
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainCard({
+    required double width,
+    required double height,
+    required Color cardColor,
+    required bool isFrontCard,
+    required int depth,
+    required int actualSoundGridId,
+    required int index,
+    required SequencerState sequencer,
+  }) {
+    // Non-front cards are grayed out but still visible
+    if (!isFrontCard) {
+      return Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          color: const Color(0xFF374151).withOpacity(0.6 - 0.1 * depth), // Less grayed out, more visible
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: const Color(0xFF9CA3AF).withOpacity(0.6), // More visible border
+            width: 1.5, // Slightly thicker border
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 3,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFF6B7280).withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: const Color(0xFF6B7280).withOpacity(0.2),
+              width: 1,
+            ),
+          ),
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.music_note,
+                  color: Colors.white.withOpacity(0.15),
+                  size: 40,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  sequencer.getGridLabel(actualSoundGridId),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.25),
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    fontFamily: 'monospace',
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Front card - clearly highlighted as selected
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: const Color(0xFF1f2937), // Clean dark background
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: sequencer.isInSelectionMode 
+              ? Colors.cyanAccent 
+              : const Color(0xFFE5E7EB), // Bright highlight border for selected card
+          width: 3, // Thicker border to show selection
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+          // Additional glow effect for front card
+          BoxShadow(
+            color: const Color(0xFFE5E7EB).withOpacity(0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 0),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12), // Reduced padding
+        child: Column(
+          children: [
+            // Minimal space for tab label above
+            const SizedBox(height: 4),
+            // Sound grid
+            Expanded(
+              child: _buildGridContent(sequencer),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGridContent(SequencerState sequencer) {
+    return GestureDetector(
+      onPanStart: (details) {
+        _gestureStartPosition = details.localPosition;
+        _gestureMode = GestureMode.undetermined;
+        
+        if (sequencer.isInSelectionMode) {
+          final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+          final cellIndex = sequencer.getCellIndexFromPosition(details.localPosition, context, scrollOffset: scrollOffset);
+          if (cellIndex != null) {
+            sequencer.handleGridCellSelection(cellIndex, true);
+          }
+        }
+      },
+      onPanUpdate: (details) {
+        _handlePanUpdate(details, sequencer);
+      },
+      onPanEnd: (details) {
+        _gestureStartPosition = null;
+        _currentPanPosition = null;
+        _gestureMode = GestureMode.undetermined;
+        _stopAutoScroll();
+        
+        if (sequencer.isInSelectionMode) {
+          sequencer.handlePanEnd();
+        }
+      },
+      child: GridView.builder(
+        controller: _scrollController,
+        physics: (sequencer.isInSelectionMode || _gestureMode == GestureMode.selecting)
+            ? const NeverScrollableScrollPhysics()
+            : const AlwaysScrollableScrollPhysics(),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: sequencer.gridColumns,
+          crossAxisSpacing: 4,
+          mainAxisSpacing: 4,
+          childAspectRatio: 2.5,
+        ),
+        itemCount: sequencer.gridSamples.length,
+        itemBuilder: (context, index) {
+          return _buildGridCell(context, sequencer, index);
+        },
+      ),
+    );
+  }
+
+  double _calculateTabPosition(int index, double width, int numSoundGrids) {
+    // Calculate tab width with relative spacing
+    final tabWidth = _calculateTabWidth(width, numSoundGrids);
+    final spacingBetweenTabs = _calculateTabSpacing(width, numSoundGrids);
+    
+    // Position from left to right with spacing
+    final leftMargin = 8.0; // Small left margin
+    
+    // Important: Use only the available card width for positioning
+    // The cards may be transformed by StackedCardsWidget but tabs need to align with card boundaries
+    return leftMargin + (tabWidth + spacingBetweenTabs) * index;
+  }
+
+  double _calculateTabWidth(double width, int numSoundGrids) {
+    // Calculate available width for tabs (leaving small margins)
+    final leftMargin = 8.0;
+    final rightMargin = 8.0;
+    final availableWidth = width - leftMargin - rightMargin;
+    
+    // Calculate spacing between tabs (relative to number of tabs)
+    final spacingBetweenTabs = _calculateTabSpacing(width, numSoundGrids);
+    final totalSpacing = spacingBetweenTabs * (numSoundGrids - 1);
+    
+    // Calculate tab width with relative spacing
+    final tabWidth = (availableWidth - totalSpacing) / numSoundGrids;
+    
+    // Ensure minimum tab width
+    return tabWidth.clamp(40.0, double.infinity);
+  }
+
+  double _calculateTabSpacing(double width, int numSoundGrids) {
+    // Relative spacing based on number of tabs and available width
+    // More tabs = smaller spacing, fewer tabs = more spacing
+    final baseSpacing = width * 0.1; // 2% of card width as base
+    final scaleFactor = 1.0 / numSoundGrids; // Reduce spacing as tabs increase
+    
+    return (baseSpacing * scaleFactor).clamp(2.0, 12.0); // Min 2px, Max 12px
   }
 } 

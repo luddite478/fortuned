@@ -11,7 +11,6 @@ class RecordingWidget extends StatelessWidget {
     return Consumer<SequencerState>(
       builder: (context, sequencerState, child) {
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: sequencerState.lastRecordingPath != null
                 ? const Color(0xFF1f2937).withOpacity(0.9)

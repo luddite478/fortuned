@@ -29,9 +29,10 @@ while IFS= read -r asset_dir; do
 done < "$TEMP_ASSETS"
 
 # Step 5: Add .env file to assets if it exists
-if [[ -f ".env" ]]; then
-  yq eval '.flutter.assets += [".env"]' -i pubspec.yaml
-fi
+yq eval '.flutter.assets += [".env"]' -i pubspec.yaml
+
+# Step 6: Add samples_manifest.json to assets
+yq eval '.flutter.assets += ["samples_manifest.json"]' -i pubspec.yaml
 
 # Clean up temp file
 rm "$TEMP_ASSETS"

@@ -91,7 +91,10 @@ class UserProfilesResponse {
 }
 
 class UserProfileService {
-  static const String _baseUrl = 'http://localhost:8888/api/v1';
+  static String get _baseUrl {
+    final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+    return 'http://$serverIp:8888/api/v1';
+  }
   
   static String get _apiToken {
     final token = dotenv.env['API_TOKEN'] ?? '';
@@ -185,7 +188,7 @@ class UserProfileService {
 
   static Future<List<UserSeries>> getUserSeries(String userId) async {
     try {
-      final url = Uri.parse('$_baseUrl/soundseries/user')
+      final url = Uri.parse('$_baseUrl/projects/user')
           .replace(queryParameters: {
         'user_id': userId,
         'token': _apiToken,
@@ -202,9 +205,9 @@ class UserProfileService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        final soundseriesList = jsonData['soundseries'] as List<dynamic>? ?? [];
-        
-        return soundseriesList.map((soundseries) => UserSeries.fromJson(soundseries)).toList();
+              final projectsList = jsonData['projects'] as List<dynamic>? ?? [];
+      
+      return projectsList.map((project) => UserSeries.fromJson(project)).toList();
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid API token');
       } else {
@@ -216,11 +219,11 @@ class UserProfileService {
     }
   }
 
-  static Future<SoundSeriesData> getSoundSeries(String seriesId) async {
+  static Future<ProjectData> getProject(String projectId) async {
     try {
-      final url = Uri.parse('$_baseUrl/soundseries')
+      final url = Uri.parse('$_baseUrl/projects')
           .replace(queryParameters: {
-        'id': seriesId,
+                  'id': projectId,
         'token': _apiToken,
       });
 
@@ -233,7 +236,7 @@ class UserProfileService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        return SoundSeriesData.fromJson(jsonData);
+        return ProjectData.fromJson(jsonData);
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid API token');
       } else if (response.statusCode == 404) {
@@ -292,7 +295,7 @@ class UserSeries {
   }
 }
 
-class SoundSeriesData {
+class ProjectData {
   final String seriesId;
   final String title;
   final List<SoundTrack> sounds;
@@ -302,7 +305,7 @@ class SoundSeriesData {
   final List<AudioRender> renders;
   final List<AudioSource> sources;
 
-  SoundSeriesData({
+  ProjectData({
     required this.seriesId,
     required this.title,
     required this.sounds,
@@ -313,13 +316,13 @@ class SoundSeriesData {
     required this.sources,
   });
 
-  factory SoundSeriesData.fromJson(Map<String, dynamic> json) {
+  factory ProjectData.fromJson(Map<String, dynamic> json) {
     final audioData = json['audio'] as Map<String, dynamic>? ?? {};
     final soundsList = audioData['sounds'] as List<dynamic>? ?? [];
     final rendersList = audioData['renders'] as List<dynamic>? ?? [];
     final sourcesList = audioData['sources'] as List<dynamic>? ?? [];
 
-    return SoundSeriesData(
+    return ProjectData(
       seriesId: json['id'] ?? '',
       title: json['name'] ?? '',
       sounds: soundsList.map((sound) => SoundTrack.fromJson(sound)).toList(),

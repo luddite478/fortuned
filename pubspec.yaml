@@ -114,3 +114,4 @@ flutter:
     - samples/synth/Yamaha CS40M/Bass/
     - samples/synth/Yamaha CS40M/Keys/
     - .env
+    - samples_manifest.json

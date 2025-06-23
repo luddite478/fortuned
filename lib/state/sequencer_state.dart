@@ -11,7 +11,8 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../sequencer_library.dart';
 import '../services/audio_conversion_service.dart';
-import 'patterns_state.dart';
+import 'threads_state.dart';
+// import 'patterns_state.dart';
 
 // Sample browser item model
 class SampleBrowserItem {
@@ -157,6 +158,12 @@ class SequencerState extends ChangeNotifier {
   List<String> _currentSamplePath = [];
   List<SampleBrowserItem> _currentSampleItems = [];
 
+  // Grid labeling system
+  List<String> _soundGridLabels = [];
+
+  // Thread integration
+  ThreadsState? _threadsState;
+
   // Initialize sequencer
   SequencerState() {
     _sequencerLibrary = SequencerLibrary.instance;
@@ -169,6 +176,173 @@ class SequencerState extends ChangeNotifier {
     _slotPlaying = List.filled(_slotCount, false);
     _soundGridSamples = []; // Will be initialized when sound grids are created
     _columnPlayingSample = List.filled(_gridColumns, null);
+  }
+
+  // Set threads state for collaboration tracking
+  void setThreadsState(ThreadsState threadsState) {
+    _threadsState = threadsState;
+  }
+
+  // Create a snapshot of current sequencer state for threads (matches database structure)
+  SequencerSnapshot createSnapshot({String? name, String? comment}) {
+    final now = DateTime.now();
+    final snapshotId = 'snapshot_${now.millisecondsSinceEpoch}';
+    
+    // Convert current sequencer state to database-compatible structure
+    final layers = <SequencerLayer>[];
+    
+    // Create layers from current sound grids
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      final gridSamples = _soundGridSamples[gridIndex];
+      
+      // Group cells into rows (assuming _gridColumns cells per row)
+      final rows = <SequencerRow>[];
+      for (int rowIndex = 0; rowIndex < _gridRows; rowIndex++) {
+        final cells = <SequencerCell>[];
+        for (int colIndex = 0; colIndex < _gridColumns; colIndex++) {
+          final cellIndex = rowIndex * _gridColumns + colIndex;
+          final sampleSlot = cellIndex < gridSamples.length ? gridSamples[cellIndex] : null;
+          
+          cells.add(SequencerCell(
+            sample: CellSample(
+              sampleId: sampleSlot != null ? 'slot_$sampleSlot' : null,
+              sampleName: sampleSlot != null && sampleSlot < _fileNames.length 
+                ? _fileNames[sampleSlot] 
+                : null,
+            ),
+          ));
+        }
+        rows.add(SequencerRow(cells: cells));
+      }
+      
+      layers.add(SequencerLayer(
+        id: 'layer_${gridIndex.toString().padLeft(3, '0')}',
+        index: gridIndex,
+        rows: rows,
+      ));
+    }
+    
+    // Create sample info from loaded samples
+    final samples = <SampleInfo>[];
+    for (int i = 0; i < _filePaths.length; i++) {
+      if (_filePaths[i] != null) {
+        samples.add(SampleInfo(
+          id: 'slot_$i',
+          name: _fileNames[i] ?? 'Sample $i',
+          url: _filePaths[i]!,
+          isPublic: true, // Default to public for now
+        ));
+      }
+    }
+    
+    // Create the scene with metadata
+    final scene = SequencerScene(
+      layers: layers,
+      metadata: SceneMetadata(
+        user: _threadsState?.currentUserId ?? 'unknown',
+        createdAt: now,
+        bpm: _bpm,
+        key: 'C Major', // Default for now, could be enhanced
+        timeSignature: '4/4', // Default for now
+      ),
+    );
+    
+    // Create the audio source
+    final audioSource = AudioSource(
+      scenes: [scene],
+      samples: samples,
+    );
+    
+    // Create the full audio structure
+    final audio = ProjectAudio(
+      format: 'mp3',
+      duration: 0.0, // Could calculate based on BPM and pattern length
+      sampleRate: 44100,
+      channels: 2,
+      sources: [audioSource],
+    );
+    
+    return SequencerSnapshot(
+      id: snapshotId,
+      name: name ?? comment ?? 'Sequencer State ${now.toString().substring(11, 19)}',
+      createdAt: now,
+      audio: audio,
+    );
+  }
+
+  // Apply a snapshot to current sequencer state (for receiving thread messages)
+  void applySnapshot(SequencerSnapshot snapshot) {
+    try {
+      final audio = snapshot.audio;
+      if (audio.sources.isEmpty) return;
+      
+      final source = audio.sources.first;
+      if (source.scenes.isEmpty) return;
+      
+      final scene = source.scenes.first;
+      
+      // Apply BPM from metadata
+      _bpm = scene.metadata.bpm;
+      
+      // Clear current state
+      _soundGridSamples.clear();
+      
+      // Rebuild sample mappings from snapshot samples
+      final sampleIdToSlot = <String, int>{};
+      for (int i = 0; i < source.samples.length; i++) {
+        final sample = source.samples[i];
+        if (i < _filePaths.length) {
+          _filePaths[i] = sample.url;
+          _fileNames[i] = sample.name;
+          _slotLoaded[i] = true;
+          sampleIdToSlot[sample.id] = i;
+        }
+      }
+      
+      // Apply layers as sound grids
+      for (int layerIndex = 0; layerIndex < scene.layers.length; layerIndex++) {
+        final layer = scene.layers[layerIndex];
+        final gridSamples = <int?>[];
+        
+        // Convert rows back to grid format
+        for (final row in layer.rows) {
+          for (final cell in row.cells) {
+            if (cell.sample.hasSample && sampleIdToSlot.containsKey(cell.sample.sampleId)) {
+              gridSamples.add(sampleIdToSlot[cell.sample.sampleId]);
+            } else {
+              gridSamples.add(null);
+            }
+          }
+        }
+        
+        // Ensure grid has the right size
+        while (gridSamples.length < _gridColumns * _gridRows) {
+          gridSamples.add(null);
+        }
+        
+        if (layerIndex < _soundGridSamples.length) {
+          _soundGridSamples[layerIndex] = gridSamples;
+        } else {
+          _soundGridSamples.add(gridSamples);
+        }
+      }
+      
+      // Update grid order if needed
+      while (_soundGridOrder.length < _soundGridSamples.length) {
+        _soundGridOrder.add(_soundGridOrder.length);
+      }
+      
+      // Reload samples that are marked as loaded
+      for (int i = 0; i < _slotLoaded.length; i++) {
+        if (_slotLoaded[i] && _filePaths[i] != null) {
+          loadSlot(i);
+        }
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error applying sequencer snapshot: $e');
+    }
   }
 
   // Getters
@@ -761,10 +935,14 @@ class SequencerState extends ChangeNotifier {
   void _syncGridToSequencer() {
     // Clear sequencer grid first
     _sequencerLibrary.clearAllGridCells();
+    print('🔄 [SYNC] Cleared all native sequencer cells');
     
     // Transfer ALL sound grids to sequencer as one horizontally concatenated table
+    int totalCellsSet = 0;
     for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
       final gridSamples = _soundGridSamples[gridIndex];
+      int gridCellsSet = 0;
+      
       for (int row = 0; row < _gridRows; row++) {
         for (int col = 0; col < _gridColumns; col++) {
           final cellIndex = row * _gridColumns + col;
@@ -773,10 +951,15 @@ class SequencerState extends ChangeNotifier {
             // Calculate absolute column index: gridIndex * columnsPerGrid + column
             final absoluteColumn = gridIndex * _gridColumns + col;
             _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+            gridCellsSet++;
+            totalCellsSet++;
+            print('🎹 [SYNC] Grid $gridIndex: Set [row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn] = sample $sampleSlot');
           }
         }
       }
+      print('📊 [SYNC] Grid $gridIndex: Set $gridCellsSet cells');
     }
+    print('✅ [SYNC] Total: Set $totalCellsSet cells across ${_soundGridSamples.length} grids');
   }
   
   void _startUIUpdateTimer() {
@@ -991,9 +1174,9 @@ class SequencerState extends ChangeNotifier {
   }
 
   // Generate shareable data for the current pattern
-  Future<Map<String, dynamic>> generateShareData(Pattern? pattern) async {
+  Future<Map<String, dynamic>> generateShareData(dynamic pattern) async {
     final now = DateTime.now();
-    final patternName = pattern?.name ?? 'Untitled Pattern';
+    final patternName = 'NIYYA Pattern';
     
     // Build sample information
     List<Map<String, dynamic>> sampleInfo = [];
@@ -1054,7 +1237,7 @@ Made with Demo Sequencer 🚀
       'version': '1.0',
       'timestamp': now.toIso8601String(),
       'pattern': {
-        'id': pattern?.id,
+        'id': now.millisecondsSinceEpoch.toString(),
         'name': patternName,
         'bpm': _bpm,
         'grid': {
@@ -1352,12 +1535,22 @@ Made with Demo Sequencer 🚀
 
   // Sound Grid stack methods
   void initializeSoundGrids(int numGrids) {
+    // Initialize with L1 at front (closest to user)
+    // Stack widget: index 0=back, index (n-1)=front  
+    // Inversion: invertedIndex = numGrids - 1 - stackIndex
+    // Want: stackIndex 2 (front) → invertedIndex 0 → soundGridOrder[0] should be L1 (gridId=0)
+    // Want: stackIndex 1 (middle) → invertedIndex 1 → soundGridOrder[1] should be L2 (gridId=1)  
+    // Want: stackIndex 0 (back) → invertedIndex 2 → soundGridOrder[2] should be L3 (gridId=2)
+    // So soundGridOrder = [0, 1, 2] = [L1, L2, L3]
     _soundGridOrder = List.generate(numGrids, (index) => index);
-    _currentSoundGridIndex = _soundGridOrder.last; // Front sound grid
+    _currentSoundGridIndex = 0; // L1 is front initially
     
     // Initialize grid samples for each sound grid
     _soundGridSamples = List.generate(numGrids, (index) => 
         List.filled(_gridColumns * _gridRows, null));
+    
+    // Initialize grid labels - simplified to just track count
+    _soundGridLabels = List.generate(numGrids, (index) => 'L${index + 1}');
     
     // Configure native sequencer columns (native calculates: numGrids × columnsPerGrid)
     final nativeTableColumns = numGrids * _gridColumns;
@@ -1372,6 +1565,22 @@ Made with Demo Sequencer 🚀
     notifyListeners();
   }
 
+  // Bring a specific grid to the front by reordering soundGridOrder
+  void bringGridToFront(int gridId) {
+    if (_soundGridOrder.contains(gridId)) {
+      // Remove the grid from its current position
+      _soundGridOrder.remove(gridId);
+      // Add it to the BEGINNING (front position due to inversion)
+      // Because invertedIndex = numGrids - 1 - stackIndex
+      // Stack index 2 (front) → invertedIndex 0 → soundGridOrder[0]
+      _soundGridOrder.insert(0, gridId);
+      // Update current grid index
+      _currentSoundGridIndex = gridId;
+      notifyListeners();
+      print('🎛️ Brought grid $gridId to front. New order: $_soundGridOrder');
+    }
+  }
+
   // Helper method to get current sound grid's samples
   List<int?> _getCurrentGridSamples() {
     if (_soundGridSamples.isEmpty || _currentSoundGridIndex >= _soundGridSamples.length) {
@@ -1384,6 +1593,27 @@ Made with Demo Sequencer 🚀
   void _setCurrentGridSample(int index, int? value) {
     if (_soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length) {
       _soundGridSamples[_currentSoundGridIndex][index] = value;
+      
+      // 🔧 FIX: Immediately sync this change to native sequencer if sequencer is running
+      _syncSingleCellToNative(index, value);
+    }
+  }
+
+  // 🔧 NEW: Sync a single cell change to native sequencer immediately
+  void _syncSingleCellToNative(int cellIndex, int? sampleSlot) {
+    // Calculate row and column from cell index
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    
+    // Calculate absolute column: gridIndex * columnsPerGrid + localColumn
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    if (sampleSlot != null) {
+      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+      print('🎹 [SYNC] Set cell [grid:$_currentSoundGridIndex, row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn] = sample $sampleSlot');
+    } else {
+      _sequencerLibrary.clearGridCell(row, absoluteColumn);
+      print('🗑️ [SYNC] Cleared cell [grid:$_currentSoundGridIndex, row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn]');
     }
   }
 
@@ -1459,6 +1689,70 @@ Made with Demo Sequencer 🚀
       if (secondDemoIndex < _getCurrentGridSamples().length) {
         _setCurrentGridSample(secondDemoIndex, 1); // Second loaded slot
       }
+    }
+  }
+
+  // 🧪 DEBUG: Print comprehensive grid state for debugging
+  void debugPrintGridState() {
+    print('\n🔍 ===== GRID STATE DEBUG =====');
+    print('📊 Current Sound Grid Index: $_currentSoundGridIndex');
+    print('📊 Total Sound Grids: ${_soundGridSamples.length}');
+    print('📊 Grid Dimensions: $_gridColumns × $_gridRows');
+    print('📊 Native Columns: ${numSoundGrids * _gridColumns}');
+    print('📊 Sequencer Playing: $_isSequencerPlaying');
+    print('📊 Current Step: $_currentStep');
+    
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      print('\n🎛️ --- Sound Grid $gridIndex ---');
+      final gridSamples = _soundGridSamples[gridIndex];
+      int cellsWithSamples = 0;
+      
+      for (int row = 0; row < _gridRows; row++) {
+        String rowString = 'Row ${row.toString().padLeft(2, '0')}: ';
+        for (int col = 0; col < _gridColumns; col++) {
+          final cellIndex = row * _gridColumns + col;
+          final sampleSlot = gridSamples[cellIndex];
+          if (sampleSlot != null) {
+            rowString += '[${sampleSlot.toString().padLeft(2, ' ')}] ';
+            cellsWithSamples++;
+          } else {
+            rowString += '[ - ] ';
+          }
+        }
+        // Only print rows with content
+        if (rowString.contains('[') && !rowString.replaceAll('[ - ]', '').trim().endsWith(':')) {
+          print(rowString);
+        }
+      }
+      
+      if (cellsWithSamples == 0) {
+        print('   (empty grid)');
+      } else {
+        print('   Total cells with samples: $cellsWithSamples');
+      }
+    }
+    
+    print('\n📱 --- Native Mapping ---');
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      final startCol = gridIndex * _gridColumns;
+      final endCol = startCol + _gridColumns - 1;
+      print('Grid $gridIndex → Native columns $startCol-$endCol');
+    }
+    
+    print('🔍 ===== END DEBUG =====\n');
+  }
+
+  // Getters for grid labels
+  List<String> get soundGridLabels => List.unmodifiable(_soundGridLabels);
+  
+  String getGridLabel(int gridIndex) {
+    return 'L${gridIndex + 1}';
+  }
+
+  void setGridLabel(int gridIndex, String label) {
+    if (gridIndex >= 0 && gridIndex < _soundGridLabels.length) {
+      _soundGridLabels[gridIndex] = label.toUpperCase();
+      notifyListeners();
     }
   }
 

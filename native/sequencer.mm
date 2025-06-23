@@ -1007,11 +1007,11 @@ void clear_cell(int step, int column) {
 
 void clear_all_cells(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
-        for (int col = 0; col < g_columns; col++) {
+        for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1;
         }
     }
-    prnt("🗑️ [SEQUENCER] Cleared all grid cells");
+    prnt("🗑️ [SEQUENCER] Cleared all grid cells (entire %dx%d table)", MAX_SEQUENCER_STEPS, MAX_TOTAL_COLUMNS);
 }
 
 // Multi-grid sequencer support

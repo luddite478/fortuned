@@ -10,7 +10,6 @@ class SampleSelectionWidget extends StatelessWidget {
     return Consumer<SequencerState>(
       builder: (context, sequencerState, child) {
         return Container(
-          margin: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
             color: const Color(0xFF1f2937),
             borderRadius: BorderRadius.circular(8),
