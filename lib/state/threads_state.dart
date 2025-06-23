@@ -1,43 +1,30 @@
 import 'package:flutter/foundation.dart';
-import 'dart:collection';
+import '../services/threads_service.dart';
 
-// Thread message data model - represents a complete sequencer state snapshot
-class ThreadMessage {
+enum ThreadStatus { active, paused, completed, archived }
+
+class ThreadUser {
   final String id;
-  final String threadId;
-  final String userId;
-  final String userName;
-  final SequencerSnapshot sequencerState;
-  final DateTime timestamp;
-  final String? comment; // Optional comment from user about changes made
-
-  const ThreadMessage({
+  final String name;
+  final DateTime joinedAt;
+  
+  const ThreadUser({
     required this.id,
-    required this.threadId,
-    required this.userId,
-    required this.userName,
-    required this.sequencerState,
-    required this.timestamp,
-    this.comment,
+    required this.name,
+    required this.joinedAt,
   });
-
-  ThreadMessage copyWith({
-    String? id,
-    String? threadId,
-    String? userId,
-    String? userName,
-    SequencerSnapshot? sequencerState,
-    DateTime? timestamp,
-    String? comment,
-  }) {
-    return ThreadMessage(
-      id: id ?? this.id,
-      threadId: threadId ?? this.threadId,
-      userId: userId ?? this.userId,
-      userName: userName ?? this.userName,
-      sequencerState: sequencerState ?? this.sequencerState,
-      timestamp: timestamp ?? this.timestamp,
-      comment: comment ?? this.comment,
+  
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'joined_at': joinedAt.toIso8601String(),
+  };
+  
+  factory ThreadUser.fromJson(Map<String, dynamic> json) {
+    return ThreadUser(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      joinedAt: DateTime.parse(json['joined_at'] ?? DateTime.now().toIso8601String()),
     );
   }
 }
@@ -54,9 +41,17 @@ class SequencerSnapshot {
     required this.id,
     required this.name,
     required this.createdAt,
+    required this.version,
     required this.audio,
-    this.version = '1.0',
   });
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'createdAt': createdAt.toIso8601String(),
+    'version': version,
+    'audio': audio.toJson(),
+  };
 
   factory SequencerSnapshot.fromJson(Map<String, dynamic> json) {
     return SequencerSnapshot(
@@ -67,14 +62,6 @@ class SequencerSnapshot {
       audio: ProjectAudio.fromJson(json['audio'] ?? {}),
     );
   }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'createdAt': createdAt.toIso8601String(),
-    'version': version,
-    'audio': audio.toJson(),
-  };
 
   SequencerSnapshot copyWith({
     String? id,
@@ -97,10 +84,10 @@ class SequencerSnapshot {
 class ProjectAudio {
   final String format; // mp3, wav, etc.
   final double duration; // seconds
-  final int sampleRate; // 44100, 48000, etc.
-  final int channels; // 1 (mono), 2 (stereo)
-  final String? url; // Main audio file URL (optional for unsaved)
-  final List<AudioRender> renders; // Rendered versions
+  final int sampleRate;
+  final int channels;
+  final String url;
+  final List<AudioRender> renders;
   final List<AudioSource> sources; // The actual sequencer data
 
   const ProjectAudio({
@@ -108,8 +95,8 @@ class ProjectAudio {
     required this.duration,
     required this.sampleRate,
     required this.channels,
-    this.url,
-    this.renders = const [],
+    required this.url,
+    required this.renders,
     required this.sources,
   });
 
@@ -119,12 +106,12 @@ class ProjectAudio {
       duration: (json['duration'] ?? 0.0).toDouble(),
       sampleRate: json['sample_rate'] ?? 44100,
       channels: json['channels'] ?? 2,
-      url: json['url'],
-      renders: (json['renders'] as List? ?? [])
-          .map((r) => AudioRender.fromJson(r))
+      url: json['url'] ?? '',
+      renders: (json['renders'] as List<dynamic>? ?? [])
+          .map((render) => AudioRender.fromJson(render))
           .toList(),
-      sources: (json['sources'] as List? ?? [])
-          .map((s) => AudioSource.fromJson(s))
+      sources: (json['sources'] as List<dynamic>? ?? [])
+          .map((source) => AudioSource.fromJson(source))
           .toList(),
     );
   }
@@ -143,9 +130,9 @@ class ProjectAudio {
 class AudioRender {
   final String id;
   final String url;
-  final DateTime createdAt;
+  final String createdAt;
   final String version;
-  final String quality; // low, medium, high, ultra
+  final String quality;
 
   const AudioRender({
     required this.id,
@@ -159,16 +146,16 @@ class AudioRender {
     return AudioRender(
       id: json['id'] ?? '',
       url: json['url'] ?? '',
-      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
-      version: json['version'] ?? '1.0',
-      quality: json['quality'] ?? 'medium',
+      createdAt: json['created_at'] ?? '',
+      version: json['version'] ?? '',
+      quality: json['quality'] ?? '',
     );
   }
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'url': url,
-    'created_at': createdAt.toIso8601String(),
+    'created_at': createdAt,
     'version': version,
     'quality': quality,
   };
@@ -185,11 +172,11 @@ class AudioSource {
 
   factory AudioSource.fromJson(Map<String, dynamic> json) {
     return AudioSource(
-      scenes: (json['scenes'] as List? ?? [])
-          .map((s) => SequencerScene.fromJson(s))
+      scenes: (json['scenes'] as List<dynamic>? ?? [])
+          .map((scene) => SequencerScene.fromJson(scene))
           .toList(),
-      samples: (json['samples'] as List? ?? [])
-          .map((s) => SampleInfo.fromJson(s))
+      samples: (json['samples'] as List<dynamic>? ?? [])
+          .map((sample) => SampleInfo.fromJson(sample))
           .toList(),
     );
   }
@@ -211,8 +198,8 @@ class SequencerScene {
 
   factory SequencerScene.fromJson(Map<String, dynamic> json) {
     return SequencerScene(
-      layers: (json['layers'] as List? ?? [])
-          .map((l) => SequencerLayer.fromJson(l))
+      layers: (json['layers'] as List<dynamic>? ?? [])
+          .map((layer) => SequencerLayer.fromJson(layer))
           .toList(),
       metadata: SceneMetadata.fromJson(json['metadata'] ?? {}),
     );
@@ -225,8 +212,8 @@ class SequencerScene {
 }
 
 class SequencerLayer {
-  final String id; // layer_001, layer_002, etc.
-  final int index; // 0, 1, 2, 3, etc. (layer position)
+  final String id;
+  final int index;
   final List<SequencerRow> rows;
 
   const SequencerLayer({
@@ -239,8 +226,8 @@ class SequencerLayer {
     return SequencerLayer(
       id: json['id'] ?? '',
       index: json['index'] ?? 0,
-      rows: (json['rows'] as List? ?? [])
-          .map((r) => SequencerRow.fromJson(r))
+      rows: (json['rows'] as List<dynamic>? ?? [])
+          .map((row) => SequencerRow.fromJson(row))
           .toList(),
     );
   }
@@ -261,8 +248,8 @@ class SequencerRow {
 
   factory SequencerRow.fromJson(Map<String, dynamic> json) {
     return SequencerRow(
-      cells: (json['cells'] as List? ?? [])
-          .map((c) => SequencerCell.fromJson(c))
+      cells: (json['cells'] as List<dynamic>? ?? [])
+          .map((cell) => SequencerCell.fromJson(cell))
           .toList(),
     );
   }
@@ -273,20 +260,22 @@ class SequencerRow {
 }
 
 class SequencerCell {
-  final CellSample sample;
+  final CellSample? sample;
 
   const SequencerCell({
-    required this.sample,
+    this.sample,
   });
 
   factory SequencerCell.fromJson(Map<String, dynamic> json) {
     return SequencerCell(
-      sample: CellSample.fromJson(json['sample'] ?? {}),
+      sample: json['sample'] != null 
+          ? CellSample.fromJson(json['sample'])
+          : null,
     );
   }
 
   Map<String, dynamic> toJson() => {
-    'sample': sample.toJson(),
+    'sample': sample?.toJson(),
   };
 }
 
@@ -299,6 +288,8 @@ class CellSample {
     this.sampleName,
   });
 
+  bool get hasSample => sampleId != null && sampleId!.isNotEmpty;
+
   factory CellSample.fromJson(Map<String, dynamic> json) {
     return CellSample(
       sampleId: json['sample_id'],
@@ -310,50 +301,47 @@ class CellSample {
     'sample_id': sampleId,
     'sample_name': sampleName,
   };
-
-  bool get isEmpty => sampleId == null;
-  bool get hasSample => sampleId != null;
 }
 
 class SceneMetadata {
-  final String user; // UUID of who created this grid
-  final DateTime createdAt;
+  final String user;
   final int bpm;
-  final String key; // C Major, D Minor, etc.
-  final String timeSignature; // 4/4, 3/4, etc.
+  final String key;
+  final String timeSignature;
+  final DateTime createdAt;
 
   const SceneMetadata({
     required this.user,
-    required this.createdAt,
     required this.bpm,
     required this.key,
     required this.timeSignature,
+    required this.createdAt,
   });
 
   factory SceneMetadata.fromJson(Map<String, dynamic> json) {
     return SceneMetadata(
       user: json['user'] ?? '',
-      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
       bpm: json['bpm'] ?? 120,
       key: json['key'] ?? 'C Major',
       timeSignature: json['time_signature'] ?? '4/4',
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
     );
   }
 
   Map<String, dynamic> toJson() => {
     'user': user,
-    'created_at': createdAt.toIso8601String(),
     'bpm': bpm,
     'key': key,
     'time_signature': timeSignature,
+    'created_at': createdAt.toIso8601String(),
   };
 }
 
 class SampleInfo {
-  final String id; // kick_01, snare_02, etc.
-  final String name; // Human readable name
-  final String url; // Sample audio file URL
-  final bool isPublic; // Can others use this sample
+  final String id;
+  final String name;
+  final String url;
+  final bool isPublic;
 
   const SampleInfo({
     required this.id,
@@ -367,7 +355,7 @@ class SampleInfo {
       id: json['id'] ?? '',
       name: json['name'] ?? '',
       url: json['url'] ?? '',
-      isPublic: json['is_public'] ?? true,
+      isPublic: json['is_public'] ?? false,
     );
   }
 
@@ -379,288 +367,377 @@ class SampleInfo {
   };
 }
 
-// Thread data model - represents a collaborative session
-class CollaborativeThread {
+// A checkpoint represents a project state at a specific point in time
+class ThreadCheckpoint {
   final String id;
-  final String originalProjectId;
-  final String originalUserId;
-  final String originalUserName;
-  final String collaboratorUserId;
-  final String collaboratorUserName;
-  final String projectTitle;
-  final List<ThreadMessage> messages;
-  final ThreadStatus status;
-  final DateTime createdAt;
-  final DateTime lastActivity;
-  final SequencerSnapshot? currentState; // Latest sequencer state
-  final bool isActiveForUser; // Is this thread active for current user
+  final String userId; // User who created this checkpoint
+  final String userName;
+  final DateTime timestamp;
+  final String comment; // Optional description of changes
+  final SequencerSnapshot snapshot; // Complete project state
 
-  const CollaborativeThread({
+  const ThreadCheckpoint({
     required this.id,
-    required this.originalProjectId,
-    required this.originalUserId,
-    required this.originalUserName,
-    required this.collaboratorUserId,
-    required this.collaboratorUserName,
-    required this.projectTitle,
-    this.messages = const [],
-    required this.status,
-    required this.createdAt,
-    required this.lastActivity,
-    this.currentState,
-    this.isActiveForUser = false,
+    required this.userId,
+    required this.userName,
+    required this.timestamp,
+    required this.comment,
+    required this.snapshot,
   });
 
-  CollaborativeThread copyWith({
-    String? id,
-    String? originalProjectId,
-    String? originalUserId,
-    String? originalUserName,
-    String? collaboratorUserId,
-    String? collaboratorUserName,
-    String? projectTitle,
-    List<ThreadMessage>? messages,
-    ThreadStatus? status,
-    DateTime? createdAt,
-    DateTime? lastActivity,
-    SequencerSnapshot? currentState,
-    bool? isActiveForUser,
-  }) {
-    return CollaborativeThread(
-      id: id ?? this.id,
-      originalProjectId: originalProjectId ?? this.originalProjectId,
-      originalUserId: originalUserId ?? this.originalUserId,
-      originalUserName: originalUserName ?? this.originalUserName,
-      collaboratorUserId: collaboratorUserId ?? this.collaboratorUserId,
-      collaboratorUserName: collaboratorUserName ?? this.collaboratorUserName,
-      projectTitle: projectTitle ?? this.projectTitle,
-      messages: messages ?? this.messages,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      lastActivity: lastActivity ?? this.lastActivity,
-      currentState: currentState ?? this.currentState,
-      isActiveForUser: isActiveForUser ?? this.isActiveForUser,
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'user_id': userId,
+    'user_name': userName,
+    'timestamp': timestamp.toIso8601String(),
+    'comment': comment,
+    'snapshot': snapshot.toJson(),
+  };
+
+  factory ThreadCheckpoint.fromJson(Map<String, dynamic> json) {
+    return ThreadCheckpoint(
+      id: json['id'] ?? '',
+      userId: json['user_id'] ?? '',
+      userName: json['user_name'] ?? '',
+      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
+      comment: json['comment'] ?? '',
+      snapshot: SequencerSnapshot.fromJson(json['snapshot'] ?? {}),
+    );
+  }
+}
+
+// A thread represents the complete history of a project
+class Thread {
+  final String id;
+  final String title;
+  final List<ThreadUser> users; // First user is always the initial author
+  final List<ThreadCheckpoint> checkpoints;
+  final ThreadStatus status;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final Map<String, dynamic> metadata; // Additional project metadata
+
+  const Thread({
+    required this.id,
+    required this.title,
+    required this.users,
+    required this.checkpoints,
+    required this.status,
+    required this.createdAt,
+    required this.updatedAt,
+    this.metadata = const {},
+  });
+
+  // Get the initial author (first user)
+  ThreadUser get author => users.first;
+  
+  // Get the latest checkpoint
+  ThreadCheckpoint? get latestCheckpoint => 
+      checkpoints.isNotEmpty ? checkpoints.last : null;
+  
+  // Check if user is part of this thread
+  bool hasUser(String userId) => users.any((user) => user.id == userId);
+  
+  // Get user by ID
+  ThreadUser? getUser(String userId) => 
+      users.where((user) => user.id == userId).firstOrNull;
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'title': title,
+    'users': users.map((u) => u.toJson()).toList(),
+    'checkpoints': checkpoints.map((c) => c.toJson()).toList(),
+    'status': status.name,
+    'created_at': createdAt.toIso8601String(),
+    'updated_at': updatedAt.toIso8601String(),
+    'metadata': metadata,
+  };
+
+  factory Thread.fromJson(Map<String, dynamic> json) {
+    return Thread(
+      id: json['id'] ?? '',
+      title: json['title'] ?? '',
+      users: (json['users'] as List<dynamic>? ?? [])
+          .map((user) => ThreadUser.fromJson(user))
+          .toList(),
+      checkpoints: (json['checkpoints'] as List<dynamic>? ?? [])
+          .map((checkpoint) => ThreadCheckpoint.fromJson(checkpoint))
+          .toList(),
+      status: ThreadStatus.values.firstWhere(
+        (s) => s.name == (json['status'] ?? 'active'),
+        orElse: () => ThreadStatus.active,
+      ),
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
+      updatedAt: DateTime.parse(json['updated_at'] ?? DateTime.now().toIso8601String()),
+      metadata: json['metadata'] ?? {},
     );
   }
 
-  String get otherUserName => originalUserName == collaboratorUserName ? collaboratorUserName : originalUserName;
-  String get otherUserId => originalUserId == collaboratorUserId ? collaboratorUserId : originalUserId;
+  Thread copyWith({
+    String? id,
+    String? title,
+    List<ThreadUser>? users,
+    List<ThreadCheckpoint>? checkpoints,
+    ThreadStatus? status,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    Map<String, dynamic>? metadata,
+  }) {
+    return Thread(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      users: users ?? this.users,
+      checkpoints: checkpoints ?? this.checkpoints,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      metadata: metadata ?? this.metadata,
+    );
+  }
 }
 
-// Thread status enum
-enum ThreadStatus {
-  active,      // Thread is active and both users can edit
-  paused,      // Thread is paused
-  completed,   // Thread is completed
-  abandoned,   // Thread was abandoned by one user
-}
-
-// Threads state management - handles all collaborative threads
 class ThreadsState extends ChangeNotifier {
-  final Map<String, CollaborativeThread> _threads = {};
-  String? _activeThreadId;
+  List<Thread> _threads = [];
   String? _currentUserId;
-  bool _isConnected = false;
+  Thread? _activeThread;
+  bool _isLoading = false;
+  String? _error;
 
   // Getters
-  UnmodifiableMapView<String, CollaborativeThread> get threads => 
-      UnmodifiableMapView(_threads);
-  String? get activeThreadId => _activeThreadId;
+  List<Thread> get threads => _threads;
   String? get currentUserId => _currentUserId;
-  bool get isConnected => _isConnected;
-  
-  CollaborativeThread? get activeThread => 
-      _activeThreadId != null ? _threads[_activeThreadId] : null;
-  
-  List<CollaborativeThread> get threadsList => 
-      _threads.values.toList()..sort((a, b) => b.lastActivity.compareTo(a.lastActivity));
+  Thread? get activeThread => _activeThread;
+  bool get isLoading => _isLoading;
+  String? get error => _error;
 
-  List<CollaborativeThread> get activeThreadsList => 
-      _threads.values.where((thread) => thread.status == ThreadStatus.active).toList()
-      ..sort((a, b) => b.lastActivity.compareTo(a.lastActivity));
+  // Get threads where user is a participant
+  List<Thread> getUserThreads(String userId) {
+    return _threads.where((thread) => thread.hasUser(userId)).toList();
+  }
 
-  // Initialize current user
+  // Get threads created by a specific user
+  List<Thread> getUserCreatedThreads(String userId) {
+    return _threads.where((thread) => thread.author.id == userId).toList();
+  }
+
   void setCurrentUser(String userId) {
     _currentUserId = userId;
     notifyListeners();
   }
 
-  // Connection management
-  void setConnectionStatus(bool isConnected) {
-    _isConnected = isConnected;
+  void setActiveThread(Thread? thread) {
+    _activeThread = thread;
     notifyListeners();
   }
 
-  // Start a new collaborative thread
-  Future<String> startThread({
-    required String originalProjectId,
-    required String originalUserId,
-    required String originalUserName,
-    required String collaboratorUserId,
-    required String collaboratorUserName,
-    required String projectTitle,
-    required SequencerSnapshot initialState,
-  }) async {
-    final threadId = 'thread_${DateTime.now().millisecondsSinceEpoch}_${originalUserId.substring(0, 8)}';
-    
-    // Create initial message with the starting state
-    final initialMessage = ThreadMessage(
-      id: 'msg_${DateTime.now().millisecondsSinceEpoch}_${originalUserId.substring(0, 8)}',
-      threadId: threadId,
-      userId: originalUserId,
-      userName: originalUserName,
-      sequencerState: initialState,
-      timestamp: DateTime.now(),
-      comment: 'Started collaborative work on "${projectTitle}"',
-    );
-    
-    final thread = CollaborativeThread(
-      id: threadId,
-      originalProjectId: originalProjectId,
-      originalUserId: originalUserId,
-      originalUserName: originalUserName,
-      collaboratorUserId: collaboratorUserId,
-      collaboratorUserName: collaboratorUserName,
-      projectTitle: projectTitle,
-      messages: [initialMessage],
-      status: ThreadStatus.active,
-      createdAt: DateTime.now(),
-      lastActivity: DateTime.now(),
-      currentState: initialState,
-      isActiveForUser: true,
-    );
-
-    _threads[threadId] = thread;
-    _activeThreadId = threadId;
-
+  void setLoading(bool loading) {
+    _isLoading = loading;
     notifyListeners();
-    return threadId;
+  }
+
+  void setError(String? error) {
+    _error = error;
+    notifyListeners();
+  }
+
+  // Create a new thread (can be solo or with collaborators)
+  Future<String> createThread({
+    required String title,
+    required String authorId,
+    required String authorName,
+    List<String> collaboratorIds = const [],
+    List<String> collaboratorNames = const [],
+    required SequencerSnapshot initialSnapshot,
+    Map<String, dynamic> metadata = const {},
+  }) async {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Create thread users list (author first, then collaborators)
+      final users = <ThreadUser>[
+        ThreadUser(
+          id: authorId,
+          name: authorName,
+          joinedAt: DateTime.now(),
+        ),
+      ];
+
+      // Add collaborators
+      for (int i = 0; i < collaboratorIds.length; i++) {
+        users.add(ThreadUser(
+          id: collaboratorIds[i],
+          name: i < collaboratorNames.length ? collaboratorNames[i] : 'User ${collaboratorIds[i]}',
+          joinedAt: DateTime.now(),
+        ));
+      }
+
+      // Create initial checkpoint
+      final initialCheckpoint = ThreadCheckpoint(
+        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+        userId: authorId,
+        userName: authorName,
+        timestamp: DateTime.now(),
+        comment: collaboratorIds.isEmpty 
+            ? 'Created project "${title}"'
+            : 'Started collaboration on "${title}"',
+        snapshot: initialSnapshot,
+      );
+
+      // Create thread using service
+      final threadId = await ThreadsService.createThread(
+        title: title,
+        users: users,
+        initialCheckpoint: initialCheckpoint,
+        metadata: metadata,
+      );
+
+      // Create local thread object
+      final thread = Thread(
+        id: threadId,
+        title: title,
+        users: users,
+        checkpoints: [initialCheckpoint],
+        status: ThreadStatus.active,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        metadata: metadata,
+      );
+
+      // Add to local state
+      _threads.add(thread);
+      setActiveThread(thread);
+
+      return threadId;
+    } catch (e) {
+      setError('Failed to create thread: $e');
+      rethrow;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Add a checkpoint to an existing thread
+  Future<void> addCheckpoint({
+    required String threadId,
+    required String userId,
+    required String userName,
+    required String comment,
+    required SequencerSnapshot snapshot,
+  }) async {
+    try {
+      setLoading(true);
+      setError(null);
+
+      final checkpoint = ThreadCheckpoint(
+        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+        userId: userId,
+        userName: userName,
+        timestamp: DateTime.now(),
+        comment: comment,
+        snapshot: snapshot,
+      );
+
+      await ThreadsService.addCheckpoint(threadId, checkpoint);
+
+      // Update local state
+      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+      if (threadIndex != -1) {
+        final thread = _threads[threadIndex];
+        final updatedCheckpoints = [...thread.checkpoints, checkpoint];
+        _threads[threadIndex] = thread.copyWith(
+          checkpoints: updatedCheckpoints,
+          updatedAt: DateTime.now(),
+        );
+
+        if (_activeThread?.id == threadId) {
+          setActiveThread(_threads[threadIndex]);
+        }
+      }
+    } catch (e) {
+      setError('Failed to add checkpoint: $e');
+      rethrow;
+    } finally {
+      setLoading(false);
+    }
   }
 
   // Join an existing thread
-  void joinThread(String threadId) {
-    if (_threads.containsKey(threadId)) {
-      _activeThreadId = threadId;
-      
-      // Mark thread as active for current user
-      final thread = _threads[threadId]!;
-      _threads[threadId] = thread.copyWith(
-        isActiveForUser: true,
-        lastActivity: DateTime.now(),
-      );
-      
-      notifyListeners();
-    }
-  }
-
-  // Leave current thread
-  void leaveThread() {
-    if (_activeThreadId != null && _threads.containsKey(_activeThreadId!)) {
-      final thread = _threads[_activeThreadId!]!;
-      _threads[_activeThreadId!] = thread.copyWith(
-        isActiveForUser: false,
-        lastActivity: DateTime.now(),
-      );
-    }
-    
-    _activeThreadId = null;
-    notifyListeners();
-  }
-
-  // Send a new message (sequencer state) to a thread
-  void sendMessage({
+  Future<void> joinThread({
     required String threadId,
-    required SequencerSnapshot sequencerState,
-    String? comment,
-  }) {
-    if (!_threads.containsKey(threadId) || _currentUserId == null) return;
+    required String userId,
+    required String userName,
+  }) async {
+    try {
+      setLoading(true);
+      setError(null);
 
-    final thread = _threads[threadId]!;
-    final messageId = 'msg_${DateTime.now().millisecondsSinceEpoch}_${_currentUserId!.substring(0, 8)}';
-    
-    final message = ThreadMessage(
-      id: messageId,
-      threadId: threadId,
-      userId: _currentUserId!,
-      userName: _getUserName(_currentUserId!),
-      sequencerState: sequencerState,
-      timestamp: DateTime.now(),
-      comment: comment,
-    );
+      await ThreadsService.joinThread(threadId, userId, userName);
 
-    final updatedMessages = List<ThreadMessage>.from(thread.messages)
-      ..add(message);
-
-    _threads[threadId] = thread.copyWith(
-      messages: updatedMessages,
-      lastActivity: DateTime.now(),
-      currentState: sequencerState,
-    );
-
-    notifyListeners();
-  }
-
-  // Get the latest message in a thread
-  ThreadMessage? getLatestMessage(String threadId) {
-    if (!_threads.containsKey(threadId)) return null;
-    
-    final thread = _threads[threadId]!;
-    if (thread.messages.isEmpty) return null;
-    
-    return thread.messages.last;
-  }
-
-  // Get all messages in a thread
-  List<ThreadMessage> getThreadMessages(String threadId) {
-    if (!_threads.containsKey(threadId)) return [];
-    
-    return _threads[threadId]!.messages;
-  }
-
-  // Get user name by ID (simplified - in real app this would come from user service)
-  String _getUserName(String userId) {
-    // This is a simplified implementation
-    // In a real app, you'd fetch this from a user service
-    return 'User ${userId.substring(0, 8)}';
-  }
-
-  // Update thread status
-  void updateThreadStatus(String threadId, ThreadStatus status) {
-    if (_threads.containsKey(threadId)) {
-      final thread = _threads[threadId]!;
-      _threads[threadId] = thread.copyWith(
-        status: status,
-        lastActivity: DateTime.now(),
-      );
-      notifyListeners();
+      // Update local state
+      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+      if (threadIndex != -1) {
+        final thread = _threads[threadIndex];
+        final newUser = ThreadUser(
+          id: userId,
+          name: userName,
+          joinedAt: DateTime.now(),
+        );
+        final updatedUsers = [...thread.users, newUser];
+        _threads[threadIndex] = thread.copyWith(
+          users: updatedUsers,
+          updatedAt: DateTime.now(),
+        );
+      }
+    } catch (e) {
+      setError('Failed to join thread: $e');
+      rethrow;
+    } finally {
+      setLoading(false);
     }
   }
 
-  // Get thread history as a readable list
-  List<String> getThreadHistory(String threadId) {
-    if (!_threads.containsKey(threadId)) return [];
-    
-    final thread = _threads[threadId]!;
-    return thread.messages.map((message) {
-      final timeStr = '${message.timestamp.hour.toString().padLeft(2, '0')}:${message.timestamp.minute.toString().padLeft(2, '0')}';
-      final comment = message.comment ?? 'Updated sequencer';
-      return '$timeStr ${message.userName}: $comment';
-    }).toList();
-  }
+  // Load threads from service
+  Future<void> loadThreads() async {
+    try {
+      setLoading(true);
+      setError(null);
 
-  // Clear all threads (for logout/reset)
-  void clearThreads() {
-    _threads.clear();
-    _activeThreadId = null;
-    notifyListeners();
-  }
-
-  // Remove a specific thread
-  void removeThread(String threadId) {
-    _threads.remove(threadId);
-    if (_activeThreadId == threadId) {
-      _activeThreadId = null;
+      final threads = await ThreadsService.getThreads();
+      _threads = threads;
+    } catch (e) {
+      setError('Failed to load threads: $e');
+    } finally {
+      setLoading(false);
     }
+  }
+
+  // Load a specific thread
+  Future<Thread?> loadThread(String threadId) async {
+    try {
+      setLoading(true);
+      setError(null);
+
+      final thread = await ThreadsService.getThread(threadId);
+      if (thread != null) {
+        final existingIndex = _threads.indexWhere((t) => t.id == threadId);
+        if (existingIndex != -1) {
+          _threads[existingIndex] = thread;
+        } else {
+          _threads.add(thread);
+        }
+      }
+      return thread;
+    } catch (e) {
+      setError('Failed to load thread: $e');
+      return null;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  void clearError() {
+    _error = null;
     notifyListeners();
   }
 } 

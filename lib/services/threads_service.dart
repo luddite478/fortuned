@@ -3,89 +3,6 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../state/threads_state.dart';
 
-// Thread request/response models
-class CreateThreadRequest {
-  final String originalProjectId;
-  final String collaboratorUserId;
-  final SequencerSnapshot initialState;
-
-  CreateThreadRequest({
-    required this.originalProjectId,
-    required this.collaboratorUserId,
-    required this.initialState,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'original_project_id': originalProjectId,
-    'collaborator_user_id': collaboratorUserId,
-    'initial_state': initialState.toJson(),
-  };
-}
-
-class SendMessageRequest {
-  final String threadId;
-  final SequencerSnapshot sequencerState;
-  final String? comment;
-
-  SendMessageRequest({
-    required this.threadId,
-    required this.sequencerState,
-    this.comment,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'thread_id': threadId,
-    'sequencer_state': sequencerState.toJson(),
-    'comment': comment,
-  };
-}
-
-class ThreadResponse {
-  final String threadId;
-  final CollaborativeThread thread;
-
-  ThreadResponse({
-    required this.threadId,
-    required this.thread,
-  });
-
-  factory ThreadResponse.fromJson(Map<String, dynamic> json) {
-    return ThreadResponse(
-      threadId: json['thread_id'] ?? '',
-      thread: CollaborativeThread(
-        id: json['id'] ?? '',
-        originalProjectId: json['original_project_id'] ?? '',
-        originalUserId: json['original_user_id'] ?? '',
-        originalUserName: json['original_user_name'] ?? '',
-        collaboratorUserId: json['collaborator_user_id'] ?? '',
-        collaboratorUserName: json['collaborator_user_name'] ?? '',
-        projectTitle: json['project_title'] ?? '',
-        messages: (json['messages'] as List<dynamic>? ?? [])
-            .map((msg) => ThreadMessage(
-                  id: msg['id'] ?? '',
-                  threadId: msg['thread_id'] ?? '',
-                  userId: msg['user_id'] ?? '',
-                  userName: msg['user_name'] ?? '',
-                  sequencerState: SequencerSnapshot.fromJson(msg['sequencer_state'] ?? {}),
-                  timestamp: DateTime.parse(msg['timestamp'] ?? DateTime.now().toIso8601String()),
-                  comment: msg['comment'],
-                ))
-            .toList(),
-        status: ThreadStatus.values.firstWhere(
-          (status) => status.toString().split('.').last == json['status'],
-          orElse: () => ThreadStatus.active,
-        ),
-        createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
-        lastActivity: DateTime.parse(json['last_activity'] ?? DateTime.now().toIso8601String()),
-        currentState: json['current_state'] != null 
-          ? SequencerSnapshot.fromJson(json['current_state'])
-          : null,
-      ),
-    );
-  }
-}
-
-// Threads service for API communication
 class ThreadsService {
   static String get _baseUrl {
     final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
@@ -100,239 +17,249 @@ class ThreadsService {
     return token;
   }
 
-  // Create a new collaborative thread
-  static Future<ThreadResponse> createThread({
-    required String originalProjectId,
-    required String collaboratorUserId,
-    required SequencerSnapshot initialState,
+  // Create a new thread
+  static Future<String> createThread({
+    required String title,
+    required List<ThreadUser> users,
+    required ThreadCheckpoint initialCheckpoint,
+    Map<String, dynamic> metadata = const {},
   }) async {
     try {
-      final request = CreateThreadRequest(
-        originalProjectId: originalProjectId,
-        collaboratorUserId: collaboratorUserId,
-        initialState: initialState,
-      );
-
-      final url = Uri.parse('$_baseUrl/threads/create')
-          .replace(queryParameters: {'token': _apiToken});
+      final url = Uri.parse('$_baseUrl/threads');
+      
+      final body = jsonEncode({
+        'title': title,
+        'users': users.map((u) => u.toJson()).toList(),
+        'initial_checkpoint': initialCheckpoint.toJson(),
+        'metadata': metadata,
+        'token': _apiToken,
+      });
 
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(request.toJson()),
+        headers: {'Content-Type': 'application/json'},
+        body: body,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final jsonData = json.decode(response.body);
-        return ThreadResponse.fromJson(jsonData);
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
+        return jsonData['thread_id'] ?? jsonData['id'];
       } else {
-        throw Exception('Failed to create thread: ${response.statusCode}');
+        throw Exception('Failed to create thread: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception('Network error creating thread: $e');
     }
   }
 
-  // Send a new message (sequencer state) to a thread
-  static Future<void> sendMessage({
-    required String threadId,
-    required SequencerSnapshot sequencerState,
-    String? comment,
-  }) async {
+  // Add a checkpoint to an existing thread
+  static Future<void> addCheckpoint(String threadId, ThreadCheckpoint checkpoint) async {
     try {
-      final request = SendMessageRequest(
-        threadId: threadId,
-        sequencerState: sequencerState,
-        comment: comment,
-      );
-
-      final url = Uri.parse('$_baseUrl/threads/message')
-          .replace(queryParameters: {'token': _apiToken});
+      final url = Uri.parse('$_baseUrl/threads/$threadId/checkpoints');
+      
+      final body = jsonEncode({
+        'checkpoint': checkpoint.toJson(),
+        'token': _apiToken,
+      });
 
       final response = await http.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(request.toJson()),
+        headers: {'Content-Type': 'application/json'},
+        body: body,
       );
 
       if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Failed to send message: ${response.statusCode}');
+        throw Exception('Failed to add checkpoint: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception('Network error adding checkpoint: $e');
     }
   }
 
-  // Get user's threads
-  static Future<List<CollaborativeThread>> getUserThreads({
-    required String userId,
-    int limit = 20,
-    int offset = 0,
-  }) async {
+  // Join an existing thread
+  static Future<void> joinThread(String threadId, String userId, String userName) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/user')
-          .replace(queryParameters: {
+      final url = Uri.parse('$_baseUrl/threads/$threadId/users');
+      
+      final body = jsonEncode({
         'user_id': userId,
+        'user_name': userName,
         'token': _apiToken,
-        'limit': limit.toString(),
-        'offset': offset.toString(),
       });
 
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      );
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Failed to join thread: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error joining thread: $e');
+    }
+  }
+
+  // Get all threads
+  static Future<List<Thread>> getThreads({
+    int limit = 50,
+    int offset = 0,
+    String? userId,
+  }) async {
+    try {
+      final queryParams = {
+        'limit': limit.toString(),
+        'offset': offset.toString(),
+        'token': _apiToken,
+      };
+      
+      if (userId != null) {
+        queryParams['user_id'] = userId;
+      }
+
+      final url = Uri.parse('$_baseUrl/threads').replace(queryParameters: queryParams);
+      
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
         final threadsList = jsonData['threads'] as List<dynamic>? ?? [];
         
-        return threadsList.map((threadData) => 
-            ThreadResponse.fromJson(threadData).thread).toList();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
+        return threadsList.map((threadJson) => Thread.fromJson(threadJson)).toList();
       } else {
-        throw Exception('Failed to load threads: ${response.statusCode}');
+        throw Exception('Failed to get threads: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception('Network error getting threads: $e');
     }
   }
 
-  // Get specific thread details
-  static Future<CollaborativeThread> getThread(String threadId) async {
+  // Get a specific thread
+  static Future<Thread?> getThread(String threadId) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/details')
-          .replace(queryParameters: {
-        'thread_id': threadId,
+      final url = Uri.parse('$_baseUrl/threads/$threadId').replace(queryParameters: {
         'token': _apiToken,
       });
-
+      
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        return ThreadResponse.fromJson(jsonData).thread;
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
+        return Thread.fromJson(jsonData);
       } else if (response.statusCode == 404) {
-        throw Exception('Thread not found');
+        return null;
       } else {
-        throw Exception('Failed to load thread: ${response.statusCode}');
+        throw Exception('Failed to get thread: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception('Network error getting thread: $e');
     }
   }
 
-  // Get thread messages
-  static Future<List<ThreadMessage>> getThreadMessages({
-    required String threadId,
+  // Get threads for a specific user
+  static Future<List<Thread>> getUserThreads(String userId, {
     int limit = 50,
     int offset = 0,
   }) async {
+    return getThreads(limit: limit, offset: offset, userId: userId);
+  }
+
+  // Update thread metadata
+  static Future<void> updateThread(String threadId, {
+    String? title,
+    ThreadStatus? status,
+    Map<String, dynamic>? metadata,
+  }) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/messages')
-          .replace(queryParameters: {
-        'thread_id': threadId,
+      final url = Uri.parse('$_baseUrl/threads/$threadId');
+      
+      final updateData = <String, dynamic>{
         'token': _apiToken,
+      };
+      
+      if (title != null) updateData['title'] = title;
+      if (status != null) updateData['status'] = status.name;
+      if (metadata != null) updateData['metadata'] = metadata;
+
+      final body = jsonEncode(updateData);
+
+      final response = await http.put(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: body,
+      );
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to update thread: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error updating thread: $e');
+    }
+  }
+
+  // Delete a thread (archive it)
+  static Future<void> deleteThread(String threadId) async {
+    try {
+      final url = Uri.parse('$_baseUrl/threads/$threadId').replace(queryParameters: {
+        'token': _apiToken,
+      });
+      
+      final response = await http.delete(url);
+
+      if (response.statusCode != 200 && response.statusCode != 204) {
+        throw Exception('Failed to delete thread: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error deleting thread: $e');
+    }
+  }
+
+  // Get thread statistics
+  static Future<Map<String, dynamic>> getThreadStats() async {
+    try {
+      final url = Uri.parse('$_baseUrl/threads/stats').replace(queryParameters: {
+        'token': _apiToken,
+      });
+      
+      final response = await http.get(url);
+
+      if (response.statusCode == 200) {
+        return json.decode(response.body);
+      } else {
+        throw Exception('Failed to get thread stats: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error getting thread stats: $e');
+    }
+  }
+
+  // Search threads
+  static Future<List<Thread>> searchThreads({
+    required String query,
+    int limit = 20,
+    int offset = 0,
+  }) async {
+    try {
+      final url = Uri.parse('$_baseUrl/threads/search').replace(queryParameters: {
+        'q': query,
         'limit': limit.toString(),
         'offset': offset.toString(),
+        'token': _apiToken,
       });
-
+      
       final response = await http.get(url);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        final messagesList = jsonData['messages'] as List<dynamic>? ?? [];
+        final threadsList = jsonData['threads'] as List<dynamic>? ?? [];
         
-        return messagesList.map((msgData) => ThreadMessage(
-          id: msgData['id'] ?? '',
-          threadId: msgData['thread_id'] ?? '',
-          userId: msgData['user_id'] ?? '',
-          userName: msgData['user_name'] ?? '',
-          sequencerState: SequencerSnapshot.fromJson(msgData['sequencer_state'] ?? {}),
-          timestamp: DateTime.parse(msgData['timestamp'] ?? DateTime.now().toIso8601String()),
-          comment: msgData['comment'],
-        )).toList();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
+        return threadsList.map((threadJson) => Thread.fromJson(threadJson)).toList();
       } else {
-        throw Exception('Failed to load messages: ${response.statusCode}');
+        throw Exception('Failed to search threads: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-
-  // Update thread status
-  static Future<void> updateThreadStatus({
-    required String threadId,
-    required ThreadStatus status,
-  }) async {
-    try {
-      final url = Uri.parse('$_baseUrl/threads/status')
-          .replace(queryParameters: {
-        'thread_id': threadId,
-        'status': status.toString().split('.').last,
-        'token': _apiToken,
-      });
-
-      final response = await http.put(url);
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to update thread status: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-
-  // Join thread
-  static Future<CollaborativeThread> joinThread(String threadId) async {
-    try {
-      final url = Uri.parse('$_baseUrl/threads/join')
-          .replace(queryParameters: {
-        'thread_id': threadId,
-        'token': _apiToken,
-      });
-
-      final response = await http.post(url);
-
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        return ThreadResponse.fromJson(jsonData).thread;
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
-      } else if (response.statusCode == 404) {
-        throw Exception('Thread not found');
-      } else {
-        throw Exception('Failed to join thread: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
-    }
-  }
-
-  // Leave thread
-  static Future<void> leaveThread(String threadId) async {
-    try {
-      final url = Uri.parse('$_baseUrl/threads/leave')
-          .replace(queryParameters: {
-        'thread_id': threadId,
-        'token': _apiToken,
-      });
-
-      final response = await http.post(url);
-
-      if (response.statusCode != 200) {
-        throw Exception('Failed to leave thread: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Network error: $e');
+      throw Exception('Network error searching threads: $e');
     }
   }
 } 

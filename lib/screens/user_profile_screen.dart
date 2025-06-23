@@ -584,7 +584,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              Text('Starting collaborative thread...'),
+              Text('Starting thread...'),
             ],
           ),
           backgroundColor: const Color.fromARGB(255, 160, 160, 161),
@@ -601,25 +601,45 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       final currentUserName = 'Current User'; // TODO: Get from user session
       threadsState.setCurrentUser(currentUserId);
       
-      // Load the sound series into sequencer state
-      // Note: This assumes you have a loadProject method in SequencerState
-      // If not, you might need to implement it or load the samples manually
+      // Load the project into sequencer state if needed
       try {
-        // For now, create a basic snapshot - you can enhance this to load actual series data
+        // For now, create a snapshot from current sequencer state
         final initialSnapshot = sequencerState.createSnapshot();
         
-        // Start a new collaborative thread with the current sequencer state
-        final threadId = await threadsState.startThread(
-          originalProjectId: series.id,
-          originalUserId: widget.userId,
-          originalUserName: widget.userName,
-          collaboratorUserId: currentUserId,
-          collaboratorUserName: currentUserName,
-          projectTitle: series.title,
-          initialState: initialSnapshot,
+        // Create thread users list
+        final users = <ThreadUser>[
+          ThreadUser(
+            id: widget.userId,
+            name: widget.userName,
+            joinedAt: DateTime.now(),
+          ),
+        ];
+        
+        // Add current user as collaborator if different from original author
+        if (currentUserId != widget.userId) {
+          users.add(ThreadUser(
+            id: currentUserId,
+            name: currentUserName,
+            joinedAt: DateTime.now(),
+          ));
+        }
+        
+        // Start a new thread with the project
+        final threadId = await threadsState.createThread(
+          title: series.title,
+          authorId: widget.userId,
+          authorName: widget.userName,
+          collaboratorIds: currentUserId != widget.userId ? [currentUserId] : [],
+          collaboratorNames: currentUserId != widget.userId ? [currentUserName] : [],
+          initialSnapshot: initialSnapshot,
+          metadata: {
+            'original_project_id': series.id,
+            'project_type': 'collaboration',
+            'genre': series.genre,
+          },
         );
         
-        print('🚀 Started collaborative thread: $threadId');
+        print('🚀 Started thread: $threadId');
         
       } catch (seriesLoadError) {
         print('Note: Could not load series data, using current sequencer state: $seriesLoadError');
@@ -627,24 +647,46 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         // Fallback: Use current sequencer state as initial state
         final initialSnapshot = sequencerState.createSnapshot();
         
-        final threadId = await threadsState.startThread(
-          originalProjectId: series.id,
-          originalUserId: widget.userId,
-          originalUserName: widget.userName,
-          collaboratorUserId: currentUserId,
-          collaboratorUserName: currentUserName,
-          projectTitle: series.title,
-          initialState: initialSnapshot,
+        // Create thread users list
+        final users = <ThreadUser>[
+          ThreadUser(
+            id: widget.userId,
+            name: widget.userName,
+            joinedAt: DateTime.now(),
+          ),
+        ];
+        
+        // Add current user as collaborator if different from original author
+        if (currentUserId != widget.userId) {
+          users.add(ThreadUser(
+            id: currentUserId,
+            name: currentUserName,
+            joinedAt: DateTime.now(),
+          ));
+        }
+        
+        final threadId = await threadsState.createThread(
+          title: series.title,
+          authorId: widget.userId,
+          authorName: widget.userName,
+          collaboratorIds: currentUserId != widget.userId ? [currentUserId] : [],
+          collaboratorNames: currentUserId != widget.userId ? [currentUserName] : [],
+          initialSnapshot: initialSnapshot,
+          metadata: {
+            'original_project_id': series.id,
+            'project_type': 'collaboration',
+            'genre': series.genre,
+          },
         );
         
-        print('🚀 Started collaborative thread with fallback: $threadId');
+        print('🚀 Started thread with fallback: $threadId');
       }
       
       // Hide loading snackbar and show success
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🚀 Started collaborative thread for "${series.title}"'),
+          content: Text('🚀 Started thread for "${series.title}"'),
           backgroundColor: const Color(0xFF10B981),
           duration: const Duration(seconds: 3),
         ),

@@ -204,12 +204,12 @@ class SequencerState extends ChangeNotifier {
           final sampleSlot = cellIndex < gridSamples.length ? gridSamples[cellIndex] : null;
           
           cells.add(SequencerCell(
-            sample: CellSample(
-              sampleId: sampleSlot != null ? 'slot_$sampleSlot' : null,
-              sampleName: sampleSlot != null && sampleSlot < _fileNames.length 
-                ? _fileNames[sampleSlot] 
-                : null,
-            ),
+            sample: sampleSlot != null ? CellSample(
+              sampleId: 'slot_$sampleSlot',
+              sampleName: sampleSlot < _fileNames.length 
+                ? _fileNames[sampleSlot] ?? 'Sample $sampleSlot'
+                : 'Sample $sampleSlot',
+            ) : null,
           ));
         }
         rows.add(SequencerRow(cells: cells));
@@ -253,19 +253,22 @@ class SequencerState extends ChangeNotifier {
       samples: samples,
     );
     
-    // Create the full audio structure
+        // Create the full audio structure
     final audio = ProjectAudio(
       format: 'mp3',
       duration: 0.0, // Could calculate based on BPM and pattern length
       sampleRate: 44100,
       channels: 2,
+      url: '', // Empty URL since this is a live snapshot
+      renders: [], // No renders yet
       sources: [audioSource],
     );
-    
+
     return SequencerSnapshot(
       id: snapshotId,
       name: name ?? comment ?? 'Sequencer State ${now.toString().substring(11, 19)}',
       createdAt: now,
+      version: '1.0', // Default version
       audio: audio,
     );
   }
@@ -307,8 +310,8 @@ class SequencerState extends ChangeNotifier {
         // Convert rows back to grid format
         for (final row in layer.rows) {
           for (final cell in row.cells) {
-            if (cell.sample.hasSample && sampleIdToSlot.containsKey(cell.sample.sampleId)) {
-              gridSamples.add(sampleIdToSlot[cell.sample.sampleId]);
+            if (cell.sample?.hasSample == true && sampleIdToSlot.containsKey(cell.sample!.sampleId)) {
+              gridSamples.add(sampleIdToSlot[cell.sample!.sampleId]);
             } else {
               gridSamples.add(null);
             }
