@@ -122,10 +122,10 @@ async def get_project(request: Request, id: str = Query(..., description="Projec
         db = get_db()
         project = db.projects.find_one({"id": id}, {"_id": 0})
         
-            if not project:
-        raise HTTPException(status_code=404, detail=f"Project not found: {id}")
-    
-    return project
+        if not project:
+            raise HTTPException(status_code=404, detail=f"Project not found: {id}")
+        
+        return project
         
     except Exception as e:
         if isinstance(e, HTTPException):
@@ -150,8 +150,8 @@ async def get_user_projects(
         # Get total count for pagination
         total = db.projects.count_documents({"user_id": user_id})
         
-            # Get projects with pagination, sorted by creation date (newest first)
-    projects_cursor = db.projects.find(
+        # Get projects with pagination, sorted by creation date (newest first)
+        projects_cursor = db.projects.find(
             {"user_id": user_id}, 
             {"_id": 0}
         ).sort("created", -1).limit(limit).skip(offset)
@@ -186,8 +186,8 @@ async def get_recent_projects(
     try:
         db = get_db()
         
-            # Get recent projects sorted by creation date (newest first)
-    recent_cursor = db.projects.find(
+        # Get recent projects sorted by creation date (newest first)
+        recent_cursor = db.projects.find(
             {"visibility": "public"}, 
             {
                 "_id": 0,
@@ -243,8 +243,8 @@ async def get_platform_stats(request: Request, token: str = Query(..., descripti
         return {
             "platform_stats": {
                 "total_users": total_users,
-                        "total_projects": total_projects,
-        "public_projects": public_projects,
+                "total_projects": total_projects,
+                "public_projects": public_projects,
                 "total_plays": total_plays,
                 "total_forks": total_forks
             }
