@@ -1,11 +1,9 @@
-from fastapi import APIRouter, Request, Body, HTTPException, Query
+from fastapi import Request, Body, HTTPException, Query
 from http_api.rate_limiter import check_rate_limit
 from pymongo import MongoClient
 from typing import Dict, Any, Optional
 from datetime import datetime
 import uuid
-
-router = APIRouter()
 
 MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
 DATABASE_NAME = "admin"
@@ -19,8 +17,7 @@ def verify_token(token: str):
     if token != API_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-@router.post("/threads")
-async def create_thread(request: Request, thread_data: Dict[str, Any] = Body(...)):
+async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = Body(...)):
     check_rate_limit(request)
     verify_token(thread_data.get("token", ""))
     try:
@@ -54,8 +51,7 @@ async def create_thread(request: Request, thread_data: Dict[str, Any] = Body(...
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.post("/threads/{thread_id}/checkpoints")
-async def add_checkpoint(request: Request, thread_id: str, checkpoint_data: Dict[str, Any] = Body(...)):
+async def add_checkpoint_handler(request: Request, thread_id: str, checkpoint_data: Dict[str, Any] = Body(...)):
     check_rate_limit(request)
     verify_token(checkpoint_data.get("token", ""))
     try:
@@ -82,8 +78,7 @@ async def add_checkpoint(request: Request, thread_id: str, checkpoint_data: Dict
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.post("/threads/{thread_id}/users")
-async def join_thread(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
+async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
     check_rate_limit(request)
     verify_token(user_data.get("token", ""))
     try:
@@ -118,8 +113,7 @@ async def join_thread(request: Request, thread_id: str, user_data: Dict[str, Any
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.get("/threads")
-async def get_threads(request: Request, token: str = Query(...), limit: int = Query(50), offset: int = Query(0), user_id: Optional[str] = Query(None)):
+async def get_threads_handler(request: Request, token: str = Query(...), limit: int = Query(50), offset: int = Query(0), user_id: Optional[str] = Query(None)):
     check_rate_limit(request)
     verify_token(token)
     try:
@@ -139,8 +133,7 @@ async def get_threads(request: Request, token: str = Query(...), limit: int = Qu
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.get("/threads/{thread_id}")
-async def get_thread(request: Request, thread_id: str, token: str = Query(...)):
+async def get_thread_handler(request: Request, thread_id: str, token: str = Query(...)):
     check_rate_limit(request)
     verify_token(token)
     try:
@@ -153,8 +146,7 @@ async def get_thread(request: Request, thread_id: str, token: str = Query(...)):
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.put("/threads/{thread_id}")
-async def update_thread(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
+async def update_thread_handler(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
     check_rate_limit(request)
     verify_token(update_data.get("token", ""))
     try:

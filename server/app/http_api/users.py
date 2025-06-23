@@ -1,9 +1,7 @@
-from fastapi import APIRouter, Request, Query, HTTPException
+from fastapi import Request, Query, HTTPException
 from typing import Optional
 from http_api.rate_limiter import check_rate_limit
 from pymongo import MongoClient
-
-router = APIRouter()
 
 MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
 DATABASE_NAME = "admin"
@@ -17,8 +15,7 @@ def verify_token(token: str):
     if token != API_TOKEN:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-@router.get("/users/profile")
-async def get_user_profile(request: Request, id: str = Query(...), token: str = Query(...)):
+async def get_user_profile_handler(request: Request, id: str = Query(...), token: str = Query(...)):
     check_rate_limit(request)
     verify_token(token)
     
@@ -33,8 +30,7 @@ async def get_user_profile(request: Request, id: str = Query(...), token: str = 
             raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-@router.get("/users/profiles")
-async def get_user_profiles(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0)):
+async def get_user_profiles_handler(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0)):
     check_rate_limit(request)
     verify_token(token)
     
