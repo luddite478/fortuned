@@ -22,7 +22,7 @@ class SampleBanksWidget extends StatelessWidget {
             return Container(
               padding: EdgeInsets.symmetric(horizontal: padding),
               decoration: BoxDecoration(
-                color: const Color(0xFF1f2937),
+                color: Colors.black,
                 borderRadius: BorderRadius.circular(borderRadius),
               ),
               child: Row(

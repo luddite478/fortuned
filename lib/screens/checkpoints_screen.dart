@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
+import '../widgets/app_header_widget.dart';
 
 class CheckpointsScreen extends StatefulWidget {
   final String threadId;
@@ -36,39 +37,49 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     }
   }
 
+  void _showProjectInfo() {
+    final threadsState = context.read<ThreadsState>();
+    final thread = threadsState.currentThread;
+    
+    if (thread == null) return;
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(thread.title),
+        content: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Created: ${thread.createdAt.toString().substring(0, 16)}'),
+            Text('Last updated: ${thread.updatedAt.toString().substring(0, 16)}'),
+            Text('Status: ${thread.status.name}'),
+            const SizedBox(height: 16),
+            const Text('Collaborators:', style: TextStyle(fontWeight: FontWeight.bold)),
+            ...thread.users.map((user) => Padding(
+              padding: const EdgeInsets.only(left: 16, top: 4),
+              child: Text('• ${user.name}'),
+            )),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Consumer<ThreadsState>(
-          builder: (context, threadsState, child) {
-            final thread = threadsState.currentThread;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  thread?.title ?? 'Project Checkpoints',
-                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                Text(
-                  '${thread?.users.length ?? 0} collaborators',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.grey[300],
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-        backgroundColor: const Color(0xFF1f2937),
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () => _showProjectInfo(context),
-          ),
-        ],
+      appBar: AppHeaderWidget(
+        mode: HeaderMode.checkpoints,
+        title: 'Project Checkpoints',
+        onInfo: _showProjectInfo,
+        showProjectInfo: true,
       ),
       backgroundColor: const Color(0xFF0f172a),
       body: Consumer2<ThreadsState, SequencerState>(
@@ -438,7 +449,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
             child: ElevatedButton.icon(
               onPressed: () => _createNewCheckpoint(context, threadsState, sequencerState),
               icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Save Current State'),
+              label: const Text('Save Checkpoint'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF10b981),
                 foregroundColor: Colors.white,
@@ -637,72 +648,6 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
         ],
       ),
     );
-  }
-
-  void _showProjectInfo(BuildContext context) {
-    final threadsState = Provider.of<ThreadsState>(context, listen: false);
-    final thread = threadsState.currentThread;
-    
-    if (thread == null) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF374151),
-        title: const Text(
-          'Project Info',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Title: ${thread.title}',
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Status: ${thread.status.name}',
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Collaborators (${thread.users.length}):',
-              style: const TextStyle(color: Colors.white70, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            ...thread.users.map((user) => Padding(
-              padding: const EdgeInsets.only(left: 16, top: 2),
-              child: Text(
-                '• ${user.name}${thread.users.indexOf(user) == 0 ? ' (Author)' : ''}',
-                style: const TextStyle(color: Colors.white60),
-              ),
-            )),
-            const SizedBox(height: 8),
-            Text(
-              'Checkpoints: ${thread.checkpoints.length}',
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Created: ${_formatDate(thread.createdAt)}',
-              style: const TextStyle(color: Colors.white70),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
   }
 
   @override

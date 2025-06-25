@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:share_plus/share_plus.dart';
 import '../widgets/sequencer/top_multitask_panel_widget.dart';
 import '../widgets/sequencer/sample_banks_widget.dart';
 import '../widgets/sequencer/sound_grid_widget.dart';
 import '../widgets/sequencer/edit_buttons_widget.dart';
+import '../widgets/app_header_widget.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
-import 'users_screen.dart';
+
 import 'checkpoints_screen.dart';
 
 class PatternScreen extends StatefulWidget {
@@ -41,223 +41,136 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
     }
   }
 
+  void _navigateToCheckpoints() {
+    final threadsState = context.read<ThreadsState>();
+    final currentThread = threadsState.currentThread;
+    
+    if (currentThread != null) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckpointsScreen(
+            threadId: currentThread.id,
+          ),
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF111827),
-        elevation: 0,
-        title: const Text(
-          'NIYYA SEQUENCER',
-          style: TextStyle(
-            fontFamily: 'monospace',
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-          ),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.orangeAccent),
-            onPressed: () {
-              // Navigate back to pattern selection screen
-              Navigator.of(context).pop();
-            },
-            tooltip: 'Back to Patterns',
-          ),
-          IconButton(
-            icon: const Icon(Icons.share, color: Colors.purpleAccent),
-            onPressed: () => _sharePattern(context),
-            tooltip: 'Share Pattern',
-          ),
-          IconButton(
-            icon: const Icon(Icons.people, color: Colors.cyanAccent),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const UsersScreen(),
-                ),
-              );
-            },
-            tooltip: 'Users',
-          ),
-          // Checkpoints button
-          Consumer<ThreadsState>(
-            builder: (context, threadsState, child) {
-              final currentThread = threadsState.currentThread;
-              return IconButton(
-                icon: const Icon(Icons.history, color: Colors.amberAccent),
-                onPressed: currentThread != null 
-                    ? () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => CheckpointsScreen(
-                              threadId: currentThread.id,
-                            ),
-                          ),
-                        );
-                      }
-                    : null,
-                tooltip: 'Project History',
-              );
-            },
-          ),
-          // Recording controls
-          Consumer<SequencerState>(
-            builder: (context, sequencer, child) {
-              return Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (sequencer.isRecording) ...[
-                    // Recording indicator and duration
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.red, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            sequencer.formattedRecordingDuration,
-                            style: const TextStyle(
-                              color: Colors.red,
-                              fontSize: 12,
-                              fontFamily: 'monospace',
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    // Stop recording button
-                    IconButton(
-                      icon: const Icon(Icons.stop, color: Colors.red),
-                      onPressed: () => sequencer.stopRecording(),
-                      tooltip: 'Stop Recording',
-                    ),
-                  ] else ...[
-                    // Start recording button
-                    IconButton(
-                      icon: const Icon(Icons.fiber_manual_record, color: Colors.red),
-                      onPressed: () => sequencer.startRecording(),
-                      tooltip: 'Start Recording',
-                    ),
-                  ],
-                ],
-              );
-            },
-          ),
-          // Sequencer controls
-          IconButton(
-            icon: const Icon(Icons.play_circle, color: Colors.greenAccent),
-            onPressed: () {
-              // 🚀 Using sample-accurate sequencer for perfect timing
-              context.read<SequencerState>().startSequencer();
-            },
-            tooltip: 'Start Sequencer',
-          ),
-          IconButton(
-            icon: const Icon(Icons.stop_circle, color: Colors.redAccent),
-            onPressed: () {
-              // 🚀 Using sample-accurate sequencer
-              context.read<SequencerState>().stopSequencer();
-            },
-            tooltip: 'Stop Sequencer',
-          ),
-        ],
+      appBar: AppHeaderWidget(
+        mode: HeaderMode.sequencer,
+        onBack: () => Navigator.of(context).pop(),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final screenHeight = constraints.maxHeight;
-            final screenWidth = constraints.maxWidth;
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final screenHeight = constraints.maxHeight;
+          final screenWidth = constraints.maxWidth;
+          
+          // EASY FOOTER SIZE CONTROL - Adjust this value for iPhone bottom clearance
+          const double footerPadding = 7.0; // Easy to adjust for different needs
+          
+          // EASY PERCENTAGE CONTROL - Adjust these values to redistribute space
+          const double multitaskPanelPercent = 20.0;    // 20%
+          const double sampleBanksPercent = 8.0;        // 8%
+          const double sampleGridPercent = 63.0;        // 63% - Main grid (increased)
+          const double editButtonsPercent = 9.0;        // 9%
+          
+          // Calculate spacing to distribute evenly
+          final totalContentPercent = multitaskPanelPercent + sampleBanksPercent + 
+                                    sampleGridPercent + editButtonsPercent;
+          final remainingPercent = 100.0 - totalContentPercent;
+          final singleSpacingPercent = remainingPercent / 5; // 5 spacing areas
+          
+          // Use screen height minus footer padding
+          final availableHeight = screenHeight - footerPadding;
+          
+          final multitaskPanelHeight = availableHeight * (multitaskPanelPercent / 100);
+          final sampleBanksHeight = availableHeight * (sampleBanksPercent / 100);
+          final sampleGridHeight = availableHeight * (sampleGridPercent / 100);
+          final editButtonsHeight = availableHeight * (editButtonsPercent / 100);
+          final spacingHeight = availableHeight * (singleSpacingPercent / 100);
             
-            return Container(
-              constraints: BoxConstraints(maxWidth: screenWidth > 400 ? 400 : screenWidth),
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  // Top spacing from SafeArea
-                  SizedBox(height: screenHeight * 0.01), // 1% top margin
-                  
-                  // Multitask panel (15% of screen height)
-                  SizedBox(
-                    height: screenHeight * 0.2,
-                    child: const MultitaskPanelWidget(),
+            final totalUsedHeight = multitaskPanelHeight + spacingHeight + 
+                                  sampleBanksHeight + spacingHeight + sampleGridHeight + 
+                                  spacingHeight + editButtonsHeight + spacingHeight;
+            
+            final unusedHeight = screenHeight - totalUsedHeight;
+            final unusedPercentage = (unusedHeight / screenHeight) * 100;
+            
+            // Debug log of space allocation
+            debugPrint('📐 SEQUENCER HEIGHT ALLOCATION (AUTO-FILL):');
+            debugPrint('📱 Total Screen Height: ${screenHeight.toStringAsFixed(1)}px');
+            debugPrint('📐 Available Height: ${availableHeight.toStringAsFixed(1)}px (minus border padding)');
+            debugPrint('┌─ Multitask Panel: ${multitaskPanelHeight.toStringAsFixed(1)}px (${multitaskPanelPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Sample Banks: ${sampleBanksHeight.toStringAsFixed(1)}px (${sampleBanksPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Sample Grid: ${sampleGridHeight.toStringAsFixed(1)}px (${sampleGridPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Edit Buttons: ${editButtonsHeight.toStringAsFixed(1)}px (${editButtonsPercent.toStringAsFixed(1)}%)');
+            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
+            debugPrint('└─ Border: No padding - using full screen height');
+            debugPrint('🔢 Total Content: ${(totalContentPercent).toStringAsFixed(1)}%');
+            debugPrint('🔢 Total Used: ${totalUsedHeight.toStringAsFixed(1)}px (${((totalUsedHeight/screenHeight)*100).toStringAsFixed(1)}%)');
+            debugPrint('🆓 Unused Space: ${unusedHeight.toStringAsFixed(1)}px (${unusedPercentage.toStringAsFixed(1)}%)');
+            debugPrint('─────────────────────────────────────');
+            
+            return Column(
+              children: [
+                // Auto-calculated spacing
+                SizedBox(height: spacingHeight),
+                
+                // Multitask panel
+                SizedBox(
+                  height: multitaskPanelHeight,
+                  child: const MultitaskPanelWidget(),
+                ),
+                
+                // Auto-calculated spacing
+                SizedBox(height: spacingHeight),
+                
+                // Sample banks panel
+                SizedBox(
+                  height: sampleBanksHeight,
+                  child: const SampleBanksWidget(),
+                ),
+                
+                // Auto-calculated spacing
+                SizedBox(height: spacingHeight),
+                
+                // Sample grid
+                SizedBox(
+                  height: sampleGridHeight,
+                  child: const SampleGridWidget(),
+                ),
+                
+                // Auto-calculated spacing
+                SizedBox(height: spacingHeight),
+                
+                // Edit buttons panel
+                SizedBox(
+                  height: editButtonsHeight,
+                  child: const EditButtonsWidget(),
+                ),
+                
+                // Auto-calculated spacing (fills remaining space)
+                SizedBox(height: spacingHeight),
+                
+                // Footer container matching edit buttons style
+                Container(
+                  height: footerPadding,
+                  decoration: BoxDecoration(
+                    color: const Color.fromARGB(255, 244, 244, 244),
                   ),
-                  
-                  // Spacing between top panel and sample banks
-                  SizedBox(height: screenHeight * 0.005), // 0.5% spacing
-                  
-                  // Sample banks panel (8% of screen height, fixed to prevent size changes)
-                  SizedBox(
-                    height: screenHeight * 0.08,
-                    child: const SampleBanksWidget(),
-                  ),
-                  
-                  // Spacing between sample banks and grid
-                  SizedBox(height: screenHeight * 0.005), // 0.5% spacing
-                  
-                  // Sample grid (61% of screen height, adjusted for new spacing)
-                  SizedBox(
-                    height: screenHeight * 0.55,
-                    child: const SampleGridWidget(),
-                  ),
-                  
-                  // Spacing between grid and edit buttons
-                  SizedBox(height: screenHeight * 0.005), // 0.5% spacing
-                  
-                  // Edit buttons panel (9% of screen height)
-                  SizedBox(
-                    height: screenHeight * 0.09,
-                    child: const EditButtonsWidget(),
-                  ),
-                  
-                  // Bottom spacing
-                  SizedBox(height: screenHeight * 0.005), // 0.5% bottom margin
-                ],
-              ),
+                ),
+              ],
             );
-          },
-        ),
+        },
       ),
     );
-  }
-
-  Future<void> _sharePattern(BuildContext context) async {
-    final sequencerState = context.read<SequencerState>();
-    
-    try {
-      final shareData = await sequencerState.generateShareData(null);
-      
-      await Share.share(
-        shareData['text'] as String,
-        subject: shareData['subject'] as String,
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to share pattern: $e'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
-    }
   }
 } 

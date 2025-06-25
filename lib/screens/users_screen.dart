@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/chat_client.dart';
 import '../services/user_profile_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'chat_conversation_screen.dart';
-import 'sequencer_screen.dart';
+import 'thread_screen.dart';
 import 'user_profile_screen.dart';
-import 'pattern_selection_screen.dart';
+import '../state/threads_state.dart';
+import '../state/sequencer_state.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({Key? key}) : super(key: key);
@@ -47,7 +48,8 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     });
 
     _chatClient.errorStream.listen((error) {
-      if (_error == null) { // Only show error if we haven't loaded API data
+      // Only show WebSocket error if we haven't successfully loaded user profiles from API
+      if (_userProfiles.isEmpty) {
         setState(() {
           _error = error;
           _isLoading = false;
@@ -132,11 +134,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       body: SafeArea(
         child: Column(
           children: [
-            // My Series Button at the top
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(12),
-              child: _buildMySeriesButton(),
+              child: _buildMySequencerButton(),
             ),
             
             // Users List
@@ -181,7 +182,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildMySeriesButton() {
+  Widget _buildMySequencerButton() {
     return Container(
       height: 60,
       decoration: BoxDecoration(
@@ -198,34 +199,40 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const PatternScreen()),
-            );
+          onTap: () async {
+            final threadsState = context.read<ThreadsState>();
+            final sequencerState = context.read<SequencerState>();
+            
+            try {
+              // Ensure we have an active solo thread for this user
+              await threadsState.ensureActiveSoloThread(sequencerState);
+              
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ThreadScreen(
+                      threadId: threadsState.currentThread!.id,
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error creating project: $e')),
+                );
+              }
+            }
           },
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF9CA3AF),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
-                const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'My Series',
+                    'My Sequencer',
                     style: TextStyle(
                       color: Color(0xFF374151),
                       fontSize: 18,

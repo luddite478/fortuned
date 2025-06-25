@@ -113,5 +113,13 @@ flutter:
     - samples/synth/Yamaha CS40M/
     - samples/synth/Yamaha CS40M/Bass/
     - samples/synth/Yamaha CS40M/Keys/
+    - samples/wavparty-braids-vol-1/
+    - samples/wavparty-braids-vol-1/chords-tunedC/
+    - samples/wavparty-braids-vol-1/hats/
+    - samples/wavparty-braids-vol-1/kicks/
+    - samples/wavparty-braids-vol-1/perc/
+    - samples/wavparty-braids-vol-1/snares/
+    - samples/wavparty-braids-vol-1/synth-tunedC/
+    - samples/wavparty-braids-vol-1/vox-tunedC/
     - .env
     - samples_manifest.json

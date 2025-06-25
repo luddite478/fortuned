@@ -5,66 +5,50 @@ import '../state/threads_state.dart';
 
 class UserProfile {
   final String id;
+  final String username;
   final String name;
-  final DateTime registeredAt;
-  final DateTime lastOnline;
   final String email;
-  final String info;
-  final String avatar;
-  final String bio;
-  final bool isWorking;
-  final String currentProject;
-  final int totalSeries;
-  final int totalTracks;
-  final DateTime joinedDate;
+  final DateTime createdAt;
+  final DateTime lastLogin;
+  final DateTime lastOnline;
+  final bool isActive;
+  final bool emailVerified;
+  final UserProfileInfo profile;
+  final UserStats stats;
+  final String? avatarUrl;
+  final UserPreferences preferences;
 
   UserProfile({
     required this.id,
+    required this.username,
     required this.name,
-    required this.registeredAt,
-    required this.lastOnline,
     required this.email,
-    required this.info,
-    this.avatar = '👤',
-    String? bio,
-    this.isWorking = false,
-    this.currentProject = '',
-    this.totalSeries = 0,
-    this.totalTracks = 0,
-    DateTime? joinedDate,
-  }) : bio = bio ?? info,
-       joinedDate = joinedDate ?? registeredAt;
+    required this.createdAt,
+    required this.lastLogin,
+    required this.lastOnline,
+    required this.isActive,
+    required this.emailVerified,
+    required this.profile,
+    required this.stats,
+    this.avatarUrl,
+    required this.preferences,
+  });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
-    // Handle the nested info structure from the server
-    final infoData = json['info'];
-    String bioText = '';
-    String infoText = '';
-    
-    if (infoData is Map<String, dynamic>) {
-      bioText = infoData['bio'] ?? '';
-      infoText = bioText; // Use bio as the main info text
-    } else if (infoData is String) {
-      infoText = infoData;
-      bioText = infoData;
-    }
-    
     return UserProfile(
       id: json['id'] ?? '',
+      username: json['username'] ?? '',
       name: json['name'] ?? '',
-      registeredAt: DateTime.parse(json['registered_at'] ?? DateTime.now().toIso8601String()),
-      lastOnline: DateTime.parse(json['last_online'] ?? DateTime.now().toIso8601String()),
       email: json['email'] ?? '',
-      info: infoText,
-      avatar: json['avatar'] ?? '👤',
-      bio: bioText,
-      isWorking: json['isWorking'] ?? false,
-      currentProject: json['currentProject'] ?? '',
-      totalSeries: json['totalSeries'] ?? 0,
-      totalTracks: json['totalTracks'] ?? 0,
-      joinedDate: json['joinedDate'] != null 
-          ? DateTime.parse(json['joinedDate']) 
-          : DateTime.parse(json['registered_at'] ?? DateTime.now().toIso8601String()),
+      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
+      lastLogin: DateTime.parse(json['last_login'] ?? DateTime.now().toIso8601String()),
+      lastOnline: DateTime.parse(json['last_online'] ?? DateTime.now().toIso8601String()),
+      isActive: json['is_active'] ?? true,
+      emailVerified: json['email_verified'] ?? false,
+      profile: UserProfileInfo.fromJson(json['profile'] ?? {}),
+      stats: UserStats.fromJson(json['stats'] ?? {}),
+      avatarUrl: json['avatar_url'],
+      preferences: UserPreferences.fromJson(json['preferences'] ?? {}),
     );
   }
 
@@ -73,33 +57,184 @@ class UserProfile {
     final diff = now.difference(lastOnline);
     return diff.inMinutes < 15; // Consider online if active within 15 minutes
   }
+
+  // Legacy properties for backward compatibility
+  String get info => profile.bio;
+  String get bio => profile.bio;
+  DateTime get registeredAt => createdAt;
+  DateTime get joinedDate => createdAt;
+  String get avatar => avatarUrl ?? '👤';
+  bool get isWorking => false;
+  String get currentProject => '';
+  int get totalSeries => 0;
+  int get totalTracks => 0;
 }
 
-class UserProfilesResponse {
-  final List<UserProfile> profiles;
+class UserProfileInfo {
+  final String bio;
+  final String location;
+  final String website;
+  final Map<String, String> socialLinks;
+
+  UserProfileInfo({
+    required this.bio,
+    required this.location,
+    required this.website,
+    required this.socialLinks,
+  });
+
+  factory UserProfileInfo.fromJson(Map<String, dynamic> json) {
+    final social = json['social_links'] ?? {};
+    return UserProfileInfo(
+      bio: json['bio'] ?? '',
+      location: json['location'] ?? '',
+      website: json['website'] ?? '',
+      socialLinks: {
+        'twitter': social['twitter'] ?? '',
+        'instagram': social['instagram'] ?? '',
+        'youtube': social['youtube'] ?? '',
+      },
+    );
+  }
+}
+
+class UserStats {
+  final int totalPlays;
+  final int totalLikes;
+  final int followerCount;
+  final int followingCount;
+
+  UserStats({
+    required this.totalPlays,
+    required this.totalLikes,
+    required this.followerCount,
+    required this.followingCount,
+  });
+
+  factory UserStats.fromJson(Map<String, dynamic> json) {
+    return UserStats(
+      totalPlays: json['total_plays'] ?? 0,
+      totalLikes: json['total_likes'] ?? 0,
+      followerCount: json['follower_count'] ?? 0,
+      followingCount: json['following_count'] ?? 0,
+    );
+  }
+}
+
+class UserPreferences {
+  final bool notificationsEnabled;
+  final bool publicProfile;
+  final String theme;
+
+  UserPreferences({
+    required this.notificationsEnabled,
+    required this.publicProfile,
+    required this.theme,
+  });
+
+  factory UserPreferences.fromJson(Map<String, dynamic> json) {
+    return UserPreferences(
+      notificationsEnabled: json['notifications_enabled'] ?? true,
+      publicProfile: json['public_profile'] ?? true,
+      theme: json['theme'] ?? 'dark',
+    );
+  }
+}
+
+class UsersResponse {
+  final List<UserProfile> users;
   final int total;
   final int limit;
   final int offset;
   final bool hasMore;
 
-  UserProfilesResponse({
-    required this.profiles,
+  UsersResponse({
+    required this.users,
     required this.total,
     required this.limit,
     required this.offset,
     required this.hasMore,
   });
 
-  factory UserProfilesResponse.fromJson(Map<String, dynamic> json) {
-    final profilesList = json['profiles'] as List<dynamic>? ?? [];
+  factory UsersResponse.fromJson(Map<String, dynamic> json) {
+    final usersList = json['users'] as List<dynamic>? ?? [];
     final pagination = json['pagination'] as Map<String, dynamic>? ?? {};
 
-    return UserProfilesResponse(
-      profiles: profilesList.map((profile) => UserProfile.fromJson(profile)).toList(),
+    return UsersResponse(
+      users: usersList.map((user) => UserProfile.fromJson(user)).toList(),
       total: pagination['total'] ?? 0,
       limit: pagination['limit'] ?? 20,
       offset: pagination['offset'] ?? 0,
       hasMore: pagination['has_more'] ?? false,
+    );
+  }
+
+  // Legacy getter for backward compatibility
+  List<UserProfile> get profiles => users;
+}
+
+class LoginRequest {
+  final String email;
+  final String password;
+
+  LoginRequest({required this.email, required this.password});
+
+  Map<String, dynamic> toJson() {
+    return {
+      'email': email,
+      'password': password,
+    };
+  }
+}
+
+class RegisterRequest {
+  final String username;
+  final String name;
+  final String email;
+  final String password;
+
+  RegisterRequest({
+    required this.username,
+    required this.name,
+    required this.email,
+    required this.password,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'username': username,
+      'name': name,
+      'email': email,
+      'password': password,
+    };
+  }
+}
+
+class AuthResponse {
+  final bool success;
+  final String? userId;
+  final String? username;
+  final String? name;
+  final String? email;
+  final String? message;
+
+  AuthResponse({
+    required this.success,
+    this.userId,
+    this.username,
+    this.name,
+    this.email,
+    this.message,
+  });
+
+  factory AuthResponse.fromJson(Map<String, dynamic> json) {
+    return AuthResponse(
+      success: json['success'] ?? false,
+      userId: json['user_id'],
+      username: json['username'],
+      name: json['name'],
+      email: json['email'],
+      message: json['message'],
     );
   }
 }
@@ -124,7 +259,66 @@ class UserProfileService {
     return token;
   }
 
-  static Future<UserProfilesResponse> getUserProfiles({
+  static Future<AuthResponse> login(String email, String password) async {
+    try {
+      final loginRequest = LoginRequest(email: email, password: password);
+      final url = Uri.parse('$_baseUrl/auth/login');
+
+      print('Attempting login to: $url');
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(loginRequest.toJson()),
+      );
+
+      print('Login response status: ${response.statusCode}');
+      print('Login response body: ${response.body}');
+
+      final jsonData = json.decode(response.body);
+      return AuthResponse.fromJson(jsonData);
+    } catch (e) {
+      print('Error during login: $e');
+      return AuthResponse(
+        success: false,
+        message: 'Login failed: $e',
+      );
+    }
+  }
+
+  static Future<AuthResponse> register(String username, String name, String email, String password) async {
+    try {
+      final registerRequest = RegisterRequest(
+        username: username,
+        name: name,
+        email: email,
+        password: password,
+      );
+      final url = Uri.parse('$_baseUrl/auth/register');
+
+      print('Attempting registration to: $url');
+
+      final response = await http.post(
+        url,
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode(registerRequest.toJson()),
+      );
+
+      print('Register response status: ${response.statusCode}');
+      print('Register response body: ${response.body}');
+
+      final jsonData = json.decode(response.body);
+      return AuthResponse.fromJson(jsonData);
+    } catch (e) {
+      print('Error during registration: $e');
+      return AuthResponse(
+        success: false,
+        message: 'Registration failed: $e',
+      );
+    }
+  }
+
+  static Future<UsersResponse> getUsers({
     int limit = 20,
     int offset = 0,
   }) async {
@@ -145,10 +339,10 @@ class UserProfileService {
       };
       print('Query params: $queryParams');
       
-      final url = Uri.parse('$_baseUrl/users/profiles')
+      final url = Uri.parse('$_baseUrl/users/list')
           .replace(queryParameters: queryParams);
 
-      print('Fetching user profiles from: $url');
+      print('Fetching users from: $url');
 
       final response = await http.get(url);
 
@@ -157,27 +351,27 @@ class UserProfileService {
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
-        return UserProfilesResponse.fromJson(jsonData);
+        return UsersResponse.fromJson(jsonData);
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized: Invalid API token');
       } else {
-        throw Exception('Failed to load user profiles: ${response.statusCode}');
+        throw Exception('Failed to load users: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching user profiles: $e');
+      print('Error fetching users: $e');
       throw Exception('Network error: $e');
     }
   }
 
-  static Future<UserProfile> getUserProfile(String userId) async {
+  static Future<UserProfile> getUser(String userId) async {
     try {
-      final url = Uri.parse('$_baseUrl/users/profile')
+      final url = Uri.parse('$_baseUrl/users/user')
           .replace(queryParameters: {
         'id': userId,
         'token': _apiToken,
       });
 
-      print('Fetching user profile from: $url');
+      print('Fetching user from: $url');
 
       final response = await http.get(url);
 
@@ -192,75 +386,21 @@ class UserProfileService {
       } else if (response.statusCode == 404) {
         throw Exception('User not found');
       } else {
-        throw Exception('Failed to load user profile: ${response.statusCode}');
+        throw Exception('Failed to load user: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching user profile: $e');
+      print('Error fetching user: $e');
       throw Exception('Network error: $e');
     }
   }
 
-  static Future<List<Thread>> getUserThreads(String userId) async {
-    try {
-      final url = Uri.parse('$_baseUrl/threads')
-          .replace(queryParameters: {
-        'user_id': userId,
-        'token': _apiToken,
-        'limit': '20',
-        'offset': '0',
-      });
-
-      print('Fetching user threads from: $url');
-
-      final response = await http.get(url);
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        final threadsList = jsonData['threads'] as List<dynamic>? ?? [];
-      
-        return threadsList.map((thread) => Thread.fromJson(thread)).toList();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
-      } else {
-        throw Exception('Failed to load user threads: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching user threads: $e');
-      throw Exception('Network error: $e');
-    }
+  // Legacy methods for backward compatibility
+  static Future<UsersResponse> getUserProfiles({int limit = 20, int offset = 0}) {
+    return getUsers(limit: limit, offset: offset);
   }
 
-  static Future<Thread> getThread(String threadId) async {
-    try {
-      final url = Uri.parse('$_baseUrl/threads/$threadId')
-          .replace(queryParameters: {
-        'token': _apiToken,
-      });
-
-      print('Fetching thread from: $url');
-
-      final response = await http.get(url);
-
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
-
-      if (response.statusCode == 200) {
-        final jsonData = json.decode(response.body);
-        return Thread.fromJson(jsonData);
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized: Invalid API token');
-      } else if (response.statusCode == 404) {
-        throw Exception('Thread not found');
-      } else {
-        throw Exception('Failed to load thread: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error fetching thread: $e');
-      throw Exception('Network error: $e');
-    }
+  static Future<UserProfile> getUserProfile(String userId) {
+    return getUser(userId);
   }
 }
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/user_profile_service.dart';
-import '../services/threads_service.dart';
+
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 import 'user_projects_screen.dart';
@@ -24,7 +24,7 @@ class UserProfileScreen extends StatefulWidget {
 class _UserProfileScreenState extends State<UserProfileScreen> {
 
   UserProfile? _userProfile;
-  List<UserSeries> _userSeries = [];
+  List<Thread> _userThreads = [];
   bool _isLoading = true;
   String? _error;
 
@@ -42,11 +42,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       });
 
       final profile = await UserProfileService.getUserProfile(widget.userId);
-      final series = await UserProfileService.getUserSeries(widget.userId);
+      final threads = await UserProfileService.getUserThreads(widget.userId);
 
       setState(() {
         _userProfile = profile;
-        _userSeries = series;
+        _userThreads = threads;
         _isLoading = false;
       });
     } catch (e) {
@@ -275,7 +275,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _buildSeriesSection() {
-    if (_userSeries.isEmpty) {
+            if (_userThreads.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(32),
         decoration: BoxDecoration(
@@ -315,14 +315,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return ListView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      itemCount: _userSeries.length,
-      itemBuilder: (context, index) {
-        return _buildSeriesCard(_userSeries[index]);
+              itemCount: _userThreads.length,
+        itemBuilder: (context, index) {
+          return _buildSeriesCard(_userThreads[index]);
       },
     );
   }
 
-  Widget _buildSeriesCard(UserSeries series) {
+  Widget _buildSeriesCard(Thread thread) {
     return Container(
       height: 76, // Slightly increased height to prevent overflow
       margin: const EdgeInsets.only(bottom: 8),
@@ -340,24 +340,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () => _openSeries(series),
+          onTap: () => _openSeries(thread),
           borderRadius: BorderRadius.circular(6),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10), // Increased vertical padding
             child: Row(
               children: [
-                // Series cover with play button
+                // Thread cover with play button
                 Container(
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: Color(series.coverColor),
+                    color: const Color(0xFF9CA3AF), // Default color for threads
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => _playSeries(series),
+                      onTap: () => _playSeries(thread),
                       borderRadius: BorderRadius.circular(4),
                       child: const Icon(
                         Icons.play_arrow,
@@ -370,7 +370,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                 
                 const SizedBox(width: 12),
                 
-                // Series info
+                // Thread info
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,7 +380,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       Row(
                         children: [
                           Text(
-                            _formatDate(series.createdDate),
+                            _formatDate(thread.createdAt),
                             style: const TextStyle(
                               color: Color(0xFF374151),
                               fontSize: 14,
@@ -388,7 +388,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          if (!series.isPublic)
+                          if (thread.status != ThreadStatus.active)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
@@ -398,9 +398,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 color: const Color(0xFFF3F4F6),
                                 borderRadius: BorderRadius.circular(3),
                               ),
-                              child: const Text(
-                                'Private',
-                                style: TextStyle(
+                              child: Text(
+                                thread.status.toString().split('.').last,
+                                style: const TextStyle(
                                   color: Color(0xFF6B7280),
                                   fontSize: 9,
                                   fontWeight: FontWeight.w500,
@@ -412,17 +412,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       
                       const SizedBox(height: 3), // Reduced spacing
                       
-                      // Author comment space
+                      // Thread title/description
                       Text(
-                        series.description.isNotEmpty 
-                            ? series.description 
-                            : 'No comment yet...',
+                        thread.title.isNotEmpty 
+                            ? thread.title 
+                            : 'Untitled Thread',
                         style: TextStyle(
-                          color: series.description.isNotEmpty 
+                          color: thread.title.isNotEmpty 
                               ? const Color(0xFF6B7280) 
                               : const Color(0xFF9CA3AF),
                           fontSize: 11,
-                          fontStyle: series.description.isEmpty 
+                          fontStyle: thread.title.isEmpty 
                               ? FontStyle.italic 
                               : FontStyle.normal,
                         ),
@@ -436,7 +436,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       Row(
                         children: [
                           Text(
-                            '${_getRandomPlays(series.id)} plays',
+                            '${thread.checkpoints.length} checkpoints',
                             style: const TextStyle(
                               color: Color(0xFF9CA3AF),
                               fontSize: 10,
@@ -449,14 +449,14 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                               fontSize: 10,
                             ),
                           ),
-                          Icon(
-                            Icons.call_split,
+                          const Icon(
+                            Icons.group,
                             size: 10,
-                            color: const Color(0xFF9CA3AF),
+                            color: Color(0xFF9CA3AF),
                           ),
                           const SizedBox(width: 2),
                           Text(
-                            '${_getRandomForks(series.id)}',
+                            '${thread.users.length}',
                             style: const TextStyle(
                               color: Color(0xFF9CA3AF),
                               fontSize: 10,
@@ -479,7 +479,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       width: 70, // Fixed width to ensure consistent size
                       height: 32,
                       decoration: BoxDecoration(
-                        color: _canEditSeries(series) 
+                        color: _canEditSeries(thread) 
                             ? const Color.fromARGB(255, 199, 195, 255) // Light purple for unlocked
                             : const Color(0xFFE5E7EB), // Light gray for locked
                         borderRadius: BorderRadius.circular(6),
@@ -487,16 +487,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                       child: Material(
                         color: Colors.transparent,
                         child: InkWell(
-                          onTap: _canEditSeries(series) 
-                              ? () => _editSeries(series) 
+                          onTap: _canEditSeries(thread) 
+                              ? () => _editSeries(thread) 
                               : null,
                           borderRadius: BorderRadius.circular(6),
                           child: Center(
-                            child: _canEditSeries(series)
-                                ? Text(
+                            child: _canEditSeries(thread)
+                                ? const Text(
                                     'IMPROVE',
                                     style: TextStyle(
-                                      color: const Color.fromARGB(255, 80, 91, 108), // Dark gray text for light purple background
+                                      color: Color.fromARGB(255, 80, 91, 108), // Dark gray text for light purple background
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,
                                       letterSpacing: 0.2,
@@ -553,22 +553,20 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return (hash % 50) + 1; // Between 1-50
   }
 
-  bool _canEditSeries(UserSeries series) {
-    // Check if series is not locked
-    return !series.isLocked;
+  bool _canEditSeries(Thread thread) {
+    return thread.status == ThreadStatus.active;
   }
 
-  void _playSeries(UserSeries series) {
+  void _playSeries(Thread thread) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('🎵 Playing: ${series.title}'),
-        backgroundColor: const Color(0xFF10B981),
+        content: Text('Playing: ${thread.title}'),
         duration: const Duration(seconds: 2),
       ),
     );
   }
 
-  Future<void> _editSeries(UserSeries series) async {
+  Future<void> _editSeries(Thread thread) async {
     try {
       // Show loading indicator
       ScaffoldMessenger.of(context).showSnackBar(
@@ -626,16 +624,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         
         // Start a new thread with the project
         final threadId = await threadsState.createThread(
-          title: series.title,
+          title: thread.title,
           authorId: widget.userId,
           authorName: widget.userName,
           collaboratorIds: currentUserId != widget.userId ? [currentUserId] : [],
           collaboratorNames: currentUserId != widget.userId ? [currentUserName] : [],
           initialSnapshot: initialSnapshot,
           metadata: {
-            'original_project_id': series.id,
+            'original_project_id': thread.id,
             'project_type': 'collaboration',
-            'genre': series.genre,
+            'genre': thread.metadata?['genre'] ?? 'Unknown',
           },
         );
         
@@ -666,16 +664,16 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         }
         
         final threadId = await threadsState.createThread(
-          title: series.title,
+          title: thread.title,
           authorId: widget.userId,
           authorName: widget.userName,
           collaboratorIds: currentUserId != widget.userId ? [currentUserId] : [],
           collaboratorNames: currentUserId != widget.userId ? [currentUserName] : [],
           initialSnapshot: initialSnapshot,
           metadata: {
-            'original_project_id': series.id,
+            'original_project_id': thread.id,
             'project_type': 'collaboration',
-            'genre': series.genre,
+            'genre': thread.metadata?['genre'] ?? 'Unknown',
           },
         );
         
@@ -686,7 +684,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('🚀 Started thread for "${series.title}"'),
+          content: Text('🚀 Started thread for "${thread.title}"'),
           backgroundColor: const Color(0xFF10B981),
           duration: const Duration(seconds: 3),
         ),
@@ -710,11 +708,11 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     }
   }
 
-  void _openSeries(UserSeries series) {
+  void _openSeries(Thread thread) {
     // TODO: Navigate to series detail screen
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Opening series: ${series.title}'),
+        content: Text('Opening series: ${thread.title}'),
         backgroundColor: const Color.fromARGB(255, 118, 41, 195),
         duration: const Duration(seconds: 2),
       ),

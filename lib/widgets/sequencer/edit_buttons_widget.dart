@@ -21,8 +21,12 @@ class EditButtonsWidget extends StatelessWidget {
             return Container(
               padding: EdgeInsets.symmetric(horizontal: panelHeight * 0.1), // Only horizontal padding
               decoration: BoxDecoration(
-                color: const Color(0xFF1f2937),
+                color: const Color.fromARGB(255, 0, 0, 0),
                 borderRadius: BorderRadius.circular(8),
+                // border: Border.all(
+                //   color: const Color.fromARGB(255, 17, 181, 22).withOpacity(0.3),
+                //   width: 4,
+                // ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,

@@ -13,8 +13,8 @@ class RecordingWidget extends StatelessWidget {
         return Container(
           decoration: BoxDecoration(
             color: sequencerState.lastRecordingPath != null
-                ? const Color(0xFF1f2937).withOpacity(0.9)
-                : const Color(0xFF1f2937),
+                ? Colors.black.withOpacity(0.9)
+                : Colors.black,
             borderRadius: BorderRadius.circular(8),
           ),
           child: sequencerState.lastRecordingPath != null

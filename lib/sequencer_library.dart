@@ -1,7 +1,6 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:convert';
-import 'dart:typed_data';
 import 'sequencer_bindings_generated.dart';
 
 // Import malloc from dart:ffi

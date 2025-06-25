@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:collection';
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:convert';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 import '../sequencer_library.dart';
 import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
@@ -158,11 +158,26 @@ class SequencerState extends ChangeNotifier {
   List<String> _currentSamplePath = [];
   List<SampleBrowserItem> _currentSampleItems = [];
 
+  // Share widget state
+  bool _isShowingShareWidget = false;
+  List<String> _localRecordings = []; // List of local recording file paths
+
   // Grid labeling system
   List<String> _soundGridLabels = [];
 
   // Thread integration
   ThreadsState? _threadsState;
+
+  // Autosave functionality
+  bool _autosaveEnabled = true;
+  Timer? _autosaveTimer;
+  Timer? _debounceTimer;
+  static const String _autosaveKey = 'sequencer_autosave';
+  static const Duration _autosaveInterval = Duration(seconds: 30);
+  static const Duration _debounceDelay = Duration(seconds: 3);
+  DateTime? _lastSaveTime;
+  bool _hasUnsavedChanges = false;
+  bool _isCurrentlySaving = false;
 
   // Initialize sequencer
   SequencerState() {
@@ -176,6 +191,15 @@ class SequencerState extends ChangeNotifier {
     _slotPlaying = List.filled(_slotCount, false);
     _soundGridSamples = []; // Will be initialized when sound grids are created
     _columnPlayingSample = List.filled(_gridColumns, null);
+    
+    // Start autosave timer
+    _startAutosave();
+    
+    // Load saved state on initialization
+    _loadAutosavedState();
+    
+    // Load saved recordings
+    _loadSavedRecordings();
   }
 
   // Set threads state for collaboration tracking
@@ -379,7 +403,12 @@ class SequencerState extends ChangeNotifier {
   List<Color> get bankColors => List.unmodifiable(_bankColors);
   bool get hasClipboardData => _hasClipboardData;
   int get slotCount => _slotCount;
+  bool get hasUnsavedChanges => _hasUnsavedChanges;
+  bool get isCurrentlySaving => _isCurrentlySaving;
+  bool get autosaveEnabled => _autosaveEnabled;
   bool get isSelectingSample => _isSelectingSample;
+  bool get isShowingShareWidget => _isShowingShareWidget;
+  List<String> get localRecordings => List.unmodifiable(_localRecordings);
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
   List<SampleBrowserItem> get currentSampleItems => List.unmodifiable(_currentSampleItems);
@@ -595,6 +624,10 @@ class SequencerState extends ChangeNotifier {
       loadToMemory: true,
     );
     _slotLoaded[slot] = success;
+    
+    // Trigger autosave when sample is loaded
+    _triggerAutosave();
+    
     notifyListeners();
   }
 
@@ -1108,6 +1141,12 @@ class SequencerState extends ChangeNotifier {
       // Store the completed recording info
       _lastRecordingPath = _currentRecordingPath;
       _lastRecordingTime = DateTime.now();
+      
+      // Add to local recordings list
+      if (_currentRecordingPath != null) {
+        _addLocalRecording(_currentRecordingPath!);
+      }
+      
       _currentRecordingPath = null;
       notifyListeners();
       
@@ -1509,6 +1548,9 @@ Made with Demo Sequencer 🚀
       _sequencerLibrary.setSequencerBpm(newBpm);
     }
     
+    // Trigger autosave when BPM changes
+    _triggerAutosave();
+    
     notifyListeners();
   }
 
@@ -1599,6 +1641,9 @@ Made with Demo Sequencer 🚀
       
       // 🔧 FIX: Immediately sync this change to native sequencer if sequencer is running
       _syncSingleCellToNative(index, value);
+      
+      // Trigger autosave when grid changes
+      _triggerAutosave();
     }
   }
 
@@ -1759,8 +1804,351 @@ Made with Demo Sequencer 🚀
     }
   }
 
+  // =============================================================================
+  // AUTOSAVE FUNCTIONALITY
+  // =============================================================================
+
+  void _startAutosave() {
+    if (!_autosaveEnabled) return;
+    
+    _autosaveTimer = Timer.periodic(_autosaveInterval, (timer) {
+      _saveStateToPreferences();
+    });
+  }
+
+  /// Trigger debounced autosave (called when state changes)
+  void _triggerAutosave() {
+    if (!_autosaveEnabled) return;
+    
+    // Mark that we have unsaved changes
+    _hasUnsavedChanges = true;
+    notifyListeners();
+    
+    // Cancel any existing debounce timer
+    _debounceTimer?.cancel();
+    
+    // Start new debounce timer - only save after user stops making changes
+    _debounceTimer = Timer(_debounceDelay, () async {
+      // Additional throttling: don't save more than once per 5 seconds
+      final now = DateTime.now();
+      if (_lastSaveTime != null && 
+          now.difference(_lastSaveTime!) < const Duration(seconds: 5)) {
+        return;
+      }
+      
+      _isCurrentlySaving = true;
+      notifyListeners();
+      
+      await _saveStateToPreferences();
+      
+      _lastSaveTime = now;
+      _hasUnsavedChanges = false;
+      _isCurrentlySaving = false;
+      notifyListeners();
+    });
+  }
+
+  /// Save current sequencer state to SharedPreferences for autosave
+  Future<void> _saveStateToPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stateJson = _serializeCurrentState();
+      await prefs.setString(_autosaveKey, stateJson);
+      debugPrint('🔄 Autosaved sequencer state to local storage (${stateJson.length} chars)');
+    } catch (e) {
+      debugPrint('❌ Error autosaving state: $e');
+    }
+  }
+
+  /// Load autosaved state from SharedPreferences
+  Future<void> _loadAutosavedState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final stateJson = prefs.getString(_autosaveKey);
+      
+      if (stateJson != null) {
+        await _deserializeAndApplyState(stateJson);
+        debugPrint('✅ Loaded autosaved sequencer state from local storage');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading autosaved state: $e');
+    }
+  }
+
+  /// Serialize current sequencer state to JSON
+  String _serializeCurrentState() {
+    final state = {
+      'version': '1.0',
+      'timestamp': DateTime.now().toIso8601String(),
+      'bpm': _bpm,
+      'gridColumns': _gridColumns,
+      'gridRows': _gridRows,
+      'currentSoundGridIndex': _currentSoundGridIndex,
+      'activeBank': _activeBank,
+      'filePaths': _filePaths,
+      'fileNames': _fileNames,
+      'slotLoaded': _slotLoaded,
+      'soundGridSamples': _soundGridSamples,
+      'soundGridOrder': _soundGridOrder,
+      'soundGridLabels': _soundGridLabels,
+    };
+    return jsonEncode(state);
+  }
+
+  /// Deserialize and apply state from JSON
+  Future<void> _deserializeAndApplyState(String stateJson) async {
+    try {
+      final state = jsonDecode(stateJson) as Map<String, dynamic>;
+      
+      // Apply simple properties
+      _bpm = state['bpm'] ?? 120;
+      _gridColumns = state['gridColumns'] ?? 4;
+      _gridRows = state['gridRows'] ?? 16;
+      _currentSoundGridIndex = state['currentSoundGridIndex'] ?? 0;
+      _activeBank = state['activeBank'] ?? 0;
+      
+      // Apply file paths and names
+      final filePaths = List<String?>.from(state['filePaths'] ?? []);
+      final fileNames = List<String?>.from(state['fileNames'] ?? []);
+      final slotLoaded = List<bool>.from(state['slotLoaded'] ?? []);
+      
+      for (int i = 0; i < _slotCount && i < filePaths.length; i++) {
+        _filePaths[i] = filePaths[i];
+        _fileNames[i] = fileNames[i];
+        _slotLoaded[i] = slotLoaded.length > i ? slotLoaded[i] : false;
+      }
+      
+      // Apply sound grid samples
+      final soundGridSamples = state['soundGridSamples'] as List?;
+      if (soundGridSamples != null) {
+        _soundGridSamples.clear();
+        for (final gridData in soundGridSamples) {
+          final gridSamples = List<int?>.from(gridData);
+          _soundGridSamples.add(gridSamples);
+        }
+      }
+      
+      // Apply sound grid order
+      final soundGridOrder = state['soundGridOrder'] as List?;
+      if (soundGridOrder != null) {
+        _soundGridOrder = List<int>.from(soundGridOrder);
+      }
+      
+      // Apply sound grid labels
+      final soundGridLabels = state['soundGridLabels'] as List?;
+      if (soundGridLabels != null) {
+        _soundGridLabels = List<String>.from(soundGridLabels);
+      }
+      
+      // Reload samples that were previously loaded
+      for (int i = 0; i < _slotLoaded.length; i++) {
+        if (_slotLoaded[i] && _filePaths[i] != null) {
+          // Note: We can't actually reload files from paths that might not exist anymore
+          // So we just mark them as not loaded for now
+          _slotLoaded[i] = false;
+        }
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error deserializing state: $e');
+    }
+  }
+
+  /// Manually save current state (can be called explicitly)
+  Future<void> saveCurrentState() async {
+    await _saveStateToPreferences();
+  }
+
+  /// Clear autosaved state from SharedPreferences
+  Future<void> clearAutosavedState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_autosaveKey);
+      debugPrint('🗑️ Cleared autosaved sequencer state');
+    } catch (e) {
+      debugPrint('❌ Error clearing autosaved state: $e');
+    }
+  }
+
+  /// Toggle autosave on/off
+  void setAutosaveEnabled(bool enabled) {
+    _autosaveEnabled = enabled;
+    if (enabled) {
+      _startAutosave();
+    } else {
+      _autosaveTimer?.cancel();
+      _debounceTimer?.cancel();
+    }
+    notifyListeners();
+  }
+
+  /// Show/hide share widget
+  void setShowShareWidget(bool show) {
+    _isShowingShareWidget = show;
+    notifyListeners();
+  }
+
+  /// Add a recording to local storage
+  void _addLocalRecording(String filePath) {
+    _localRecordings.add(filePath);
+    _saveRecordingsList();
+    notifyListeners();
+  }
+
+  /// Save recordings list to SharedPreferences
+  Future<void> _saveRecordingsList() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList('local_recordings', _localRecordings);
+    } catch (e) {
+      debugPrint('❌ Error saving recordings list: $e');
+    }
+  }
+
+  /// Load recordings list from SharedPreferences
+  Future<void> _loadSavedRecordings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedRecordings = prefs.getStringList('local_recordings') ?? [];
+      
+      // Filter out recordings that no longer exist on disk
+      _localRecordings.clear();
+      for (final recordingPath in savedRecordings) {
+        final file = File(recordingPath);
+        if (await file.exists()) {
+          _localRecordings.add(recordingPath);
+        }
+      }
+      
+      // Update saved list to remove non-existent files
+      if (_localRecordings.length != savedRecordings.length) {
+        await _saveRecordingsList();
+      }
+      
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error loading saved recordings: $e');
+    }
+  }
+
+  // =============================================================================
+  // REMOTE DATABASE PUBLISHING
+  // =============================================================================
+
+  /// Publish current sequencer state to remote database
+  Future<bool> publishToDatabase({
+    required String title,
+    String? description,
+    List<String>? tags,
+    bool isPublic = true,
+  }) async {
+    try {
+      // Create a snapshot of current state
+      final snapshot = createSnapshot(name: title, comment: description);
+      
+      // Prepare data for database (matches init_collections.py structure)
+      final threadData = {
+        'id': 'thread_${DateTime.now().millisecondsSinceEpoch}',
+        'title': title,
+        'users': [
+          {
+            'id': _threadsState?.currentUserId ?? 'unknown_user',
+            'name': _threadsState?.currentUserName ?? 'Unknown User',
+            'joined_at': DateTime.now().toIso8601String(),
+          }
+        ],
+        'checkpoints': [
+          {
+            'id': 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+            'user_id': _threadsState?.currentUserId ?? 'unknown_user',
+            'user_name': _threadsState?.currentUserName ?? 'Unknown User',
+            'timestamp': DateTime.now().toIso8601String(),
+            'comment': description ?? 'Published from mobile app',
+            'renders': [], // Will be populated after audio rendering
+            'snapshot': {
+              'id': snapshot.id,
+              'name': snapshot.name,
+              'createdAt': snapshot.createdAt.toIso8601String(),
+              'version': snapshot.version,
+              'audio': {
+                'sources': snapshot.audio.sources.map((source) => {
+                  'scenes': source.scenes.map((scene) => {
+                    'layers': scene.layers.map((layer) => {
+                      'id': layer.id,
+                      'index': layer.index,
+                      'rows': layer.rows.map((row) => {
+                        'cells': row.cells.map((cell) => {
+                          'sample': cell.sample?.hasSample == true ? {
+                            'sample_id': cell.sample!.sampleId,
+                            'sample_name': cell.sample!.sampleName,
+                          } : null,
+                        }).toList(),
+                      }).toList(),
+                    }).toList(),
+                    'metadata': {
+                      'user': scene.metadata.user,
+                      'bpm': scene.metadata.bpm,
+                      'key': scene.metadata.key,
+                      'time_signature': scene.metadata.timeSignature,
+                      'created_at': scene.metadata.createdAt.toIso8601String(),
+                    },
+                  }).toList(),
+                  'samples': source.samples.map((sample) => {
+                    'id': sample.id,
+                    'name': sample.name,
+                    'url': sample.url,
+                    'is_public': sample.isPublic,
+                  }).toList(),
+                }).toList(),
+              },
+            },
+          }
+        ],
+        'status': 'active',
+        'created_at': DateTime.now().toIso8601String(),
+        'updated_at': DateTime.now().toIso8601String(),
+        'metadata': {
+          'original_project_id': null,
+          'project_type': 'solo',
+          'genre': 'Electronic', // Could be enhanced to be user-selectable
+          'tags': tags ?? ['mobile', 'sequencer'],
+          'description': description ?? '',
+          'is_public': isPublic,
+          'plays_num': 0,
+          'likes_num': 0,
+          'forks_num': 0,
+        },
+      };
+
+      // Send to database (replace with your actual API endpoint)
+      final response = await http.post(
+        Uri.parse('http://localhost:8000/api/threads'),  // Update with your actual server URL
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(threadData),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('✅ Successfully published sequencer state to database');
+        
+        // Clear autosaved state since it's now published
+        await clearAutosavedState();
+        
+        return true;
+      } else {
+        debugPrint('❌ Failed to publish to database: ${response.statusCode} - ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Error publishing to database: $e');
+      return false;
+    }
+  }
+
   @override
   void dispose() {
+    _autosaveTimer?.cancel();
+    _debounceTimer?.cancel();
     _sequencerTimer?.cancel();
     if (_isRecording) {
       stopRecording();

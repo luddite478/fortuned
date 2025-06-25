@@ -25,18 +25,23 @@ DATABASE_NAME = "admin"
 
 # Collection Schema Definitions
 COLLECTIONS_CONFIG = {
-    "profiles": {
+    "users": {
         "indexes": [
             {"fields": "id", "unique": True},
             {"fields": "email", "unique": True},
+            {"fields": "username", "unique": True},
             {"fields": "name", "unique": False},
-            {"fields": "registered_at", "unique": False}
+            {"fields": "created_at", "unique": False},
+            {"fields": "last_login", "unique": False}
         ],
         "schema": {
             "id": "string (UUID)",
+            "username": "string",
             "name": "string",
             "email": "string",
-            "info": {
+            "password_hash": "string",
+            "salt": "string",
+            "profile": {
                 "bio": "string", 
                 "location": "string",
                 "website": "string",
@@ -46,13 +51,23 @@ COLLECTIONS_CONFIG = {
                     "youtube": "string"
                 }
             },
-            "registered_at": "datetime",
+            "created_at": "datetime",
+            "last_login": "datetime",
             "last_online": "datetime",
-            "total_plays": "number",
-            "total_likes": "number",
-            "follower_count": "number",
-            "following_count": "number",
-            "avatar_url": "string | null"
+            "is_active": "boolean",
+            "email_verified": "boolean",
+            "stats": {
+                "total_plays": "number",
+                "total_likes": "number",
+                "follower_count": "number",
+                "following_count": "number"
+            },
+            "avatar_url": "string | null",
+            "preferences": {
+                "notifications_enabled": "boolean",
+                "public_profile": "boolean",
+                "theme": "string"
+            }
         }
     },
     "threads": {
@@ -80,21 +95,21 @@ COLLECTIONS_CONFIG = {
                     "user_name": "string",
                     "timestamp": "datetime",
                     "comment": "string",
+                    "renders": [
+                        {
+                            "id": "string (UUID)",
+                            "url": "string",
+                            "created_at": "datetime",
+                            "version": "string",
+                            "quality": "string"  # high, medium, low
+                        }
+                    ],
                     "snapshot": {
                         "id": "string (UUID)",
                         "name": "string",
                         "createdAt": "datetime",
                         "version": "string",
                         "audio": {
-                            "renders": [
-                                {
-                                    "id": "string (UUID)",
-                                    "url": "string",
-                                    "created_at": "datetime",
-                                    "version": "string",
-                                    "quality": "string"  # high, medium, low
-                                }
-                            ],
                             "sources": [
                                 {
                                     "scenes": [
@@ -184,12 +199,15 @@ COLLECTIONS_CONFIG = {
 
 # Sample Data Templates
 SAMPLE_DATA_TEMPLATES = {
-    "profiles": [
+    "users": [
         {
             "id": "660e8400-e29b-41d4-a716-446655440001",
+            "username": "alexproducer",
             "name": "Alex Producer",
             "email": "alex@example.com",
-            "info": {
+            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "password123"
+            "salt": "$2b$12$LQv3c1yqBWVHxkd0LHAkCO",
+            "profile": {
                 "bio": "Electronic music producer and sound designer",
                 "location": "Los Angeles, CA",
                 "website": "https://alexproducer.com",
@@ -199,19 +217,32 @@ SAMPLE_DATA_TEMPLATES = {
                     "youtube": "AlexProducerMusic"
                 }
             },
-            "registered_at": "2024-01-15T10:30:00Z",
+            "created_at": "2024-01-15T10:30:00Z",
+            "last_login": "2024-12-06T15:45:00Z",
             "last_online": "2024-03-20T14:22:00Z",
-            "total_plays": 15420,
-            "total_likes": 892,
-            "follower_count": 245,
-            "following_count": 180,
-            "avatar_url": "https://example.com/avatars/alex.jpg"
+            "is_active": True,
+            "email_verified": True,
+            "stats": {
+                "total_plays": 15420,
+                "total_likes": 892,
+                "follower_count": 245,
+                "following_count": 180
+            },
+            "avatar_url": "https://example.com/avatars/alex.jpg",
+            "preferences": {
+                "notifications_enabled": True,
+                "public_profile": True,
+                "theme": "dark"
+            }
         },
         {
             "id": "660e8400-e29b-41d4-a716-446655440002", 
+            "username": "sambeats",
             "name": "Sam Beats",
             "email": "sam@example.com",
-            "info": {
+            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "password123"
+            "salt": "$2b$12$LQv3c1yqBWVHxkd0LHAkCO",
+            "profile": {
                 "bio": "Hip-hop and trap music creator",
                 "location": "Atlanta, GA",
                 "website": "",
@@ -221,13 +252,23 @@ SAMPLE_DATA_TEMPLATES = {
                     "youtube": ""
                 }
             },
-            "registered_at": "2024-02-01T09:15:00Z",
-            "last_online": "2024-03-19T16:45:00Z", 
-            "total_plays": 8930,
-            "total_likes": 456,
-            "follower_count": 189,
-            "following_count": 203,
-            "avatar_url": "https://example.com/avatars/sam.jpg"
+            "created_at": "2024-02-01T09:15:00Z",
+            "last_login": "2024-12-05T12:30:00Z",
+            "last_online": "2024-03-19T16:45:00Z",
+            "is_active": True,
+            "email_verified": True,
+            "stats": {
+                "total_plays": 8930,
+                "total_likes": 456,
+                "follower_count": 189,
+                "following_count": 203
+            },
+            "avatar_url": "https://example.com/avatars/sam.jpg",
+            "preferences": {
+                "notifications_enabled": True,
+                "public_profile": True,
+                "theme": "light"
+            }
         }
     ],
     "threads": [
@@ -253,21 +294,21 @@ SAMPLE_DATA_TEMPLATES = {
                     "user_name": "Alex Producer", 
                     "timestamp": "2024-03-15T10:00:00Z",
                     "comment": "Initial project setup with basic drum pattern",
+                    "renders": [
+                        {
+                            "id": "render_001",
+                            "url": "https://example.com/renders/thread_001_v1_high.mp3",
+                            "created_at": "2024-03-15T10:05:00Z",
+                            "version": "1.0",
+                            "quality": "high"
+                        }
+                    ],
                     "snapshot": {
                         "id": "snapshot_001",
                         "name": "Initial Beat",
                         "createdAt": "2024-03-15T10:00:00Z",
                         "version": "1.0",
                         "audio": {
-                            "renders": [
-                                {
-                                    "id": "render_001",
-                                    "url": "https://example.com/renders/thread_001_v1_high.mp3",
-                                    "created_at": "2024-03-15T10:05:00Z",
-                                    "version": "1.0",
-                                    "quality": "high"
-                                }
-                            ],
                             "sources": [
                                 {
                                     "scenes": [
@@ -326,21 +367,21 @@ SAMPLE_DATA_TEMPLATES = {
                     "user_name": "Sam Beats",
                     "timestamp": "2024-03-15T14:30:00Z", 
                     "comment": "Added snare pattern and hi-hats",
+                    "renders": [
+                        {
+                            "id": "render_002",
+                            "url": "https://example.com/renders/thread_001_v1_1_high.mp3",
+                            "created_at": "2024-03-15T14:35:00Z",
+                            "version": "1.1",
+                            "quality": "high"
+                        }
+                    ],
                     "snapshot": {
                         "id": "snapshot_002",
                         "name": "With Snare & Hats",
                         "createdAt": "2024-03-15T14:30:00Z",
                         "version": "1.1",
                         "audio": {
-                            "renders": [
-                                {
-                                    "id": "render_002",
-                                    "url": "https://example.com/renders/thread_001_v1_1_high.mp3",
-                                    "created_at": "2024-03-15T14:35:00Z",
-                                    "version": "1.1",
-                                    "quality": "high"
-                                }
-                            ],
                             "sources": [
                                 {
                                     "scenes": [

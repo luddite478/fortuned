@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../services/chat_client.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'chat_conversation_screen.dart';
-import 'sequencer_screen.dart';
+
+import 'thread_screen.dart';
 import 'user_profile_screen.dart';
+import '../state/threads_state.dart';
+import '../state/sequencer_state.dart';
 
 class ContactsScreen extends StatefulWidget {
   const ContactsScreen({Key? key}) : super(key: key);
@@ -133,7 +136,6 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       body: SafeArea(
         child: Column(
           children: [
-            // My Series Button at the top
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(12),
@@ -199,11 +201,31 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const PatternScreen()),
-            );
+          onTap: () async {
+            final threadsState = context.read<ThreadsState>();
+            final sequencerState = context.read<SequencerState>();
+            
+            try {
+              // Ensure we have an active solo thread for this user
+              await threadsState.ensureActiveSoloThread(sequencerState);
+              
+              if (context.mounted) {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ThreadScreen(
+                      threadId: threadsState.currentThread!.id,
+                    ),
+                  ),
+                );
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Error creating project: $e')),
+                );
+              }
+            }
           },
           borderRadius: BorderRadius.circular(8),
           child: Container(
@@ -226,7 +248,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'My Series',
+                    'My Sequencer',
                     style: TextStyle(
                       color: Color(0xFF374151),
                       fontSize: 18,

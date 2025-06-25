@@ -504,6 +504,7 @@ class ThreadsState extends ChangeNotifier {
   Thread? _activeThread;
   bool _isLoading = false;
   String? _error;
+  String? _expandedCheckpointId; // Track which checkpoint is magnified
 
   // Getters
   List<Thread> get threads => _threads;
@@ -513,6 +514,7 @@ class ThreadsState extends ChangeNotifier {
   Thread? get currentThread => _activeThread; // Alias for convenience
   bool get isLoading => _isLoading;
   String? get error => _error;
+  String? get expandedCheckpointId => _expandedCheckpointId;
 
   // Get threads where user is a participant
   List<Thread> getUserThreads(String userId) {
@@ -542,6 +544,11 @@ class ThreadsState extends ChangeNotifier {
 
   void setError(String? error) {
     _error = error;
+    notifyListeners();
+  }
+
+  void setExpandedCheckpoint(String? checkpointId) {
+    _expandedCheckpointId = checkpointId;
     notifyListeners();
   }
 
@@ -677,6 +684,74 @@ class ThreadsState extends ChangeNotifier {
       comment: comment,
       snapshot: snapshot,
     );
+  }
+
+  // Create a solo thread for single-user sequencer work
+  Future<String> createSoloThread({
+    String? title,
+    required SequencerState sequencerState,
+  }) async {
+    final userId = _currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
+    final userName = _currentUserName ?? 'Solo Producer';
+    final threadTitle = title ?? 'My Sequencer Project ${DateTime.now().day}/${DateTime.now().month}';
+    
+    // Create a snapshot from current sequencer state
+    final initialSnapshot = sequencerState.createSnapshot(
+      name: threadTitle,
+      comment: 'Started working on sequencer project',
+    );
+
+    return await createThread(
+      title: threadTitle,
+      authorId: userId,
+      authorName: userName,
+      collaboratorIds: [], // Solo thread
+      collaboratorNames: [],
+      initialSnapshot: initialSnapshot,
+      metadata: {
+        'project_type': 'solo',
+        'is_public': false,
+        'created_from': 'my_sequencer_button',
+      },
+    );
+  }
+
+  // Check if user has an active solo thread, create one if needed
+  Future<Thread> ensureActiveSoloThread(SequencerState sequencerState) async {
+    // Ensure we have a current user ID
+    if (_currentUserId == null) {
+      final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
+      final userName = 'Solo Producer';
+      setCurrentUser(userId, userName);
+    }
+
+    // Check if we already have an active thread for this user
+    if (_activeThread != null && 
+        _activeThread!.users.length == 1 && 
+        _activeThread!.users.first.id == _currentUserId) {
+      return _activeThread!;
+    }
+
+    // Look for existing solo thread for this user
+    final userId = _currentUserId!;
+    final existingSoloThread = _threads.where((thread) => 
+      thread.users.length == 1 && 
+      thread.users.first.id == userId &&
+      thread.status == ThreadStatus.active
+    ).isNotEmpty ? _threads.where((thread) => 
+      thread.users.length == 1 && 
+      thread.users.first.id == userId &&
+      thread.status == ThreadStatus.active
+    ).first : null;
+
+    if (existingSoloThread != null) {
+      setActiveThread(existingSoloThread);
+      return existingSoloThread;
+    }
+
+    // Create new solo thread
+    final threadId = await createSoloThread(sequencerState: sequencerState);
+    return _activeThread!; // Will be set by createSoloThread
   }
 
   // Join an existing thread
