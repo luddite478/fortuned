@@ -2,95 +2,9 @@
 
 A Flutter project demonstrating FFI (Foreign Function Interface) integration with native C code on iOS, specifically designed for audio applications. This project showcases a complete FFI chain setup with miniaudio integration for low-latency audio mixing and playback.
 
-## 🎯 **Project Overview**
-- **🎵 Multi-slot audio mixing** - Play up to 8 audio samples simultaneously
-- **⚡ Low latency audio playbook** using miniaudio
-- **💾 Memory-loaded samples** - All samples are loaded into memory for instant triggering
-- **🎛️ DAW-style step sequencer** - 4-column × 16-step grid with BPM-based timing
-- **🎙️ Output recording & rendering** - Record grid combinations to WAV files
-- **🎵 MP3 320kbps conversion** - Export recordings to high-quality MP3 using native LAME integration
-- **📊 Memory usage tracking** - Real-time display of memory consumption per slot and total usage
-- **🔄 Instant restart capability** - Trigger samples from beginning on each play press
-- **📱 Cross-platform support** (iOS focus)
-- **🎛️ Real-time mixing** through native audio performance via FFI
-- **📁 File picker** for audio files
 
-## 📋 **Current Status**
-
-✅ **WORKING:** Complete FFI chain (Flutter → Dart → C → Return)  
-✅ **WORKING:** File picker for audio files  
-✅ **WORKING:** iOS build and deployment (simulator and physical device)  
-✅ **WORKING:** Miniaudio integration with CoreAudio backend  
-✅ **WORKING:** Audio playbook with proper lifecycle management  
-✅ **WORKING:** **8-slot multi-track mixing system**  
-✅ **WORKING:** **Memory-loaded samples with instant triggering**  
-✅ **WORKING:** **Real-time memory usage tracking and display**  
-✅ **WORKING:** **DAW-style step sequencer (4×16 grid, BPM timing)**  
-✅ **WORKING:** **Thread-safe slot operations**  
-✅ **WORKING:** **Bluetooth audio routing for AirPods/Bluetooth speakers**  
-✅ **WORKING:** **Output recording & rendering (single device architecture)**  
-✅ **WORKING:** **MP3 320kbps conversion with native LAME integration**
-
-## 🚀 **Key Features**
-
-### **🎛️ Multi-Slot Audio System**
-- **8 Independent Audio Slots**: Load different samples into separate slots (0-7)
-- **Simultaneous Playback**: All slots can play at the same time, mixed together seamlessly
-- **Memory-Loaded**: All samples are loaded into memory for instant, zero-latency triggering
-- **Individual Controls**: Each slot has its own load/play/stop controls
-- **Real-time Status**: Visual feedback showing loaded/playing state per slot
-
-### **⚡ Performance & Safety Improvements**
-- **Thread-Safe Operations**: All slot operations use Grand Central Dispatch serial queue
-- **Memory-Safe Design**: Proper resource cleanup and memory management
-- **Symbol Export Fix**: Added proper `__attribute__((visibility("default")))` for iOS device compatibility
-- **Instant Restart**: Samples restart from beginning when triggered while playing
-- **Fast Triggering**: Safe to press play/stop rapidly without crashes
-
-### **🎵 Audio Engineering Features**
-**Based on Official Miniaudio Simple Mixing Example**: Our audio playback system implements the exact pattern from [miniaudio's simple_mixing example](https://miniaud.io/docs/examples/simple_mixing.html).
-
-**Single Device Architecture for Playback:**
-- **One `ma_device`**: All audio mixing happens through a single device instance
-- **Single Data Callback**: One unified callback mixes all active audio slots
-- **Floating Point Mixing**: Uses `ma_format_f32` for precise sample addition
-- **No Engine Overhead**: Direct device approach eliminates multiple engine complexity
-
-**Simple Mixing Implementation:**
-```c
-// Official miniaudio Simple Mixing data callback (exactly like the example)
-static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
-    float* pOutputF32 = (float*)pOutput;
-    memset(pOutputF32, 0, sizeof(float) * frameCount * CHANNEL_COUNT);
-
-    // Mix all active slots
-    for (int slot = 0; slot < MINIAUDIO_MAX_SLOTS; ++slot) {
-        audio_slot_t* s = &g_slots[slot];
-        
-        // Skip inactive, unloaded, or finished slots
-        if (!s->active || !s->loaded || s->at_end) {
-            continue;
-        }
-
-        mix_slot_audio(s, pOutputF32, frameCount);
-    }
-}
-```
-
-**How Mixing Works:**
-- **Zero Output Buffer**: Starts with silence (`memset(pOutputF32, 0, ...)`)
-- **Additive Mixing**: Each slot adds its samples to the output buffer
-- **Natural Blending**: Multiple samples playing simultaneously blend together
-- **No Clipping Protection**: Relies on proper sample levels (like the official example)
-
-**Key Technical Benefits:**
-- **Low-Latency Path**: Memory-loaded samples bypass file I/O for instant triggering
-- **Efficient Mixing**: Simple float addition, no complex DSP processing
-- **Scalable**: Easily handles 1-8 simultaneous samples
-- **Standard Pattern**: Follows miniaudio's recommended approach exactly
-
-### 🎛️ Node Graph Based Mixing (v2 ‑ 2025-06)
-**Why upgrade?** The simple-mixing callback works but limits us when we want many independent voices that can keep playing while others are replaced.  Miniaudio's *node-graph* API solves this by giving every sound its own node whose output is automatically mixed by the graph.
+### 🎛️ Node Graph Based Mixing
+The simple-mixing callback works but limits us when we want many independent voices that can keep playing while others are replaced.  Miniaudio's *node-graph* API solves this by giving every sound its own node whose output is automatically mixed by the graph.
 
 **What changed natively**
 1. A global `ma_node_graph` is created during `miniaudio_init()`.
@@ -102,15 +16,12 @@ static void data_callback(ma_device* pDevice, void* pOutput, const void* pInput,
 5. All slots' resources (decoder, memory, node) are cleaned up in the correct order.  The graph itself is torn down in `miniaudio_cleanup()`.
 
 **Dart / Flutter API impact**
-• Good news – **no API changes**.  The public FFI functions remain the same (`miniaudio_load_sound_to_slot`, `play_slot`, `stop_slot`, etc.).  The sequencer logic in `tracker_state.dart` already calls `playSlot()` every step and only stops a column when a new sample is triggered, which is exactly what the node-graph backend expects.
 • `MiniaudioLibrary.slotCount` now returns 1024, giving head-room for much larger grids (e.g. 16×48 = 768 cells) and future features.
 
 **Benefits achieved**
 • Unlimited simultaneous voices (practically 1024) with individual volume control.
 • Built-in clipping prevention and high-quality mixing handled by miniaudio.
 • Cleaner, shorter data callback and easier future DSP insertions (filters, delays, etc.) – just insert more nodes!
-
-If you are upgrading an existing app you only need to rebuild the native project.  No Dart code changes are required, but you can query `slotCount` to show the new limit in the UI if you like.
 
 ### **🎙️ Output Recording & Rendering**
 **Based on Simple Capture Example**: Implements [miniaudio's simple_capture pattern](https://miniaud.io/docs/examples/simple_capture.html) to record the mixed output from our single device architecture.
@@ -165,13 +76,13 @@ if (g_is_output_recording) {
 
 ### **🎛️ DAW-Style Step Sequencer**
 **Grid Layout:**
-- **4 columns × 16 rows** = 64 cells total
+- **4 columns × 16 rows** = 64 cells total (will be configurable in feature)
 - **Column = Track**: Each column represents an independent audio track
 - **Row = Step**: Each row represents a 1/16 note timing step
 - **Visual feedback**: Current playing step highlighted with yellow border
 
 **Timing & BPM:**
-- **120 BPM default** with precise timing calculation
+- **120 BPM default** with precise timing calculation (wil lbe configurable)
 - **1/16 note resolution**: Each step = 125ms at 120 BPM
 - **Formula**: `stepDuration = (60 * 1000) / (bpm * 4)` milliseconds
 - **Automatic looping**: Continuously cycles through steps 1-16
@@ -211,7 +122,7 @@ if (g_is_output_recording) {
 **Critical Configuration:**
 ```objective-c
 // Prevent miniaudio from overriding our Bluetooth config
-#define MA_NO_AVFOUNDATION
+#define MA_NO_AVFOUNDATIONR
 
 // Configure session with Bluetooth support (WITHOUT DefaultToSpeaker)
 [session setCategory:AVAudioSessionCategoryPlayback
@@ -356,15 +267,6 @@ class AudioConversionService {
   }
 }
 ```
-
-**Key Benefits:**
-- **Perfect Audio Quality**: No noise or artifacts (fixed float-to-int conversion)
-- **Professional Bitrate**: 320kbps MP3 for maximum quality
-- **Smart Detection**: Automatically detects and handles different WAV formats
-- **Commercial Safe**: LGPL licensing allows commercial distribution
-- **No Dependencies**: No reliance on discontinued or broken Flutter packages
-- **Native Performance**: Direct C integration for fastest conversion speed
-- **Cross-Platform**: Same implementation works on iOS and Android
 
 **Usage Workflow:**
 1. **Record Audio**: Create beats using the step sequencer and record to WAV

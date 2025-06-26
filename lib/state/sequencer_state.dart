@@ -12,6 +12,7 @@ import 'package:http/http.dart' as http;
 import '../sequencer_library.dart';
 import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
+import '../services/threads_service.dart';
 // import 'patterns_state.dart';
 
 // Sample browser item model
@@ -167,6 +168,14 @@ class SequencerState extends ChangeNotifier {
 
   // Thread integration
   ThreadsState? _threadsState;
+
+  // Collaboration state
+  bool _isCollaborating = false;
+  Thread? _sourceThread;
+
+  // Collaboration getters
+  bool get isCollaborating => _isCollaborating;
+  Thread? get sourceThread => _sourceThread;
 
   // Autosave functionality
   bool _autosaveEnabled = true;
@@ -2142,6 +2151,223 @@ Made with Demo Sequencer 🚀
     } catch (e) {
       debugPrint('❌ Error publishing to database: $e');
       return false;
+    }
+  }
+
+  // =============================================================================
+  // COLLABORATION METHODS
+  // =============================================================================
+
+  /// Load a project from a Thread ID (for collaboration/sourcing)
+  Future<bool> loadFromThread(String threadId) async {
+    try {
+      debugPrint('🤝 Loading project from thread ID: $threadId');
+      
+      // Fetch the thread data from server
+      final thread = await ThreadsService.getThread(threadId);
+      if (thread == null) {
+        debugPrint('❌ Thread not found: $threadId');
+        return false;
+      }
+      
+      debugPrint('📥 Fetched thread: ${thread.title}');
+      
+      // Get the latest checkpoint from the thread
+      final latestCheckpoint = thread.latestCheckpoint;
+      if (latestCheckpoint == null) {
+        debugPrint('❌ No checkpoints found in thread');
+        return false;
+      }
+
+      debugPrint('📸 Loading latest checkpoint: ${latestCheckpoint.comment}');
+
+      // Load the sequencer snapshot
+      await loadFromSnapshot(latestCheckpoint.snapshot);
+      
+      // Set collaboration mode
+      _isCollaborating = true;
+      _sourceThread = thread;
+      
+      debugPrint('✅ Successfully loaded project from thread: ${thread.title}');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error loading project from thread: $e');
+      return false;
+    }
+  }
+
+  /// Load a project from a Thread object (for collaboration/sourcing)
+  Future<bool> loadFromThreadObject(Thread thread) async {
+    try {
+      debugPrint('🤝 Loading project from thread object: ${thread.title}');
+      
+      // Get the latest checkpoint from the thread
+      final latestCheckpoint = thread.latestCheckpoint;
+      if (latestCheckpoint == null) {
+        debugPrint('❌ No checkpoints found in thread');
+        return false;
+      }
+
+      // Load the sequencer snapshot
+      await loadFromSnapshot(latestCheckpoint.snapshot);
+      
+      // Set collaboration mode
+      _isCollaborating = true;
+      _sourceThread = thread;
+      
+      debugPrint('✅ Successfully loaded project from thread');
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error loading project from thread: $e');
+      return false;
+    }
+  }
+
+  /// Load sequencer state from a snapshot
+  Future<void> loadFromSnapshot(SequencerSnapshot snapshot) async {
+    try {
+      debugPrint('📸 Loading sequencer from snapshot: ${snapshot.name}');
+      
+      // Clear current state first
+      _clearAllSampleSlots();
+      clearAllCells();
+      
+      // Load basic metadata
+      if (snapshot.audio.sources.isNotEmpty) {
+        final source = snapshot.audio.sources.first;
+        
+        // Load samples first
+        final sampleMap = <String, int>{}; // Map sample ID to slot index
+        for (int i = 0; i < source.samples.length && i < _slotCount; i++) {
+          final sample = source.samples[i];
+          sampleMap[sample.id] = i;
+          
+          // Note: In a real implementation, you'd download and load the actual sample files
+          // For now, we'll just set the metadata
+          _fileNames[i] = sample.name;
+          _slotLoaded[i] = true; // Mark as loaded (though file might not be available locally)
+          
+          debugPrint('🎵 Loaded sample ${i + 1}: ${sample.name}');
+        }
+        
+        // Load grid data if available
+        if (source.scenes.isNotEmpty) {
+          final scene = source.scenes.first;
+          
+          // Update BPM if available
+          if (scene.metadata.bpm > 0) {
+            _bpm = scene.metadata.bpm;
+          }
+          
+          // Load grid patterns
+          if (scene.layers.isNotEmpty) {
+            final layer = scene.layers.first;
+            
+            // Ensure we have grid storage
+            if (_soundGridSamples.isEmpty) {
+              addSoundGrid();
+            }
+            
+            // Load grid cells
+            for (int rowIndex = 0; rowIndex < layer.rows.length && rowIndex < _gridRows; rowIndex++) {
+              final row = layer.rows[rowIndex];
+              for (int cellIndex = 0; cellIndex < row.cells.length && cellIndex < _gridColumns; cellIndex++) {
+                final cell = row.cells[cellIndex];
+                
+                if (cell.sample?.hasSample == true) {
+                  // Find the slot index for this sample
+                  final sampleSlot = sampleMap[cell.sample!.sampleId];
+                  if (sampleSlot != null) {
+                    final gridIndex = rowIndex * _gridColumns + cellIndex;
+                    _soundGridSamples[_currentSoundGridIndex][gridIndex] = sampleSlot;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      debugPrint('✅ Successfully loaded snapshot');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error loading from snapshot: $e');
+      rethrow;
+    }
+  }
+
+  /// Exit collaboration mode
+  void exitCollaboration() {
+    _isCollaborating = false;
+    _sourceThread = null;
+    notifyListeners();
+  }
+
+  /// Create a collaboration checkpoint
+  Future<bool> createCollaborationCheckpoint({
+    required String comment,
+    String? currentUserId,
+    String? currentUserName,
+  }) async {
+    if (!_isCollaborating || _sourceThread == null) {
+      debugPrint('❌ Not in collaboration mode');
+      return false;
+    }
+
+    try {
+      // Create snapshot of current state
+      final snapshot = createSnapshot(
+        name: _sourceThread!.title,
+        comment: comment,
+      );
+
+      // Use provided user info or fallback
+      final userId = currentUserId ?? _threadsState?.currentUserId ?? 'current_user_123';
+      final userName = currentUserName ?? _threadsState?.currentUserName ?? 'Collaborator';
+
+      // First, ensure current user is a participant in the thread
+      try {
+        await ThreadsService.joinThread(_sourceThread!.id, userId, userName);
+        debugPrint('✅ Joined thread as participant: $userName');
+      } catch (e) {
+        debugPrint('⚠️ Failed to join thread (user might already be participant): $e');
+        // Continue anyway - the user might already be in the thread
+      }
+
+      // Create checkpoint object
+      final checkpoint = ThreadCheckpoint(
+        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+        userId: userId,
+        userName: userName,
+        timestamp: DateTime.now(),
+        comment: comment,
+        snapshot: snapshot,
+      );
+
+      // Send collaboration checkpoint to server
+      await ThreadsService.addCheckpoint(_sourceThread!.id, checkpoint);
+      
+      debugPrint('🤝 Created collaboration checkpoint: $comment');
+      debugPrint('📤 Sent checkpoint to server for thread: ${_sourceThread!.id}');
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error creating collaboration checkpoint: $e');
+      return false;
+    }
+  }
+
+  /// Clear all loaded sample slots
+  void _clearAllSampleSlots() {
+    for (int i = 0; i < _slotCount; i++) {
+      if (_slotLoaded[i]) {
+        _sequencerLibrary.unloadSlot(i);
+        _slotLoaded[i] = false;
+        _slotPlaying[i] = false;
+        _filePaths[i] = null;
+        _fileNames[i] = null;
+      }
     }
   }
 

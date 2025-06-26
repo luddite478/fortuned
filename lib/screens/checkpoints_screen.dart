@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 import '../widgets/app_header_widget.dart';
+import 'user_profile_screen.dart';
 
 class CheckpointsScreen extends StatefulWidget {
   final String threadId;
@@ -654,5 +655,206 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+}
+
+// Enhanced version that shows user context and common threads
+class CheckpointsScreenWithUserContext extends StatefulWidget {
+  final String threadId;
+  final String targetUserId;
+  final String targetUserName;
+  final List<Thread> commonThreads;
+  
+  const CheckpointsScreenWithUserContext({
+    super.key,
+    required this.threadId,
+    required this.targetUserId,
+    required this.targetUserName,
+    required this.commonThreads,
+  });
+
+  @override
+  State<CheckpointsScreenWithUserContext> createState() => _CheckpointsScreenWithUserContextState();
+}
+
+class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWithUserContext> {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0f172a),
+      body: Column(
+        children: [
+          // User header with threads button
+          _buildUserHeader(),
+          
+          // Common threads pinned section (if more than 1 common thread)
+          if (widget.commonThreads.length > 1)
+            _buildCommonThreadsSection(),
+          
+          // Checkpoints content
+          Expanded(
+            child: CheckpointsScreen(threadId: widget.threadId),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildUserHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 50, 16, 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF374151),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
+      ),
+      child: Row(
+        children: [
+          // Back button
+          IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () => Navigator.pop(context),
+          ),
+          
+          // User name with online indicator
+          Expanded(
+            child: Row(
+              children: [
+                Text(
+                  widget.targetUserName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Online indicator (assuming online for now - you can connect this to actual user status)
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: Color.fromARGB(255, 118, 41, 195),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          
+          // Threads button
+          ElevatedButton(
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserProfileScreen(
+                    userId: widget.targetUserId,
+                    userName: widget.targetUserName,
+                  ),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 118, 41, 195),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text(
+              'Profile',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildCommonThreadsSection() {
+    // Filter out the current thread from common threads
+    final otherCommonThreads = widget.commonThreads
+        .where((thread) => thread.id != widget.threadId)
+        .toList();
+    
+    if (otherCommonThreads.isEmpty) return const SizedBox();
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: const BoxDecoration(
+        color: Color(0xFF1e293b),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '📌 Other Common Threads',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...otherCommonThreads.map((thread) => _buildPinnedThread(thread)),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildPinnedThread(Thread thread) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFF374151),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.push_pin, color: Colors.white70, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              thread.title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              // Switch to this thread
+              final threadsState = Provider.of<ThreadsState>(context, listen: false);
+              threadsState.setActiveThread(thread);
+              
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => CheckpointsScreenWithUserContext(
+                    threadId: thread.id,
+                    targetUserId: widget.targetUserId,
+                    targetUserName: widget.targetUserName,
+                    commonThreads: widget.commonThreads,
+                  ),
+                ),
+              );
+            },
+            child: const Text(
+              'Open',
+              style: TextStyle(color: Color.fromARGB(255, 118, 41, 195)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 } 

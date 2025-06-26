@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
-import 'package:path/path.dart' as path;
 import '../../state/sequencer_state.dart';
-import '../../screens/publish_screen.dart';
 
 class ShareWidget extends StatelessWidget {
   const ShareWidget({super.key});
@@ -20,7 +18,7 @@ class ShareWidget extends StatelessWidget {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // Use the actual constraints from parent (20% of screen height)
+              // Use the actual constraints from parent R(20% of screen height)
               final availableHeight = constraints.maxHeight;
               final availableWidth = constraints.maxWidth;
               
@@ -45,11 +43,15 @@ class ShareWidget extends StatelessWidget {
                         children: [
                           const Spacer(),
                           
-                          // Responsive publish button
+                          // Dynamic button: Publish or Collaborate
                           ElevatedButton(
-                            onPressed: () => _publishProject(context, sequencer),
+                            onPressed: () => sequencer.isCollaborating 
+                              ? _createCollaborationCheckpoint(context, sequencer)
+                              : _publishProject(context, sequencer),
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.grey.shade600,
+                              backgroundColor: sequencer.isCollaborating 
+                                ? const Color.fromARGB(255, 118, 41, 195) // Purple for collaborate
+                                : Colors.grey.shade600, // Gray for publish
                               padding: EdgeInsets.symmetric(
                                 horizontal: headerHeight * 0.25,
                                 vertical: headerHeight * 0.1,
@@ -63,13 +65,13 @@ class ShareWidget extends StatelessWidget {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(
-                                  Icons.cloud_upload, 
+                                  sequencer.isCollaborating ? Icons.group_work : Icons.cloud_upload,
                                   size: iconSize.clamp(8.0, 14.0), 
                                   color: Colors.white70,
                                 ),
                                 SizedBox(width: headerHeight * 0.08),
                                 Text(
-                                  'Publish',
+                                  sequencer.isCollaborating ? 'Collaborate' : 'Publish',
                                   style: TextStyle(
                                     fontSize: fontSize.clamp(6.0, 12.0),
                                     fontWeight: FontWeight.w600,
@@ -276,16 +278,115 @@ class ShareWidget extends StatelessWidget {
     }
   }
 
-  void _publishProject(BuildContext context, SequencerState sequencer) {
-    // Close share widget and open publish screen
-    sequencer.setShowShareWidget(false);
-    
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const PublishScreen(),
-      ),
-    );
+  void _publishProject(BuildContext context, SequencerState sequencer) async {
+    try {
+      // Close share widget
+      sequencer.setShowShareWidget(false);
+      
+      // Show loading indicator
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Publishing project...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Auto-generate title with timestamp
+      final now = DateTime.now();
+      final title = 'Project ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      
+      // Publish to database
+      final success = await sequencer.publishToDatabase(
+        title: title,
+        description: 'Published from mobile app',
+        isPublic: true,
+      );
+      
+      if (!context.mounted) return;
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Project published successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to publish project'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  void _createCollaborationCheckpoint(BuildContext context, SequencerState sequencer) async {
+    try {
+      // Close share widget
+      sequencer.setShowShareWidget(false);
+      
+      // Show loading indicator
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Creating collaboration checkpoint...'),
+          backgroundColor: Color.fromARGB(255, 118, 41, 195),
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Create collaboration checkpoint with auto-generated comment
+      final now = DateTime.now();
+      final comment = 'Update ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+      
+      final success = await sequencer.createCollaborationCheckpoint(comment: comment);
+      
+      if (!context.mounted) return;
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Collaboration checkpoint created!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to create checkpoint'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void _playRecording(String filePath) async {

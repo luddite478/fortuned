@@ -3,10 +3,12 @@ import 'package:provider/provider.dart';
 import '../services/chat_client.dart';
 import '../services/user_profile_service.dart';
 import '../services/auth_service.dart';
+import '../services/threads_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'thread_screen.dart';
 import 'user_profile_screen.dart';
 import 'sequencer_screen.dart';
+import 'checkpoints_screen.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 
@@ -215,20 +217,24 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
               // User avatar              
               const SizedBox(width: 12),
               
-              // User info
+              // User info - clickable to view own profile
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                                          Text(
+                child: GestureDetector(
+                  onTap: () => _viewMyProfile(currentUser),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         currentUser.name,
                         style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: const Color.fromARGB(255, 36, 63, 116),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: const Color.fromARGB(255, 36, 63, 116),
+                          decoration: TextDecoration.underline, // Show it's clickable
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               
@@ -512,14 +518,99 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
-  void _startChat(User user) {
-    // Navigate to user profile instead of chat
+  void _startChat(User user) async {
+    // Check for common threads with this user
+    final commonThreads = await _getCommonThreadsWithUser(user.id);
+    
+    if (commonThreads.isNotEmpty) {
+      // We have collaborations - navigate directly to checkpoints screen
+      debugPrint('🤝 Found ${commonThreads.length} common threads with ${user.name}');
+      
+      // Sort by updated date to get the latest thread
+      commonThreads.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final latestThread = commonThreads.first;
+      
+      debugPrint('📋 Opening checkpoints for latest thread: ${latestThread.title}');
+      
+      // Set the active thread in ThreadsState before navigating
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      threadsState.setActiveThread(latestThread);
+      
+      // Navigate to checkpoints screen (chat-like interface)
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckpointsScreenWithUserContext(
+            threadId: latestThread.id,
+            targetUserId: user.id,
+            targetUserName: user.name,
+            commonThreads: commonThreads,
+          ),
+        ),
+      );
+    } else {
+      // No collaborations - navigate to user profile
+      debugPrint('👤 No common threads with ${user.name}, opening profile');
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => UserProfileScreen(
+            userId: user.id,
+            userName: user.name,
+          ),
+        ),
+      );
+    }
+  }
+
+  /// Get common threads between current user and target user
+  Future<List<Thread>> _getCommonThreadsWithUser(String targetUserId) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUserId = authService.currentUser?.id;
+      
+      debugPrint('🔍 Checking common threads: current=$currentUserId, target=$targetUserId');
+      
+      if (currentUserId == null) {
+        debugPrint('❌ No current user ID');
+        return [];
+      }
+
+      // Get threads for the target user
+      final targetUserThreads = await ThreadsService.getUserThreads(targetUserId);
+      debugPrint('📋 Found ${targetUserThreads.length} threads for target user');
+      
+      // Debug: Print thread participants
+      for (final thread in targetUserThreads) {
+        final userIds = thread.users.map((u) => u.id).toList();
+        debugPrint('   Thread "${thread.title}": users=$userIds');
+      }
+      
+      // Find threads where both current user and target user are participants
+      final commonThreads = targetUserThreads.where((thread) => 
+        thread.hasUser(currentUserId) && thread.hasUser(targetUserId)
+      ).toList();
+      
+      debugPrint('🤝 Found ${commonThreads.length} common threads');
+      for (final thread in commonThreads) {
+        debugPrint('   Common: "${thread.title}" (${thread.id})');
+      }
+      
+      return commonThreads;
+    } catch (e) {
+      debugPrint('❌ Error getting common threads: $e');
+      return [];
+    }
+  }
+
+  void _viewMyProfile(UserProfile currentUser) {
+    // Navigate to own profile
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => UserProfileScreen(
-          userId: user.id,
-          userName: user.name,
+          userId: currentUser.id,
+          userName: currentUser.name,
         ),
       ),
     );

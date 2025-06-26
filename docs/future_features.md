@@ -1,2 +1,4 @@
 - comment(reply)-menu for chekpoints
 - contacts and all users search
+- bpm
+- pitch
