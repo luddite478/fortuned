@@ -221,7 +221,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                   children: [
                     Text(
                       currentUser.name,
-                      style: TextStyle(
+                      style: TextSt yle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: const Color.fromARGB(255, 36, 63, 116),
