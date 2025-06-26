@@ -66,21 +66,14 @@ class UserProfile {
       'profile': {
         'bio': profile.bio,
         'location': profile.location,
-        'website': profile.website,
-        'social_links': profile.socialLinks,
       },
-      'stats': {
-        'total_plays': stats.totalPlays,
-        'total_likes': stats.totalLikes,
-        'follower_count': stats.followerCount,
-        'following_count': stats.followingCount,
-      },
+              'stats': {
+          'total_plays': stats.totalPlays,
+        },
 
-      'preferences': {
-        'notifications_enabled': preferences.notificationsEnabled,
-        'public_profile': preferences.publicProfile,
-        'theme': preferences.theme,
-      },
+              'preferences': {
+          'theme': preferences.theme,
+        },
     };
   }
 
@@ -105,69 +98,43 @@ class UserProfile {
 class UserProfileInfo {
   final String bio;
   final String location;
-  final String website;
-  final Map<String, String> socialLinks;
 
   UserProfileInfo({
     required this.bio,
     required this.location,
-    required this.website,
-    required this.socialLinks,
   });
 
   factory UserProfileInfo.fromJson(Map<String, dynamic> json) {
-    final social = json['social_links'] ?? {};
     return UserProfileInfo(
       bio: json['bio'] ?? '',
       location: json['location'] ?? '',
-      website: json['website'] ?? '',
-      socialLinks: {
-        'twitter': social['twitter'] ?? '',
-        'instagram': social['instagram'] ?? '',
-        'youtube': social['youtube'] ?? '',
-      },
     );
   }
 }
 
 class UserStats {
   final int totalPlays;
-  final int totalLikes;
-  final int followerCount;
-  final int followingCount;
 
   UserStats({
     required this.totalPlays,
-    required this.totalLikes,
-    required this.followerCount,
-    required this.followingCount,
   });
 
   factory UserStats.fromJson(Map<String, dynamic> json) {
     return UserStats(
       totalPlays: json['total_plays'] ?? 0,
-      totalLikes: json['total_likes'] ?? 0,
-      followerCount: json['follower_count'] ?? 0,
-      followingCount: json['following_count'] ?? 0,
     );
   }
 }
 
 class UserPreferences {
-  final bool notificationsEnabled;
-  final bool publicProfile;
   final String theme;
 
   UserPreferences({
-    required this.notificationsEnabled,
-    required this.publicProfile,
     required this.theme,
   });
 
   factory UserPreferences.fromJson(Map<String, dynamic> json) {
     return UserPreferences(
-      notificationsEnabled: json['notifications_enabled'] ?? true,
-      publicProfile: json['public_profile'] ?? true,
       theme: json['theme'] ?? 'dark',
     );
   }

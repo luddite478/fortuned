@@ -43,13 +43,7 @@ COLLECTIONS_CONFIG = {
             "salt": "string",
             "profile": {
                 "bio": "string", 
-                "location": "string",
-                "website": "string",
-                "social_links": {
-                    "twitter": "string",
-                    "instagram": "string", 
-                    "youtube": "string"
-                }
+                "location": "string"
             },
             "created_at": "datetime",
             "last_login": "datetime",
@@ -57,15 +51,10 @@ COLLECTIONS_CONFIG = {
             "is_active": "boolean",
             "email_verified": "boolean",
             "stats": {
-                "total_plays": "number",
-                "total_likes": "number",
-                "follower_count": "number",
-                "following_count": "number"
+                "total_plays": "number"
             },
 
             "preferences": {
-                "notifications_enabled": "boolean",
-                "public_profile": "boolean",
                 "theme": "string"
             }
         }
@@ -201,21 +190,15 @@ COLLECTIONS_CONFIG = {
 SAMPLE_DATA_TEMPLATES = {
     "users": [
         {
-            "id": "alice-test-user-001",
+            "id": "dj_vegan-test-user-001",
             "username": "dj_vegan",
             "name": "dj_vegan",
-            "email": "alice@test.com",
+            "email": "dj_vegan@test.com",
             "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
             "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
             "profile": {
-                "bio": "Electronic music producer and sound designer",
-                "location": "Los Angeles, CA",
-                "website": "https://alicejohnson.com",
-                "social_links": {
-                    "twitter": "@alicej",
-                    "instagram": "@alicebeats",
-                    "youtube": "AliceJohnsonMusic"
-                }
+                "bio": "IT guy",
+                "location": "Los Angeles, CA"
             },
             "created_at": "2024-01-15T10:30:00Z",
             "last_login": "2024-12-06T15:45:00Z",
@@ -223,15 +206,10 @@ SAMPLE_DATA_TEMPLATES = {
             "is_active": True,
             "email_verified": True,
             "stats": {
-                "total_plays": 15420,
-                "total_likes": 892,
-                "follower_count": 245,
-                "following_count": 180
+                "total_plays": 15420
             },
 
             "preferences": {
-                "notifications_enabled": True,
-                "public_profile": True,
                 "theme": "dark"
             }
         },
@@ -243,30 +221,19 @@ SAMPLE_DATA_TEMPLATES = {
             "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
             "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
             "profile": {
-                "bio": "Hip-hop and trap music creator",
-                "location": "Atlanta, GA",
-                "website": "",
-                "social_links": {
-                    "twitter": "@bobsmith",
-                    "instagram": "@bobbeatsofficial",
-                    "youtube": ""
-                }
+                "bio": "Bach interpreter",
+                "location": "Atlanta, GA"
             },
             "created_at": "2024-02-01T09:15:00Z",
-            "last_login": "2024-12-05T12:30:00Z",
+            "last_login": "2024-R12-05T12:30:00Z",
             "last_online": "2024-03-19T16:45:00Z",
             "is_active": True,
             "email_verified": True,
             "stats": {
-                "total_plays": 8930,
-                "total_likes": 456,
-                "follower_count": 189,
-                "following_count": 203
+                "total_plays": 8930
             },
 
             "preferences": {
-                "notifications_enabled": True,
-                "public_profile": True,
                 "theme": "light"
             }
         }
@@ -466,9 +433,9 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Initialize MongoDB collections")
-    parser.add_argument("--drop", action="store_True", help="Drop existing collections")
-    parser.add_argument("--no-samples", action="store_True", help="Skip sample data insertion")
-    parser.add_argument("--list-config", action="store_True", help="List current configuration")
+    parser.add_argument("--drop", action="store_true", help="Drop existing collections")
+    parser.add_argument("--no-samples", action="store_true", help="Skip sample data insertion")
+    parser.add_argument("--list-config", action="store_true", help="List current configuration")
     
     args = parser.parse_args()
     

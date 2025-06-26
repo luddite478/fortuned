@@ -219,9 +219,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      currentUser.name,
-                      style: TextSt yle(
+                                          Text(
+                        currentUser.name,
+                        style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: const Color.fromARGB(255, 36, 63, 116),

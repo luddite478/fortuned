@@ -74,9 +74,9 @@ class AuthService extends ChangeNotifier {
           lastOnline: DateTime.now(),
           isActive: true,
           emailVerified: false,
-          profile: UserProfileInfo(bio: '', location: '', website: '', socialLinks: {}),
-          stats: UserStats(totalPlays: 0, totalLikes: 0, followerCount: 0, followingCount: 0),
-          preferences: UserPreferences(notificationsEnabled: true, publicProfile: true, theme: 'dark'),
+          profile: UserProfileInfo(bio: '', location: ''),
+          stats: UserStats(totalPlays: 0),
+          preferences: UserPreferences(theme: 'dark'),
         );
         
         _isAuthenticated = true;
@@ -119,9 +119,9 @@ class AuthService extends ChangeNotifier {
           lastOnline: DateTime.now(),
           isActive: true,
           emailVerified: false,
-          profile: UserProfileInfo(bio: '', location: '', website: '', socialLinks: {}),
-          stats: UserStats(totalPlays: 0, totalLikes: 0, followerCount: 0, followingCount: 0),
-          preferences: UserPreferences(notificationsEnabled: true, publicProfile: true, theme: 'dark'),
+          profile: UserProfileInfo(bio: '', location: ''),
+          stats: UserStats(totalPlays: 0),
+          preferences: UserPreferences(theme: 'dark'),
         );
         
         _isAuthenticated = true;
