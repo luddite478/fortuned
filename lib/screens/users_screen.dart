@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_client.dart';
 import '../services/user_profile_service.dart';
+import '../services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'thread_screen.dart';
 import 'user_profile_screen.dart';
@@ -96,9 +97,14 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
 
   List<User> get _users {
     final users = <User>[];
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
     
-    // Convert UserProfile from API to User for UI
+    // Convert UserProfile from API to User for UI, excluding current user
     for (final profile in _userProfiles) {
+      // Skip if this is the current user
+      if (profile.id == currentUserId) continue;
+      
       final isOnline = profile.isOnline || _onlineUserIds.contains(profile.id);
       final isWorking = _onlineUserIds.contains(profile.id) && (profile.id.hashCode.abs() % 3 == 0);
       
@@ -111,9 +117,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       ));
     }
     
-    // Add additional online users that aren't in our profile list
+    // Add additional online users that aren't in our profile list (excluding current user)
     for (final userId in _onlineUserIds) {
-      if (!users.any((u) => u.id == userId)) {
+      if (userId != currentUserId && !users.any((u) => u.id == userId)) {
         users.add(User(
           id: userId,
           name: 'User ${userId.substring(0, 8)}', // Show partial ID as name
@@ -134,6 +140,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       body: SafeArea(
         child: Column(
           children: [
+            // User indicator at the top
+            _buildUserIndicator(),
+            
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(12),
@@ -179,6 +188,62 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildUserIndicator() {
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        final currentUser = authService.currentUser;
+        if (currentUser == null) return const SizedBox();
+        
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: const Color.fromARGB(255, 255, 255, 255),
+            border: Border(
+              bottom: BorderSide(
+                color: const Color.fromARGB(255, 255, 255, 255)!,
+                width: 1,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              // User avatar              
+              const SizedBox(width: 12),
+              
+              // User info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      currentUser.name,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color.fromARGB(255, 36, 63, 116),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Online indicator
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  color: Colors.green[500],
+                  shape: BoxShape.circle,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

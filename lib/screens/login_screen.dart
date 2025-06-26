@@ -26,14 +26,14 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     {
       'email': 'alice@test.com',
       'password': 'test123',
-      'name': 'Alice Johnson',
-      'username': 'alice_j'
+      'name': 'dj_vegan',
+      'username': 'dj_vegan'
     },
     {
       'email': 'bob@test.com',
       'password': 'test123',
-      'name': 'Bob Smith',
-      'username': 'bob_s'
+      'name': 'dj_rodry',
+      'username': 'dj_rodry'
     },
   ];
 
@@ -180,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 8),
                                 ),
-                                child: const Text('Alice'),
+                                child: const Text('dj_vegan'),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -192,7 +192,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   foregroundColor: Colors.white,
                                   padding: const EdgeInsets.symmetric(vertical: 8),
                                 ),
-                                child: const Text('Bob'),
+                                child: const Text('dj_rodry'),
                               ),
                             ),
                           ],

@@ -202,8 +202,8 @@ SAMPLE_DATA_TEMPLATES = {
     "users": [
         {
             "id": "alice-test-user-001",
-            "username": "alice_j",
-            "name": "Alice Johnson",
+            "username": "dj_vegan",
+            "name": "dj_vegan",
             "email": "alice@test.com",
             "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
             "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
@@ -237,8 +237,8 @@ SAMPLE_DATA_TEMPLATES = {
         },
         {
             "id": "bob-test-user-002", 
-            "username": "bob_s",
-            "name": "Bob Smith",
+            "username": "dj_rodry",
+            "name": "dj_rodry",
             "email": "bob@test.com",
             "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
             "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
