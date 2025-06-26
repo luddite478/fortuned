@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/user_profile_service.dart';
+import '../services/threads_service.dart';
 
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
@@ -42,7 +43,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       });
 
       final profile = await UserProfileService.getUserProfile(widget.userId);
-      final threads = await UserProfileService.getUserThreads(widget.userId);
+      final threads = await ThreadsService.getUserThreads(widget.userId);
 
       setState(() {
         _userProfile = profile;

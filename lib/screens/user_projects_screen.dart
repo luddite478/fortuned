@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/user_profile_service.dart';
+import '../services/threads_service.dart';
 import '../state/threads_state.dart';
 
 class UserProjectsScreen extends StatefulWidget {
@@ -34,7 +35,7 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
         _error = null;
       });
 
-      final projects = await UserProfileService.getUserThreads(widget.userId);
+      final projects = await ThreadsService.getUserThreads(widget.userId);
 
       setState(() {
         _projects = projects;
@@ -296,13 +297,19 @@ class _UserProjectsScreenState extends State<UserProjectsScreen> {
       );
 
       // Fetch detailed thread data
-      final threadData = await UserProfileService.getThread(thread.id);
+      final threadData = await ThreadsService.getThread(thread.id);
       
       // Hide loading
       Navigator.of(context).pop();
       
-      // Show details dialog
-      _showProjectDetailsDialog(threadData);
+      if (threadData != null) {
+        // Show details dialog
+        _showProjectDetailsDialog(threadData);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Thread not found')),
+        );
+      }
       
     } catch (e) {
       // Hide loading

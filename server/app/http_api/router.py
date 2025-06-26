@@ -19,7 +19,7 @@ from http_api.threads import (
 from typing import Dict, Any, Optional
 import json
 
-router = APIRouter(prefix="/api/v1")
+router = APIRouter()
 
 # Health check endpoint
 @router.get("/health")
@@ -63,6 +63,11 @@ async def get_threads(request: Request, token: str = Query(...), limit: int = Qu
 @router.post("/threads/create")
 async def create_thread(request: Request, thread_data: dict):
     """Create new thread"""
+    return await create_thread_handler(request, thread_data)
+
+@router.post("/threads")
+async def create_thread_alias(request: Request, thread_data: dict):
+    """Create new thread - alias for /threads/create"""
     return await create_thread_handler(request, thread_data)
 
 # Legacy generic endpoint

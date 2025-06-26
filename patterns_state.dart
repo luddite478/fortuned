@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import '../services/pattern_storage.dart';
+import 'pattern_storage.dart';
 
 // Pattern data model
 class Pattern {

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../state/patterns_state.dart';
+import 'patterns_state.dart';
 
 class PatternStorageService {
   static const String _patternsKey = 'saved_patterns';
