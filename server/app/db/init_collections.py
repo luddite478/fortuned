@@ -62,7 +62,7 @@ COLLECTIONS_CONFIG = {
                 "follower_count": "number",
                 "following_count": "number"
             },
-            "avatar_url": "string | null",
+
             "preferences": {
                 "notifications_enabled": "boolean",
                 "public_profile": "boolean",
@@ -228,7 +228,7 @@ SAMPLE_DATA_TEMPLATES = {
                 "follower_count": 245,
                 "following_count": 180
             },
-            "avatar_url": null,
+
             "preferences": {
                 "notifications_enabled": True,
                 "public_profile": True,
@@ -263,7 +263,7 @@ SAMPLE_DATA_TEMPLATES = {
                 "follower_count": 189,
                 "following_count": 203
             },
-            "avatar_url": null,
+
             "preferences": {
                 "notifications_enabled": True,
                 "public_profile": True,

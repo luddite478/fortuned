@@ -15,7 +15,7 @@ class UserProfile {
   final bool emailVerified;
   final UserProfileInfo profile;
   final UserStats stats;
-  final String? avatarUrl;
+
   final UserPreferences preferences;
 
   UserProfile({
@@ -30,7 +30,7 @@ class UserProfile {
     required this.emailVerified,
     required this.profile,
     required this.stats,
-    this.avatarUrl,
+
     required this.preferences,
   });
 
@@ -47,7 +47,7 @@ class UserProfile {
       emailVerified: json['email_verified'] ?? false,
       profile: UserProfileInfo.fromJson(json['profile'] ?? {}),
       stats: UserStats.fromJson(json['stats'] ?? {}),
-      avatarUrl: json['avatar_url'],
+
       preferences: UserPreferences.fromJson(json['preferences'] ?? {}),
     );
   }
@@ -75,7 +75,7 @@ class UserProfile {
         'follower_count': stats.followerCount,
         'following_count': stats.followingCount,
       },
-      'avatar_url': avatarUrl,
+
       'preferences': {
         'notifications_enabled': preferences.notificationsEnabled,
         'public_profile': preferences.publicProfile,
@@ -95,7 +95,7 @@ class UserProfile {
   String get bio => profile.bio;
   DateTime get registeredAt => createdAt;
   DateTime get joinedDate => createdAt;
-  String get avatar => avatarUrl ?? '👤';
+  String get avatar => '👤';
   bool get isWorking => false;
   String get currentProject => '';
   int get totalSeries => 0;

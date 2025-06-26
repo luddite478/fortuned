@@ -141,16 +141,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       
                       const SizedBox(height: 8),
                       
-                      Text(
-                        'Music Collaboration Platform',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[400],
-                          letterSpacing: 1,
-                        ),
-                      ),
-                      
                       const SizedBox(height: 60),
                       
                       // Mode toggle
