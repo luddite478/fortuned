@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/user_profile_service.dart';
 import '../services/threads_service.dart';
-
+import '../services/auth_service.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 import 'user_projects_screen.dart';
@@ -80,9 +80,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.more_vert, color: Color(0xFF374151)),
-            onPressed: () {
-              // TODO: Show user options menu
-            },
+            onPressed: () => _showOptionsMenu(context),
           ),
         ],
       ),
@@ -727,6 +725,91 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         builder: (context) => UserProjectsScreen(
           userId: widget.userId,
           userName: widget.userName,
+        ),
+      ),
+    );
+  }
+
+  void _showOptionsMenu(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUser = authService.currentUser;
+    
+    // Only show logout if this is the current user's profile
+    final isCurrentUser = currentUser?.id == widget.userId;
+    
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isCurrentUser) ...[
+              ListTile(
+                leading: const Icon(Icons.logout, color: Colors.red),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.w500),
+                ),
+                onTap: () async {
+                  Navigator.pop(context); // Close bottom sheet
+                  
+                  // Show confirmation dialog
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Logout'),
+                      content: const Text('Are you sure you want to logout?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: const Text('Logout'),
+                        ),
+                      ],
+                    ),
+                  );
+                  
+                  if (confirmed == true) {
+                    await authService.logout();
+                    if (mounted) {
+                      // Navigate back to root and let AuthWrapper handle showing login
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    }
+                  }
+                },
+              ),
+              const Divider(),
+            ],
+            ListTile(
+              leading: const Icon(Icons.share, color: Color(0xFF374151)),
+              title: const Text('Share Profile'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Share profile feature coming soon')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.report, color: Color(0xFF374151)),
+              title: const Text('Report User'),
+              onTap: () {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Report feature coming soon')),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

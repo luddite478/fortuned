@@ -3,6 +3,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/users_screen.dart';
+import 'screens/login_screen.dart';
+import 'services/auth_service.dart';
 import 'state/sequencer_state.dart';
 import 'state/threads_state.dart';
 // import 'state/patterns_state.dart';
@@ -23,6 +25,7 @@ class NiyyaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (context) => AuthService()),
         ChangeNotifierProvider(create: (context) => SequencerState()),
         ChangeNotifierProvider(create: (context) => ThreadsState()),
       ],
@@ -33,8 +36,36 @@ class NiyyaApp extends StatelessWidget {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           useMaterial3: true,
         ),
-        home: const MainPage(),
+        home: const AuthWrapper(),
       ),
+    );
+  }
+}
+
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AuthService>(
+      builder: (context, authService, child) {
+        if (authService.isLoading) {
+          return const Scaffold(
+            backgroundColor: Colors.black,
+            body: Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.purple),
+              ),
+            ),
+          );
+        }
+        
+        if (authService.isAuthenticated) {
+          return const MainPage();
+        } else {
+          return const LoginScreen();
+        }
+      },
     );
   }
 }

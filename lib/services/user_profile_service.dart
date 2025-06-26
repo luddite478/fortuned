@@ -52,6 +52,38 @@ class UserProfile {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'name': name,
+      'email': email,
+      'created_at': createdAt.toIso8601String(),
+      'last_login': lastLogin.toIso8601String(),
+      'last_online': lastOnline.toIso8601String(),
+      'is_active': isActive,
+      'email_verified': emailVerified,
+      'profile': {
+        'bio': profile.bio,
+        'location': profile.location,
+        'website': profile.website,
+        'social_links': profile.socialLinks,
+      },
+      'stats': {
+        'total_plays': stats.totalPlays,
+        'total_likes': stats.totalLikes,
+        'follower_count': stats.followerCount,
+        'following_count': stats.followingCount,
+      },
+      'avatar_url': avatarUrl,
+      'preferences': {
+        'notifications_enabled': preferences.notificationsEnabled,
+        'public_profile': preferences.publicProfile,
+        'theme': preferences.theme,
+      },
+    };
+  }
+
   bool get isOnline {
     final now = DateTime.now();
     final diff = now.difference(lastOnline);

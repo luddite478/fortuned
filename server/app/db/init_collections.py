@@ -201,20 +201,20 @@ COLLECTIONS_CONFIG = {
 SAMPLE_DATA_TEMPLATES = {
     "users": [
         {
-            "id": "660e8400-e29b-41d4-a716-446655440001",
-            "username": "alexproducer",
-            "name": "Alex Producer",
-            "email": "alex@example.com",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "password123"
+            "id": "alice-test-user-001",
+            "username": "alice_j",
+            "name": "Alice Johnson",
+            "email": "alice@test.com",
+            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "test123"
             "salt": "$2b$12$LQv3c1yqBWVHxkd0LHAkCO",
             "profile": {
                 "bio": "Electronic music producer and sound designer",
                 "location": "Los Angeles, CA",
-                "website": "https://alexproducer.com",
+                "website": "https://alicejohnson.com",
                 "social_links": {
-                    "twitter": "@alexproducer",
-                    "instagram": "@alexbeats",
-                    "youtube": "AlexProducerMusic"
+                    "twitter": "@alicej",
+                    "instagram": "@alicebeats",
+                    "youtube": "AliceJohnsonMusic"
                 }
             },
             "created_at": "2024-01-15T10:30:00Z",
@@ -228,7 +228,7 @@ SAMPLE_DATA_TEMPLATES = {
                 "follower_count": 245,
                 "following_count": 180
             },
-            "avatar_url": "https://example.com/avatars/alex.jpg",
+            "avatar_url": null,
             "preferences": {
                 "notifications_enabled": True,
                 "public_profile": True,
@@ -236,19 +236,19 @@ SAMPLE_DATA_TEMPLATES = {
             }
         },
         {
-            "id": "660e8400-e29b-41d4-a716-446655440002", 
-            "username": "sambeats",
-            "name": "Sam Beats",
-            "email": "sam@example.com",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "password123"
+            "id": "bob-test-user-002", 
+            "username": "bob_s",
+            "name": "Bob Smith",
+            "email": "bob@test.com",
+            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "test123"
             "salt": "$2b$12$LQv3c1yqBWVHxkd0LHAkCO",
             "profile": {
                 "bio": "Hip-hop and trap music creator",
                 "location": "Atlanta, GA",
                 "website": "",
                 "social_links": {
-                    "twitter": "@sambeats",
-                    "instagram": "@sambeatsofficial",
+                    "twitter": "@bobsmith",
+                    "instagram": "@bobbeatsofficial",
                     "youtube": ""
                 }
             },
@@ -263,7 +263,7 @@ SAMPLE_DATA_TEMPLATES = {
                 "follower_count": 189,
                 "following_count": 203
             },
-            "avatar_url": "https://example.com/avatars/sam.jpg",
+            "avatar_url": null,
             "preferences": {
                 "notifications_enabled": True,
                 "public_profile": True,
@@ -277,21 +277,21 @@ SAMPLE_DATA_TEMPLATES = {
             "title": "Urban Vibes Collaboration",
             "users": [
                 {
-                    "id": "660e8400-e29b-41d4-a716-446655440001",
-                    "name": "Alex Producer",
+                    "id": "alice-test-user-001",
+                    "name": "Alice Johnson",
                     "joined_at": "2024-03-15T10:00:00Z"
                 },
                 {
-                    "id": "660e8400-e29b-41d4-a716-446655440002", 
-                    "name": "Sam Beats",
+                    "id": "bob-test-user-002", 
+                    "name": "Bob Smith",
                     "joined_at": "2024-03-15T10:30:00Z"
                 }
             ],
             "checkpoints": [
                 {
                     "id": "checkpoint_001",
-                    "user_id": "660e8400-e29b-41d4-a716-446655440001",
-                    "user_name": "Alex Producer", 
+                    "user_id": "alice-test-user-001",
+                    "user_name": "Alice Johnson", 
                     "timestamp": "2024-03-15T10:00:00Z",
                     "comment": "Initial project setup with basic drum pattern",
                     "renders": [
@@ -340,7 +340,7 @@ SAMPLE_DATA_TEMPLATES = {
                                                 }
                                             ],
                                             "metadata": {
-                                                "user": "Alex Producer",
+                                                "user": "Alice Johnson",
                                                 "bpm": 128,
                                                 "key": "C Major",
                                                 "time_signature": "4/4",
@@ -363,8 +363,8 @@ SAMPLE_DATA_TEMPLATES = {
                 },
                 {
                     "id": "checkpoint_002",
-                    "user_id": "660e8400-e29b-41d4-a716-446655440002",
-                    "user_name": "Sam Beats",
+                    "user_id": "bob-test-user-002",
+                    "user_name": "Bob Smith",
                     "timestamp": "2024-03-15T14:30:00Z", 
                     "comment": "Added snare pattern and hi-hats",
                     "renders": [
