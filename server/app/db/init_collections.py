@@ -205,8 +205,8 @@ SAMPLE_DATA_TEMPLATES = {
             "username": "alice_j",
             "name": "Alice Johnson",
             "email": "alice@test.com",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "test123"
-            "salt": "$2b$12$LQv3c1yqBWVHxkd0LHAkCO",
+            "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
+            "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
             "profile": {
                 "bio": "Electronic music producer and sound designer",
                 "location": "Los Angeles, CA",
@@ -240,8 +240,8 @@ SAMPLE_DATA_TEMPLATES = {
             "username": "bob_s",
             "name": "Bob Smith",
             "email": "bob@test.com",
-            "password_hash": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj7QOB9v2g/W",  # hashed "test123"
-            "salt": "$2b$12$LQv3c1yqBWVHxkd0LHAkCO",
+            "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
+            "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
             "profile": {
                 "bio": "Hip-hop and trap music creator",
                 "location": "Atlanta, GA",
