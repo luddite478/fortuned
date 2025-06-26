@@ -225,7 +225,7 @@ SAMPLE_DATA_TEMPLATES = {
                 "location": "Atlanta, GA"
             },
             "created_at": "2024-02-01T09:15:00Z",
-            "last_login": "2024-R12-05T12:30:00Z",
+                          "last_login": "2024-12-05T12:30:00Z",
             "last_online": "2024-03-19T16:45:00Z",
             "is_active": True,
             "email_verified": True,

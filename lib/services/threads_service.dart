@@ -11,9 +11,6 @@ class ThreadsService {
   
   static String get _apiToken {
     final token = dotenv.env['API_TOKEN'] ?? '';
-    if (token.isEmpty) {
-      return 'asdfasdasduiu546'; // Fallback for development
-    }
     return token;
   }
 

@@ -249,12 +249,6 @@ class UserProfileService {
     print('API_TOKEN from env: "$token"');
     print('All env vars: ${dotenv.env.keys.toList()}');
     
-    // Fallback for development if env loading fails
-    if (token.isEmpty) {
-      print('WARNING: API_TOKEN is empty, using hardcoded fallback');
-      return 'asdfasdasduiu546'; // This should work since it matches server
-    }
-    
     return token;
   }
 
