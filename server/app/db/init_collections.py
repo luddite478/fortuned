@@ -190,7 +190,7 @@ COLLECTIONS_CONFIG = {
 SAMPLE_DATA_TEMPLATES = {
     "users": [
         {
-            "id": "dj_vegan-test-user-001",
+            "id": "550e8400-e29b-41d4-a716-446655440001",
             "username": "dj_vegan",
             "name": "dj_vegan",
             "email": "dj_vegan@test.com",
@@ -214,7 +214,7 @@ SAMPLE_DATA_TEMPLATES = {
             }
         },
         {
-            "id": "bob-test-user-002", 
+            "id": "550e8400-e29b-41d4-a716-446655440002", 
             "username": "dj_rodry",
             "name": "dj_rodry",
             "email": "bob@test.com",

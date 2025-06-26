@@ -120,13 +120,7 @@ async def register_handler(request: Request, register_data: RegisterRequest):
             "salt": salt,
             "profile": {
                 "bio": "",
-                "location": "",
-                "website": "",
-                "social_links": {
-                    "twitter": "",
-                    "instagram": "",
-                    "youtube": ""
-                }
+                "location": ""
             },
             "created_at": datetime.now(timezone.utc).isoformat(),
             "last_login": datetime.now(timezone.utc).isoformat(),
@@ -134,15 +128,9 @@ async def register_handler(request: Request, register_data: RegisterRequest):
             "is_active": True,
             "email_verified": False,
             "stats": {
-                "total_plays": 0,
-                "total_likes": 0,
-                "follower_count": 0,
-                "following_count": 0
+                "total_plays": 0
             },
-            "avatar_url": None,
             "preferences": {
-                "notifications_enabled": True,
-                "public_profile": True,
                 "theme": "dark"
             }
         }
