@@ -115,7 +115,7 @@ class ThreadsService {
         queryParams['user_id'] = userId;
       }
 
-      final url = Uri.parse('$_baseUrl/threads').replace(queryParameters: queryParams);
+      final url = Uri.parse('$_baseUrl/threads/list').replace(queryParameters: queryParams);
       
       final response = await http.get(url);
 
@@ -135,7 +135,8 @@ class ThreadsService {
   // Get a specific thread
   static Future<Thread?> getThread(String threadId) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/$threadId').replace(queryParameters: {
+      final url = Uri.parse('$_baseUrl/threads/thread').replace(queryParameters: {
+        'id': threadId,
         'token': _apiToken,
       });
       

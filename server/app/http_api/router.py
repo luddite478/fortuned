@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Request, Query, Body
+from typing import Optional
 from http_api.rate_limiter import check_rate_limit
 from http_api.users import (
     login_handler, 
@@ -16,7 +17,7 @@ from http_api.threads import (
     get_thread_handler, 
     update_thread_handler
 )
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import json
 
 router = APIRouter()
@@ -56,9 +57,9 @@ async def get_thread(request: Request, id: str = Query(...), token: str = Query(
     return await get_thread_handler(request, id, token)
 
 @router.get("/threads/list")
-async def get_threads(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0)):
+async def get_threads(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0), user_id: Optional[str] = Query(None)):
     """Get list of threads"""
-    return await get_threads_handler(request, token, limit, offset)
+    return await get_threads_handler(request, token, limit, offset, user_id)
 
 @router.post("/threads/create")
 async def create_thread(request: Request, thread_data: dict):

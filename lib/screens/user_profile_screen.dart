@@ -7,6 +7,7 @@ import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 import 'user_projects_screen.dart';
 import 'sequencer_screen.dart';
+import 'checkpoints_screen.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -42,20 +43,65 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         _error = null;
       });
 
+      // Load user profile first (required)
       final profile = await UserProfileService.getUserProfile(widget.userId);
-      final threads = await ThreadsService.getUserThreads(widget.userId);
+      
+      // Load threads separately (optional - don't fail if this fails)
+      List<Thread> threads = [];
+      try {
+        threads = await ThreadsService.getUserThreads(widget.userId);
+      } catch (threadsError) {
+        print('Warning: Failed to load user threads: $threadsError');
+        // Continue without threads - don't fail the whole profile load
+      }
 
       setState(() {
         _userProfile = profile;
         _userThreads = threads;
         _isLoading = false;
       });
+
+      // Check for common threads and auto-navigate if any exist
+      _checkForCommonThreadsAndNavigate();
     } catch (e) {
       setState(() {
         _error = e.toString();
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _checkForCommonThreadsAndNavigate() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    if (currentUserId == null || _userThreads.isEmpty) return;
+
+    // Find common threads (threads where both current user and clicked user are participants)
+    final commonThreads = _userThreads.where((thread) => 
+      thread.hasUser(currentUserId) && thread.hasUser(widget.userId)
+    ).toList();
+
+    if (commonThreads.isNotEmpty) {
+      // Sort by updated date to get the latest thread
+      commonThreads.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+      final latestThread = commonThreads.first;
+      
+      // Set the active thread in ThreadsState before navigating
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      threadsState.setActiveThread(latestThread);
+      
+      // Navigate to checkpoints screen for the latest common thread
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => CheckpointsScreen(
+            threadId: latestThread.id,
+          ),
+        ),
+      );
+    }
+    // If no common threads, stay on profile but we'll show the threads button in the UI
   }
 
   @override
@@ -133,14 +179,81 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   Widget _buildProfileContent() {
     if (_userProfile == null) return const SizedBox();
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      children: [
+        // Top threads bar (only show if no common threads)
+        _buildThreadsTopBar(),
+        
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildProfileHeader(),
+                const SizedBox(height: 24),
+                _buildSeriesSection(),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThreadsTopBar() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    if (currentUserId == null) return const SizedBox();
+    
+    // Check if there are common threads
+    final commonThreads = _userThreads.where((thread) => 
+      thread.hasUser(currentUserId) && thread.hasUser(widget.userId)
+    ).toList();
+    
+    // Only show the bar if there are NO common threads but user has some threads
+    if (commonThreads.isNotEmpty || _userThreads.isEmpty) {
+      return const SizedBox();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: const BoxDecoration(
+        color: Color(0xFF374151),
+        border: Border(
+          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+        ),
+      ),
+      child: Row(
         children: [
-          _buildProfileHeader(),
-          const SizedBox(height: 24),
-          _buildSeriesSection(),
+          Expanded(
+            child: Text(
+              '${widget.userName}',
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: _viewUserThreads,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color.fromARGB(255, 118, 41, 195),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              minimumSize: const Size(0, 36),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+            ),
+            child: const Text(
+              'Threads',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
         ],
       ),
     );
@@ -719,6 +832,18 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   void _viewAllProjects() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProjectsScreen(
+          userId: widget.userId,
+          userName: widget.userName,
+        ),
+      ),
+    );
+  }
+
+  void _viewUserThreads() {
     Navigator.push(
       context,
       MaterialPageRoute(

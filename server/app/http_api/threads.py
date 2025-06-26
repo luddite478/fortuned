@@ -113,12 +113,16 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
-async def get_threads_handler(request: Request, token: str = Query(...), limit: int = Query(50), offset: int = Query(0), user_id: Optional[str] = Query(None)):
+async def get_threads_handler(request: Request, token: str, limit: int = 50, offset: int = 0, user_id: Optional[str] = None):
     check_rate_limit(request)
     verify_token(token)
     try:
         db = get_db()
-        query = {"users.id": user_id} if user_id else {}
+        # Fix: Only add user_id filter if it's actually provided and not None
+        query = {}
+        if user_id is not None and user_id.strip():
+            query["users.id"] = user_id
+            
         total = db.threads.count_documents(query)
         threads_cursor = db.threads.find(query, {"_id": 0}).sort("updated_at", -1).limit(limit).skip(offset)
         return {

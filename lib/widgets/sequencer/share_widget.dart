@@ -18,96 +18,128 @@ class ShareWidget extends StatelessWidget {
             color: Colors.black,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Column(
-              children: [
-                // Top row: Publish button centered with close button
-                Row(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // Use the actual constraints from parent (20% of screen height)
+              final availableHeight = constraints.maxHeight;
+              final availableWidth = constraints.maxWidth;
+              
+              // Responsive sizing based on available space
+              final headerHeight = availableHeight * 0.35; // 35% for header
+              final listHeight = availableHeight * 0.60; // 60% for recordings list  
+              final padding = availableHeight * 0.015; // 1.5% padding
+              final verticalSpacing = availableHeight * 0.01; // 1% spacing
+              
+              // Icon and text sizing
+              final iconSize = headerHeight * 0.4;
+              final fontSize = headerHeight * 0.25;
+              
+              return Padding(
+                padding: EdgeInsets.all(padding),
+                child: Column(
                   children: [
-                    const Spacer(),
-                    
-                    // Less vibrant, centered publish button
-                    ElevatedButton(
-                      onPressed: () => _publishProject(context, sequencer),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey.shade600,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        minimumSize: const Size(0, 32),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
+                    // Top row: Publish button centered with close button
+                    SizedBox(
+                      height: headerHeight,
+                      child: Row(
                         children: [
-                          Icon(Icons.cloud_upload, size: 14, color: Colors.white70),
-                          SizedBox(width: 4),
-                          Text(
-                            'Publish',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white70,
+                          const Spacer(),
+                          
+                          // Responsive publish button
+                          ElevatedButton(
+                            onPressed: () => _publishProject(context, sequencer),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.grey.shade600,
+                              padding: EdgeInsets.symmetric(
+                                horizontal: headerHeight * 0.25,
+                                vertical: headerHeight * 0.1,
+                              ),
+                              minimumSize: Size(0, headerHeight * 0.7),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(headerHeight * 0.12),
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.cloud_upload, 
+                                  size: iconSize.clamp(8.0, 14.0), 
+                                  color: Colors.white70,
+                                ),
+                                SizedBox(width: headerHeight * 0.08),
+                                Text(
+                                  'Publish',
+                                  style: TextStyle(
+                                    fontSize: fontSize.clamp(6.0, 12.0),
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.white70,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          
+                          const Spacer(),
+                          
+                          GestureDetector(
+                            onTap: () => sequencer.setShowShareWidget(false),
+                            child: Container(
+                              padding: EdgeInsets.all(headerHeight * 0.08),
+                              child: Icon(
+                                Icons.close,
+                                color: Colors.grey,
+                                size: iconSize.clamp(10.0, 16.0),
+                              ),
                             ),
                           ),
                         ],
                       ),
                     ),
                     
-                    const Spacer(),
+                    SizedBox(height: verticalSpacing),
                     
-                    GestureDetector(
-                      onTap: () => sequencer.setShowShareWidget(false),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(
-                          Icons.close,
-                          color: Colors.grey,
-                          size: 16,
-                        ),
-                      ),
+                    // Recordings list - constrained to fit
+                    SizedBox(
+                      height: listHeight,
+                      child: _buildRecordingsList(context, sequencer, listHeight, availableWidth),
                     ),
                   ],
                 ),
-                
-                const SizedBox(height: 8),
-                
-                // Recordings list
-                Expanded(
-                  child: _buildRecordingsList(context, sequencer),
-                ),
-              ],
-            ),
+              );
+            },
           ),
         );
       },
     );
   }
 
-  Widget _buildRecordingsList(BuildContext context, SequencerState sequencer) {
+  Widget _buildRecordingsList(BuildContext context, SequencerState sequencer, double availableHeight, double availableWidth) {
     if (sequencer.localRecordings.isEmpty) {
+      final emptyIconSize = availableHeight * 0.25;
+      final emptyFontSize = availableHeight * 0.12;
+      
       return Container(
         decoration: BoxDecoration(
           color: Colors.black.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(availableHeight * 0.03),
           border: Border.all(color: Colors.grey.withOpacity(0.3)),
         ),
-        child: const Center(
+        child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
                 Icons.mic_off,
                 color: Colors.grey,
-                size: 24,
+                size: emptyIconSize.clamp(12.0, 24.0),
               ),
-              SizedBox(height: 4),
+              SizedBox(height: availableHeight * 0.03),
               Text(
                 'No recordings yet',
                 style: TextStyle(
                   color: Colors.grey,
-                  fontSize: 11,
+                  fontSize: emptyFontSize.clamp(6.0, 12.0),
                 ),
               ),
             ],
@@ -116,37 +148,42 @@ class ShareWidget extends StatelessWidget {
       );
     }
 
-    // Horizontal scrollable layout similar to sample files
+    // Horizontal scrollable layout with inherited sizing
+    final itemWidth = availableHeight * 0.9; // Item width based on available height
+    final itemPadding = availableHeight * 0.04;
+    final buttonHeight = availableHeight * 0.28;
+    final titleFontSize = availableHeight * 0.1;
+    final buttonIconSize = availableHeight * 0.15;
+    
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       child: Row(
         children: sequencer.localRecordings.asMap().entries.map((entry) {
           final index = entry.key;
           final recording = entry.value;
-          final fileName = path.basename(recording);
           
           return Container(
-            width: 100,
-            height: double.infinity,
-            margin: const EdgeInsets.only(right: 8),
+            width: itemWidth,
+            height: availableHeight,
+            margin: EdgeInsets.only(right: itemPadding),
             decoration: BoxDecoration(
               color: Colors.green.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(availableHeight * 0.06),
               border: Border.all(
                 color: Colors.green.withOpacity(0.5),
                 width: 1,
               ),
             ),
             child: Padding(
-              padding: const EdgeInsets.all(8),
+              padding: EdgeInsets.all(itemPadding),
               child: Column(
                 children: [
                   // File name at top
                   Text(
                     'Take ${index + 1}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.lightGreen,
-                      fontSize: 10,
+                      fontSize: titleFontSize.clamp(6.0, 12.0),
                       fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.center,
@@ -164,10 +201,10 @@ class ShareWidget extends StatelessWidget {
                         child: GestureDetector(
                           onTap: () => _playRecording(recording),
                           child: Container(
-                            height: 32,
+                            height: buttonHeight,
                             decoration: BoxDecoration(
                               color: Colors.green.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(availableHeight * 0.03),
                               border: Border.all(
                                 color: Colors.green.withOpacity(0.6),
                                 width: 1,
@@ -176,23 +213,23 @@ class ShareWidget extends StatelessWidget {
                             child: Icon(
                               Icons.play_arrow,
                               color: Colors.green,
-                              size: 16,
+                              size: buttonIconSize.clamp(8.0, 16.0),
                             ),
                           ),
                         ),
                       ),
                       
-                      const SizedBox(width: 4),
+                      SizedBox(width: itemPadding * 0.5),
                       
                       // Share button - rectangular tile
                       Expanded(
                         child: GestureDetector(
                           onTap: () => _shareSpecificRecording(context, recording),
                           child: Container(
-                            height: 32,
+                            height: buttonHeight,
                             decoration: BoxDecoration(
                               color: Colors.blue.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(4),
+                              borderRadius: BorderRadius.circular(availableHeight * 0.03),
                               border: Border.all(
                                 color: Colors.blue.withOpacity(0.6),
                                 width: 1,
@@ -201,7 +238,7 @@ class ShareWidget extends StatelessWidget {
                             child: Icon(
                               Icons.share,
                               color: Colors.blue,
-                              size: 14,
+                              size: buttonIconSize.clamp(6.0, 14.0),
                             ),
                           ),
                         ),

@@ -93,7 +93,7 @@ class SampleSelectionWidget extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           
-          // Horizontal scrollable sample list
+          // Horizontal scrollable sample list showing 3 full items + partial 4th
           Expanded(
             child: sequencerState.currentSampleItems.isEmpty
                 ? const Center(
@@ -103,7 +103,7 @@ class SampleSelectionWidget extends StatelessWidget {
                         Icon(
                           Icons.folder_open,
                           color: Colors.grey,
-                          size: 32,
+                          size: 24,
                         ),
                         SizedBox(height: 8),
                         Text(
@@ -116,108 +116,149 @@ class SampleSelectionWidget extends StatelessWidget {
                       ],
                     ),
                   )
-                : SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: sequencerState.currentSampleItems.map((item) {
-                        return GestureDetector(
-                          onTap: () => sequencerState.selectSampleItem(item),
-                          child: Container(
-                            width: 100,
-                            height: double.infinity,
-                            margin: const EdgeInsets.only(right: 8),
-                            decoration: BoxDecoration(
-                              color: item.isFolder 
-                                  ? Colors.blue.withOpacity(0.2)
-                                  : Colors.green.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(
-                                color: item.isFolder 
-                                    ? Colors.blue.withOpacity(0.4)
-                                    : Colors.green.withOpacity(0.5),
-                                width: 1,
-                              ),
-                            ),
-                            child: item.isFolder 
-                                ? // Folder layout - keep simple centered design
-                                  Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(8),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        crossAxisAlignment: CrossAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.folder,
-                                            color: Colors.blue,
-                                            size: 24,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            item.name,
-                                            style: const TextStyle(
-                                              color: Colors.lightBlue,
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w500,
-                                            ),
-                                            textAlign: TextAlign.center,
-                                            maxLines: 3,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
+                : LayoutBuilder(
+                    builder: (context, constraints) {
+                      // Calculate item width: show 3 full items + 40% of 4th item
+                      final itemWidth = (constraints.maxWidth - 24) / 3.4; // 3 items + 0.4 of next + margins
+                      
+                      return SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: sequencerState.currentSampleItems.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final item = entry.value;
+                            
+                            return Container(
+                              width: itemWidth,
+                              height: constraints.maxHeight,
+                              margin: EdgeInsets.only(right: index < sequencerState.currentSampleItems.length - 1 ? 8 : 0),
+                              child: GestureDetector(
+                                onTap: () => sequencerState.selectSampleItem(item),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: item.isFolder 
+                                        ? Colors.blue.withOpacity(0.2)
+                                        : Colors.green.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: item.isFolder 
+                                          ? Colors.blue.withOpacity(0.4)
+                                          : Colors.green.withOpacity(0.5),
+                                      width: 1,
                                     ),
-                                  )
-                                : // File layout - independent positioning
-                                  Stack(
-                                    children: [
-                                      // Play button - positioned independently
-                                      Positioned(
-                                        top: 20, // Adjust this value to move play button up/down
-                                        left: 0,
-                                        right: 0,
-                                        child: Center(
-                                          child: GestureDetector(
-                                            onTap: () => sequencerState.previewSample(item.path),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(8),
-                                              decoration: BoxDecoration(
-                                                color: Colors.grey.withOpacity(0.3),
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: Icon(
-                                                Icons.play_arrow,
-                                                color: Colors.green.withOpacity(0.7),
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      // File name - positioned independently
-                                      Positioned(
-                                        bottom: 8, // Adjust this value to move text up/down
-                                        left: 8,
-                                        right: 8,
-                                        child: Text(
-                                          item.name,
-                                          style: const TextStyle(
-                                            color: Colors.lightGreen,
-                                            fontSize: 10,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                          textAlign: TextAlign.center,
-                                          maxLines: 3,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                      ),
-                                    ],
                                   ),
-                          ),
-                        );
-                      }).toList(),
-                    ),
+                                  child: item.isFolder 
+                                      ? // Folder layout
+                                        LayoutBuilder(
+                                          builder: (context, itemConstraints) {
+                                            final iconSize = itemConstraints.maxHeight * 0.3; // 30% of height
+                                            final fontSize = itemConstraints.maxHeight * 0.12; // 12% of height
+                                            
+                                            return Center(
+                                              child: Padding(
+                                                padding: EdgeInsets.all(itemConstraints.maxHeight * 0.08), // 8% padding
+                                                child: Column(
+                                                  mainAxisAlignment: MainAxisAlignment.center,
+                                                  children: [
+                                                    Icon(
+                                                      Icons.folder,
+                                                      color: Colors.blue,
+                                                      size: iconSize.clamp(16.0, 32.0), // min 16, max 32
+                                                    ),
+                                                    SizedBox(height: itemConstraints.maxHeight * 0.08),
+                                                    Flexible(
+                                                      child: Text(
+                                                        item.name,
+                                                        style: TextStyle(
+                                                          color: Colors.lightBlue,
+                                                          fontSize: fontSize.clamp(8.0, 14.0), // min 8, max 14
+                                                          fontWeight: FontWeight.w500,
+                                                        ),
+                                                        textAlign: TextAlign.center,
+                                                        maxLines: 2,
+                                                        overflow: TextOverflow.ellipsis,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : // File layout
+                                        LayoutBuilder(
+                                          builder: (context, itemConstraints) {
+                                            final iconSize = itemConstraints.maxHeight * 0.2; // 20% of height for icon
+                                            final fontSize = itemConstraints.maxHeight * 0.15; // 15% of height for bigger text
+                                            final topSectionHeight = itemConstraints.maxHeight * 0.5; // Top 35% for play button
+                                            final bottomSectionHeight = itemConstraints.maxHeight * 0.5; // Bottom 65% for text
+                                            
+                                            return Column(
+                                              children: [
+                                                // Top section - Play button area (easily controllable)
+                                                Container(
+                                                  height: topSectionHeight,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.purple.withOpacity(0.2), // Colored background to see the section
+                                                    borderRadius: BorderRadius.only(
+                                                      topLeft: Radius.circular(8),
+                                                      topRight: Radius.circular(8),
+                                                    ),
+                                                  ),
+                                                  child: Center(
+                                                    child: GestureDetector(
+                                                      onTap: () => sequencerState.previewSample(item.path),
+                                                      child: Container(
+                                                        padding: EdgeInsets.all(iconSize * 0.3),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color.fromARGB(66, 33, 99, 51).withOpacity(0.6),
+                                                          borderRadius: BorderRadius.circular(iconSize * 0.6),
+                                                        ),
+                                                        child: Icon(
+                                                          Icons.play_arrow,
+                                                          color: Colors.white,
+                                                          size: iconSize.clamp(12.0, 20.0), // min 12, max 20
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ),
+                                                // Bottom section - Text/pick surface (easily controllable)
+                                                Container(
+                                                  height: bottomSectionHeight,
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.green.withOpacity(0.2), // Colored background to see the section
+                                                    borderRadius: BorderRadius.only(
+                                                      bottomLeft: Radius.circular(8),
+                                                      bottomRight: Radius.circular(8),
+                                                    ),
+                                                  ),
+                                                  padding: EdgeInsets.symmetric(horizontal: itemConstraints.maxHeight * 0.08),
+                                                  child: Center(
+                                                    child: Text(
+                                                      item.name,
+                                                      style: TextStyle(
+                                                        color: Colors.white,
+                                                        fontSize: fontSize.clamp(6.0, 18.0), // min 6, max 12
+                                                        fontWeight: FontWeight.w500,
+                                                      ),
+                                                      textAlign: TextAlign.center,
+                                                      maxLines: 3,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          },
+                                        ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      );
+                    },
                   ),
           ),
         ],

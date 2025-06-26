@@ -6,6 +6,7 @@ import '../services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'thread_screen.dart';
 import 'user_profile_screen.dart';
+import 'sequencer_screen.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 
@@ -231,6 +232,24 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 ),
               ),
               
+              // Logout button
+              GestureDetector(
+                onTap: () async {
+                  final authService = Provider.of<AuthService>(context, listen: false);
+                  await authService.logout();
+                },
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.logout,
+                    size: 16,
+                    color: const Color.fromARGB(255, 36, 63, 116),
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 8),
+              
               // Online indicator
               Container(
                 width: 8,
@@ -276,9 +295,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => ThreadScreen(
-                      threadId: threadsState.currentThread!.id,
-                    ),
+                    builder: (context) => const PatternScreen(),
                   ),
                 );
               }
