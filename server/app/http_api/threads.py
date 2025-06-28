@@ -155,9 +155,29 @@ async def update_thread_handler(request: Request, thread_id: str, update_data: D
     verify_token(update_data.get("token", ""))
     try:
         db = get_db()
+        
+        # Check if thread exists first
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
+        
+        # If there's a checkpoint in the update data, add it to the thread
+        if "checkpoint" in update_data:
+            checkpoint = update_data.pop("checkpoint")
+            db.threads.update_one(
+                {"id": thread_id},
+                {"$push": {"checkpoints": checkpoint}}
+            )
+        
+        # Update other fields
         update_fields = {k: v for k, v in update_data.items() if k != "token"}
         update_fields["updated_at"] = datetime.utcnow().isoformat() + "Z"
-        db.threads.update_one({"id": thread_id}, {"$set": update_fields})
+        
+        result = db.threads.update_one({"id": thread_id}, {"$set": update_fields})
+        
+        if result.matched_count == 0:
+            raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
+            
         return {"status": "updated"}
     except Exception as e:
         if isinstance(e, HTTPException): raise e
