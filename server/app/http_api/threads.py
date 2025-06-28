@@ -26,19 +26,23 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         now = datetime.utcnow().isoformat() + "Z"
         title = thread_data.get("title", "Untitled Thread")
         users = thread_data.get("users", [])
-        initial_checkpoint = thread_data.get("initial_checkpoint", {})
+        initial_checkpoint = thread_data.get("initial_checkpoint")  # Can be None
         metadata = thread_data.get("metadata", {})
         
-        if not initial_checkpoint.get("id"):
-            initial_checkpoint["id"] = str(uuid.uuid4())
-        if not initial_checkpoint.get("timestamp"):
-            initial_checkpoint["timestamp"] = now
+        # Only process initial checkpoint if provided
+        checkpoints = []
+        if initial_checkpoint:
+            if not initial_checkpoint.get("id"):
+                initial_checkpoint["id"] = str(uuid.uuid4())
+            if not initial_checkpoint.get("timestamp"):
+                initial_checkpoint["timestamp"] = now
+            checkpoints = [initial_checkpoint]
         
         thread_doc = {
             "id": thread_id,
             "title": title,
             "users": users,
-            "checkpoints": [initial_checkpoint],
+            "checkpoints": checkpoints,  # Can be empty list
             "status": "active",
             "created_at": now,
             "updated_at": now,
