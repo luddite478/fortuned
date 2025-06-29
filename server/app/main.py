@@ -17,11 +17,16 @@ from ws.router import start_websocket_server
 from db.init_collections import init_mongodb
 
 from dotenv import load_dotenv
-load_dotenv()
+# Load .env from the server directory (parent of app directory)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Debug: Print loaded API_TOKEN
+api_token = os.getenv("API_TOKEN")
+logger.info(f"🔑 Server loaded API_TOKEN: {api_token}")
 
 app = FastAPI(
     title="API",

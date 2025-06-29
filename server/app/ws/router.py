@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 # Constants
 API_TOKEN = os.getenv("API_TOKEN")
+print(f"🔑 WebSocket server loaded API_TOKEN: {API_TOKEN}")
 MAX_CONNECTIONS_PER_MINUTE = 10
 MAX_TOTAL_CLIENTS = 100
 MAX_MESSAGE_RATE = 60

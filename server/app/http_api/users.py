@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
 DATABASE_NAME = "admin"
-API_TOKEN = "asdfasdasduiu546"
+API_TOKEN = os.getenv("API_TOKEN")
 
 # Connect to MongoDB
 client = MongoClient(MONGO_URL)

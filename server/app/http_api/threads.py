@@ -7,7 +7,7 @@ import uuid
 
 MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
 DATABASE_NAME = "admin"
-API_TOKEN = "asdfasdasduiu546"
+API_TOKEN = os.getenv("API_TOKEN")
 
 def get_db():
     client = MongoClient(MONGO_URL)
@@ -32,10 +32,10 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         # Only process initial checkpoint if provided
         checkpoints = []
         if initial_checkpoint:
-            if not initial_checkpoint.get("id"):
-                initial_checkpoint["id"] = str(uuid.uuid4())
-            if not initial_checkpoint.get("timestamp"):
-                initial_checkpoint["timestamp"] = now
+        if not initial_checkpoint.get("id"):
+            initial_checkpoint["id"] = str(uuid.uuid4())
+        if not initial_checkpoint.get("timestamp"):
+            initial_checkpoint["timestamp"] = now
             checkpoints = [initial_checkpoint]
         
         thread_doc = {
