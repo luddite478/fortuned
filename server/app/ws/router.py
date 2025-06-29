@@ -133,6 +133,18 @@ def store_message(sender, recipient, message):
         "timestamp": int(time.time())
     })
 
+def store_thread_message(sender, recipient, thread_id, thread_title):
+    key = chat_key(sender, recipient)
+    chats[key].append({
+        "from": sender,
+        "to": recipient,
+        "type": "thread_message",
+        "thread_id": thread_id,
+        "thread_title": thread_title,
+        "message": f"🎵 Shared thread: {thread_title}",
+        "timestamp": int(time.time())
+    })
+
 def get_chat_history(user1, user2):
     key = chat_key(user1, user2)
     return chats.get(key, [])
@@ -187,6 +199,41 @@ async def handle_special_command(websocket, client_id, message_obj):
             "type": "chat_history",
             "with": with_user,
             "messages": history
+        })
+        return True
+    elif msg_type == "thread_message":
+        # Handle thread sharing notification
+        target_user = sanitize_input(message_obj.get("target_user", ""))
+        thread_id = sanitize_input(message_obj.get("thread_id", ""))
+        thread_title = sanitize_input(message_obj.get("thread_title", ""))
+        
+        if not target_user or not thread_id:
+            await send_error(websocket, "Missing required fields for thread message")
+            return True
+            
+        # Store as a special message type
+        store_thread_message(client_id, target_user, thread_id, thread_title)
+        
+        # Send real-time notification to target user if online
+        target_ws = clients.get(target_user)
+        if target_ws:
+            try:
+                await send_json(target_ws, {
+                    "type": "thread_message",
+                    "from": client_id,
+                    "thread_id": thread_id,
+                    "thread_title": thread_title,
+                    "timestamp": int(time.time())
+                })
+            except Exception as e:
+                logger.error(f"Failed to send thread message to {target_user}: {e}")
+        
+        # Confirm to sender
+        await send_json(websocket, {
+            "type": "message_sent",
+            "to": target_user,
+            "thread_id": thread_id,
+            "message": "Thread shared successfully"
         })
         return True
     return False
