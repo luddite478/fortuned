@@ -3,14 +3,22 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
 import '../../state/sequencer_state.dart';
+import '../../state/threads_state.dart';
 
 class ShareWidget extends StatelessWidget {
   const ShareWidget({super.key});
 
+  // Configurable layout percentages
+  static const double _headerHeightPercent = 0.20;      // 20% for header
+  static const double _publishButtonHeightPercent = 0.15; // 15% for publish button (when visible)
+  static const double _recordingsHeightPercent = 0.65;   // 65% for recordings (or 80% without publish)
+  static const double _paddingPercent = 0.02;            // 2% padding
+  static const double _spacingPercent = 0.015;           // 1.5% spacing
+
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer2<SequencerState, ThreadsState>(
+      builder: (context, sequencer, threadsState, child) {
         return Container(
           decoration: BoxDecoration(
             color: Colors.black,
@@ -18,67 +26,57 @@ class ShareWidget extends StatelessWidget {
           ),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              // Use the actual constraints from parent R(20% of screen height)
               final availableHeight = constraints.maxHeight;
               final availableWidth = constraints.maxWidth;
               
-              // Responsive sizing based on available space
-              final headerHeight = availableHeight * 0.35; // 35% for header
-              final listHeight = availableHeight * 0.60; // 60% for recordings list  
-              final padding = availableHeight * 0.015; // 1.5% padding
-              final verticalSpacing = availableHeight * 0.01; // 1% spacing
+              // Show publish button if:
+              // 1. No active thread (standalone sequencer mode) - can always publish
+              // 2. Unpublished solo thread
+              final activeThread = threadsState.activeThread;
+              final canPublish = activeThread == null || 
+                                (activeThread.users.length == 1 && 
+                                 activeThread.users.first.id == threadsState.currentUserId &&
+                                 !(activeThread.metadata['is_public'] ?? false));
               
-              // Icon and text sizing
-              final iconSize = headerHeight * 0.4;
-              final fontSize = headerHeight * 0.25;
+              // Calculate heights based on percentages
+              final padding = availableHeight * _paddingPercent;
+              final spacing = availableHeight * _spacingPercent;
+              final headerHeight = availableHeight * _headerHeightPercent;
+              final publishButtonHeight = canPublish ? availableHeight * _publishButtonHeightPercent : 0.0;
+              final recordingsHeight = availableHeight * (canPublish ? _recordingsHeightPercent : (_recordingsHeightPercent + _publishButtonHeightPercent));
+              
+              // Calculate available content height (minus padding and spacing)
+              final contentHeight = availableHeight - (padding * 2);
+              final usedHeight = headerHeight + publishButtonHeight + recordingsHeight + (canPublish ? spacing * 2 : spacing);
+              
+              // Ensure we don't overflow
+              final scaleFactor = usedHeight > contentHeight ? contentHeight / usedHeight : 1.0;
+              final finalHeaderHeight = headerHeight * scaleFactor;
+              final finalPublishHeight = publishButtonHeight * scaleFactor;
+              final finalRecordingsHeight = recordingsHeight * scaleFactor;
+              final finalSpacing = spacing * scaleFactor;
+              
+              // Font and icon sizing based on header height
+              final fontSize = finalHeaderHeight * 0.3;
+              final iconSize = finalHeaderHeight * 0.4;
               
               return Padding(
                 padding: EdgeInsets.all(padding),
                 child: Column(
                   children: [
-                    // Top row: Publish button centered with close button
+                    // Header with title and close button
                     SizedBox(
-                      height: headerHeight,
+                      height: finalHeaderHeight,
                       child: Row(
                         children: [
                           const Spacer(),
                           
-                          // Dynamic button: Publish or Collaborate
-                          ElevatedButton(
-                            onPressed: () => sequencer.isCollaborating 
-                              ? _createCollaborationCheckpoint(context, sequencer)
-                              : _publishProject(context, sequencer),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: sequencer.isCollaborating 
-                                ? const Color.fromARGB(255, 118, 41, 195) // Purple for collaborate
-                                : Colors.grey.shade600, // Gray for publish
-                              padding: EdgeInsets.symmetric(
-                                horizontal: headerHeight * 0.25,
-                                vertical: headerHeight * 0.1,
-                              ),
-                              minimumSize: Size(0, headerHeight * 0.7),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(headerHeight * 0.12),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  sequencer.isCollaborating ? Icons.group_work : Icons.cloud_upload,
-                                  size: iconSize.clamp(8.0, 14.0), 
-                                  color: Colors.white70,
-                                ),
-                                SizedBox(width: headerHeight * 0.08),
-                                Text(
-                                  sequencer.isCollaborating ? 'Collaborate' : 'Publish',
-                                  style: TextStyle(
-                                    fontSize: fontSize.clamp(6.0, 12.0),
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                              ],
+                          Text(
+                            'Share',
+                            style: TextStyle(
+                              fontSize: fontSize.clamp(8.0, 16.0),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white70,
                             ),
                           ),
                           
@@ -87,11 +85,11 @@ class ShareWidget extends StatelessWidget {
                           GestureDetector(
                             onTap: () => sequencer.setShowShareWidget(false),
                             child: Container(
-                              padding: EdgeInsets.all(headerHeight * 0.08),
+                              padding: EdgeInsets.all(finalHeaderHeight * 0.1),
                               child: Icon(
                                 Icons.close,
                                 color: Colors.grey,
-                                size: iconSize.clamp(10.0, 16.0),
+                                size: iconSize.clamp(12.0, 20.0),
                               ),
                             ),
                           ),
@@ -99,12 +97,40 @@ class ShareWidget extends StatelessWidget {
                       ),
                     ),
                     
-                    SizedBox(height: verticalSpacing),
+                    if (canPublish) ...[
+                      SizedBox(height: finalSpacing),
+                      
+                      // Publish button for unpublished solo threads
+                      SizedBox(
+                        height: finalPublishHeight,
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () => _publishProject(context, sequencer),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.orangeAccent,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: Text(
+                            'Publish',
+                            style: TextStyle(
+                              fontSize: (finalPublishHeight * 0.35).clamp(8.0, 14.0),
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                     
-                    // Recordings list - constrained to fit
+                    SizedBox(height: finalSpacing),
+                    
+                    // Recordings list
                     SizedBox(
-                      height: listHeight,
-                      child: _buildRecordingsList(context, sequencer, listHeight, availableWidth),
+                      height: finalRecordingsHeight,
+                      child: _buildRecordingsList(context, sequencer, finalRecordingsHeight, availableWidth),
                     ),
                   ],
                 ),
@@ -278,117 +304,6 @@ class ShareWidget extends StatelessWidget {
     }
   }
 
-  void _publishProject(BuildContext context, SequencerState sequencer) async {
-    try {
-      // Close share widget
-      sequencer.setShowShareWidget(false);
-      
-      // Show loading indicator
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Publishing project...'),
-          backgroundColor: Colors.blue,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      // Auto-generate title with timestamp
-      final now = DateTime.now();
-      final title = 'Project ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      
-      // Publish to database
-      final success = await sequencer.publishToDatabase(
-        title: title,
-        description: 'Published from mobile app',
-        isPublic: true,
-      );
-      
-      if (!context.mounted) return;
-      
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Project published successfully!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to publish project'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
-  void _createCollaborationCheckpoint(BuildContext context, SequencerState sequencer) async {
-    try {
-      // Close share widget
-      sequencer.setShowShareWidget(false);
-      
-      // Show loading indicator
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Creating collaboration checkpoint...'),
-          backgroundColor: Color.fromARGB(255, 118, 41, 195),
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      // Create collaboration checkpoint with auto-generated comment
-      final now = DateTime.now();
-      final comment = 'Update ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-      
-      final success = await sequencer.createCollaborationCheckpoint(comment: comment);
-      
-      if (!context.mounted) return;
-      
-      if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Collaboration checkpoint created!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to create checkpoint'),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
-
   void _playRecording(String filePath) async {
     try {
       // TODO: Implement audio playback using your audio player
@@ -424,5 +339,81 @@ class ShareWidget extends StatelessWidget {
         backgroundColor: Colors.redAccent,
       ),
     );
+  }
+
+  void _publishProject(BuildContext context, SequencerState sequencer) async {
+    try {
+      // Close share widget
+      sequencer.setShowShareWidget(false);
+      
+      // Show loading indicator
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Publishing project...'),
+          backgroundColor: Colors.orangeAccent,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      print('🚀 Starting publish process...');
+      
+      // Get active thread info before publishing
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      final activeThread = threadsState.activeThread;
+      
+      print('📋 Active thread before publish: ${activeThread?.id}');
+      print('📋 Active thread checkpoints count: ${activeThread?.checkpoints.length ?? 0}');
+      print('👤 Current user ID: ${threadsState.currentUserId}');
+      print('👤 Current user name: ${threadsState.currentUserName}');
+
+      // Publish to database (title will be auto-generated as 6-char ID)
+      final success = await sequencer.publishToDatabase(
+        description: 'Published from mobile app',
+        isPublic: true,
+      );
+      
+      print('✅ Publish result: $success');
+      
+      // Check active thread after publishing
+      final activeThreadAfter = threadsState.activeThread;
+      print('📋 Active thread after publish: ${activeThreadAfter?.id}');
+      print('📋 Active thread checkpoints count after: ${activeThreadAfter?.checkpoints.length ?? 0}');
+      
+      if (!context.mounted) return;
+      
+      if (success) {
+        // Refresh threads to make sure we have the latest data
+        await threadsState.loadThreads();
+        print('🔄 Threads refreshed after publish');
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Project published successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to publish project'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      print('❌ Publish error: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 } 

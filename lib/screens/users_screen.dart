@@ -221,20 +221,20 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
               Expanded(
                 child: GestureDetector(
                   onTap: () => _viewMyProfile(currentUser),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                                          Text(
                         currentUser.name,
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: const Color.fromARGB(255, 36, 63, 116),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: const Color.fromARGB(255, 36, 63, 116),
                           decoration: TextDecoration.underline, // Show it's clickable
                         ),
                       ),
                     ],
-                  ),
+                    ),
                 ),
               ),
               
@@ -289,29 +289,14 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () async {
-            final threadsState = context.read<ThreadsState>();
-            final sequencerState = context.read<SequencerState>();
-            
-            try {
-              // Ensure we have an active solo thread for this user
-              await threadsState.ensureActiveSoloThread(sequencerState);
-              
-              if (context.mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => const PatternScreen(),
-                  ),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error creating project: $e')),
-                );
-              }
-            }
+          onTap: () {
+            // Just navigate to sequencer - no need to create threads locally
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PatternScreen(),
+              ),
+            );
           },
           borderRadius: BorderRadius.circular(8),
           child: Container(
@@ -551,12 +536,12 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     } else {
       // No collaborations - navigate to user profile
       debugPrint('👤 No common threads with ${user.name}, opening profile');
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => UserProfileScreen(
-            userId: user.id,
-            userName: user.name,
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => UserProfileScreen(
+          userId: user.id,
+          userName: user.name,
           ),
         ),
       );

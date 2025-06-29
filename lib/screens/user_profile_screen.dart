@@ -260,73 +260,73 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         ],
       ),
       child: Row(
-        children: [
-          // Avatar
-          Container(
+            children: [
+              // Avatar
+              Container(
             width: 48,
             height: 48,
-            decoration: BoxDecoration(
-              color: profile.isOnline 
-                  ? const Color.fromARGB(255, 222, 187, 255)
-                  : const Color(0xFFE5E7EB),
+                decoration: BoxDecoration(
+                  color: profile.isOnline 
+                      ? const Color.fromARGB(255, 222, 187, 255)
+                      : const Color(0xFFE5E7EB),
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: profile.isOnline 
-                    ? const Color.fromARGB(255, 118, 41, 195)
-                    : const Color(0xFFD1D5DB),
-                width: 2,
-              ),
-            ),
-            child: Center(
-              child: Text(
-                profile.avatar,
-                style: const TextStyle(fontSize: 18),
-              ),
-            ),
-          ),
-          
-          const SizedBox(width: 12),
-          
-          // Name and status
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  profile.name,
-                  style: const TextStyle(
-                    color: Color(0xFF374151),
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+                  border: Border.all(
+                    color: profile.isOnline 
+                        ? const Color.fromARGB(255, 118, 41, 195)
+                        : const Color(0xFFD1D5DB),
+                    width: 2,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Row(
+                child: Center(
+                  child: Text(
+                    profile.avatar,
+                style: const TextStyle(fontSize: 18),
+                  ),
+                ),
+              ),
+              
+          const SizedBox(width: 12),
+              
+              // Name and status
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(
+                    Text(
+                      profile.name,
+                      style: const TextStyle(
+                        color: Color(0xFF374151),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
                       width: 6,
                       height: 6,
-                      decoration: BoxDecoration(
-                        color: profile.isOnline 
-                            ? const Color.fromARGB(255, 118, 41, 195)
-                            : const Color(0xFF9CA3AF),
-                        shape: BoxShape.circle,
-                      ),
-                    ),
+                          decoration: BoxDecoration(
+                            color: profile.isOnline 
+                                ? const Color.fromARGB(255, 118, 41, 195)
+                                : const Color(0xFF9CA3AF),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
                     const SizedBox(width: 4),
-                    Text(
-                      profile.isOnline ? 'Online' : 'Offline',
-                      style: TextStyle(
-                        color: profile.isOnline 
-                            ? const Color.fromARGB(255, 118, 41, 195)
-                            : const Color(0xFF9CA3AF),
+                        Text(
+                          profile.isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            color: profile.isOnline 
+                                ? const Color.fromARGB(255, 118, 41, 195)
+                                : const Color(0xFF9CA3AF),
                         fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
-                ),
-              ],
             ),
           ),
         ],
@@ -335,19 +335,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _buildPublishedProjects() {
-    return Container(
+      return Container(
       padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
+        decoration: BoxDecoration(
+          color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -384,35 +384,35 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.music_note_outlined,
-                      size: 48,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                    SizedBox(height: 12),
-                    Text(
+          child: Column(
+            children: [
+              Icon(
+                Icons.music_note_outlined,
+                size: 48,
+                color: Color(0xFF9CA3AF),
+              ),
+              SizedBox(height: 12),
+              Text(
                       'No projects published yet',
-                      style: TextStyle(
-                        color: Color(0xFF9CA3AF),
-                        fontSize: 16,
-                      ),
-                    ),
-                  ],
+                style: TextStyle(
+                  color: Color(0xFF9CA3AF),
+                  fontSize: 16,
                 ),
               ),
+            ],
+          ),
+        ),
             )
           else
             ListView.separated(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
               itemCount: _userThreads.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
+        itemBuilder: (context, index) {
                 final project = _userThreads[index];
                 return _buildProjectCard(project);
-              },
+      },
             ),
         ],
       ),
@@ -427,43 +427,43 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: const Color(0xFFE5E7EB)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
             project.title,
-            style: const TextStyle(
-              color: Color(0xFF374151),
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+                            style: const TextStyle(
+                              color: Color(0xFF374151),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
           const SizedBox(height: 6),
           Row(
             children: [
               Text(
                 '${project.checkpoints.length}',
-                style: const TextStyle(
+                                style: const TextStyle(
                   color: Color(0xFF9CA3AF),
                   fontSize: 11,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
               const SizedBox(width: 2),
               const Icon(
                 Icons.history,
                 size: 10,
                 color: Color(0xFF9CA3AF),
-              ),
+                      ),
               const SizedBox(width: 8),
-              Text(
+                      Text(
                 '${project.metadata['plays_num'] ?? 0}',
-                style: const TextStyle(
-                  color: Color(0xFF9CA3AF),
+                            style: const TextStyle(
+                              color: Color(0xFF9CA3AF),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                ),
-              ),
+                            ),
+                          ),
               const SizedBox(width: 2),
               const Icon(
                 Icons.play_arrow,
@@ -474,17 +474,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               Text(
                 '${project.users.length}',
                 style: const TextStyle(
-                  color: Color(0xFF9CA3AF),
+                              color: Color(0xFF9CA3AF),
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                ),
-              ),
+                            ),
+                          ),
               const SizedBox(width: 2),
-              const Icon(
-                Icons.group,
-                size: 10,
-                color: Color(0xFF9CA3AF),
-              ),
+                          const Icon(
+                            Icons.group,
+                            size: 10,
+                            color: Color(0xFF9CA3AF),
+                          ),
             ],
           ),
           const SizedBox(height: 8),
@@ -501,7 +501,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
                     ),
-                  ),
+                      ),
                   child: const Text(
                     'Listen',
                     style: TextStyle(fontSize: 12),
@@ -519,17 +519,17 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                     minimumSize: const Size(0, 28),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(4),
-                    ),
+                                    ),
                   ),
                   child: const Text(
                     'Source',
                     style: TextStyle(fontSize: 12),
-                  ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
       ),
     );
   }
@@ -568,24 +568,24 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
         );
       } else if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to load project'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 2),
-          ),
-        );
+        ),
+      );
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
             content: Text('Error: $e'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
+  }
   }
 } 

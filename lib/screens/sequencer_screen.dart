@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../widgets/sequencer/top_multitask_panel_widget.dart';
 import '../widgets/sequencer/sample_banks_widget.dart';
 import '../widgets/sequencer/sound_grid_widget.dart';
@@ -7,6 +8,7 @@ import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
+import '../services/chat_client.dart';
 
 import 'checkpoints_screen.dart';
 
@@ -18,15 +20,26 @@ class PatternScreen extends StatefulWidget {
 }
 
 class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserver {
+  late ChatClient _chatClient;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _chatClient = ChatClient();
+    _setupChatClient();
+  }
+
+  void _setupChatClient() async {
+    // Connect to server for sending thread messages
+    final clientId = '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+    await _chatClient.connect(clientId);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _chatClient.dispose();
     super.dispose();
   }
 
@@ -64,6 +77,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
       appBar: AppHeaderWidget(
         mode: HeaderMode.sequencer,
         onBack: () => Navigator.of(context).pop(),
+        chatClient: _chatClient,
       ),
       body: LayoutBuilder(
         builder: (context, constraints) {

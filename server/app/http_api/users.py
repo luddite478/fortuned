@@ -155,10 +155,8 @@ async def register_handler(request: Request, register_data: RegisterRequest):
 async def get_user_handler(request: Request, id: str = Query(...), token: str = Query(...)):
     """Get user by ID (renamed from get_user_profile_handler)"""
     try:
-        # Validate token (basic check)
-        expected_token = "asdfasdasduiu546"
-        if token != expected_token:
-            raise HTTPException(status_code=401, detail="Invalid API token")
+        # Validate token using environment variable
+        verify_token(token)
 
         user = db.users.find_one({"id": id}, {"_id": 0, "password_hash": 0, "salt": 0})
         if not user:
@@ -173,10 +171,8 @@ async def get_user_handler(request: Request, id: str = Query(...), token: str = 
 async def get_users_handler(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0)):
     """Get list of users (renamed from get_user_profiles_handler)"""
     try:
-        # Validate token (basic check)
-        expected_token = "asdfasdasduiu546"
-        if token != expected_token:
-            raise HTTPException(status_code=401, detail="Invalid API token")
+        # Validate token using environment variable
+        verify_token(token)
 
         total = db.users.count_documents({})
         users_cursor = db.users.find(

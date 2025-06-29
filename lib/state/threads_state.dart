@@ -559,8 +559,9 @@ class ThreadsState extends ChangeNotifier {
     required String authorName,
     List<String> collaboratorIds = const [],
     List<String> collaboratorNames = const [],
-    required SequencerSnapshot initialSnapshot,
+    SequencerSnapshot? initialSnapshot,
     Map<String, dynamic> metadata = const {},
+    bool createInitialCheckpoint = true, // New parameter to control initial checkpoint
   }) async {
     try {
       setLoading(true);
@@ -584,23 +585,26 @@ class ThreadsState extends ChangeNotifier {
         ));
       }
 
-      // Create initial checkpoint
-      final initialCheckpoint = ThreadCheckpoint(
-        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
-        userId: authorId,
-        userName: authorName,
-        timestamp: DateTime.now(),
-        comment: collaboratorIds.isEmpty 
-            ? 'Created project "${title}"'
-            : 'Started collaboration on "${title}"',
-        snapshot: initialSnapshot,
-      );
+      // Create initial checkpoint only if requested
+      ThreadCheckpoint? initialCheckpoint;
+      if (createInitialCheckpoint && initialSnapshot != null) {
+        initialCheckpoint = ThreadCheckpoint(
+          id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+          userId: authorId,
+          userName: authorName,
+          timestamp: DateTime.now(),
+          comment: collaboratorIds.isEmpty 
+              ? 'Created project "${title}"'
+              : 'Started collaboration on "${title}"',
+          snapshot: initialSnapshot,
+        );
+      }
 
       // Create thread using service
       final threadId = await ThreadsService.createThread(
         title: title,
         users: users,
-        initialCheckpoint: initialCheckpoint,
+        initialCheckpoint: initialCheckpoint, // Can be null now
         metadata: metadata,
       );
 
@@ -609,7 +613,7 @@ class ThreadsState extends ChangeNotifier {
         id: threadId,
         title: title,
         users: users,
-        checkpoints: [initialCheckpoint],
+        checkpoints: initialCheckpoint != null ? [initialCheckpoint] : [], // Empty list if no initial checkpoint
         status: ThreadStatus.active,
         createdAt: DateTime.now(),
         updatedAt: DateTime.now(),
@@ -686,73 +690,9 @@ class ThreadsState extends ChangeNotifier {
     );
   }
 
-  // Create a solo thread for single-user sequencer work
-  Future<String> createSoloThread({
-    String? title,
-    required SequencerState sequencerState,
-  }) async {
-    final userId = _currentUserId ?? 'user_${DateTime.now().millisecondsSinceEpoch}';
-    final userName = _currentUserName ?? 'Solo Producer';
-    final threadTitle = title ?? 'My Sequencer Project ${DateTime.now().day}/${DateTime.now().month}';
-    
-    // Create a snapshot from current sequencer state
-    final initialSnapshot = sequencerState.createSnapshot(
-      name: threadTitle,
-      comment: 'Started working on sequencer project',
-    );
-
-    return await createThread(
-      title: threadTitle,
-      authorId: userId,
-      authorName: userName,
-      collaboratorIds: [], // Solo thread
-      collaboratorNames: [],
-      initialSnapshot: initialSnapshot,
-      metadata: {
-        'project_type': 'solo',
-        'is_public': false,
-        'created_from': 'my_sequencer_button',
-      },
-    );
-  }
-
-  // Check if user has an active solo thread, create one if needed
-  Future<Thread> ensureActiveSoloThread(SequencerState sequencerState) async {
-    // Ensure we have a current user ID
-    if (_currentUserId == null) {
-      final userId = 'user_${DateTime.now().millisecondsSinceEpoch}';
-      final userName = 'Solo Producer';
-      setCurrentUser(userId, userName);
-    }
-
-    // Check if we already have an active thread for this user
-    if (_activeThread != null && 
-        _activeThread!.users.length == 1 && 
-        _activeThread!.users.first.id == _currentUserId) {
-      return _activeThread!;
-    }
-
-    // Look for existing solo thread for this user
-    final userId = _currentUserId!;
-    final existingSoloThread = _threads.where((thread) => 
-      thread.users.length == 1 && 
-      thread.users.first.id == userId &&
-      thread.status == ThreadStatus.active
-    ).isNotEmpty ? _threads.where((thread) => 
-      thread.users.length == 1 && 
-      thread.users.first.id == userId &&
-      thread.status == ThreadStatus.active
-    ).first : null;
-
-    if (existingSoloThread != null) {
-      setActiveThread(existingSoloThread);
-      return existingSoloThread;
-    }
-
-    // Create new solo thread
-    final threadId = await createSoloThread(sequencerState: sequencerState);
-    return _activeThread!; // Will be set by createSoloThread
-  }
+  // Note: Removed createSoloThread and ensureActiveSoloThread methods
+  // ThreadsState should only manage server data, not create local threads
+  // Use the sequencer's publishToDatabase method to create threads on server
 
   // Join an existing thread
   Future<void> joinThread({

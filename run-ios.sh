@@ -3,10 +3,22 @@
 set -e
 
 DEVICE_TYPE="$1"
+IPHONE_MODEL="$2"
 
 if [[ "$DEVICE_TYPE" != "simulator" && "$DEVICE_TYPE" != "physical" ]]; then
-  echo "Usage: $0 [simulator|physical]"
+  echo "Usage: $0 [simulator|physical] [iPhone_model]"
+  echo "Examples:"
+  echo "  $0 simulator \"iPhone 15\""
+  echo "  $0 simulator \"iPhone 15 Pro\""
+  echo "  $0 simulator \"iPhone SE (3rd generation)\""
+  echo "  $0 physical"
   exit 1
+fi
+
+# Set default iPhone model if not provided for simulator
+if [[ "$DEVICE_TYPE" == "simulator" && -z "$IPHONE_MODEL" ]]; then
+  IPHONE_MODEL="iPhone 15"
+  echo "No iPhone model specified, using default: $IPHONE_MODEL"
 fi
 
 # Step 1: Find all directories (including empty ones) in samples folder
@@ -39,10 +51,8 @@ rm "$TEMP_ASSETS"
 
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
-  echo "Running on iPhone 15 Simulator..."
-  #flutter run -d 'iPhone 15' --debug
-  flutter run -d 'iPhone SE (3rd generation)' --debug
-  #open -a Simulator
+  echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
+  flutter run -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
   flutter build ios --release

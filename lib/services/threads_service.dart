@@ -18,24 +18,27 @@ class ThreadsService {
   static Future<String> createThread({
     required String title,
     required List<ThreadUser> users,
-    required ThreadCheckpoint initialCheckpoint,
+    ThreadCheckpoint? initialCheckpoint,
     Map<String, dynamic> metadata = const {},
   }) async {
     try {
       final url = Uri.parse('$_baseUrl/threads');
       
-      final body = jsonEncode({
+      final body = <String, dynamic>{
         'title': title,
         'users': users.map((u) => u.toJson()).toList(),
-        'initial_checkpoint': initialCheckpoint.toJson(),
         'metadata': metadata,
         'token': _apiToken,
-      });
+      };
+      
+      if (initialCheckpoint != null) {
+        body['initial_checkpoint'] = initialCheckpoint.toJson();
+      }
 
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: body,
+        body: jsonEncode(body),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {

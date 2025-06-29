@@ -5,6 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'thread_screen.dart';
 import 'user_profile_screen.dart';
+import 'sequencer_screen.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 
@@ -20,6 +21,9 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   List<String> _onlineUserIds = [];
   bool _isLoading = true;
   String? _error;
+  
+  // Track users with unread thread messages
+  Set<String> _usersWithNotifications = {};
 
   // Animation controllers
   late AnimationController _lampAnimation;
@@ -69,6 +73,24 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       if (connected) {
         // Request online users when connected
         _chatClient.requestOnlineUsers();
+      }
+    });
+
+    // Listen for thread messages (collaboration notifications)
+    _chatClient.threadMessageStream.listen((threadMessage) {
+      setState(() {
+        _usersWithNotifications.add(threadMessage.from);
+      });
+      
+      // Show snackbar notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${threadMessage.from} shared a project: ${threadMessage.threadTitle}'),
+            backgroundColor: const Color(0xFF7C3AED),
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     });
 
@@ -201,31 +223,14 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () async {
-            final threadsState = context.read<ThreadsState>();
-            final sequencerState = context.read<SequencerState>();
-            
-            try {
-              // Ensure we have an active solo thread for this user
-              await threadsState.ensureActiveSoloThread(sequencerState);
-              
-              if (context.mounted) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => ThreadScreen(
-                      threadId: threadsState.currentThread!.id,
-                    ),
-                  ),
-                );
-              }
-            } catch (e) {
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error creating project: $e')),
-                );
-              }
-            }
+          onTap: () {
+            // Just navigate to sequencer - no need to create threads locally
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const PatternScreen(),
+              ),
+            );
           },
           borderRadius: BorderRadius.circular(8),
           child: Container(
@@ -353,6 +358,28 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                         ),
                       ),
                       
+                      // Notification indicator - red dot for unread thread messages
+                      if (_usersWithNotifications.contains(user.id))
+                        Container(
+                          margin: const EdgeInsets.only(right: 8),
+                          width: 12,
+                          height: 12,
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444), // Red color for notifications
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Center(
+                            child: Text(
+                              '!',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 8,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      
                       // Online indicator - small purple circle
                       if (user.isOnline)
                         Container(
@@ -447,6 +474,11 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   }
 
   void _startChat(ContactUser user) {
+    // Clear notification for this user
+    setState(() {
+      _usersWithNotifications.remove(user.id);
+    });
+    
     // Navigate to user profile instead of chat
     Navigator.push(
       context,

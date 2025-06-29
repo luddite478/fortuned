@@ -16,6 +16,7 @@ class ChatClient {
   final _onlineUsersController = StreamController<List<String>>.broadcast();
   final _chatHistoryController = StreamController<ChatHistoryResponse>.broadcast();
   final _deliveryController = StreamController<DeliveryConfirmation>.broadcast();
+  final _threadMessageController = StreamController<ThreadMessage>.broadcast();
   
   // Simple server configuration from environment
   static String get serverUrl {
@@ -24,7 +25,7 @@ class ChatClient {
     return 'ws://$host:$port';
   }
   
-  static String get authToken => dotenv.env['WEBSOCKET_TOKEN'] ?? 'secure_chat_token_9999';
+  static String get authToken => dotenv.env['API_TOKEN'] ?? '';
   static String get clientIdPrefix => dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user';
   
   // Getters for streams (for listening in UI)
@@ -34,6 +35,7 @@ class ChatClient {
   Stream<List<String>> get onlineUsersStream => _onlineUsersController.stream;
   Stream<ChatHistoryResponse> get chatHistoryStream => _chatHistoryController.stream;
   Stream<DeliveryConfirmation> get deliveryStream => _deliveryController.stream;
+  Stream<ThreadMessage> get threadMessageStream => _threadMessageController.stream;
   bool get isConnected => _isConnected;
   String? get clientId => _clientId;
   
@@ -52,7 +54,7 @@ class ChatClient {
       });
       
       _socket!.add(authMessage);
-      print('🔐 Sent authentication...');
+      print('🔐 Sent authentication with token: $authToken');
       
       // Listen for messages
       _socket!.listen(
@@ -140,6 +142,20 @@ class ChatClient {
               messages: messages,
             );
             _chatHistoryController.add(response);
+          }
+          break;
+          
+        case 'thread_message':
+          if (!_threadMessageController.isClosed) {
+            final threadMessage = ThreadMessage(
+              from: message['from'],
+              threadId: message['thread_id'],
+              threadTitle: message['thread_title'],
+              timestamp: DateTime.fromMillisecondsSinceEpoch(
+                message['timestamp'] * 1000,
+              ),
+            );
+            _threadMessageController.add(threadMessage);
           }
           break;
           
@@ -233,6 +249,31 @@ class ChatClient {
       return false;
     }
   }
+
+  Future<bool> sendThreadMessage(String targetUser, String threadId, String threadTitle) async {
+    if (!_isConnected || _socket == null) {
+      if (!_errorController.isClosed) {
+        _errorController.add('Not connected to server');
+      }
+      return false;
+    }
+
+    try {
+      final request = jsonEncode({
+        'type': 'thread_message',
+        'target_user': targetUser,
+        'thread_id': threadId,
+        'thread_title': threadTitle,
+      });
+      _socket!.add(request);
+      return true;
+    } catch (e) {
+      if (!_errorController.isClosed) {
+        _errorController.add('Failed to send thread message: $e');
+      }
+      return false;
+    }
+  }
   
   void disconnect() {
     _socket?.close();
@@ -263,6 +304,9 @@ class ChatClient {
     if (!_deliveryController.isClosed) {
       _deliveryController.close();
     }
+    if (!_threadMessageController.isClosed) {
+      _threadMessageController.close();
+    }
   }
 }
 
@@ -285,5 +329,20 @@ class DeliveryConfirmation {
   DeliveryConfirmation({
     required this.to,
     required this.message,
+  });
+}
+
+// Data model for thread message
+class ThreadMessage {
+  final String from;
+  final String threadId;
+  final String threadTitle;
+  final DateTime timestamp;
+  
+  ThreadMessage({
+    required this.from,
+    required this.threadId,
+    required this.threadTitle,
+    required this.timestamp,
   });
 } 

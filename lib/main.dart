@@ -79,6 +79,39 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   @override
+  void initState() {
+    super.initState();
+    // Sync current user from AuthService to ThreadsState
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncCurrentUser();
+    });
+  }
+
+  void _syncCurrentUser() {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final sequencerState = Provider.of<SequencerState>(context, listen: false);
+    
+    print('🔍 Attempting to sync current user...');
+    print('🔍 AuthService currentUser: ${authService.currentUser?.id} (${authService.currentUser?.name})');
+    print('🔍 ThreadsState currentUserId: ${threadsState.currentUserId}');
+    
+    // Set the ThreadsState reference in SequencerState
+    sequencerState.setThreadsState(threadsState);
+    print('🔗 Set ThreadsState reference in SequencerState');
+    
+    if (authService.currentUser != null) {
+      threadsState.setCurrentUser(
+        authService.currentUser!.id,
+        authService.currentUser!.name,
+      );
+      print('🔗 Synced current user to ThreadsState: ${authService.currentUser!.id} (${authService.currentUser!.name})');
+    } else {
+      print('❌ No current user found in AuthService');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     // Show users screen as the initial view
     return const UsersScreen();

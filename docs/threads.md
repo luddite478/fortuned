@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Threads system in Niyya provides a collaborative framework for music production where users can work together on sequencer projects or maintain versioning history for solo projects. Each thread represents a project timeline with checkpoints that capture complete project snapshots at specific points in time.
+The Threads system provides a collaborative framework for music production where users can work together on sequencer projects or maintain versioning history for solo projects. Each thread represents a project timeline with checkpoints that capture complete project snapshots at specific points in time.
 
 ## Architecture
 
