@@ -57,6 +57,17 @@ typedef float ieee754_float32_t;
 #define HAVE_MEMMOVE 1
 #define HAVE_STRCHR 1
 
+/* Disable assembly optimizations for Android */
+#undef HAVE_NASM
+#undef MMX_choose_table
+
+/* Disable CPU feature detection and optimizations */
+#define HAVE_NASM 0
+
+/* Disable all x86 assembly optimizations */
+#undef HAVE_XMMINTRIN_H
+#undef HAVE_IMMINTRIN_H
+
 /* Missing function compatibility macros */
 // #define bcopy(src, dst, len) memmove(dst, src, len)
 

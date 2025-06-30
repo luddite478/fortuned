@@ -42,6 +42,12 @@ set_source_files_properties(
 add_definitions(-DMA_NO_AAUDIO)
 add_definitions(-DHAVE_CONFIG_H)
 
+# Disable NASM and assembly optimizations for Android
+if(ANDROID)
+  add_definitions(-DHAVE_NASM=0)
+  add_definitions(-UMMX_choose_table)
+endif()
+
 # Include directories
 if(ANDROID)
   include_directories(lame_android)
@@ -65,6 +71,7 @@ if(ANDROID)
     lame_android/VbrTag.c
     lame_android/version.c
     lame_android/gain_analysis.c
+    lame_android/nasm_stubs.c
   )
 else()
   include_directories(lame)
