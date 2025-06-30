@@ -43,7 +43,34 @@ add_definitions(-DMA_NO_AAUDIO)
 add_definitions(-DHAVE_CONFIG_H)
 
 # Include directories
-include_directories(lame)
+if(ANDROID)
+  include_directories(lame_android)
+  list(APPEND SEQUENCER_SOURCES
+    lame_android/lame.c
+    lame_android/bitstream.c
+    lame_android/encoder.c
+    lame_android/fft.c
+    lame_android/id3tag.c
+    lame_android/newmdct.c
+    lame_android/presets.c
+    lame_android/psymodel.c
+    lame_android/quantize.c
+    lame_android/quantize_pvt.c
+    lame_android/reservoir.c
+    lame_android/set_get.c
+    lame_android/tables.c
+    lame_android/takehiro.c
+    lame_android/util.c
+    lame_android/vbrquantize.c
+    lame_android/VbrTag.c
+    lame_android/version.c
+    lame_android/gain_analysis.c
+  )
+else()
+  include_directories(lame)
+  list(APPEND SEQUENCER_SOURCES ${LAME_SOURCES})
+endif()
+
 include_directories(miniaudio)
 
 # Create sequencer library (includes both sequencer and conversion functionality)
