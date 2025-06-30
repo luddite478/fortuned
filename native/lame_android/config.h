@@ -1,4 +1,4 @@
-/* Minimal config.h for LAME on iOS/macOS */
+/* Minimal config.h for LAME on iOS/macOS/Android */
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -55,6 +55,7 @@ typedef float ieee754_float32_t;
 /* Function compatibility */
 #define HAVE_MEMSET 1
 #define HAVE_MEMMOVE 1
+#define HAVE_STRCHR 1
 
 /* Missing function compatibility macros */
 // #define bcopy(src, dst, len) memmove(dst, src, len)
