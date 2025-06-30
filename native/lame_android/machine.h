@@ -34,8 +34,8 @@
 # ifndef HAVE_STRCHR
 #  define strchr index
 #  define strrchr rindex
-# endif
 char   *strchr(), *strrchr();
+# endif
 // #  define memcpy(d, s, n) bcopy ((s), (d), (n))
 // #  define memmove(d, s, n) bcopy ((s), (d), (n))
 #endif
