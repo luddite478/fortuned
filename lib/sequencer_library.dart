@@ -22,8 +22,18 @@ class SequencerLibrary {
   late final SequencerBindings _bindings;
   bool _isLibraryLoaded = false;
   String? _loadError;
+  
+  // TEMPORARY: Mock mode for debugging - set to true to disable native bindings
+  static const bool _mockMode = true;
 
   SequencerLibrary._() {
+    if (_mockMode) {
+      print('🧪 MOCK MODE: Native library loading disabled for debugging');
+      _isLibraryLoaded = false;
+      _loadError = 'Mock mode enabled - native bindings disabled';
+      return;
+    }
+    
     try {
       _dylib = _loadLibrary();
       _bindings = SequencerBindings(_dylib);
@@ -71,6 +81,11 @@ class SequencerLibrary {
 
   // Wrapper methods for easier access
   bool initialize() {
+    if (_mockMode) {
+      print('🧪 MOCK: initialize() called - returning true');
+      return true;
+    }
+    
     if (!_isLibraryLoaded) {
       print('❌ Cannot initialize: Native library not loaded - ${_loadError ?? "Unknown error"}');
       return false;
@@ -163,10 +178,20 @@ class SequencerLibrary {
   }
 
   void stopAllSounds() {
+    if (_mockMode) {
+      print('🧪 MOCK: stopAllSounds()');
+      return;
+    }
+    
     _bindings.stop_all_sounds();
   }
 
   bool isInitialized() {
+    if (_mockMode) {
+      print('🧪 MOCK: isInitialized() - returning true');
+      return true;
+    }
+    
     if (!_isLibraryLoaded) return false;
     
     try {
@@ -189,6 +214,11 @@ class SequencerLibrary {
 
   // Re-activate Bluetooth audio session (call when Bluetooth routing stops working)
   bool reconfigureAudioSession() {
+    if (_mockMode) {
+      print('🧪 MOCK: reconfigureAudioSession() - returning true');
+      return true;
+    }
+    
     if (!_isLibraryLoaded) return false;
     
     try {
@@ -246,6 +276,11 @@ class SequencerLibrary {
 
   // -------------- MULTI SLOT --------------
   int get slotCount {
+    if (_mockMode) {
+      print('🧪 MOCK: slotCount - returning 1024');
+      return 1024;
+    }
+    
     if (!_isLibraryLoaded) return 1024; // Return default value
     
     try {
@@ -257,6 +292,11 @@ class SequencerLibrary {
   }
 
   bool loadSoundToSlot(int slot, String filePath, {bool loadToMemory = false}) {
+    if (_mockMode) {
+      print('🧪 MOCK: loadSoundToSlot($slot, $filePath) - returning true');
+      return true;
+    }
+    
     final utf8Bytes = utf8.encode(filePath);
     final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
     try {
@@ -272,11 +312,21 @@ class SequencerLibrary {
   }
 
   bool playSlot(int slot) {
+    if (_mockMode) {
+      print('🧪 MOCK: playSlot($slot) - returning true');
+      return true;
+    }
+    
     int result = _bindings.play_slot(slot);
     return result == 0;
   }
 
   void stopSlot(int slot) {
+    if (_mockMode) {
+      print('🧪 MOCK: stopSlot($slot)');
+      return;
+    }
+    
     _bindings.stop_slot(slot);
   }
 
@@ -354,6 +404,10 @@ class SequencerLibrary {
   
   /// Get formatted recording duration as MM:SS
   String get formattedOutputRecordingDuration {
+    if (_mockMode) {
+      return '00:00';
+    }
+    
     final durationMs = outputRecordingDurationMs;
     final totalSeconds = durationMs ~/ 1000;
     final minutes = totalSeconds ~/ 60;

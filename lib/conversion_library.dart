@@ -12,10 +12,20 @@ class ConversionLibrary {
   late final ConversionBindings _bindings;
   bool _isLoaded = false;
   String? _loadError;
+  
+  // TEMPORARY: Mock mode for debugging - set to true to disable native bindings
+  static const bool _mockMode = true;
 
   /// Initialize the conversion library and load the native library
   void initialize() {
     if (_isLoaded) return;
+    
+    if (_mockMode) {
+      print('🧪 MOCK MODE: Conversion library loading disabled for debugging');
+      _isLoaded = false;
+      _loadError = 'Mock mode enabled - conversion bindings disabled';
+      return;
+    }
 
     try {
       final ffi.DynamicLibrary library;
@@ -53,6 +63,11 @@ class ConversionLibrary {
   /// 
   /// Returns true if initialization was successful
   bool init() {
+    if (_mockMode) {
+      print('🧪 MOCK: conversion init() - returning true');
+      return true;
+    }
+    
     if (!_isLoaded) {
       throw StateError('ConversionLibrary not initialized. Call initialize() first.');
     }
@@ -76,6 +91,11 @@ class ConversionLibrary {
   /// 
   /// Returns true if conversion was successful
   bool convertWavToMp3(String wavPath, String mp3Path, int bitrateKbps) {
+    if (_mockMode) {
+      print('🧪 MOCK: convertWavToMp3($wavPath, $mp3Path, $bitrateKbps) - returning true');
+      return true;
+    }
+    
     if (!_isLoaded) {
       throw StateError('ConversionLibrary not initialized. Call initialize() first.');
     }
@@ -129,6 +149,10 @@ class ConversionLibrary {
 
   /// Get the version string of the underlying LAME encoder
   String get version {
+    if (_mockMode) {
+      return 'Mock Mode - No Native Library';
+    }
+    
     if (!_isLoaded) {
       throw StateError('ConversionLibrary not initialized. Call initialize() first.');
     }
