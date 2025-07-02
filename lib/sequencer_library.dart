@@ -1,6 +1,7 @@
 import 'dart:ffi';
 import 'dart:io';
 import 'dart:convert';
+import 'package:ffi/ffi.dart';
 import 'sequencer_bindings_generated.dart';
 
 // Import malloc from dart:ffi
@@ -20,40 +21,17 @@ class SequencerLibrary {
   static SequencerLibrary? _instance;
   late final DynamicLibrary _dylib;
   late final SequencerBindings _bindings;
-  bool _isLibraryLoaded = false;
-  String? _loadError;
-  
-  // TEMPORARY: Mock mode for debugging - set to true to disable native bindings
-  static const bool _mockMode = true;
+  bool _isInitialized = false;
 
   SequencerLibrary._() {
-    if (_mockMode) {
-      print('🧪 MOCK MODE: Native library loading disabled for debugging');
-      _isLibraryLoaded = false;
-      _loadError = 'Mock mode enabled - native bindings disabled';
-      return;
-    }
-    
-    try {
-      _dylib = _loadLibrary();
-      _bindings = SequencerBindings(_dylib);
-      _isLibraryLoaded = true;
-      print('✅ Native library loaded successfully');
-    } catch (e) {
-      _loadError = e.toString();
-      print('❌ Failed to load native library: $e');
-      print('❌ Audio functionality will be disabled');
-      _isLibraryLoaded = false;
-    }
+    _dylib = _loadLibrary();
+    _bindings = SequencerBindings(_dylib);
   }
 
   static SequencerLibrary get instance {
     _instance ??= SequencerLibrary._();
     return _instance!;
   }
-
-  bool get isLibraryLoaded => _isLibraryLoaded;
-  String? get loadError => _loadError;
 
   DynamicLibrary _loadLibrary() {
     try {
@@ -72,40 +50,36 @@ class SequencerLibrary {
         throw UnsupportedError('Platform not supported');
       }
     } catch (e) {
-      print('⚠️ Failed to load native library: $e');
-      print('⚠️ Audio functionality will be disabled');
-      // Don't rethrow, let the constructor handle it gracefully
-      throw e;
+      throw Exception('Failed to load native library: $e. '
+          'Make sure the C files are properly added to your project.');
     }
   }
 
   // Wrapper methods for easier access
   bool initialize() {
-    if (_mockMode) {
-      print('🧪 MOCK: initialize() called - returning true');
-      return true;
-    }
-    
-    if (!_isLibraryLoaded) {
-      print('❌ Cannot initialize: Native library not loaded - ${_loadError ?? "Unknown error"}');
-      return false;
-    }
-    
     try {
       int result = _bindings.init();
-      bool success = result == 0;
-      if (!success) {
+      _isInitialized = result == 0;
+      if (_isInitialized) {
+        print('✅ Audio initialized successfully');
+      } else {
         print('❌ Audio initialization failed with code: $result');
       }
-      return success;
+      return _isInitialized;
     } catch (e) {
       print('❌ Error initializing audio: $e');
+      _isInitialized = false;
       return false;
     }
   }
 
   // Direct file playback (streaming from disk)
   bool playSoundFromFile(String filePath) {
+    if (!_isInitialized) {
+      print('❌ Audio not initialized, call initialize() first');
+      return false;
+    }
+    
     print('Attempting to play from file: $filePath');
     
     // Convert Dart string to C string using manual allocation
@@ -137,6 +111,11 @@ class SequencerLibrary {
 
   // Load sound into memory for faster playback
   bool loadSoundIntoMemory(String filePath) {
+    if (!_isInitialized) {
+      print('❌ Audio not initialized, call initialize() first');
+      return false;
+    }
+    
     print('Loading sound into memory: $filePath');
     
     final utf8Bytes = utf8.encode(filePath);
@@ -164,6 +143,11 @@ class SequencerLibrary {
 
   // Play the previously loaded sound
   bool playLoadedSound() {
+    if (!_isInitialized) {
+      print('❌ Audio not initialized, call initialize() first');
+      return false;
+    }
+    
     print('Playing loaded sound from memory');
     
     int result = _bindings.play_loaded_sound();
@@ -178,90 +162,35 @@ class SequencerLibrary {
   }
 
   void stopAllSounds() {
-    if (_mockMode) {
-      print('🧪 MOCK: stopAllSounds()');
-      return;
-    }
-    
     _bindings.stop_all_sounds();
   }
 
   bool isInitialized() {
-    if (_mockMode) {
-      print('🧪 MOCK: isInitialized() - returning true');
-      return true;
-    }
-    
-    if (!_isLibraryLoaded) return false;
-    
-    try {
-      return _bindings.is_initialized() == 1;
-    } catch (e) {
-      print('❌ Error checking initialization: $e');
-      return false;
-    }
+    return _isInitialized && _bindings.is_initialized() == 1;
   }
 
   void cleanup() {
-    if (!_isLibraryLoaded) return;
-    
-    try {
-      _bindings.cleanup();
-    } catch (e) {
-      print('❌ Error during cleanup: $e');
-    }
+    _bindings.cleanup();
+    _isInitialized = false;
   }
 
   // Re-activate Bluetooth audio session (call when Bluetooth routing stops working)
   bool reconfigureAudioSession() {
-    if (_mockMode) {
-      print('🧪 MOCK: reconfigureAudioSession() - returning true');
-      return true;
-    }
-    
-    if (!_isLibraryLoaded) return false;
-    
-    try {
-      int result = _bindings.reconfigure_audio_session();
-      return result == 0;
-    } catch (e) {
-      print('❌ Error reconfiguring audio session: $e');
-      return false;
-    }
+    int result = _bindings.reconfigure_audio_session();
+    return result == 0;
   }
 
   // Memory tracking methods
   int getTotalMemoryUsage() {
-    if (!_isLibraryLoaded) return 0;
-    
-    try {
-      return _bindings.get_total_memory_usage();
-    } catch (e) {
-      print('❌ Error getting memory usage: $e');
-      return 0;
-    }
+    return _bindings.get_total_memory_usage();
   }
 
   int getSlotMemoryUsage(int slot) {
-    if (!_isLibraryLoaded) return 0;
-    
-    try {
-      return _bindings.get_slot_memory_usage(slot);
-    } catch (e) {
-      print('❌ Error getting slot memory usage: $e');
-      return 0;
-    }
+    return _bindings.get_slot_memory_usage(slot);
   }
 
   int getMemorySlotCount() {
-    if (!_isLibraryLoaded) return 0;
-    
-    try {
-      return _bindings.get_memory_slot_count();
-    } catch (e) {
-      print('❌ Error getting memory slot count: $e');
-      return 0;
-    }
+    return _bindings.get_memory_slot_count();
   }
 
   String formatMemorySize(int bytes) {
@@ -276,27 +205,10 @@ class SequencerLibrary {
 
   // -------------- MULTI SLOT --------------
   int get slotCount {
-    if (_mockMode) {
-      print('🧪 MOCK: slotCount - returning 1024');
-      return 1024;
-    }
-    
-    if (!_isLibraryLoaded) return 1024; // Return default value
-    
-    try {
-      return _bindings.get_slot_count();
-    } catch (e) {
-      print('❌ Error getting slot count: $e');
-      return 1024;
-    }
+    return _bindings.get_slot_count();
   }
 
   bool loadSoundToSlot(int slot, String filePath, {bool loadToMemory = false}) {
-    if (_mockMode) {
-      print('🧪 MOCK: loadSoundToSlot($slot, $filePath) - returning true');
-      return true;
-    }
-    
     final utf8Bytes = utf8.encode(filePath);
     final Pointer<Int8> cString = malloc(utf8Bytes.length + 1).cast<Int8>();
     try {
@@ -312,9 +224,9 @@ class SequencerLibrary {
   }
 
   bool playSlot(int slot) {
-    if (_mockMode) {
-      print('🧪 MOCK: playSlot($slot) - returning true');
-      return true;
+    if (!_isInitialized) {
+      print('❌ Audio not initialized, call initialize() first');
+      return false;
     }
     
     int result = _bindings.play_slot(slot);
@@ -322,11 +234,6 @@ class SequencerLibrary {
   }
 
   void stopSlot(int slot) {
-    if (_mockMode) {
-      print('🧪 MOCK: stopSlot($slot)');
-      return;
-    }
-    
     _bindings.stop_slot(slot);
   }
 
@@ -404,10 +311,6 @@ class SequencerLibrary {
   
   /// Get formatted recording duration as MM:SS
   String get formattedOutputRecordingDuration {
-    if (_mockMode) {
-      return '00:00';
-    }
-    
     final durationMs = outputRecordingDurationMs;
     final totalSeconds = durationMs ~/ 1000;
     final minutes = totalSeconds ~/ 60;
@@ -427,95 +330,62 @@ class SequencerLibrary {
       return false;
     }
     
-    try {
-      int result = _bindings.start(bpm, steps);
-      bool success = result == 0;
-      if (success) {
-        print('🎵 Sequencer started: $bpm BPM, $steps steps');
-      } else {
-        print('❌ Failed to start sequencer');
-      }
-      return success;
-    } catch (e) {
-      print('❌ Error starting sequencer: $e');
-      return false;
+    int result = _bindings.start(bpm, steps);
+    bool success = result == 0;
+    if (success) {
+      print('🎵 Sequencer started: $bpm BPM, $steps steps');
+    } else {
+      print('❌ Failed to start sequencer');
     }
+    return success;
   }
   
   /// Stop the sequencer
   void stopSequencer() {
-    try {
-      _bindings.stop();
-      print('⏹️ Sequencer stopped');
-    } catch (e) {
-      print('❌ Error stopping sequencer: $e');
-    }
+    _bindings.stop();
+    print('⏹️ Sequencer stopped');
   }
   
   /// Check if sequencer is playing
   bool get isSequencerPlaying {
-    try {
-      return _bindings.is_playing() == 1;
-    } catch (e) {
-      return false;
-    }
+    return _bindings.is_playing() == 1;
   }
   
   /// Get current sequencer step (0-based)
   int get currentStep {
-    try {
-      return _bindings.get_current_step();
-    } catch (e) {
-      return -1;
-    }
+    return _bindings.get_current_step();
   }
   
   /// Set sequencer BPM (updates timing instantly)
   void setSequencerBpm(int bpm) {
-    try {
-      _bindings.set_bpm(bpm);
-    } catch (e) {
-      print('❌ Error setting sequencer BPM: $e');
-    }
+    _bindings.set_bpm(bpm);
   }
   
   /// Set a grid cell to play a specific sample slot
   /// step: 0-31, column: 0-7, sampleSlot: 0-1023 (or -1 to clear)
   void setGridCell(int step, int column, int sampleSlot) {
-    try {
-      _bindings.set_cell(step, column, sampleSlot);
-    } catch (e) {
-      print('❌ Error setting grid cell: $e');
-    }
+    _bindings.set_cell(step, column, sampleSlot);
   }
   
   /// Clear a specific grid cell
   void clearGridCell(int step, int column) {
-    try {
-      _bindings.clear_cell(step, column);
-    } catch (e) {
-      print('❌ Error clearing grid cell: $e');
-    }
+    _bindings.clear_cell(step, column);
   }
   
   /// Clear all grid cells
   void clearAllGridCells() {
-    try {
-      _bindings.clear_all_cells();
-      print('🗑️ All grid cells cleared');
-    } catch (e) {
-      print('❌ Error clearing all grid cells: $e');
-    }
+    _bindings.clear_all_cells();
+    print('🗑️ All grid cells cleared');
   }
   
   // -------------- MULTI-GRID SEQUENCER FUNCTIONS --------------
-  
+   
   /// Set a cell using grid coordinates (automatically calculates absolute column)
   void setCellAt(int gridIndex, int step, int column, int sampleSlot, {int columnsPerGrid = 4}) {
     final absoluteColumn = gridIndex * columnsPerGrid + column;
     setGridCell(step, absoluteColumn, sampleSlot);
   }
-  
+       
   /// Clear a cell using grid coordinates
   void clearCellAt(int gridIndex, int step, int column, {int columnsPerGrid = 4}) {
     final absoluteColumn = gridIndex * columnsPerGrid + column;
@@ -525,11 +395,7 @@ class SequencerLibrary {
   /// Configure columns for multi-grid support  
   /// Directly sets the columns in native sequencer
   void configureColumns(int columns) {
-    try {
-      _bindings.set_columns(columns);
-      print('🎛️ Set sequencer columns to $columns');
-    } catch (e) {
-      print('❌ Error setting columns: $e');
-    }
+    _bindings.set_columns(columns);
+    print('🎛️ Set sequencer columns to $columns');
   }
 } 

@@ -1,100 +1,44 @@
-﻿publish_to: none
+publish_to: none
 description: A new Flutter project.
 environment:
   sdk: '>=3.4.4 <4.0.0'
 version: 1.0.0+1
 flutter:
   assets:
-  - samples/Simulacrum Sounds/
-  - samples/Simulacrum Sounds/1 Shots/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Keys/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/
-  - samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Winds/
-  - samples/Simulacrum Sounds/1 Shots/Synths/
-  - samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/
-  - samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/
-  - samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/
-  - samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/
-  - samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/FX/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Leads and Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/
-  - samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/
-  - samples/Simulacrum Sounds/Modular Synth Loops/
-  - .env
-  - samples_manifest.json
+    - samples/acoustic/
+    - samples/drums/
+    - samples/drums/China/
+    - samples/drums/Crash A/
+    - samples/drums/Crash B/
+    - samples/drums/Crash C/
+    - samples/drums/Hi Hat/
+    - samples/drums/Kick/
+    - samples/drums/Ride Cymbal/
+    - samples/drums/Snare Off/
+    - samples/drums/Snare On/
+    - samples/drums/Splash/
+    - samples/drums/Tom Floor/
+    - samples/drums/Tom High/
+    - samples/drums/Tom Mid/
+    - samples/noise/
+    - samples/other/
+    - samples/synth/
+    - samples/synth/Korg MS-20/
+    - samples/synth/Korg MS-20/Bass/
+    - samples/synth/Korg MS-20/Leads and Keys/
+    - samples/synth/Yamaha CS40M/
+    - samples/synth/Yamaha CS40M/Bass/
+    - samples/synth/Yamaha CS40M/Keys/
+    - samples/wavparty-braids-vol-1/
+    - samples/wavparty-braids-vol-1/chords-tunedC/
+    - samples/wavparty-braids-vol-1/hats/
+    - samples/wavparty-braids-vol-1/kicks/
+    - samples/wavparty-braids-vol-1/perc/
+    - samples/wavparty-braids-vol-1/snares/
+    - samples/wavparty-braids-vol-1/synth-tunedC/
+    - samples/wavparty-braids-vol-1/vox-tunedC/
+    - .env
+    - samples_manifest.json
   uses-material-design: true
 name: niyya
 dependencies:
@@ -115,4 +59,3 @@ dev_dependencies:
     sdk: flutter
   ffigen: ^13.0.0
   flutter_lints: ^3.0.0
-

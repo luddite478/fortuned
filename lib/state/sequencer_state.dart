@@ -89,6 +89,14 @@ class SequencerState extends ChangeNotifier {
       try {
         _sequencerLibrary = SequencerLibrary.instance;
         print('✅ SequencerLibrary loaded successfully');
+        
+        // Initialize the audio engine immediately after loading
+        bool initSuccess = _sequencerLibrary!.initialize();
+        if (initSuccess) {
+          print('✅ Audio engine initialized successfully');
+        } else {
+          print('❌ Failed to initialize audio engine');
+        }
       } catch (e) {
         print('❌ Failed to load SequencerLibrary: $e');
         // Return a mock instance that won't crash the app
