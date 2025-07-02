@@ -1165,9 +1165,36 @@ class SequencerState extends ChangeNotifier {
       final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
       final filename = 'niyya_recording_$timestamp.wav';
       
-      // Get app's documents directory
-      final directory = await getApplicationDocumentsDirectory();
-      _currentRecordingPath = path.join(directory.path, filename);
+      // Try multiple directory options for better Android compatibility
+      String? directoryPath;
+      try {
+        // First try: Application documents directory
+        final directory = await getApplicationDocumentsDirectory();
+        directoryPath = directory.path;
+        print('📁 Using app documents directory: $directoryPath');
+      } catch (e) {
+        print('⚠️ App documents directory failed: $e');
+        try {
+          // Fallback: External storage directory (more reliable on Android)
+          final directory = await getExternalStorageDirectory();
+          if (directory != null) {
+            directoryPath = directory.path;
+            print('📁 Using external storage directory: $directoryPath');
+          }
+        } catch (e2) {
+          print('⚠️ External storage directory failed: $e2');
+          // Last fallback: Use temporary directory
+          final directory = await getTemporaryDirectory();
+          directoryPath = directory.path;
+          print('📁 Using temporary directory: $directoryPath');
+        }
+      }
+      
+      if (directoryPath == null) {
+        throw Exception('Could not find any suitable directory for recording');
+      }
+      
+      _currentRecordingPath = path.join(directoryPath, filename);
       
       bool success = sequencerLibrary.startOutputRecording(_currentRecordingPath!);
       if (success) {
