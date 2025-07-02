@@ -8,6 +8,7 @@ import 'dart:math';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/reliable_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -224,8 +225,10 @@ class SequencerState extends ChangeNotifier {
       clearAutosavedState();
     }
     
-    // Load saved recordings
-    _loadSavedRecordings();
+    // Load saved recordings asynchronously (don't block constructor)
+    _loadSavedRecordings().catchError((e) {
+      debugPrint('❌ Failed to load saved recordings during initialization: $e');
+    });
   }
 
   // Set threads state for collaboration tracking
@@ -1141,9 +1144,21 @@ class SequencerState extends ChangeNotifier {
       final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
       final filename = 'niyya_recording_$timestamp.wav';
       
-      // Get app's documents directory
-      final directory = await getApplicationDocumentsDirectory();
-      _currentRecordingPath = path.join(directory.path, filename);
+      // Use direct path to avoid path_provider pigeon channel issues on Android
+      String directoryPath;
+      if (Platform.isAndroid) {
+        // Use Android's public Downloads directory - always accessible
+        directoryPath = '/storage/emulated/0/Download';
+        print('📁 Using Android Downloads directory: $directoryPath');
+      } else {
+        // For other platforms, keep using path_provider
+        final directory = await getApplicationDocumentsDirectory();
+        directoryPath = directory.path;
+        print('📁 Using documents directory: $directoryPath');
+      }
+      
+      _currentRecordingPath = path.join(directoryPath, filename);
+      print('🎙️ Recording to: $_currentRecordingPath');
       
       bool success = _sequencerLibrary.startOutputRecording(_currentRecordingPath!);
       if (success) {
@@ -2079,14 +2094,16 @@ Made with Demo Sequencer 🚀
         }
       }
       
-      // Update saved list to remove non-existent files
+      // Update saved list to remove non-existent files (but don't await to avoid blocking)
       if (_localRecordings.length != savedRecordings.length) {
-        await _saveRecordingsList();
+        _saveRecordingsList(); // Remove await to prevent blocking initialization
       }
       
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Error loading saved recordings: $e');
+      // Initialize empty list on error to prevent further issues
+      _localRecordings.clear();
     }
   }
 

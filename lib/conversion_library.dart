@@ -125,7 +125,10 @@ class ConversionLibrary {
   }
 
   /// Check if the conversion library is available and ready to use
-  bool get isAvailable => _bindings.conversion_is_available() == 1;
+  bool get isAvailable {
+    if (!_isLoaded) return false;
+    return _bindings.conversion_is_available() == 1;
+  }
 
   /// Get the version string of the underlying LAME encoder
   String get version {
