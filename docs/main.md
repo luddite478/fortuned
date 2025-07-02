@@ -196,7 +196,7 @@ if (header.audio_format == 3 && header.bits_per_sample == 32) {
 GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 HEADER_SEARCH_PATHS = (
     "$(SRCROOT)/../native",
-    "$(SRCROOT)/../native/lame",
+    "$(SRCROOT)/../native/lame_ios",
 );
 OTHER_CFLAGS = (
     "-DHAVE_CONFIG_H",  // Enable LAME configuration
