@@ -8,14 +8,13 @@ import 'dart:math';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/reliable_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../sequencer_library.dart';
 import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
 import '../services/threads_service.dart';
-// import 'patterns_state.dart';
 
 // Sample browser item model
 class SampleBrowserItem {
@@ -80,31 +79,8 @@ class SampleSlot {
 class SequencerState extends ChangeNotifier {
   static const int maxSlots = 8;
   
-  SequencerLibrary? _sequencerLibrary;
+  late final SequencerLibrary _sequencerLibrary;
   late final int _slotCount;
-
-  // Lazy getter for sequencer library - initializes on first access
-  SequencerLibrary get sequencerLibrary {
-    if (_sequencerLibrary == null) {
-      try {
-        _sequencerLibrary = SequencerLibrary.instance;
-        print('✅ SequencerLibrary loaded successfully');
-        
-        // Initialize the audio engine immediately after loading
-        bool initSuccess = _sequencerLibrary!.initialize();
-        if (initSuccess) {
-          print('✅ Audio engine initialized successfully');
-        } else {
-          print('❌ Failed to initialize audio engine');
-        }
-      } catch (e) {
-        print('❌ Failed to load SequencerLibrary: $e');
-        // Return a mock instance that won't crash the app
-        rethrow;
-      }
-    }
-    return _sequencerLibrary!;
-  }
 
   // Audio state
   late List<String?> _filePaths;
@@ -134,7 +110,7 @@ class SequencerState extends ChangeNotifier {
   
   // Sequencer state
   int _bpm = 120;
-  int _currentStep = 0; // -1 means not playing, 0-15 for current step
+  int _currentStep = -1; // -1 means not playing, 0-15 for current step
   bool _isSequencerPlaying = false;
   Timer? _sequencerTimer;
   
@@ -225,10 +201,10 @@ class SequencerState extends ChangeNotifier {
 
   // Initialize sequencer
   SequencerState() {
-    // Don't initialize FFI library immediately to prevent startup hangs
-    // sequencerLibrary will be initialized lazily when first accessed
-    
-    _slotCount = 1024; // Default slot count, will be updated when library loads
+    _sequencerLibrary = SequencerLibrary.instance;
+    _initializeAudio();
+
+    _slotCount = _sequencerLibrary.slotCount;
     _filePaths = List.filled(_slotCount, null);
     _fileNames = List.filled(_slotCount, null);
     _slotLoaded = List.filled(_slotCount, false);
@@ -243,7 +219,7 @@ class SequencerState extends ChangeNotifier {
     if (!_clearSavedDataOnInit) {
       _loadAutosavedState();
     } else {
-      debugPrint('�� Skipping autosaved state loading (clearSavedDataOnInit = true)');
+      debugPrint('🧪 Skipping autosaved state loading (clearSavedDataOnInit = true)');
       // Optionally clear any existing saved data
       clearAutosavedState();
     }
@@ -445,7 +421,7 @@ class SequencerState extends ChangeNotifier {
   String? get currentRecordingPath => _currentRecordingPath;
   String? get lastRecordingPath => _lastRecordingPath;
   DateTime? get lastRecordingTime => _lastRecordingTime;
-  String get formattedRecordingDuration => sequencerLibrary.formattedOutputRecordingDuration;
+  String get formattedRecordingDuration => _sequencerLibrary.formattedOutputRecordingDuration;
   bool get isConverting => _isConverting;
   double get conversionProgress => _conversionProgress;
   String? get lastMp3Path => _lastMp3Path;
@@ -484,7 +460,7 @@ class SequencerState extends ChangeNotifier {
   }
 
   Future<void> _initializeAudio() async {
-    bool success = sequencerLibrary.initialize();
+    bool success = _sequencerLibrary.initialize();
     if (!success) {
       debugPrint('Failed to initialize audio engine');
     }
@@ -655,10 +631,10 @@ class SequencerState extends ChangeNotifier {
       final tempPath = await _copyAssetToTemp(assetPath, fileName);
       
       // Load and play the preview sample in slot 0 temporarily
-      bool loadSuccess = sequencerLibrary.loadSoundToSlot(0, tempPath, loadToMemory: true);
+      bool loadSuccess = _sequencerLibrary.loadSoundToSlot(0, tempPath, loadToMemory: true);
       if (loadSuccess) {
-        sequencerLibrary.reconfigureAudioSession();
-        sequencerLibrary.playSlot(0);
+        _sequencerLibrary.reconfigureAudioSession();
+        _sequencerLibrary.playSlot(0);
       }
     } catch (e) {
       print('❌ Error previewing sample: $e');
@@ -668,7 +644,7 @@ class SequencerState extends ChangeNotifier {
   void loadSlot(int slot) {
     final path = _filePaths[slot];
     if (path == null) return;
-    bool success = sequencerLibrary.loadSoundToSlot(
+    bool success = _sequencerLibrary.loadSoundToSlot(
       slot,
       path,
       loadToMemory: true,
@@ -690,9 +666,9 @@ class SequencerState extends ChangeNotifier {
     }
     
     // Ensure Bluetooth audio routing is active before playback
-    sequencerLibrary.reconfigureAudioSession();
+    _sequencerLibrary.reconfigureAudioSession();
     
-    bool success = sequencerLibrary.playSlot(slot);
+    bool success = _sequencerLibrary.playSlot(slot);
     if (success) {
       _slotPlaying[slot] = true;
       notifyListeners();
@@ -700,13 +676,13 @@ class SequencerState extends ChangeNotifier {
   }
 
   void stopSlot(int slot) {
-    sequencerLibrary.stopSlot(slot);
+    _sequencerLibrary.stopSlot(slot);
     _slotPlaying[slot] = false;
     notifyListeners();
   }
 
   void stopAll() {
-    sequencerLibrary.stopAllSounds();
+    _sequencerLibrary.stopAllSounds();
     for (int i = 0; i < _slotCount; ++i) {
       _slotPlaying[i] = false;
     }
@@ -722,10 +698,10 @@ class SequencerState extends ChangeNotifier {
     }
 
     // Ensure Bluetooth audio routing is active before playback
-    sequencerLibrary.reconfigureAudioSession();
+    _sequencerLibrary.reconfigureAudioSession();
 
     // Then play all loaded slots
-    sequencerLibrary.playAllLoadedSlots();
+    _sequencerLibrary.playAllLoadedSlots();
 
     // Update UI state for all loaded slots
     for (int i = 0; i < _slotCount; i++) {
@@ -976,7 +952,7 @@ class SequencerState extends ChangeNotifier {
         final row = cellIndex ~/ _gridColumns;
         final col = cellIndex % _gridColumns;
         final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-        sequencerLibrary.clearGridCell(row, absoluteColumn);
+        _sequencerLibrary.clearGridCell(row, absoluteColumn);
       }
     }
     // Clear selection after deletion
@@ -988,13 +964,13 @@ class SequencerState extends ChangeNotifier {
 
   // Sequencer functionality with sample-accurate timing
   void startSequencer() {
-    if (sequencerLibrary.isSequencerPlaying) return;
+    if (_sequencerLibrary.isSequencerPlaying) return;
     
     // First, transfer current grid to sequencer
     _syncGridToSequencer();
     
     // Start sequencer with current BPM and grid size
-    bool success = sequencerLibrary.startSequencer(_bpm, _gridRows);
+    bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows);
     if (success) {
       _isSequencerPlaying = true;
       // Start a timer just for UI updates (not audio timing)
@@ -1004,7 +980,7 @@ class SequencerState extends ChangeNotifier {
   }
   
   void stopSequencer() {
-    sequencerLibrary.stopSequencer();
+    _sequencerLibrary.stopSequencer();
     _isSequencerPlaying = false;
     _currentStep = -1;
     
@@ -1020,7 +996,7 @@ class SequencerState extends ChangeNotifier {
   
   void _syncGridToSequencer() {
     // Clear sequencer grid first
-    sequencerLibrary.clearAllGridCells();
+    _sequencerLibrary.clearAllGridCells();
     print('🔄 [SYNC] Cleared all native sequencer cells');
     
     // Transfer ALL sound grids to sequencer as one horizontally concatenated table
@@ -1036,7 +1012,7 @@ class SequencerState extends ChangeNotifier {
           if (sampleSlot != null) {
             // Calculate absolute column index: gridIndex * columnsPerGrid + column
             final absoluteColumn = gridIndex * _gridColumns + col;
-            sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+            _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
             gridCellsSet++;
             totalCellsSet++;
             print('🎹 [SYNC] Grid $gridIndex: Set [row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn] = sample $sampleSlot');
@@ -1054,14 +1030,14 @@ class SequencerState extends ChangeNotifier {
     const uiUpdateIntervalMs = 50; // 20 FPS UI updates
     
     _sequencerTimer = Timer.periodic(Duration(milliseconds: uiUpdateIntervalMs), (timer) {
-      if (!sequencerLibrary.isSequencerPlaying) {
+      if (!_sequencerLibrary.isSequencerPlaying) {
         timer.cancel();
         _sequencerTimer = null;
         return;
       }
       
       // Get current step from sequencer
-      final currentStep = sequencerLibrary.currentStep;
+      final currentStep = _sequencerLibrary.currentStep;
       if (currentStep != _currentStep) {
         _currentStep = currentStep;
         notifyListeners(); // Only update UI when step actually changes
@@ -1079,7 +1055,7 @@ class SequencerState extends ChangeNotifier {
         final row = selectedIndex ~/ _gridColumns;
         final col = selectedIndex % _gridColumns;
         final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-        sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+        _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
       }
       _selectedGridCells.clear();
     } else {
@@ -1089,7 +1065,7 @@ class SequencerState extends ChangeNotifier {
       final row = cellIndex ~/ _gridColumns;
       final col = cellIndex % _gridColumns;
       final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-      sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
     }
     notifyListeners();
   }
@@ -1165,23 +1141,11 @@ class SequencerState extends ChangeNotifier {
       final timestamp = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
       final filename = 'niyya_recording_$timestamp.wav';
       
-      // Use hardcoded Android path to avoid path_provider issues
-      String directoryPath;
-      if (Platform.isAndroid) {
-        // Use Android's public Downloads directory - always accessible
-        directoryPath = '/storage/emulated/0/Download';
-        print('📁 Using Android Downloads directory: $directoryPath');
-      } else {
-        // For other platforms, keep using path_provider
-        final directory = await getApplicationDocumentsDirectory();
-        directoryPath = directory.path;
-        print('📁 Using documents directory: $directoryPath');
-      }
+      // Get app's documents directory
+      final directory = await getApplicationDocumentsDirectory();
+      _currentRecordingPath = path.join(directory.path, filename);
       
-      _currentRecordingPath = path.join(directoryPath, filename);
-      print('🎙️ Recording to: $_currentRecordingPath');
-      
-      bool success = sequencerLibrary.startOutputRecording(_currentRecordingPath!);
+      bool success = _sequencerLibrary.startOutputRecording(_currentRecordingPath!);
       if (success) {
         _isRecording = true;
         notifyListeners();
@@ -1197,7 +1161,7 @@ class SequencerState extends ChangeNotifier {
   void stopRecording() {
     if (!_isRecording) return;
     
-    bool success = sequencerLibrary.stopOutputRecording();
+    bool success = _sequencerLibrary.stopOutputRecording();
     if (success) {
       _isRecording = false;
       // Store the completed recording info
@@ -1606,8 +1570,8 @@ Made with Demo Sequencer 🚀
     _bpm = newBpm;
     
     // Update sequencer BPM if it's running
-    if (sequencerLibrary.isSequencerPlaying) {
-      sequencerLibrary.setSequencerBpm(newBpm);
+    if (_sequencerLibrary.isSequencerPlaying) {
+      _sequencerLibrary.setSequencerBpm(newBpm);
     }
     
     // Trigger autosave when BPM changes
@@ -1661,7 +1625,7 @@ Made with Demo Sequencer 🚀
     
     // Configure native sequencer columns (native calculates: numGrids × columnsPerGrid)
     final nativeTableColumns = numGrids * _gridColumns;
-    sequencerLibrary.configureColumns(nativeTableColumns);
+    _sequencerLibrary.configureColumns(nativeTableColumns);
     print('🎛️ Initialized $numGrids sound grids × $_gridColumns columns = $nativeTableColumns native table columns');
     
     notifyListeners();
@@ -1719,10 +1683,10 @@ Made with Demo Sequencer 🚀
     final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
     
     if (sampleSlot != null) {
-      sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
       print('🎹 [SYNC] Set cell [grid:$_currentSoundGridIndex, row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn] = sample $sampleSlot');
     } else {
-      sequencerLibrary.clearGridCell(row, absoluteColumn);
+      _sequencerLibrary.clearGridCell(row, absoluteColumn);
       print('🗑️ [SYNC] Cleared cell [grid:$_currentSoundGridIndex, row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn]');
     }
   }
@@ -1749,7 +1713,7 @@ Made with Demo Sequencer 🚀
     
     // Reconfigure native columns
     final nativeTableColumns = numSoundGrids * _gridColumns;
-    sequencerLibrary.configureColumns(nativeTableColumns);
+    _sequencerLibrary.configureColumns(nativeTableColumns);
     
     print('➕ Added sound grid $newGridIndex (total: $numSoundGrids grids = $nativeTableColumns native columns)');
     notifyListeners();
@@ -1774,7 +1738,7 @@ Made with Demo Sequencer 🚀
     
     // Reconfigure native columns
     final nativeTableColumns = numSoundGrids * _gridColumns;
-    sequencerLibrary.configureColumns(nativeTableColumns);
+    _sequencerLibrary.configureColumns(nativeTableColumns);
     
     print('➖ Removed sound grid $removedGridIndex (total: $numSoundGrids grids = $nativeTableColumns native columns)');
     notifyListeners();
@@ -2092,21 +2056,19 @@ Made with Demo Sequencer 🚀
     notifyListeners();
   }
 
-  /// Save recordings list to SharedPreferences
+  /// Save recordings list to ReliableStorage
   Future<void> _saveRecordingsList() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setStringList('local_recordings', _localRecordings);
+      await ReliableStorage.setStringList('local_recordings', _localRecordings);
     } catch (e) {
       debugPrint('❌ Error saving recordings list: $e');
     }
   }
 
-  /// Load recordings list from SharedPreferences
+  /// Load recordings list from ReliableStorage
   Future<void> _loadSavedRecordings() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedRecordings = prefs.getStringList('local_recordings') ?? [];
+      final savedRecordings = await ReliableStorage.getStringList('local_recordings');
       
       // Filter out recordings that no longer exist on disk
       _localRecordings.clear();
@@ -2774,7 +2736,7 @@ Made with Demo Sequencer 🚀
   void _clearAllSampleSlots() {
     for (int i = 0; i < _slotCount; i++) {
       if (_slotLoaded[i]) {
-        sequencerLibrary.unloadSlot(i);
+        _sequencerLibrary.unloadSlot(i);
         _slotLoaded[i] = false;
         _slotPlaying[i] = false;
         _filePaths[i] = null;
@@ -2791,7 +2753,7 @@ Made with Demo Sequencer 🚀
     if (_isRecording) {
       stopRecording();
     }
-    sequencerLibrary.cleanup();
+    _sequencerLibrary.cleanup();
     super.dispose();
   }
 } 
