@@ -11,31 +11,43 @@ class ConversionLibrary {
 
   late final ConversionBindings _bindings;
   bool _isLoaded = false;
+  String? _loadError;
 
   /// Initialize the conversion library and load the native library
   void initialize() {
     if (_isLoaded) return;
 
-    final ffi.DynamicLibrary library;
-    
-    if (Platform.isAndroid) {
-      library = ffi.DynamicLibrary.open('libsequencer.so');
-    } else if (Platform.isMacOS) {
-      library = ffi.DynamicLibrary.open('libsequencer.dylib');
-    } else if (Platform.isWindows) {
-      library = ffi.DynamicLibrary.open('sequencer.dll');
-    } else if (Platform.isLinux) {
-      library = ffi.DynamicLibrary.open('libsequencer.so');
-    } else if (Platform.isIOS) {
-      // On iOS, the library is statically linked
-      library = ffi.DynamicLibrary.executable();
-    } else {
-      throw UnsupportedError('Unsupported platform');
-    }
+    try {
+      final ffi.DynamicLibrary library;
+      
+      if (Platform.isAndroid) {
+        library = ffi.DynamicLibrary.open('libsequencer.so');
+      } else if (Platform.isMacOS) {
+        library = ffi.DynamicLibrary.open('libsequencer.dylib');
+      } else if (Platform.isWindows) {
+        library = ffi.DynamicLibrary.open('sequencer.dll');
+      } else if (Platform.isLinux) {
+        library = ffi.DynamicLibrary.open('libsequencer.so');
+      } else if (Platform.isIOS) {
+        // On iOS, the library is statically linked
+        library = ffi.DynamicLibrary.executable();
+      } else {
+        throw UnsupportedError('Unsupported platform');
+      }
 
-    _bindings = ConversionBindings(library);
-    _isLoaded = true;
+      _bindings = ConversionBindings(library);
+      _isLoaded = true;
+      print('✅ Conversion library loaded successfully');
+    } catch (e) {
+      _loadError = e.toString();
+      print('❌ Failed to load conversion library: $e');
+      print('❌ Conversion functionality will be disabled');
+      _isLoaded = false;
+    }
   }
+
+  bool get isLoaded => _isLoaded;
+  String? get loadError => _loadError;
 
   /// Initialize the conversion engine
   /// 

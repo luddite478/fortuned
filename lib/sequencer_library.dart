@@ -20,16 +20,30 @@ class SequencerLibrary {
   static SequencerLibrary? _instance;
   late final DynamicLibrary _dylib;
   late final SequencerBindings _bindings;
+  bool _isLibraryLoaded = false;
+  String? _loadError;
 
   SequencerLibrary._() {
-    _dylib = _loadLibrary();
-    _bindings = SequencerBindings(_dylib);
+    try {
+      _dylib = _loadLibrary();
+      _bindings = SequencerBindings(_dylib);
+      _isLibraryLoaded = true;
+      print('✅ Native library loaded successfully');
+    } catch (e) {
+      _loadError = e.toString();
+      print('❌ Failed to load native library: $e');
+      print('❌ Audio functionality will be disabled');
+      _isLibraryLoaded = false;
+    }
   }
 
   static SequencerLibrary get instance {
     _instance ??= SequencerLibrary._();
     return _instance!;
   }
+
+  bool get isLibraryLoaded => _isLibraryLoaded;
+  String? get loadError => _loadError;
 
   DynamicLibrary _loadLibrary() {
     try {
@@ -48,15 +62,31 @@ class SequencerLibrary {
         throw UnsupportedError('Platform not supported');
       }
     } catch (e) {
-      throw Exception('Failed to load native library: $e. '
-          'Make sure the C files are properly added to your iOS project.');
+      print('⚠️ Failed to load native library: $e');
+      print('⚠️ Audio functionality will be disabled');
+      // Don't rethrow, let the constructor handle it gracefully
+      throw e;
     }
   }
 
   // Wrapper methods for easier access
   bool initialize() {
-    int result = _bindings.init();
-    return result == 0;  // 0 means success in C code
+    if (!_isLibraryLoaded) {
+      print('❌ Cannot initialize: Native library not loaded - ${_loadError ?? "Unknown error"}');
+      return false;
+    }
+    
+    try {
+      int result = _bindings.init();
+      bool success = result == 0;
+      if (!success) {
+        print('❌ Audio initialization failed with code: $result');
+      }
+      return success;
+    } catch (e) {
+      print('❌ Error initializing audio: $e');
+      return false;
+    }
   }
 
   // Direct file playback (streaming from disk)
@@ -137,30 +167,71 @@ class SequencerLibrary {
   }
 
   bool isInitialized() {
-    return _bindings.is_initialized() == 1;
+    if (!_isLibraryLoaded) return false;
+    
+    try {
+      return _bindings.is_initialized() == 1;
+    } catch (e) {
+      print('❌ Error checking initialization: $e');
+      return false;
+    }
   }
 
   void cleanup() {
-    _bindings.cleanup();
+    if (!_isLibraryLoaded) return;
+    
+    try {
+      _bindings.cleanup();
+    } catch (e) {
+      print('❌ Error during cleanup: $e');
+    }
   }
 
   // Re-activate Bluetooth audio session (call when Bluetooth routing stops working)
   bool reconfigureAudioSession() {
-    int result = _bindings.reconfigure_audio_session();
-    return result == 0;
+    if (!_isLibraryLoaded) return false;
+    
+    try {
+      int result = _bindings.reconfigure_audio_session();
+      return result == 0;
+    } catch (e) {
+      print('❌ Error reconfiguring audio session: $e');
+      return false;
+    }
   }
 
   // Memory tracking methods
   int getTotalMemoryUsage() {
-    return _bindings.get_total_memory_usage();
+    if (!_isLibraryLoaded) return 0;
+    
+    try {
+      return _bindings.get_total_memory_usage();
+    } catch (e) {
+      print('❌ Error getting memory usage: $e');
+      return 0;
+    }
   }
 
   int getSlotMemoryUsage(int slot) {
-    return _bindings.get_slot_memory_usage(slot);
+    if (!_isLibraryLoaded) return 0;
+    
+    try {
+      return _bindings.get_slot_memory_usage(slot);
+    } catch (e) {
+      print('❌ Error getting slot memory usage: $e');
+      return 0;
+    }
   }
 
   int getMemorySlotCount() {
-    return _bindings.get_memory_slot_count();
+    if (!_isLibraryLoaded) return 0;
+    
+    try {
+      return _bindings.get_memory_slot_count();
+    } catch (e) {
+      print('❌ Error getting memory slot count: $e');
+      return 0;
+    }
   }
 
   String formatMemorySize(int bytes) {
@@ -174,7 +245,16 @@ class SequencerLibrary {
   }
 
   // -------------- MULTI SLOT --------------
-  int get slotCount => _bindings.get_slot_count();
+  int get slotCount {
+    if (!_isLibraryLoaded) return 1024; // Return default value
+    
+    try {
+      return _bindings.get_slot_count();
+    } catch (e) {
+      print('❌ Error getting slot count: $e');
+      return 1024;
+    }
+  }
 
   bool loadSoundToSlot(int slot, String filePath, {bool loadToMemory = false}) {
     final utf8Bytes = utf8.encode(filePath);
