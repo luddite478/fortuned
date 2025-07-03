@@ -1,13 +1,16 @@
 import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as path;
+import 'package:docman/docman.dart';
 
-/// Reliable cross-platform storage that avoids SharedPreferences pigeon channel issues on Android
+/// Reliable cross-platform storage that uses DocMan for Android app directories
+/// Avoids SharedPreferences pigeon channel issues on Android
 class ReliableStorage {
-  static String get _documentsPath {
+  
+  /// Get the best available app data directory path
+  static Future<String> get _documentsPath async {
     if (Platform.isAndroid) {
-      // Use Android's internal app data directory
-      return '/storage/emulated/0/Android/data/com.example.niyya/files';
+      return await _getAndroidAppDataPath();
     } else if (Platform.isIOS) {
       return '/var/mobile/Containers/Data/Application/Documents';
     } else if (Platform.isWindows) {
@@ -19,12 +22,39 @@ class ReliableStorage {
     }
   }
   
-  static File get _prefsFile => File(path.join(_documentsPath, 'niyya_prefs.json'));
+  /// Get the best available Android app data path using DocMan
+  static Future<String> _getAndroidAppDataPath() async {
+    try {
+      // Try internal app files directory first (most persistent for preferences)
+      final filesDir = await DocMan.dir.files();
+      if (filesDir != null) {
+        return path.join(filesDir.path, 'niyya_prefs');
+      }
+      
+      // Fallback to cache directory
+      final cacheDir = await DocMan.dir.cache();
+      if (cacheDir != null) {
+        return path.join(cacheDir.path, 'niyya_prefs');
+      }
+      
+      // Last resort fallback to Downloads
+      return '/storage/emulated/0/Download/niyya_data';
+    } catch (e) {
+      print('⚠️ DocMan failed, using Downloads fallback: $e');
+      return '/storage/emulated/0/Download/niyya_data';
+    }
+  }
+  
+  static Future<File> get _prefsFile async {
+    final docPath = await _documentsPath;
+    return File(path.join(docPath, 'niyya_prefs.json'));
+  }
   
   static Future<Map<String, dynamic>> _loadPrefs() async {
     try {
-      if (await _prefsFile.exists()) {
-        final content = await _prefsFile.readAsString();
+      final file = await _prefsFile;
+      if (await file.exists()) {
+        final content = await file.readAsString();
         return json.decode(content) as Map<String, dynamic>;
       }
     } catch (e) {
@@ -35,14 +65,15 @@ class ReliableStorage {
   
   static Future<void> _savePrefs(Map<String, dynamic> prefs) async {
     try {
+      final file = await _prefsFile;
       // Ensure directory exists
-      await _prefsFile.parent.create(recursive: true);
-      await _prefsFile.writeAsString(json.encode(prefs));
+      await file.parent.create(recursive: true);
+      await file.writeAsString(json.encode(prefs));
     } catch (e) {
       print('⚠️ Error saving prefs: $e');
     }
   }
-  
+
   // SharedPreferences-compatible interface
   static Future<void> setString(String key, String value) async {
     final prefs = await _loadPrefs();
