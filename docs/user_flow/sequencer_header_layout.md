@@ -4,17 +4,14 @@
 
 ```mermaid
 graph TD
-    A[Sequencer Header] --> B[Left Side: Checkpoints Button]
-    A --> C[Center: Recording Controls]
-    A --> D[Right Side: Action Buttons]
-    
-    B --> E[📋 Checkpoints<br/>Orange, Always Visible]
-    
-    C --> F[🔴 Record Button]
-    C --> G[▶️ Play Button]
-    
-    D --> H{Thread Context}
-    H -->|All Contexts| I[💾/📤 Save/Send + 📊 Share]
+    A[Sequencer Header] --> B[📋 Checkpoints]
+    A --> H{Thread Context}
+    H -->|Unpublished Solo| J[💾 Save]
+    H -->|Other Contexts| K[📤 Send]
+
+    A --> F[📊 Share]
+    A --> D[🔴 Record]
+    A --> E[▶️ Play Button]
 ```
 
 ## Button Behaviors

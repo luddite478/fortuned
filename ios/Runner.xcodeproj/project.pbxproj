@@ -84,25 +84,25 @@
 		5571F8BC2DF776970025EF91 /* sequencer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sequencer.mm; path = ../native/sequencer.mm; sourceTree = "<group>"; };
 		5571F8BE2DF776980025EF91 /* conversion.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = conversion.mm; path = ../native/conversion.mm; sourceTree = "<group>"; };
 		5571F8BF2DF776990025EF91 /* conversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = conversion.h; path = ../native/conversion.h; sourceTree = "<group>"; };
-		5571F8C12DF777000025EF91 /* lame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = lame.c; path = ../native/lame/lame.c; sourceTree = "<group>"; };
-		5571F8C22DF777010025EF91 /* bitstream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bitstream.c; path = ../native/lame/bitstream.c; sourceTree = "<group>"; };
-		5571F8C32DF777020025EF91 /* encoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encoder.c; path = ../native/lame/encoder.c; sourceTree = "<group>"; };
-		5571F8C42DF777030025EF91 /* fft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = fft.c; path = ../native/lame/fft.c; sourceTree = "<group>"; };
-		5571F8C52DF777040025EF91 /* id3tag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = id3tag.c; path = ../native/lame/id3tag.c; sourceTree = "<group>"; };
-		5571F8C62DF777050025EF91 /* newmdct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = newmdct.c; path = ../native/lame/newmdct.c; sourceTree = "<group>"; };
-		5571F8C72DF777060025EF91 /* presets.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = presets.c; path = ../native/lame/presets.c; sourceTree = "<group>"; };
-		5571F8C82DF777070025EF91 /* psymodel.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = psymodel.c; path = ../native/lame/psymodel.c; sourceTree = "<group>"; };
-		5571F8C92DF777080025EF91 /* quantize.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = quantize.c; path = ../native/lame/quantize.c; sourceTree = "<group>"; };
-		5571F8CA2DF777090025EF91 /* quantize_pvt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = quantize_pvt.c; path = ../native/lame/quantize_pvt.c; sourceTree = "<group>"; };
-		5571F8CB2DF7770A0025EF91 /* reservoir.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = reservoir.c; path = ../native/lame/reservoir.c; sourceTree = "<group>"; };
-		5571F8CC2DF7770B0025EF91 /* set_get.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = set_get.c; path = ../native/lame/set_get.c; sourceTree = "<group>"; };
-		5571F8CD2DF7770C0025EF91 /* tables.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = tables.c; path = ../native/lame/tables.c; sourceTree = "<group>"; };
-		5571F8CE2DF7770D0025EF91 /* takehiro.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = takehiro.c; path = ../native/lame/takehiro.c; sourceTree = "<group>"; };
-		5571F8CF2DF7770E0025EF91 /* util.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = util.c; path = ../native/lame/util.c; sourceTree = "<group>"; };
-		5571F8D02DF7770F0025EF91 /* vbrquantize.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = vbrquantize.c; path = ../native/lame/vbrquantize.c; sourceTree = "<group>"; };
-		5571F8D12DF777100025EF91 /* VbrTag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = VbrTag.c; path = ../native/lame/VbrTag.c; sourceTree = "<group>"; };
-		5571F8D22DF777110025EF91 /* version.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = version.c; path = ../native/lame/version.c; sourceTree = "<group>"; };
-		5571F8D32DF777120025EF91 /* gain_analysis.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = gain_analysis.c; path = ../native/lame/gain_analysis.c; sourceTree = "<group>"; };
+		5571F8C12DF777000025EF91 /* lame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = lame.c; path = ../native/lame_ios/lame.c; sourceTree = "<group>"; };
+		5571F8C22DF777010025EF91 /* bitstream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bitstream.c; path = ../native/lame_ios/bitstream.c; sourceTree = "<group>"; };
+		5571F8C32DF777020025EF91 /* encoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encoder.c; path = ../native/lame_ios/encoder.c; sourceTree = "<group>"; };
+		5571F8C42DF777030025EF91 /* fft.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = fft.c; path = ../native/lame_ios/fft.c; sourceTree = "<group>"; };
+		5571F8C52DF777040025EF91 /* id3tag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = id3tag.c; path = ../native/lame_ios/id3tag.c; sourceTree = "<group>"; };
+		5571F8C62DF777050025EF91 /* newmdct.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = newmdct.c; path = ../native/lame_ios/newmdct.c; sourceTree = "<group>"; };
+		5571F8C72DF777060025EF91 /* presets.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = presets.c; path = ../native/lame_ios/presets.c; sourceTree = "<group>"; };
+		5571F8C82DF777070025EF91 /* psymodel.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = psymodel.c; path = ../native/lame_ios/psymodel.c; sourceTree = "<group>"; };
+		5571F8C92DF777080025EF91 /* quantize.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = quantize.c; path = ../native/lame_ios/quantize.c; sourceTree = "<group>"; };
+		5571F8CA2DF777090025EF91 /* quantize_pvt.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = quantize_pvt.c; path = ../native/lame_ios/quantize_pvt.c; sourceTree = "<group>"; };
+		5571F8CB2DF7770A0025EF91 /* reservoir.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = reservoir.c; path = ../native/lame_ios/reservoir.c; sourceTree = "<group>"; };
+		5571F8CC2DF7770B0025EF91 /* set_get.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = set_get.c; path = ../native/lame_ios/set_get.c; sourceTree = "<group>"; };
+		5571F8CD2DF7770C0025EF91 /* tables.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = tables.c; path = ../native/lame_ios/tables.c; sourceTree = "<group>"; };
+		5571F8CE2DF7770D0025EF91 /* takehiro.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = takehiro.c; path = ../native/lame_ios/takehiro.c; sourceTree = "<group>"; };
+		5571F8CF2DF7770E0025EF91 /* util.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = util.c; path = ../native/lame_ios/util.c; sourceTree = "<group>"; };
+		5571F8D02DF7770F0025EF91 /* vbrquantize.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = vbrquantize.c; path = ../native/lame_ios/vbrquantize.c; sourceTree = "<group>"; };
+		5571F8D12DF777100025EF91 /* VbrTag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = VbrTag.c; path = ../native/lame_ios/VbrTag.c; sourceTree = "<group>"; };
+		5571F8D22DF777110025EF91 /* version.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = version.c; path = ../native/lame_ios/version.c; sourceTree = "<group>"; };
+		5571F8D32DF777120025EF91 /* gain_analysis.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = gain_analysis.c; path = ../native/lame_ios/gain_analysis.c; sourceTree = "<group>"; };
 		73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -584,7 +584,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/SwiftyGif/SwiftyGif.framework/Headers\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
-					"$(SRCROOT)/../native/lame",
+					"$(SRCROOT)/../native/lame_ios",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -784,7 +784,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/SwiftyGif/SwiftyGif.framework/Headers\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
-					"$(SRCROOT)/../native/lame",
+					"$(SRCROOT)/../native/lame_ios",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -827,7 +827,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/SwiftyGif/SwiftyGif.framework/Headers\"",
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
-					"$(SRCROOT)/../native/lame",
+					"$(SRCROOT)/../native/lame_ios",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

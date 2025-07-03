@@ -33,7 +33,7 @@
 #define bcopy(src, dst, len) memmove(dst, src, len)
 #endif
 
-#include "lame/lame.h"
+#include "lame.h"
 
 // Conversion state
 static int g_conversion_initialized = 0;

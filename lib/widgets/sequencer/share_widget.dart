@@ -176,110 +176,391 @@ class ShareWidget extends StatelessWidget {
       );
     }
 
-    // Horizontal scrollable layout with inherited sizing
-    final itemWidth = availableHeight * 0.9; // Item width based on available height
-    final itemPadding = availableHeight * 0.04;
-    final buttonHeight = availableHeight * 0.28;
-    final titleFontSize = availableHeight * 0.1;
-    final buttonIconSize = availableHeight * 0.15;
-    
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: sequencer.localRecordings.asMap().entries.map((entry) {
-          final index = entry.key;
-          final recording = entry.value;
-          
-          return Container(
-            width: itemWidth,
-            height: availableHeight,
-            margin: EdgeInsets.only(right: itemPadding),
-            decoration: BoxDecoration(
-              color: Colors.green.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(availableHeight * 0.06),
-              border: Border.all(
-                color: Colors.green.withOpacity(0.5),
-                width: 1,
-              ),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(itemPadding),
-              child: Column(
-                children: [
-                  // File name at top
-                  Text(
+    // Horizontal scrollable layout with inherited sizing - following sample banks pattern
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Use ALL available space - no minimums, just scale everything down
+        final recordingCount = sequencer.localRecordings.length;
+        final availableWidth = constraints.maxWidth;
+        
+        // Calculate item width to fit 2.5 items visible (like sample selection shows 3.4 items)
+        final itemWidth = availableWidth / 2.5; // Show 2.5 items + scrolling hint
+        final itemSpacing = availableWidth * 0.02; // 2% of available width
+        final itemPadding = availableHeight * 0.03;
+        
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: sequencer.localRecordings.asMap().entries.map((entry) {
+              final index = entry.key;
+              final recording = entry.value;
+              
+              return Container(
+                width: itemWidth,
+                height: availableHeight,
+                margin: EdgeInsets.only(right: index < recordingCount - 1 ? itemSpacing : 0),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(availableHeight * 0.06),
+                  border: Border.all(
+                    color: Colors.green.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                child: _buildRecordingItem(context, sequencer, recording, index, availableHeight, itemPadding),
+              );
+            }).toList(),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRecordingItem(BuildContext context, SequencerState sequencer, String recording, int index, double availableHeight, double itemPadding) {
+    return LayoutBuilder(
+      builder: (context, itemConstraints) {
+        // Calculate layout proportions based on available height
+        final titleHeight = itemConstraints.maxHeight * 0.15;      // 15% for title
+        final contentHeight = itemConstraints.maxHeight * 0.70;    // 70% for main content
+        final paddingHeight = itemConstraints.maxHeight * 0.15;    // 15% for padding/spacing
+        
+        // Content area sizing
+        final buttonAreaHeight = contentHeight * 0.45;             // 45% of content for buttons
+        final conversionAreaHeight = contentHeight * 0.55;         // 55% of content for conversion
+        
+        final fontSize = titleHeight * 0.4;
+        final buttonIconSize = buttonAreaHeight * 0.5;
+        final progressBarHeight = conversionAreaHeight * 0.15;
+        final statusFontSize = conversionAreaHeight * 0.12;
+        
+        return Padding(
+          padding: EdgeInsets.all(itemPadding),
+          child: Column(
+            children: [
+              // Title section
+              SizedBox(
+                height: titleHeight,
+                child: Center(
+                  child: Text(
                     'Take ${index + 1}',
                     style: TextStyle(
                       color: Colors.lightGreen,
-                      fontSize: titleFontSize.clamp(6.0, 12.0),
+                      fontSize: fontSize.clamp(6.0, 12.0),
                       fontWeight: FontWeight.w500,
                     ),
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  
-                  const Spacer(),
-                  
-                  // Horizontal row of rectangular buttons
-                  Row(
-                    children: [
-                      // Play button - rectangular tile
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _playRecording(recording),
-                          child: Container(
-                            height: buttonHeight,
-                            decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(availableHeight * 0.03),
-                              border: Border.all(
-                                color: Colors.green.withOpacity(0.6),
-                                width: 1,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.play_arrow,
-                              color: Colors.green,
-                              size: buttonIconSize.clamp(8.0, 16.0),
-                            ),
-                          ),
-                        ),
-                      ),
-                      
-                      SizedBox(width: itemPadding * 0.5),
-                      
-                      // Share button - rectangular tile
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () => _shareSpecificRecording(context, recording),
-                          child: Container(
-                            height: buttonHeight,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(availableHeight * 0.03),
-                              border: Border.all(
-                                color: Colors.blue.withOpacity(0.6),
-                                width: 1,
-                              ),
-                            ),
-                            child: Icon(
-                              Icons.share,
-                              color: Colors.blue,
-                              size: buttonIconSize.clamp(6.0, 14.0),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-          );
-        }).toList(),
+              
+              SizedBox(height: paddingHeight * 0.2),
+              
+              // Main content section
+              SizedBox(
+                height: contentHeight,
+                child: Column(
+                  children: [
+                    // Action buttons section
+                    SizedBox(
+                      height: buttonAreaHeight,
+                      child: Row(
+                        children: [
+                          // Play button
+                          Expanded(
+                            child: _buildCompactActionButton(
+                              icon: Icons.play_arrow,
+                              color: Colors.green,
+                              iconSize: buttonIconSize,
+                              borderRadius: availableHeight * 0.02,
+                              onTap: () => _playRecording(recording),
+                            ),
+                          ),
+                          
+                          SizedBox(width: itemPadding * 0.3),
+                          
+                          // Convert button (if not converted and not converting)
+                          Expanded(
+                            child: _buildCompactActionButton(
+                              icon: _getConversionIcon(sequencer, recording),
+                              color: _getConversionColor(sequencer, recording),
+                              iconSize: buttonIconSize,
+                              borderRadius: availableHeight * 0.02,
+                              onTap: _canConvert(sequencer, recording) 
+                                  ? () => _convertRecording(sequencer, recording) 
+                                  : null,
+                            ),
+                          ),
+                          
+                          SizedBox(width: itemPadding * 0.3),
+                          
+                          // Share button
+                          Expanded(
+                            child: _buildCompactActionButton(
+                              icon: Icons.share,
+                              color: Colors.blue,
+                              iconSize: buttonIconSize,
+                              borderRadius: availableHeight * 0.02,
+                              onTap: () => _shareSpecificRecording(context, recording),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    SizedBox(height: paddingHeight * 0.3),
+                    
+                    // Conversion status section
+                    SizedBox(
+                      height: conversionAreaHeight,
+                      child: _buildConversionStatus(
+                        sequencer, 
+                        recording, 
+                        progressBarHeight, 
+                        statusFontSize,
+                        conversionAreaHeight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompactActionButton({
+    required IconData icon,
+    required Color color,
+    required double iconSize,
+    required double borderRadius,
+    required VoidCallback? onTap,
+  }) {
+    final isEnabled = onTap != null;
+    final effectiveColor = isEnabled ? color : color.withOpacity(0.3);
+    
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: effectiveColor.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(borderRadius),
+          border: Border.all(
+            color: effectiveColor.withOpacity(0.6),
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            color: effectiveColor,
+            size: iconSize.clamp(8.0, 20.0),
+          ),
+        ),
       ),
     );
+  }
+
+  Widget _buildConversionStatus(SequencerState sequencer, String recording, double progressBarHeight, double fontSize, double availableHeight) {
+    final isConverting = sequencer.isConverting && sequencer.lastRecordingPath == recording;
+    final isConverted = _hasMP3Conversion(sequencer, recording);
+    final hasError = sequencer.conversionError != null && sequencer.lastRecordingPath == recording;
+    
+    if (hasError) {
+      return _buildErrorStatus(fontSize, availableHeight);
+    } else if (isConverting) {
+      return _buildProgressStatus(sequencer, progressBarHeight, fontSize, availableHeight);
+    } else if (isConverted) {
+      return _buildCompletedStatus(fontSize, availableHeight);
+    } else {
+      return _buildReadyStatus(fontSize, availableHeight);
+    }
+  }
+
+  Widget _buildErrorStatus(double fontSize, double availableHeight) {
+    return Container(
+      padding: EdgeInsets.all(availableHeight * 0.08),
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(availableHeight * 0.04),
+        border: Border.all(color: Colors.red.withOpacity(0.5), width: 1),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: (availableHeight * 0.2).clamp(8.0, 16.0),
+            ),
+            SizedBox(height: availableHeight * 0.05),
+            Text(
+              'Error',
+              style: TextStyle(
+                color: Colors.red,
+                fontSize: fontSize.clamp(6.0, 10.0),
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildProgressStatus(SequencerState sequencer, double progressBarHeight, double fontSize, double availableHeight) {
+    return Container(
+      padding: EdgeInsets.all(availableHeight * 0.08),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(availableHeight * 0.04),
+        border: Border.all(color: Colors.orange.withOpacity(0.5), width: 1),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: (availableHeight * 0.15).clamp(8.0, 16.0),
+            height: (availableHeight * 0.15).clamp(8.0, 16.0),
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+            ),
+          ),
+          SizedBox(height: availableHeight * 0.08),
+          SizedBox(
+            height: progressBarHeight.clamp(2.0, 6.0),
+            child: LinearProgressIndicator(
+              value: sequencer.conversionProgress,
+              backgroundColor: Colors.grey.withOpacity(0.3),
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+            ),
+          ),
+          SizedBox(height: availableHeight * 0.08),
+          Text(
+            '${(sequencer.conversionProgress * 100).toInt()}%',
+            style: TextStyle(
+              color: Colors.orange,
+              fontSize: fontSize.clamp(6.0, 10.0),
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompletedStatus(double fontSize, double availableHeight) {
+    return Container(
+      padding: EdgeInsets.all(availableHeight * 0.08),
+      decoration: BoxDecoration(
+        color: Colors.green.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(availableHeight * 0.04),
+        border: Border.all(color: Colors.green.withOpacity(0.5), width: 1),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: Colors.green,
+              size: (availableHeight * 0.2).clamp(8.0, 16.0),
+            ),
+            SizedBox(height: availableHeight * 0.05),
+            Text(
+              'MP3 Ready',
+              style: TextStyle(
+                color: Colors.green,
+                fontSize: fontSize.clamp(6.0, 10.0),
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReadyStatus(double fontSize, double availableHeight) {
+    return Container(
+      padding: EdgeInsets.all(availableHeight * 0.08),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(availableHeight * 0.04),
+        border: Border.all(color: Colors.grey.withOpacity(0.3), width: 1),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.audiotrack,
+              color: Colors.grey,
+              size: (availableHeight * 0.2).clamp(8.0, 16.0),
+            ),
+            SizedBox(height: availableHeight * 0.05),
+            Text(
+              'WAV',
+              style: TextStyle(
+                color: Colors.grey,
+                fontSize: fontSize.clamp(6.0, 10.0),
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper methods for conversion logic
+  IconData _getConversionIcon(SequencerState sequencer, String recording) {
+    if (_hasMP3Conversion(sequencer, recording)) {
+      return Icons.check;
+    } else if (sequencer.isConverting && sequencer.lastRecordingPath == recording) {
+      return Icons.hourglass_empty;
+    } else {
+      return Icons.audiotrack;
+    }
+  }
+
+  Color _getConversionColor(SequencerState sequencer, String recording) {
+    if (_hasMP3Conversion(sequencer, recording)) {
+      return Colors.green;
+    } else if (sequencer.isConverting && sequencer.lastRecordingPath == recording) {
+      return Colors.orange;
+    } else {
+      return Colors.orangeAccent;
+    }
+  }
+
+  bool _canConvert(SequencerState sequencer, String recording) {
+    return !_hasMP3Conversion(sequencer, recording) && 
+           !(sequencer.isConverting && sequencer.lastRecordingPath == recording);
+  }
+
+  bool _hasMP3Conversion(SequencerState sequencer, String recording) {
+    // Check if this recording has been converted to MP3
+    // This is a simplified check - you might need to implement proper MP3 tracking per recording
+    return sequencer.lastMp3Path != null && sequencer.lastRecordingPath == recording;
+  }
+
+  void _convertRecording(SequencerState sequencer, String recording) {
+    // Set this as the current recording and convert
+    // This might need to be enhanced to handle multiple recordings
+    if (sequencer.lastRecordingPath != recording) {
+      // Would need to implement per-recording conversion tracking
+      debugPrint('Converting recording: $recording');
+    }
+    sequencer.convertLastRecordingToMp3();
   }
 
   Future<void> _shareToApps(BuildContext context, SequencerState sequencer) async {

@@ -52,6 +52,8 @@ rm "$TEMP_ASSETS"
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
+  # iPhone SE (3rd generation)
+  # iPhone 15
   flutter run -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
