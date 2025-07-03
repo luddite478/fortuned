@@ -1,4 +1,30 @@
-# Sequencer Screen Flow
+# Sequencer Header
+
+
+```mermaid
+graph TD
+    %% Header Section
+    A[Sequencer Header]
+    A --> B[📋 Checkpoints]
+    A --> C[📤 Save / ➤ Send]
+    A --> D[📊 Share]
+    A --> E[🔴 Record]
+    A --> F[▶️ Play/Stop Button]
+
+    %% Save/Send Button Logic
+    C --> G{Thread Context Check}
+    G -->|Unpublished Solo| H[💾 Save: Create Checkpoint<br/>Stay in same thread]
+    G -->|Sourced Project| I[📤 Send: Add to Source Thread<br/>Join collaboration]
+    G -->|Collaborative| J[📤 Send: Add New Checkpoint<br/>To existing thread]
+
+    %% Share Button Logic
+    D --> K[Show Share Menu]
+    K --> L{Thread Type?}
+    L -->|Unpublished Solo| M[Show Publish Button + Recordings]
+    L -->|Other| N[Show Recordings Only]
+```
+
+# Main Sequencer Window
 
 ```mermaid
 graph TD
