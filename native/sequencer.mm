@@ -338,8 +338,8 @@ static void play_samples_for_step(int step) {
         if (sample_to_play >= 0 && sample_to_play < MAX_SLOTS) {
             audio_slot_t* sample = &g_slots[sample_to_play];
             if (sample->loaded && sample->node_initialized) {
-                prnt("🎹 [SEQUENCER] Step %d, Column %d: Want sample %d, Currently playing: %d", 
-                     step, column, sample_to_play, g_column_playing_sample[column]);
+                // prnt("🎹 [SEQUENCER] Step %d, Column %d: Want sample %d, Currently playing: %d", 
+                //      step, column, sample_to_play, g_column_playing_sample[column]);
                 
                 // Different sample than what's currently playing in this column?
                 if (g_column_playing_sample[column] != sample_to_play) {
@@ -364,8 +364,8 @@ static void play_samples_for_step(int step) {
                 }
             }
         } else {
-            prnt("➖ [SEQUENCER] Step %d, Column %d: Empty (currently playing: %d)", 
-                 step, column, g_column_playing_sample[column]);
+            // prnt("➖ [SEQUENCER] Step %d, Column %d: Empty (currently playing: %d)", 
+            //      step, column, g_column_playing_sample[column]);
         }
         // IMPORTANT: If grid cell is empty, do NOTHING
         // Let previous samples continue playing until replaced

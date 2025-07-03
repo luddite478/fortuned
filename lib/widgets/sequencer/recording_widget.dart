@@ -9,385 +9,331 @@ class RecordingWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: sequencerState.lastRecordingPath != null
-                ? Colors.black.withOpacity(0.9)
-                : Colors.black,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: sequencerState.lastRecordingPath != null
-              ? _buildRecordingVisualization(context, sequencerState)
-              : _buildPlaceholder(),
+      builder: (context, sequencer, child) {
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            // Calculate responsive sizes based on available space - INHERIT from parent
+            final panelHeight = constraints.maxHeight;
+            final panelWidth = constraints.maxWidth;
+            
+            // Use ALL available space - no minimums, just scale everything down
+            final padding = panelHeight * 0.06; // 6% of given height
+            final borderRadius = panelHeight * 0.08; // Scale with height
+            
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(borderRadius),
+              ),
+              child: sequencer.lastRecordingPath != null 
+                  ? _buildRecordingMenu(context, sequencer, panelHeight, panelWidth, padding, borderRadius)
+                  : _buildEmptyState(panelHeight, panelWidth, padding, borderRadius),
+            );
+          },
         );
       },
     );
   }
 
-  Widget _buildPlaceholder() {
+  Widget _buildEmptyState(double panelHeight, double panelWidth, double padding, double borderRadius) {
+    final fontSize = (panelHeight * 0.25).clamp(10.0, double.infinity);
+    final verticalSpacing = panelHeight * 0.02; // Minimal vertical spacing (2%)
+    
     return Container(
-      height: 80,
-      child: const Center(
+      padding: EdgeInsets.symmetric(
+        horizontal: padding, // Only horizontal padding like sample_banks_widget  
+        vertical: verticalSpacing, // Minimal vertical spacing
+      ),
+      child: Center(
         child: Text(
           'No Recording',
           style: TextStyle(
             color: Colors.grey,
-            fontSize: 12,
+            fontSize: fontSize,
+            fontWeight: FontWeight.w300,
           ),
         ),
       ),
     );
   }
 
-  Widget _buildRecordingVisualization(BuildContext context, SequencerState sequencerState) {
-    final fileName = path.basename(sequencerState.lastRecordingPath!);
+  Widget _buildRecordingMenu(BuildContext context, SequencerState sequencer, 
+      double panelHeight, double panelWidth, double padding, double borderRadius) {
+    
+    final fileName = path.basename(sequencer.lastRecordingPath!);
+    
+    // Follow sample_banks_widget pattern: only horizontal padding to avoid overflow
+    final horizontalPadding = padding;
+    final verticalSpacing = panelHeight * 0.02; // Minimal vertical spacing (2%)
+    
+    // Calculate available height after minimal spacing
+    final availableHeight = panelHeight - (verticalSpacing * 2); // Top and bottom spacing
+    
+    // Responsive sizing calculations from available height (not total height)
+    final titleHeight = availableHeight * 0.25; // 25% of available height
+    final buttonAreaHeight = availableHeight * 0.55; // 55% of available height
+    final statusHeight = availableHeight * 0.20; // 20% of available height
+    
+    final titleFontSize = (titleHeight * 0.4).clamp(8.0, double.infinity);
+    final buttonSize = (buttonAreaHeight * 0.6).clamp(20.0, double.infinity);
+    final iconSize = (buttonSize * 0.5).clamp(10.0, double.infinity);
+    final statusFontSize = (statusHeight * 0.3).clamp(8.0, double.infinity);
     
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: EdgeInsets.symmetric(
+        horizontal: horizontalPadding, // Only horizontal padding like sample_banks_widget
+        vertical: verticalSpacing, // Minimal vertical spacing
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with file info and action button
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      fileName,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                                         Text(
-                       'Duration: ${sequencerState.formattedRecordingDuration}',
-                       style: const TextStyle(
-                         color: Colors.grey,
-                         fontSize: 12,
-                       ),
-                     ),
-                  ],
+          // File name section
+          Container(
+            height: titleHeight,
+            child: Center(
+              child: Text(
+                fileName,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.bold,
                 ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 2,
+                textAlign: TextAlign.center,
               ),
-              IconButton(
-                icon: const Icon(Icons.more_vert, color: Colors.white),
-                onPressed: () => _showRecordingOptionsDialog(context, sequencerState),
-                tooltip: 'Recording Options',
-              ),
-            ],
+            ),
           ),
           
-          const SizedBox(height: 8),
+          // Buttons section
+          Container(
+            height: buttonAreaHeight,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Play button
+                _buildActionButton(
+                  icon: Icons.play_arrow,
+                  color: Colors.greenAccent,
+                  size: buttonSize,
+                  iconSize: iconSize,
+                  onTap: () => _playRecording(sequencer),
+                ),
+                
+                // Delete button  
+                _buildActionButton(
+                  icon: Icons.delete,
+                  color: Colors.redAccent,
+                  size: buttonSize,
+                  iconSize: iconSize,
+                  onTap: () => _showDeleteConfirmation(context, sequencer),
+                ),
+                
+                // Share button
+                _buildActionButton(
+                  icon: Icons.share,
+                  color: Colors.cyanAccent,
+                  size: buttonSize,
+                  iconSize: iconSize,
+                  onTap: () => sequencer.shareRecordedAudioAsMp3(),
+                ),
+                
+                // Convert to MP3 button
+                _buildActionButton(
+                  icon: Icons.audiotrack,
+                  color: sequencer.lastMp3Path != null 
+                      ? Colors.grey 
+                      : Colors.orangeAccent,
+                  size: buttonSize,
+                  iconSize: iconSize,
+                  onTap: sequencer.lastMp3Path != null || sequencer.isConverting
+                      ? null
+                      : () => sequencer.convertLastRecordingToMp3(),
+                ),
+              ],
+            ),
+          ),
           
-          // Conversion status and controls
-          Column(
-            children: [
-              // Error message (if any)
-              if (sequencerState.conversionError != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.red, width: 1),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.error, color: Colors.red, size: 16),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Conversion failed: ${sequencerState.conversionError}',
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
-              
-              // Action buttons row
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  // Convert to MP3 button
-                  if (sequencerState.lastMp3Path == null && !sequencerState.isConverting)
-                    _buildActionButton(
-                      icon: Icons.audiotrack,
-                      label: 'Convert MP3',
-                      color: Colors.orangeAccent,
-                      onTap: () => sequencerState.convertLastRecordingToMp3(),
-                    ),
-                    
-                  // Play/Pause button
-                  _buildActionButton(
-                    icon: Icons.play_arrow,
-                    label: 'Play',
-                    color: Colors.greenAccent,
-                    onTap: () {
-                      // TODO: Implement playback
-                    },
-                  ),
-                  
-                  // Delete button
-                  _buildActionButton(
-                    icon: Icons.delete,
-                    label: 'Delete',
-                    color: Colors.redAccent,
-                    onTap: () => _confirmDeleteRecording(context, sequencerState),
-                  ),
-                ],
-              ),
-              
-              // Conversion progress (if converting)
-              if (sequencerState.isConverting) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.orange, width: 1),
-                  ),
-                  child: Column(
-                    children: [
-                      Row(
-                        children: [
-                          const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Converting to MP3...',
-                            style: const TextStyle(color: Colors.orange, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      LinearProgressIndicator(
-                        value: sequencerState.conversionProgress,
-                        backgroundColor: Colors.grey.withOpacity(0.3),
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.orange),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '${(sequencerState.conversionProgress * 100).toInt()}%',
-                        style: const TextStyle(
-                          color: Colors.orange,
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              
-              // MP3 ready indicator and share button
-              if (sequencerState.lastMp3Path != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.green.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.green, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'MP3 Ready',
-                            style: TextStyle(
-                              color: Colors.green,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      GestureDetector(
-                        onTap: () => sequencerState.shareRecordedAudioAsMp3(),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: Colors.green.withOpacity(0.3),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green, width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.share, color: Colors.green, size: 14),
-                              const SizedBox(width: 4),
-                              Text(
-                                sequencerState.lastMp3Path != null ? 'Share MP3' : 'Share',
-                                style: const TextStyle(
-                                  color: Colors.green,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ],
+          // Status section
+          Container(
+            height: statusHeight,
+            child: _buildStatusArea(sequencer, statusFontSize, iconSize, horizontalPadding),
           ),
         ],
       ),
     );
   }
 
-  void _showRecordingOptionsDialog(BuildContext context, SequencerState sequencerState) {
-    final fileName = path.basename(sequencerState.lastRecordingPath!);
-    final hasMP3 = sequencerState.lastMp3Path != null;
-    
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          backgroundColor: const Color(0xFF1f2937),
-          title: Text(
-            fileName,
-            style: const TextStyle(color: Colors.white),
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.play_arrow, color: Colors.greenAccent),
-                title: const Text('Play Recording', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  // TODO: Implement playback
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.audiotrack,
-                  color: hasMP3 ? Colors.grey : Colors.orangeAccent,
-                ),
-                title: Text(
-                  hasMP3 ? 'Already Converted' : 'Convert to MP3',
-                  style: TextStyle(
-                    color: hasMP3 ? Colors.grey : Colors.white,
-                  ),
-                ),
-                onTap: hasMP3 ? null : () {
-                  Navigator.of(context).pop();
-                  if (!hasMP3 && !sequencerState.isConverting)
-                    sequencerState.convertLastRecordingToMp3();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.share, color: Colors.cyanAccent),
-                title: const Text('Share', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  sequencerState.shareRecordedAudioAsMp3();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.delete, color: Colors.redAccent),
-                title: const Text('Delete', style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  sequencerState.clearLastRecording();
-                },
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Close', style: TextStyle(color: Colors.cyanAccent)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Widget _buildActionButton({
     required IconData icon,
-    required String label,
     required Color color,
-    required VoidCallback onTap,
+    required double size,
+    required double iconSize,
+    VoidCallback? onTap,
   }) {
+    final isDisabled = onTap == null;
+    final effectiveColor = isDisabled ? Colors.grey : color;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        width: size,
+        height: size,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color, width: 1),
+          color: effectiveColor.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(size * 0.2),
+          border: Border.all(
+            color: effectiveColor.withOpacity(0.6),
+            width: 1.5,
+          ),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                color: color,
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ],
+        child: Center(
+          child: Icon(
+            icon,
+            color: effectiveColor,
+            size: iconSize,
+          ),
         ),
       ),
     );
   }
 
-  void _confirmDeleteRecording(BuildContext context, SequencerState sequencerState) {
+  Widget _buildStatusArea(SequencerState sequencer, double fontSize, double iconSize, double horizontalPadding) {
+    if (sequencer.conversionError != null) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
+        decoration: BoxDecoration(
+          color: Colors.red.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(horizontalPadding * 0.5),
+          border: Border.all(color: Colors.red.withOpacity(0.5), width: 1),
+        ),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, color: Colors.red, size: iconSize),
+              SizedBox(width: horizontalPadding * 0.3),
+              Flexible(
+                child: Text(
+                  'Conversion failed',
+                  style: TextStyle(color: Colors.red, fontSize: fontSize),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } 
+    
+    if (sequencer.isConverting) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
+        decoration: BoxDecoration(
+          color: Colors.orange.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(horizontalPadding * 0.5),
+          border: Border.all(color: Colors.orange.withOpacity(0.5), width: 1),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Progress bar
+            Expanded(
+              flex: 3,
+              child: Container(
+                width: double.infinity,
+                child: LinearProgressIndicator(
+                  value: sequencer.conversionProgress,
+                  backgroundColor: Colors.orange.withOpacity(0.2),
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                  minHeight: iconSize * 0.3,
+                ),
+              ),
+            ),
+            
+            SizedBox(height: horizontalPadding * 0.2),
+            
+            // Progress text
+            Expanded(
+              flex: 2,
+              child: Text(
+                'Converting: ${(sequencer.conversionProgress * 100).toInt()}%',
+                style: TextStyle(color: Colors.orange, fontSize: fontSize),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    if (sequencer.lastMp3Path != null) {
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
+        decoration: BoxDecoration(
+          color: Colors.green.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(horizontalPadding * 0.5),
+          border: Border.all(color: Colors.green.withOpacity(0.5), width: 1),
+        ),
+        child: Center(
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: iconSize),
+              SizedBox(width: horizontalPadding * 0.3),
+              Text(
+                'MP3 Ready',
+                style: TextStyle(color: Colors.green, fontSize: fontSize),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    
+    // Empty status area
+    return Container();
+  }
+
+  void _playRecording(SequencerState sequencer) {
+    // TODO: Implement audio playback functionality
+    // For now, show a placeholder message
+    debugPrint('🎵 Play recording: ${sequencer.lastRecordingPath}');
+  }
+
+  void _showDeleteConfirmation(BuildContext context, SequencerState sequencer) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
           backgroundColor: const Color(0xFF1f2937),
-          title: const Text('Delete Recording', style: TextStyle(color: Colors.white)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          title: const Text(
+            'Delete Recording?', 
+            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)
+          ),
           content: const Text(
-            'Are you sure you want to delete this recording? This action cannot be undone.',
+            'This will permanently delete the recording. This action cannot be undone.',
             style: TextStyle(color: Colors.white70),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Colors.cyanAccent)),
+              child: const Text(
+                'Cancel', 
+                style: TextStyle(color: Colors.cyanAccent)
+              ),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                sequencerState.clearLastRecording();
+                sequencer.clearLastRecording();
               },
-              child: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+              child: const Text(
+                'Delete', 
+                style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)
+              ),
             ),
           ],
         );
