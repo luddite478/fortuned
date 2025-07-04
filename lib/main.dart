@@ -47,10 +47,6 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TEMPORARY: Always show MainPage, bypassing login
-    return const MainPage();
-    // Original code below:
-    /*
     return Consumer<AuthService>(
       builder: (context, authService, child) {
         if (authService.isLoading) {
@@ -71,7 +67,6 @@ class AuthWrapper extends StatelessWidget {
         }
       },
     );
-    */
   }
 }
 
