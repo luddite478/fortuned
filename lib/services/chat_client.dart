@@ -63,7 +63,20 @@ class ChatClient {
         onDone: _handleDisconnect,
       );
       
-      return true;
+      // Wait for server confirmation (with timeout)
+      try {
+        await _connectionController.stream.firstWhere(
+          (connected) => connected == true,
+          orElse: () => false,
+        ).timeout(const Duration(seconds: 10));
+        
+        print('✅ WebSocket connection fully established and authenticated');
+        return true;
+      } catch (e) {
+        print('⚠️ Connection timeout or failed to get confirmation: $e');
+        // Still return true if socket is connected, just log the issue
+        return _socket != null;
+      }
       
     } catch (e) {
       _errorController.add('Connection failed: $e');
@@ -251,9 +264,14 @@ class ChatClient {
   }
 
   Future<bool> sendThreadMessage(String targetUser, String threadId, String threadTitle) async {
+    print('📡 Attempting to send thread message to $targetUser');
+    print('📡 Connection status: _isConnected=$_isConnected, _socket=${_socket != null ? "exists" : "null"}');
+    
     if (!_isConnected || _socket == null) {
+      final errorMsg = 'Not connected to server (connected: $_isConnected, socket: ${_socket != null})';
+      print('📡 ❌ $errorMsg');
       if (!_errorController.isClosed) {
-        _errorController.add('Not connected to server');
+        _errorController.add(errorMsg);
       }
       return false;
     }
@@ -265,11 +283,16 @@ class ChatClient {
         'thread_id': threadId,
         'thread_title': threadTitle,
       });
+      
+      print('📡 Sending WebSocket message: $request');
       _socket!.add(request);
+      print('📡 ✅ WebSocket message sent successfully to $targetUser');
       return true;
     } catch (e) {
+      final errorMsg = 'Failed to send thread message: $e';
+      print('📡 ❌ $errorMsg');
       if (!_errorController.isClosed) {
-        _errorController.add('Failed to send thread message: $e');
+        _errorController.add(errorMsg);
       }
       return false;
     }

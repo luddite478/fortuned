@@ -121,16 +121,30 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       // Save/Send button (always visible, context-aware icon)
       Consumer2<SequencerState, ThreadsState>(
         builder: (context, sequencer, threadsState, child) {
-          // Check if this is an unpublished solo thread
+          // Check thread context for Save vs Send
           final activeThread = threadsState.activeThread;
-          final isUnpublishedSolo = activeThread != null && 
-                                   activeThread.users.length == 1 && 
-                                   activeThread.users.first.id == threadsState.currentUserId &&
-                                   !(activeThread.metadata['is_public'] ?? false);
+          final sourceThread = sequencer.sourceThread;
+          
+          // Show SEND icon when:
+          // 1. There's a sourceThread (working on someone else's project)
+          // 2. There's an active thread with more than 1 user (collaborative thread)
+          bool showSendIcon = false;
+          
+          if (sourceThread != null) {
+            // Case 1: Working on a sourced project - always show SEND
+            showSendIcon = true;
+          } else if (activeThread != null && activeThread.users.length > 1) {
+            // Case 2: Collaborative thread - show SEND
+            showSendIcon = true;
+          }
+          
+          // Show SAVE icon for:
+          // - No active thread (new/unpublished project)
+          // - Unpublished solo thread (only current user, not public)
           
           return IconButton(
             icon: Icon(
-              isUnpublishedSolo ? Icons.save : Icons.send,
+              showSendIcon ? Icons.send : Icons.save,
               color: Colors.orangeAccent,
             ),
             onPressed: () => _sendCheckpoint(context, sequencer, threadsState),
@@ -301,25 +315,128 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     }
   }
 
-
-
-  void _sendCheckpoint(BuildContext context, SequencerState sequencer, ThreadsState threadsState) {
+  void _sendCheckpoint(BuildContext context, SequencerState sequencer, ThreadsState threadsState) async {
     // Determine context and create checkpoint accordingly
     final activeThread = threadsState.activeThread;
     final sourceThread = sequencer.sourceThread;
     
-    if (sourceThread != null) {
-      // Case: Sourced project - create fork with modifications
-      sequencer.createProjectFork(
-        comment: 'Modified version',
-        chatClient: chatClient,
-      );
-    } else if (activeThread != null) {
-      // Case: Solo or collaborative thread - add checkpoint to current thread
-      sequencer.createProjectFork(
-        comment: 'Project checkpoint',
-        chatClient: chatClient,
-      );
+    try {
+      if (sourceThread != null) {
+        // Case: Sourced project - create fork with modifications (SEND)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Creating fork...'),
+            backgroundColor: Colors.orangeAccent,
+            duration: Duration(seconds: 1),
+          ),
+        );
+        
+        final success = await sequencer.createProjectFork(
+          comment: 'Modified version',
+          chatClient: chatClient,
+        );
+        
+        if (success) {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Fork created successfully! 🎉'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to create fork'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+        return; // Exit early after handling sourced project
+      } else if (activeThread != null) {
+        // Check if this is unpublished solo thread (SAVE) or published/collaborative (SEND)
+        final isUnpublishedSolo = activeThread.users.length == 1 && 
+                                 activeThread.users.first.id == threadsState.currentUserId &&
+                                 !(activeThread.metadata['is_public'] ?? false);
+        
+        if (isUnpublishedSolo) {
+          // Case: Unpublished solo thread - add checkpoint to same thread (SAVE)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Saving checkpoint...'),
+              backgroundColor: Colors.orangeAccent,
+              duration: Duration(seconds: 1),
+            ),
+          );
+          
+          final success = await threadsState.addCheckpointFromSequencer(
+            activeThread.id,
+            'Saved changes',
+            sequencer,
+          );
+          
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Checkpoint saved! 💾'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        } else {
+          // Case: Published/collaborative thread - create fork or add checkpoint (SEND)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Adding to collaboration...'),
+              backgroundColor: Colors.orangeAccent,
+              duration: Duration(seconds: 1),
+            ),
+          );
+          
+          final success = await threadsState.addCheckpointFromSequencer(
+            activeThread.id,
+            'New contribution',
+            sequencer,
+          );
+          
+          if (context.mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Contribution added! 📤'),
+                backgroundColor: Colors.green,
+                duration: Duration(seconds: 3),
+              ),
+            );
+          }
+        }
+      } else {
+        // No active thread - this shouldn't happen now with auto-creation
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No active project to save'),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 } 

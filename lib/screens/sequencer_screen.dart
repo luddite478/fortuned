@@ -26,20 +26,77 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _chatClient = ChatClient();
-    _setupChatClient();
+    
+    // Use the global ChatClient from Provider instead of creating a new one
+    _chatClient = Provider.of<ChatClient>(context, listen: false);
+    _setupChatClientListeners();
+    
+    // Ensure there's an active thread for saving work
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureActiveThread();
+    });
   }
 
-  void _setupChatClient() async {
-    // Connect to server for sending thread messages
-    final clientId = '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    await _chatClient.connect(clientId);
+  void _setupChatClientListeners() async {
+    // Setup connection status listener
+    _chatClient.connectionStream.listen((connected) {
+      debugPrint('📡 ChatClient connection status changed: $connected');
+      if (connected) {
+        debugPrint('📡 ✅ WebSocket connected and ready for notifications');
+      } else {
+        debugPrint('📡 ❌ WebSocket disconnected');
+      }
+    });
+    
+    // Setup error listener
+    _chatClient.errorStream.listen((error) {
+      debugPrint('📡 ❌ ChatClient error: $error');
+    });
+    
+    // No need to connect here - it's already connected globally
+    debugPrint('📡 Using global ChatClient connection in sequencer');
+  }
+
+  void _ensureActiveThread() async {
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final sequencerState = Provider.of<SequencerState>(context, listen: false);
+    
+    // If there's no active thread and we're not in collaboration mode, create one
+    if (threadsState.activeThread == null && !sequencerState.isCollaborating) {
+      try {
+        debugPrint('📝 No active thread found, creating new unpublished thread for sequencer');
+        
+        final currentUserId = threadsState.currentUserId;
+        final currentUserName = threadsState.currentUserName;
+        
+        if (currentUserId != null) {
+          // Create an unpublished thread for this new project
+          final threadId = await threadsState.createThread(
+            title: 'Untitled Project ${DateTime.now().toString().substring(5, 16)}', // e.g. "Untitled Project 12-25 14:30"
+            authorId: currentUserId,
+            authorName: currentUserName ?? 'User',
+            metadata: {
+              'project_type': 'solo',
+              'is_public': false, // Unpublished initially
+              'created_from': 'sequencer',
+            },
+            createInitialCheckpoint: false, // Don't create checkpoint until user makes changes
+          );
+          
+          debugPrint('✅ Created new unpublished thread: $threadId');
+        } else {
+          debugPrint('❌ Cannot create thread: No current user ID');
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to create initial thread: $e');
+        // Not critical - user can still work and publish later
+      }
+    }
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _chatClient.dispose();
     super.dispose();
   }
 

@@ -335,6 +335,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
   }
 
   Widget _buildPublishedProjects() {
+    // Filter threads to only show public ones
+    final publicThreads = _userThreads.where((thread) {
+      final isPublic = thread.metadata['is_public'] as bool?;
+      return isPublic == true;
+    }).toList();
+
       return Container(
       padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
@@ -369,7 +375,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
               const Spacer(),
               Text(
-                '${_userThreads.length}',
+                '${publicThreads.length}',
                 style: const TextStyle(
                   color: Color(0xFF9CA3AF),
                   fontSize: 14,
@@ -380,7 +386,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
           const SizedBox(height: 16),
           
-          if (_userThreads.isEmpty)
+          if (publicThreads.isEmpty)
             const Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 32),
@@ -407,10 +413,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ListView.separated(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-              itemCount: _userThreads.length,
+              itemCount: publicThreads.length,
               separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
-                final project = _userThreads[index];
+                final project = publicThreads[index];
                 return _buildProjectCard(project);
       },
             ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/chat_client.dart';
+import '../services/user_profile_service.dart';
+import '../services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'thread_screen.dart';
@@ -19,6 +21,7 @@ class ContactsScreen extends StatefulWidget {
 class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStateMixin {
   late ChatClient _chatClient;
   List<String> _onlineUserIds = [];
+  List<UserProfile> _userProfiles = [];
   bool _isLoading = true;
   String? _error;
   
@@ -41,7 +44,9 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   @override
   void initState() {
     super.initState();
-    _chatClient = ChatClient();
+    
+    // Use the global ChatClient from Provider instead of creating a new one
+    _chatClient = Provider.of<ChatClient>(context, listen: false);
     
     // Initialize lamp animation (5-second cycle)
     _lampAnimation = AnimationController(
@@ -49,10 +54,10 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       vsync: this,
     )..repeat();
     
-    _setupChatClient();
+    _setupChatClientListeners();
   }
 
-  void _setupChatClient() async {
+  void _setupChatClientListeners() async {
     // Setup listeners
     _chatClient.onlineUsersStream.listen((users) {
       setState(() {
@@ -94,13 +99,24 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       }
     });
 
-    // Connect to server
-    final clientId = '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    final success = await _chatClient.connect(clientId);
+    // No need to connect here - it's already connected globally
+    debugPrint('📡 Using global ChatClient connection in contacts screen');
     
-    if (!success) {
+    // Load user profiles from API
+    await _loadUserProfiles();
+  }
+
+  Future<void> _loadUserProfiles() async {
+    try {
+      final response = await UserProfileService.getUserProfiles(limit: 50);
       setState(() {
-        _error = 'Failed to connect to server';
+        _userProfiles = response.profiles;
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load user profiles: $e';
         _isLoading = false;
       });
     }
@@ -109,43 +125,31 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   @override
   void dispose() {
     _lampAnimation.dispose();
-    _chatClient.dispose();
+    // Don't dispose the global ChatClient - it's managed at app level
     super.dispose();
   }
 
   List<ContactUser> get _contacts {
     final contacts = <ContactUser>[];
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
     
-          // Add some mock users for demonstration
-      final mockUsers = [
-      ContactUser(id: 'alex_beat', name: 'Alex Beat', isOnline: false, isWorking: false, project: 'Lo-fi Chill'),
-      ContactUser(id: 'maya_synth', name: 'Maya Synth', isOnline: true, isWorking: true, project: ''),
-      ContactUser(id: 'jordan_mix', name: 'Jordan Mix', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'sam_drums', name: 'Sam Drums', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'riley_bass', name: 'Riley Bass', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'casey_keys', name: 'Casey Keys', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'riley_bass', name: 'Riley Bass', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'casey_keys', name: 'Casey Keys', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'riley_bass', name: 'Riley Bass', isOnline: false, isWorking: false, project: ''),
-      ContactUser(id: 'casey_keys', name: 'Casey Keys', isOnline: false, isWorking: false, project: ''),
-    ];
-    
-          contacts.addAll(mockUsers);
-    
-    // Add online users from chat client
-    for (final userId in _onlineUserIds) {
-      if (!contacts.any((c) => c.id == userId)) {
-        final index = userId.hashCode.abs() % _names.length;
-        final projectIndex = userId.hashCode.abs() % _projects.length;
-        
-        contacts.add(ContactUser(
-          id: userId,
-          name: _names[index],
-          isOnline: true,
-          isWorking: userId.hashCode.abs() % 3 == 0, // Randomly working
-          project: _projects[projectIndex],
-        ));
-      }
+    // Convert UserProfile from API to ContactUser for UI, excluding current user
+    for (final profile in _userProfiles) {
+      // Skip if this is the current user
+      if (profile.id == currentUserId) continue;
+      
+      // Now we can properly match online status since WebSocket uses real user IDs
+      final isOnline = profile.isOnline || _onlineUserIds.contains(profile.id);
+      final isWorking = _onlineUserIds.contains(profile.id) && (profile.id.hashCode.abs() % 3 == 0);
+      
+      contacts.add(ContactUser(
+        id: profile.id,
+        name: profile.name,
+        isOnline: isOnline,
+        isWorking: isWorking,
+        project: profile.info, // Use info as project description
+      ));
     }
     
     return contacts;
@@ -185,7 +189,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                                     _isLoading = true;
                                     _error = null;
                                   });
-                                  _setupChatClient();
+                                  _setupChatClientListeners();
                                 },
                                 child: const Text('RETRY'),
                               ),

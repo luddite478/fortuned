@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'screens/users_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
+import 'services/chat_client.dart';
 import 'state/sequencer_state.dart';
 import 'state/threads_state.dart';
 // import 'state/patterns_state.dart';
@@ -28,6 +29,7 @@ class NiyyaApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => AuthService()),
         ChangeNotifierProvider(create: (context) => SequencerState()),
         ChangeNotifierProvider(create: (context) => ThreadsState()),
+        Provider(create: (context) => ChatClient()),
       ],
       child: MaterialApp(
         title: 'NIYYA',
@@ -47,8 +49,16 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthService>(
-      builder: (context, authService, child) {
+    return Consumer2<AuthService, ChatClient>(
+      builder: (context, authService, chatClient, child) {
+        // Handle logout - disconnect ChatClient when user logs out
+        if (!authService.isAuthenticated && chatClient.isConnected) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            chatClient.dispose();
+            print('📡 Disconnected ChatClient due to logout');
+          });
+        }
+        
         if (authService.isLoading) {
           return const Scaffold(
             backgroundColor: Colors.black,
@@ -91,6 +101,7 @@ class _MainPageState extends State<MainPage> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     final sequencerState = Provider.of<SequencerState>(context, listen: false);
+    final chatClient = Provider.of<ChatClient>(context, listen: false);
     
     print('🔍 Attempting to sync current user...');
     print('🔍 AuthService currentUser: ${authService.currentUser?.id} (${authService.currentUser?.name})');
@@ -106,8 +117,26 @@ class _MainPageState extends State<MainPage> {
         authService.currentUser!.name,
       );
       print('🔗 Synced current user to ThreadsState: ${authService.currentUser!.id} (${authService.currentUser!.name})');
+      
+      // Initialize single WebSocket connection for this user
+      _initializeChatClient(chatClient, authService.currentUser!.id);
     } else {
       print('❌ No current user found in AuthService');
+    }
+  }
+
+  void _initializeChatClient(ChatClient chatClient, String userId) async {
+    try {
+      print('📡 Initializing global ChatClient for user: $userId');
+      final success = await chatClient.connect(userId);
+      if (success) {
+        print('📡 ✅ Global ChatClient connected successfully');
+        chatClient.requestOnlineUsers();
+      } else {
+        print('📡 ❌ Failed to connect global ChatClient');
+      }
+    } catch (e) {
+      print('📡 ❌ Error connecting global ChatClient: $e');
     }
   }
 

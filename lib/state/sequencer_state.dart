@@ -1495,89 +1495,7 @@ Made with Demo Sequencer 🚀
     }
   }
 
-  // 🧪 TEST METHOD: Easy way to test native sequencer
-  void testNativeSequencer() {
-    print('🧪 Testing Native Sequencer...');
-    
-    // Stop any current sequencer
-    if (_isSequencerPlaying) {
-      stopSequencer();
-    }
-    
-    // Make sure we have some loaded samples to test with
-    bool hasLoadedSamples = false;
-    for (int i = 0; i < _slotCount; i++) {
-      if (_slotLoaded[i]) {
-        hasLoadedSamples = true;
-        break;
-      }
-    }
-    
-    if (!hasLoadedSamples) {
-      print('❌ No samples loaded - load some samples first to test sequencer');
-      return;
-    }
-    
-    // Create a simple test pattern
-    print('🎵 Creating test pattern...');
-    
-    // Clear current grid
-    final currentGrid = _getCurrentGridSamples();
-    for (int i = 0; i < currentGrid.length; i++) {
-      _setCurrentGridSample(i, null);
-    }
-    
-    // Add a simple pattern using the first loaded sample
-    int? firstLoadedSlot;
-    for (int i = 0; i < _slotCount; i++) {
-      if (_slotLoaded[i]) {
-        firstLoadedSlot = i;
-        break;
-      }
-    }
-    
-    if (firstLoadedSlot != null) {
-      // Create a simple kick pattern on steps 1, 5, 9, 13 (every 4 steps)
-      for (int step = 0; step < 16; step += 4) {
-        final cellIndex = step * _gridColumns + 0; // First column
-        _setCurrentGridSample(cellIndex, firstLoadedSlot);
-      }
-      
-      // If we have a second loaded sample, add it on off-beats
-      int? secondLoadedSlot;
-      for (int i = firstLoadedSlot + 1; i < _slotCount; i++) {
-        if (_slotLoaded[i]) {
-          secondLoadedSlot = i;
-          break;
-        }
-      }
-      
-      if (secondLoadedSlot != null) {
-        // Add second sample on steps 2, 6, 10, 14
-        for (int step = 2; step < 16; step += 4) {
-          final cellIndex = step * _gridColumns + 1; // Second column
-          _setCurrentGridSample(cellIndex, secondLoadedSlot);
-        }
-      }
-      
-      print('🎹 Test pattern created with samples $firstLoadedSlot${secondLoadedSlot != null ? ' and $secondLoadedSlot' : ''}');
-      
-      // Now start the sequencer
-      print('🚀 Starting sequencer at ${_bpm} BPM...');
-      startSequencer();
-      
-      print('✅ Sequencer test started! You should hear the pattern playing.');
-      print('   Call testStopSequencer() to stop it.');
-    }
-  }
   
-  // 🧪 TEST METHOD: Stop the sequencer test
-  void testStopSequencer() {
-    print('⏹️ Stopping sequencer test...');
-    stopSequencer();
-    print('✅ Sequencer stopped.');
-  }
-
   // Update BPM and sync with native sequencer
   void setBpm(int newBpm) {
     if (newBpm < 60 || newBpm > 300) return;
@@ -2264,75 +2182,33 @@ Made with Demo Sequencer 🚀
       debugPrint('🏷️ Project title: $projectTitle');
       debugPrint('👤 currentUserId: ${_threadsState?.currentUserId}');
       
-      // Always create a new public thread with current sequencer state
-      // This ignores any local thread logic and just publishes what's currently in the sequencer
+      // Validate user information
+      final currentUserId = _threadsState?.currentUserId;
+      final currentUserName = _threadsState?.currentUserName;
       
-      // Create a snapshot of current state
-      final snapshot = createSnapshot(name: projectTitle, comment: description);
+      if (currentUserId == null || currentUserId == 'unknown_user') {
+        debugPrint('❌ Cannot publish: No valid user ID');
+        return false;
+      }
       
-      // Prepare data for database (matches init_collections.py structure)
+      debugPrint('👤 Publishing with user ID: $currentUserId');
+      debugPrint('👤 Publishing with user name: $currentUserName');
+      
+      // Step 1: Create thread WITHOUT initial checkpoint
       final threadData = {
-        'id': 'thread_${DateTime.now().millisecondsSinceEpoch}',
         'title': projectTitle,
         'users': [
           {
-            'id': _threadsState?.currentUserId ?? 'unknown_user',
-            'name': _threadsState?.currentUserName ?? 'Unknown User',
+            'id': currentUserId,
+            'name': currentUserName ?? 'Unknown User',
             'joined_at': DateTime.now().toIso8601String(),
           }
         ],
-        'initial_checkpoint': {
-          'id': 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
-          'user_id': _threadsState?.currentUserId ?? 'unknown_user',
-          'user_name': _threadsState?.currentUserName ?? 'Unknown User',
-          'timestamp': DateTime.now().toIso8601String(),
-          'comment': description ?? 'Published from mobile app',
-          'renders': [], // Will be populated after audio rendering
-          'snapshot': {
-            'id': snapshot.id,
-            'name': snapshot.name,
-            'createdAt': snapshot.createdAt.toIso8601String(),
-            'version': snapshot.version,
-            'audio': {
-              'sources': snapshot.audio.sources.map((source) => {
-                'scenes': source.scenes.map((scene) => {
-                  'layers': scene.layers.map((layer) => {
-                    'id': layer.id,
-                    'index': layer.index,
-                    'rows': layer.rows.map((row) => {
-                      'cells': row.cells.map((cell) => {
-                        'sample': cell.sample?.hasSample == true ? {
-                          'sample_id': cell.sample!.sampleId,
-                          'sample_name': cell.sample!.sampleName,
-                        } : null,
-                      }).toList(),
-                    }).toList(),
-                  }).toList(),
-                  'metadata': {
-                    'user': scene.metadata.user,
-                    'bpm': scene.metadata.bpm,
-                    'key': scene.metadata.key,
-                    'time_signature': scene.metadata.timeSignature,
-                    'created_at': scene.metadata.createdAt.toIso8601String(),
-                  },
-                }).toList(),
-                'samples': source.samples.map((sample) => {
-                  'id': sample.id,
-                  'name': sample.name,
-                  'url': sample.url,
-                  'is_public': sample.isPublic,
-                }).toList(),
-              }).toList(),
-            },
-          },
-        },
         'status': 'active',
-        'created_at': DateTime.now().toIso8601String(),
-        'updated_at': DateTime.now().toIso8601String(),
         'metadata': {
           'original_project_id': null,
           'project_type': 'solo',
-          'genre': 'Electronic', // Could be enhanced to be user-selectable
+          'genre': 'Electronic',
           'tags': tags ?? ['mobile', 'sequencer'],
           'description': description ?? '',
           'is_public': isPublic,
@@ -2342,68 +2218,139 @@ Made with Demo Sequencer 🚀
         },
       };
 
-      // Send to database using environment variables
+      // Send thread creation request
       final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
       final apiToken = dotenv.env['API_TOKEN'] ?? '';
-      final url = 'http://$serverIp:8888/api/v1/threads';
+      final threadsUrl = 'http://$serverIp:8888/api/v1/threads';
       
-      debugPrint('🌐 Publishing to URL: $url');
-      debugPrint('🔑 Using API token: $apiToken');
-      debugPrint('🏠 SERVER_IP from env: $serverIp');
-      debugPrint('🔍 ThreadsState reference: $_threadsState');
-      debugPrint('🔍 ThreadsState currentUserId: ${_threadsState?.currentUserId}');
-      debugPrint('🔍 ThreadsState currentUserName: ${_threadsState?.currentUserName}');
-      debugPrint('👤 Publishing with user ID: ${_threadsState?.currentUserId ?? 'unknown_user'}');
-      debugPrint('👤 Publishing with user name: ${_threadsState?.currentUserName ?? 'Unknown User'}');
+      debugPrint('🌐 Creating thread at URL: $threadsUrl');
       
-      // Add token to the data
       threadData['token'] = apiToken;
       
-      final response = await http.post(
-        Uri.parse(url),
+      final threadResponse = await http.post(
+        Uri.parse(threadsUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode(threadData),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        debugPrint('✅ Successfully published sequencer state to database');
-        
-        // Parse server response to get the new thread ID
-        final responseData = jsonDecode(response.body);
-        final newThreadId = responseData['thread_id'] as String?;
-        
-        // Update local ThreadsState with the new thread from server
-        if (_threadsState != null && newThreadId != null) {
-          try {
-                         // Load the newly created thread from server
-             final newThread = await ThreadsService.getThread(newThreadId);
-             if (newThread != null) {
-               // Set as active thread (this will update the UI)
-               _threadsState!.setActiveThread(newThread);
-               debugPrint('✅ Set new published thread as active: $newThreadId');
-               
-               // Refresh threads list to include the new thread
-               await _threadsState!.loadThreads();
-               debugPrint('✅ Refreshed threads list after publish');
-             } else {
-              // Fallback: refresh all threads
-              await _threadsState!.loadThreads();
-              debugPrint('✅ Refreshed all threads after publish');
-            }
-          } catch (e) {
-            debugPrint('⚠️ Failed to update local ThreadsState: $e');
-            // Continue anyway - the server creation was successful
-          }
-        }
-        
-        // Clear autosaved state since it's now published
-        await clearAutosavedState();
-        
-        return true;
-      } else {
-        debugPrint('❌ Failed to publish to database: ${response.statusCode} - ${response.body}');
+      if (threadResponse.statusCode != 200 && threadResponse.statusCode != 201) {
+        debugPrint('❌ Failed to create thread: ${threadResponse.statusCode} - ${threadResponse.body}');
         return false;
       }
+      
+      // Parse thread creation response
+      final threadResponseData = jsonDecode(threadResponse.body);
+      final newThreadId = threadResponseData['thread_id'] as String?;
+      
+      if (newThreadId == null) {
+        debugPrint('❌ No thread_id in response');
+        return false;
+      }
+      
+      debugPrint('✅ Successfully created thread: $newThreadId');
+      
+      // Step 2: Create checkpoint using the proper checkpoint API
+      final snapshot = createSnapshot(name: projectTitle, comment: description);
+      
+      final checkpoint = {
+        'id': 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+        'user_id': currentUserId,
+        'user_name': currentUserName ?? 'Unknown User',
+        'timestamp': DateTime.now().toIso8601String(),
+        'comment': description ?? 'Published from mobile app',
+        'renders': [], // Will be populated after audio rendering
+        'snapshot': {
+          'id': snapshot.id,
+          'name': snapshot.name,
+          'createdAt': snapshot.createdAt.toIso8601String(),
+          'version': snapshot.version,
+          'audio': {
+            'sources': snapshot.audio.sources.map((source) => {
+              'scenes': source.scenes.map((scene) => {
+                'layers': scene.layers.map((layer) => {
+                  'id': layer.id,
+                  'index': layer.index,
+                  'rows': layer.rows.map((row) => {
+                    'cells': row.cells.map((cell) => {
+                      'sample': cell.sample?.hasSample == true ? {
+                        'sample_id': cell.sample!.sampleId,
+                        'sample_name': cell.sample!.sampleName,
+                      } : null,
+                    }).toList(),
+                  }).toList(),
+                }).toList(),
+                'metadata': {
+                  'user': scene.metadata.user,
+                  'bpm': scene.metadata.bpm,
+                  'key': scene.metadata.key,
+                  'time_signature': scene.metadata.timeSignature,
+                  'created_at': scene.metadata.createdAt.toIso8601String(),
+                },
+              }).toList(),
+              'samples': source.samples.map((sample) => {
+                'id': sample.id,
+                'name': sample.name,
+                'url': sample.url,
+                'is_public': sample.isPublic,
+              }).toList(),
+            }).toList(),
+          },
+        },
+      };
+      
+      // Add checkpoint to the thread
+      final checkpointUrl = 'http://$serverIp:8888/api/v1/threads/$newThreadId/checkpoints';
+      debugPrint('🌐 Adding checkpoint at URL: $checkpointUrl');
+      
+      final checkpointData = {
+        'checkpoint': checkpoint,
+        'token': apiToken,
+      };
+      
+      final checkpointResponse = await http.post(
+        Uri.parse(checkpointUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(checkpointData),
+      );
+
+      if (checkpointResponse.statusCode != 200 && checkpointResponse.statusCode != 201) {
+        debugPrint('❌ Failed to add checkpoint: ${checkpointResponse.statusCode} - ${checkpointResponse.body}');
+        // Thread was created but checkpoint failed - still consider it a partial success
+        // The user can add checkpoints later
+      } else {
+        debugPrint('✅ Successfully added checkpoint to thread');
+      }
+      
+      // Step 3: Update local ThreadsState with the new thread from server
+      if (_threadsState != null) {
+        try {
+          // Load the newly created thread from server
+          final newThread = await ThreadsService.getThread(newThreadId);
+          if (newThread != null) {
+            // Set as active thread (this will update the UI)
+            _threadsState!.setActiveThread(newThread);
+            debugPrint('✅ Set new published thread as active: $newThreadId');
+            
+            // Refresh threads list to include the new thread
+            await _threadsState!.loadThreads();
+            debugPrint('✅ Refreshed threads list after publish');
+          } else {
+            // Fallback: refresh all threads
+            await _threadsState!.loadThreads();
+            debugPrint('✅ Refreshed all threads after publish (fallback)');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Failed to update local ThreadsState: $e');
+          // Continue anyway - the server creation was successful
+        }
+      }
+      
+      // Clear autosaved state since it's now published
+      await clearAutosavedState();
+      
+      debugPrint('✅ Successfully published project to database');
+      return true;
+      
     } catch (e) {
       debugPrint('❌ Error publishing to database: $e');
       return false;
@@ -2677,12 +2624,6 @@ Made with Demo Sequencer 🚀
     }
 
     try {
-      // Create snapshot of current state
-      final snapshot = createSnapshot(
-        name: _sourceThread!.title,
-        comment: comment,
-      );
-
       // Use provided user info or fallback
       final userId = currentUserId ?? _threadsState?.currentUserId ?? 'current_user_123';
       final userName = currentUserName ?? _threadsState?.currentUserName ?? 'Collaborator';
@@ -2695,28 +2636,111 @@ Made with Demo Sequencer 🚀
       
       if (_threadsState != null) {
         try {
-          // Create new thread with both users
+          // Find the original checkpoint that we forked from
+          ThreadCheckpoint? originalCheckpoint;
+          if (_sourceThread!.checkpoints.isNotEmpty) {
+            // Look for the published checkpoint (created by original author with publish comment)
+            for (final checkpoint in _sourceThread!.checkpoints) {
+              if (checkpoint.userId == originalAuthor.id && 
+                  (checkpoint.comment.contains('Published from mobile app') || 
+                   checkpoint.comment.contains('Published'))) {
+                originalCheckpoint = checkpoint;
+                debugPrint('📍 Found original published checkpoint: ${checkpoint.comment}');
+                break;
+              }
+            }
+            
+            // If no published checkpoint found, use the first checkpoint by the original author
+            if (originalCheckpoint == null) {
+              for (final checkpoint in _sourceThread!.checkpoints) {
+                if (checkpoint.userId == originalAuthor.id) {
+                  originalCheckpoint = checkpoint;
+                  debugPrint('📍 Using first checkpoint by author: ${checkpoint.comment}');
+                  break;
+                }
+              }
+            }
+          }
+          
+          // Create new thread with both users, WITHOUT initial checkpoint (we'll add it manually)
           final forkThreadId = await _threadsState!.createThread(
             title: forkTitle,
             authorId: userId, // Current user is the author of the fork
             authorName: userName,
             collaboratorIds: [originalAuthor.id], // Add original author as collaborator
             collaboratorNames: [originalAuthor.name],
-            initialSnapshot: snapshot, // Use current state as initial checkpoint
+            initialSnapshot: null, // Don't create automatic initial checkpoint
             metadata: {
               'project_type': 'fork',
               'is_public': true,
               'original_thread_id': _sourceThread!.id,
               'fork_comment': comment,
             },
-            createInitialCheckpoint: true,
+            createInitialCheckpoint: false, // We'll manually add checkpoints
           );
           
           debugPrint('✅ Created fork thread: $forkThreadId');
           
+          // First, add the original author's checkpoint (if we found one)
+          if (originalCheckpoint != null) {
+            await _threadsState!.addCheckpoint(
+              threadId: forkThreadId,
+              userId: originalCheckpoint.userId, // Use ORIGINAL author's ID
+              userName: originalCheckpoint.userName, // Use ORIGINAL author's name
+              comment: originalCheckpoint.comment, // Use ORIGINAL comment
+              snapshot: originalCheckpoint.snapshot, // Use ORIGINAL snapshot
+            );
+            debugPrint('✅ Added original author checkpoint to fork: ${originalCheckpoint.userName}');
+          }
+          
+          // Then add the collaborator's modified version as a second checkpoint
+          final modifiedSnapshot = createSnapshot(
+            name: _sourceThread!.title,
+            comment: comment,
+          );
+          
+          await _threadsState!.addCheckpoint(
+            threadId: forkThreadId,
+            userId: userId,
+            userName: userName,
+            comment: comment,
+            snapshot: modifiedSnapshot,
+          );
+          
+          debugPrint('✅ Added collaborator checkpoint to fork: $userName');
+          
+          // Load the newly created fork thread from server to get the complete data
+          try {
+            final newForkThread = await ThreadsService.getThread(forkThreadId);
+            if (newForkThread != null) {
+              // Exit collaboration mode first
+              _isCollaborating = false;
+              _sourceThread = null;
+              debugPrint('✅ Exited collaboration mode');
+              
+              // Set the fork thread as the active thread for the collaborator
+              _threadsState!.setActiveThread(newForkThread);
+              debugPrint('✅ Set fork thread as active thread for collaborator: $forkThreadId');
+              
+              // Update the local threads list to include the new fork
+              await _threadsState!.loadThreads();
+              debugPrint('✅ Refreshed threads list after fork creation');
+              
+              // Notify listeners to update the UI
+              notifyListeners();
+              debugPrint('✅ Updated UI after fork creation');
+            } else {
+              debugPrint('⚠️ Could not load fork thread from server');
+            }
+          } catch (e) {
+            debugPrint('⚠️ Failed to load fork thread: $e');
+            // Continue anyway - the fork was created successfully
+          }
+          
           // Send thread message to original author via WebSocket
           try {
             if (chatClient != null) {
+              debugPrint('📡 Sending WebSocket notification to ${originalAuthor.name} (${originalAuthor.id})');
               final success = await chatClient.sendThreadMessage(
                 originalAuthor.id,
                 forkThreadId,
@@ -2726,15 +2750,20 @@ Made with Demo Sequencer 🚀
                 debugPrint('📡 ✅ Sent WebSocket notification to ${originalAuthor.name} about fork: $forkTitle');
               } else {
                 debugPrint('📡 ❌ Failed to send WebSocket notification to ${originalAuthor.name}');
+                debugPrint('📡 ⚠️ Fork was created successfully, but notification failed');
               }
             } else {
               debugPrint('📡 ⚠️ No ChatClient provided - cannot send notification');
+              debugPrint('📡 ℹ️ Fork was created successfully without notification');
             }
           } catch (e) {
-            debugPrint('⚠️ Failed to send WebSocket notification: $e');
+            debugPrint('📡 ❌ Exception while sending WebSocket notification: $e');
+            debugPrint('📡 ⚠️ Fork was created successfully, but notification failed due to exception');
             // Continue anyway - the fork was created successfully
           }
           
+          // Always return true if we got this far - the fork creation was successful
+          debugPrint('✅ Fork creation completed successfully, notification status logged above');
           return true;
         } catch (e) {
           debugPrint('❌ Failed to create fork thread: $e');

@@ -35,7 +35,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   void initState() {
     super.initState();
-    _chatClient = ChatClient();
+    
+    // Use the global ChatClient from Provider instead of creating a new one
+    _chatClient = Provider.of<ChatClient>(context, listen: false);
     
     // Initialize lamp animation (5-second cycle)
     _lampAnimation = AnimationController(
@@ -43,10 +45,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       vsync: this,
     )..repeat();
     
-    _setupChatClient();
+    _setupChatClientListeners();
   }
 
-  void _setupChatClient() async {
+  void _setupChatClientListeners() async {
     // Setup listeners for online users
     _chatClient.onlineUsersStream.listen((users) {
       setState(() {
@@ -70,9 +72,8 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       }
     });
 
-    // Connect to server (but don't wait for it)
-    final clientId = '${dotenv.env['CLIENT_ID_PREFIX'] ?? 'flutter_user'}_${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
-    _chatClient.connect(clientId);
+    // No need to connect here - it's already connected globally
+    debugPrint('📡 Using global ChatClient connection in users screen');
 
     // Load user profiles from API
     await _loadUserProfiles();
@@ -97,7 +98,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   void dispose() {
     _lampAnimation.dispose();
-    _chatClient.dispose();
+    // Don't dispose the global ChatClient - it's managed at app level
     super.dispose();
   }
 
@@ -111,8 +112,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       // Skip if this is the current user
       if (profile.id == currentUserId) continue;
       
+      // Now we can properly match online status since WebSocket uses real user IDs
       final isOnline = profile.isOnline || _onlineUserIds.contains(profile.id);
-      final isWorking = _onlineUserIds.contains(profile.id) && (profile.id.hashCode.abs() % 3 == 0);
+      final isWorking = false; // Simplified - remove the random working status
       
       users.add(User(
         id: profile.id,
@@ -123,18 +125,8 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       ));
     }
     
-    // Add additional online users that aren't in our profile list (excluding current user)
-    for (final userId in _onlineUserIds) {
-      if (userId != currentUserId && !users.any((u) => u.id == userId)) {
-        users.add(User(
-          id: userId,
-          name: 'User ${userId.substring(0, 8)}', // Show partial ID as name
-          isOnline: true,
-          isWorking: userId.hashCode.abs() % 3 == 0,
-          project: 'Online User',
-        ));
-      }
-    }
+    // REMOVED: No longer add WebSocket client IDs as fake users
+    // This was causing the "_mobile" users to appear
     
     return users;
   }
