@@ -82,6 +82,9 @@ typedef struct {
     // Node-graph specific members.
     ma_data_source_node node;   // Node wrapping this decoder for graph-based mixing.
     int node_initialized;       // 1 when the node has been successfully initialised and attached.
+    
+    // Volume control
+    float volume;              // Sample bank volume (0.0 to 1.0)
 } audio_slot_t;
 
 static ma_device g_device;
@@ -106,6 +109,7 @@ static int g_sequencer_steps = 16;
 static int g_current_step = 0;
 static int g_columns = 4; // Current number of columns in sequencer (starts with 1 grid × 4 columns)
 static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
+static float g_sequencer_grid_volumes[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = volume (0.0 to 1.0)
 static uint64_t g_frames_per_step = 0;
 static uint64_t g_step_frame_counter = 0;
 static int g_column_playing_sample[MAX_TOTAL_COLUMNS]; // Track which sample is playing in each column
@@ -354,13 +358,27 @@ static void play_samples_for_step(int step) {
                     
                     // Start the new sample
                     ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);  // Restart from beginning
-                    ma_node_set_output_bus_volume(&sample->node, 0, 1.0f);  // Turn volume on
+                    
+                    // Volume logic: cell volume overrides sample bank volume when set
+                    float bank_volume = sample->volume;
+                    float cell_volume = g_sequencer_grid_volumes[step][column];
+                    float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
+                    
+                    ma_node_set_output_bus_volume(&sample->node, 0, final_volume);
                     g_column_playing_sample[column] = sample_to_play;  // Remember what's playing
-                    prnt("▶️ [SEQUENCER] Started sample %d in column %d", sample_to_play, column);
+                    prnt("▶️ [SEQUENCER] Started sample %d in column %d (bank: %.2f, cell: %.2f → using %.2f)", 
+                         sample_to_play, column, bank_volume, cell_volume, final_volume);
                 } else {
                     // Same sample - restart it from the beginning
                     ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);
-                    prnt("🔄 [SEQUENCER] Restarted sample %d in column %d", sample_to_play, column);
+                    
+                    // Apply volume logic for restart too
+                    float bank_volume = sample->volume;
+                    float cell_volume = g_sequencer_grid_volumes[step][column];
+                    float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
+                    ma_node_set_output_bus_volume(&sample->node, 0, final_volume);
+                    
+                    prnt("🔄 [SEQUENCER] Restarted sample %d in column %d (volume: %.2f)", sample_to_play, column, final_volume);
                 }
             }
         } else {
@@ -560,6 +578,7 @@ int init(void) {
     // Initialize slot arrays
     for (int i = 0; i < MAX_SLOTS; ++i) {
         memset(&g_slots[i], 0, sizeof(audio_slot_t));
+        g_slots[i].volume = 1.0f; // Default volume: 100%
     }
     g_total_memory_used = 0;
     
@@ -576,6 +595,7 @@ int init(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1; // -1 means empty
+            g_sequencer_grid_volumes[step][col] = 1.0f; // Default volume: 100%
         }
     }
     
@@ -717,9 +737,9 @@ int play_slot(int slot) {
     s->active = 1;
     s->at_end = 0;
     if (s->node_initialized) {
-        ma_node_set_output_bus_volume(&s->node, 0, 1.0f);
+        ma_node_set_output_bus_volume(&s->node, 0, s->volume);
     }
-    prnt("✅ [MINIAUDIO] Slot %d started playing (%s)", slot, s->memory_data ? "memory" : "file");
+    prnt("✅ [MINIAUDIO] Slot %d started playing (%s) at volume %.2f", slot, s->memory_data ? "memory" : "file", s->volume);
     
     return 0;
 }
@@ -1009,6 +1029,7 @@ void clear_all_cells(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1;
+            g_sequencer_grid_volumes[step][col] = 1.0f; // Reset volume to 100%
         }
     }
     prnt("🗑️ [SEQUENCER] Cleared all grid cells (entire %dx%d table)", MAX_SEQUENCER_STEPS, MAX_TOTAL_COLUMNS);
@@ -1023,6 +1044,82 @@ void set_columns(int columns) {
     
     g_columns = columns;
     prnt("🎛️ [SEQUENCER] Set columns to %d", columns);
+}
+
+// Volume control functions
+int set_sample_bank_volume(int bank, float volume) {
+    if (bank < 0 || bank >= MAX_SLOTS) {
+        prnt_err("🔴 [VOLUME] Invalid sample bank: %d", bank);
+        return -1;
+    }
+    
+    if (volume < 0.0f || volume > 1.0f) {
+        prnt_err("🔴 [VOLUME] Invalid volume: %f (must be 0.0-1.0)", volume);
+        return -1;
+    }
+    
+    audio_slot_t* s = &g_slots[bank];
+    s->volume = volume;
+    
+    // NOTE: Don't apply volume immediately to playing samples
+    // Volume will be applied when cells are triggered during sequencer playback
+    
+    prnt("🔊 [VOLUME] Sample bank %d volume set to %.2f (will apply on next trigger)", bank, volume);
+    return 0;
+}
+
+float get_sample_bank_volume(int bank) {
+    if (bank < 0 || bank >= MAX_SLOTS) {
+        prnt_err("🔴 [VOLUME] Invalid sample bank: %d", bank);
+        return 0.0f;
+    }
+    
+    return g_slots[bank].volume;
+}
+
+int set_cell_volume(int step, int column, float volume) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [VOLUME] Invalid step: %d", step);
+        return -1;
+    }
+    
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [VOLUME] Invalid column: %d", column);
+        return -1;
+    }
+    
+    if (volume < 0.0f || volume > 1.0f) {
+        prnt_err("🔴 [VOLUME] Invalid volume: %f (must be 0.0-1.0)", volume);
+        return -1;
+    }
+    
+    g_sequencer_grid_volumes[step][column] = volume;
+    prnt("🔊 [VOLUME] Cell [%d,%d] volume set to %.2f", step, column, volume);
+    
+    // Debug: show what sample is in this cell
+    int sample_in_cell = g_sequencer_grid[step][column];
+    if (sample_in_cell >= 0) {
+        prnt("🔍 [DEBUG] Cell [%d,%d] contains sample %d", step, column, sample_in_cell);
+    } else {
+        prnt("🔍 [DEBUG] Cell [%d,%d] is empty", step, column);
+    }
+    return 0;
+}
+
+float get_cell_volume(int step, int column) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [VOLUME] Invalid step: %d", step);
+        return 0.0f;
+    }
+    
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [VOLUME] Invalid column: %d", column);
+        return 0.0f;
+    }
+    
+    float volume = g_sequencer_grid_volumes[step][column];
+    prnt("🔍 [DEBUG] Get cell [%d,%d] volume = %.2f", step, column, volume);
+    return volume;
 }
 
 // Cleanup function

@@ -136,111 +136,19 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
         onBack: () => Navigator.of(context).pop(),
         chatClient: _chatClient,
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final screenHeight = constraints.maxHeight;
-          final screenWidth = constraints.maxWidth;
-          
-          // EASY FOOTER SIZE CONTROL - Adjust this value for iPhone bottom clearance
-          const double footerPadding = 7.0; // Easy to adjust for different needs
-          
-          // EASY PERCENTAGE CONTROL - Adjust these values to redistribute space
-          const double multitaskPanelPercent = 20.0;    // 20%
-          const double sampleBanksPercent = 8.0;        // 8%
-          const double sampleGridPercent = 63.0;        // 63% - Main grid (increased)
-          const double editButtonsPercent = 9.0;        // 9%
-          
-          // Calculate spacing to distribute evenly
-          final totalContentPercent = multitaskPanelPercent + sampleBanksPercent + 
-                                    sampleGridPercent + editButtonsPercent;
-          final remainingPercent = 100.0 - totalContentPercent;
-          final singleSpacingPercent = remainingPercent / 5; // 5 spacing areas
-          
-          // Use screen height minus footer padding
-          final availableHeight = screenHeight - footerPadding;
-          
-          final multitaskPanelHeight = availableHeight * (multitaskPanelPercent / 100);
-          final sampleBanksHeight = availableHeight * (sampleBanksPercent / 100);
-          final sampleGridHeight = availableHeight * (sampleGridPercent / 100);
-          final editButtonsHeight = availableHeight * (editButtonsPercent / 100);
-          final spacingHeight = availableHeight * (singleSpacingPercent / 100);
-            
-            final totalUsedHeight = multitaskPanelHeight + spacingHeight + 
-                                  sampleBanksHeight + spacingHeight + sampleGridHeight + 
-                                  spacingHeight + editButtonsHeight + spacingHeight;
-            
-            final unusedHeight = screenHeight - totalUsedHeight;
-            final unusedPercentage = (unusedHeight / screenHeight) * 100;
-            
-            // Debug log of space allocation
-            debugPrint('📐 SEQUENCER HEIGHT ALLOCATION (AUTO-FILL):');
-            debugPrint('📱 Total Screen Height: ${screenHeight.toStringAsFixed(1)}px');
-            debugPrint('📐 Available Height: ${availableHeight.toStringAsFixed(1)}px (minus border padding)');
-            debugPrint('┌─ Multitask Panel: ${multitaskPanelHeight.toStringAsFixed(1)}px (${multitaskPanelPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Sample Banks: ${sampleBanksHeight.toStringAsFixed(1)}px (${sampleBanksPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Sample Grid: ${sampleGridHeight.toStringAsFixed(1)}px (${sampleGridPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Edit Buttons: ${editButtonsHeight.toStringAsFixed(1)}px (${editButtonsPercent.toStringAsFixed(1)}%)');
-            debugPrint('├─ Spacing: ${spacingHeight.toStringAsFixed(1)}px (${singleSpacingPercent.toStringAsFixed(1)}%)');
-            debugPrint('└─ Border: No padding - using full screen height');
-            debugPrint('🔢 Total Content: ${(totalContentPercent).toStringAsFixed(1)}%');
-            debugPrint('🔢 Total Used: ${totalUsedHeight.toStringAsFixed(1)}px (${((totalUsedHeight/screenHeight)*100).toStringAsFixed(1)}%)');
-            debugPrint('🆓 Unused Space: ${unusedHeight.toStringAsFixed(1)}px (${unusedPercentage.toStringAsFixed(1)}%)');
-            debugPrint('─────────────────────────────────────');
-            
-            return Column(
-              children: [
-                // Auto-calculated spacing
-                SizedBox(height: spacingHeight),
-                
-                // Multitask panel
-                SizedBox(
-                  height: multitaskPanelHeight,
-                  child: const MultitaskPanelWidget(),
-                ),
-                
-                // Auto-calculated spacing
-                SizedBox(height: spacingHeight),
-                
-                // Sample banks panel
-                SizedBox(
-                  height: sampleBanksHeight,
-                  child: const SampleBanksWidget(),
-                ),
-                
-                // Auto-calculated spacing
-                SizedBox(height: spacingHeight),
-                
-                // Sample grid
-                SizedBox(
-                  height: sampleGridHeight,
-                  child: const SampleGridWidget(),
-                ),
-                
-                // Auto-calculated spacing
-                SizedBox(height: spacingHeight),
-                
-                // Edit buttons panel
-                SizedBox(
-                  height: editButtonsHeight,
-                  child: const EditButtonsWidget(),
-                ),
-                
-                // Auto-calculated spacing (fills remaining space)
-                SizedBox(height: spacingHeight),
-                
-                // Footer container matching edit buttons style
-                Container(
-                  height: footerPadding,
-                  decoration: BoxDecoration(
-                    color: const Color.fromARGB(255, 244, 244, 244),
-                  ),
-                ),
-              ],
-            );
-        },
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(flex: 18, child: const MultitaskPanelWidget()),
+            const Spacer(flex: 1),
+            Expanded(flex: 7, child: const SampleBanksWidget()),
+            const Spacer(flex: 1),
+            Expanded(flex: 60, child: const SampleGridWidget()),
+            const Spacer(flex: 1),
+            Expanded(flex: 8, child: const EditButtonsWidget()),
+            const Spacer(flex: 3),
+          ],
+        ),
       ),
     );
   }

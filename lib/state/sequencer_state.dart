@@ -165,6 +165,17 @@ class SequencerState extends ChangeNotifier {
   bool _isShowingShareWidget = false;
   List<String> _localRecordings = []; // List of local recording file paths
 
+  // Sample settings widget state
+  bool _isShowingSampleSettings = false;
+  
+  // Cell settings widget state
+  bool _isShowingCellSettings = false;
+  int? _selectedCellForSettings;
+  
+  // Volume control state
+  late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
+  late List<double> _cellVolumes; // Individual cell volumes
+
   // Grid labeling system
   List<String> _soundGridLabels = [];
 
@@ -212,6 +223,10 @@ class SequencerState extends ChangeNotifier {
     _slotPlaying = List.filled(_slotCount, false);
     _soundGridSamples = []; // Will be initialized when sound grids are created
     _columnPlayingSample = List.filled(_gridColumns, null);
+    
+    // Initialize volume control arrays
+    _sampleVolumes = List.filled(_slotCount, 1.0); // Default to 100% volume
+    _cellVolumes = List.filled(_gridColumns * _gridRows, 1.0); // Default to 100% volume
     
     // Start autosave timer
     _startAutosave();
@@ -437,6 +452,9 @@ class SequencerState extends ChangeNotifier {
   bool get autosaveEnabled => _autosaveEnabled;
   bool get isSelectingSample => _isSelectingSample;
   bool get isShowingShareWidget => _isShowingShareWidget;
+  bool get isShowingSampleSettings => _isShowingSampleSettings;
+  bool get isShowingCellSettings => _isShowingCellSettings;
+  int? get selectedCellForSettings => _selectedCellForSettings;
   List<String> get localRecordings => List.unmodifiable(_localRecordings);
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
@@ -722,8 +740,9 @@ class SequencerState extends ChangeNotifier {
       // Empty slot - open sample browser
       pickFileForSlot(bankIndex, context);
     } else {
-      // Loaded slot - just update active bank for status display
+      // Loaded slot - update active bank and open sample settings
       _activeBank = bankIndex;
+      setShowSampleSettings(true);
       notifyListeners();
     }
   }
@@ -735,16 +754,27 @@ class SequencerState extends ChangeNotifier {
     }
     
     final now = DateTime.now();
+    final currentGrid = _getCurrentGridSamples();
+    final cellHasSample = padIndex < currentGrid.length && currentGrid[padIndex] != null;
     
     // Check for double-tap
     if (_lastTapTime != null && 
         _lastTappedCell == padIndex &&
         now.difference(_lastTapTime!) <= _doubleTapThreshold) {
-      // Double-tap detected - clear all selections and exit selection mode
-      _clearAllSelections();
-      _lastTapTime = null;
-      _lastTappedCell = null;
-      return;
+      // Double-tap detected
+      if (cellHasSample) {
+        // Double-tap on cell with sample - open cell settings
+        setSelectedCellForSettings(padIndex);
+        _lastTapTime = null;
+        _lastTappedCell = null;
+        return;
+      } else {
+        // Double-tap on empty cell - clear all selections and exit selection mode
+        _clearAllSelections();
+        _lastTapTime = null;
+        _lastTappedCell = null;
+        return;
+      }
     }
     
     // Update last tap info for double-tap detection
@@ -768,6 +798,11 @@ class SequencerState extends ChangeNotifier {
         _selectedGridCells.add(padIndex);
         _selectionStartCell = padIndex;
         _currentSelectionCell = padIndex;
+        
+        // Step 3: If cell has a sample, open cell settings menu
+        if (cellHasSample) {
+          setSelectedCellForSettings(padIndex);
+        }
       }
     } else {
       // In selection mode
@@ -776,6 +811,11 @@ class SequencerState extends ChangeNotifier {
         _selectedGridCells.add(padIndex);
         _selectionStartCell = padIndex;
         _currentSelectionCell = padIndex;
+        
+        // If cell has a sample, open cell settings menu
+        if (cellHasSample) {
+          setSelectedCellForSettings(padIndex);
+        }
       } else if (_selectedGridCells.contains(padIndex)) {
         // Tapping on an already selected cell - just remove the selection without adding new
         _selectedGridCells.clear();
@@ -787,6 +827,11 @@ class SequencerState extends ChangeNotifier {
         _selectedGridCells.add(padIndex);
         _selectionStartCell = padIndex;
         _currentSelectionCell = padIndex;
+        
+        // If cell has a sample, open cell settings menu
+        if (cellHasSample) {
+          setSelectedCellForSettings(padIndex);
+        }
       } else {
         // Multiple cells selected and tapping an unselected cell - clear all selections
         _selectedGridCells.clear();
@@ -1979,7 +2024,90 @@ Made with Demo Sequencer 🚀
   /// Show/hide share widget
   void setShowShareWidget(bool show) {
     _isShowingShareWidget = show;
+    // When showing share widget, hide other widgets
+    if (show) {
+      _isShowingSampleSettings = false;
+      _isShowingCellSettings = false;
+    }
     notifyListeners();
+  }
+
+  /// Show/hide sample settings widget
+  void setShowSampleSettings(bool show) {
+    _isShowingSampleSettings = show;
+    // When showing sample settings, hide other widgets
+    if (show) {
+      _isShowingShareWidget = false;
+      _isShowingCellSettings = false;
+    }
+    notifyListeners();
+  }
+
+  /// Show/hide cell settings widget
+  void setShowCellSettings(bool show) {
+    _isShowingCellSettings = show;
+    // When showing cell settings, hide other widgets
+    if (show) {
+      _isShowingShareWidget = false;
+      _isShowingSampleSettings = false;
+    }
+    notifyListeners();
+  }
+
+  /// Set selected cell for settings
+  void setSelectedCellForSettings(int? cellIndex) {
+    _selectedCellForSettings = cellIndex;
+    if (cellIndex != null) {
+      setShowCellSettings(true);
+    }
+    notifyListeners();
+  }
+
+  /// Get sample volume (0.0 to 1.0)
+  double getSampleVolume(int sampleIndex) {
+    if (sampleIndex >= 0 && sampleIndex < _sampleVolumes.length) {
+      return _sampleVolumes[sampleIndex];
+    }
+    return 1.0; // Default volume
+  }
+
+  /// Set sample volume (0.0 to 1.0)
+  void setSampleVolume(int sampleIndex, double volume) {
+    if (sampleIndex >= 0 && sampleIndex < _sampleVolumes.length) {
+      final clampedVolume = volume.clamp(0.0, 1.0);
+      _sampleVolumes[sampleIndex] = clampedVolume;
+      
+      // Apply volume to native audio engine
+      _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
+      
+      notifyListeners();
+    }
+  }
+
+  /// Get cell volume (0.0 to 1.0)
+  double getCellVolume(int cellIndex) {
+    if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
+      return _cellVolumes[cellIndex];
+    }
+    return 1.0; // Default volume
+  }
+
+  /// Set cell volume (0.0 to 1.0)
+  void setCellVolume(int cellIndex, double volume) {
+    if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
+      final clampedVolume = volume.clamp(0.0, 1.0);
+      _cellVolumes[cellIndex] = clampedVolume;
+      
+      // Convert cellIndex to step and column for native call
+      final row = cellIndex ~/ _gridColumns;
+      final col = cellIndex % _gridColumns;
+      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+      
+      // Store volume in native grid - will be applied when cell is triggered
+      _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
+      
+      notifyListeners();
+    }
   }
 
   /// Add a recording to local storage

@@ -392,6 +392,71 @@ class SequencerBindings {
   late final _get_available_memory_capacity =
       _get_available_memory_capacityPtr.asFunction<int Function()>();
 
+  /// Volume control functions
+  int set_sample_bank_volume(
+    int bank,
+    double volume,
+  ) {
+    return _set_sample_bank_volume(
+      bank,
+      volume,
+    );
+  }
+
+  late final _set_sample_bank_volumePtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Float)>>(
+          'set_sample_bank_volume');
+  late final _set_sample_bank_volume =
+      _set_sample_bank_volumePtr.asFunction<int Function(int, double)>();
+
+  double get_sample_bank_volume(
+    int bank,
+  ) {
+    return _get_sample_bank_volume(
+      bank,
+    );
+  }
+
+  late final _get_sample_bank_volumePtr =
+      _lookup<ffi.NativeFunction<ffi.Float Function(ffi.Int)>>(
+          'get_sample_bank_volume');
+  late final _get_sample_bank_volume =
+      _get_sample_bank_volumePtr.asFunction<double Function(int)>();
+
+  int set_cell_volume(
+    int step,
+    int column,
+    double volume,
+  ) {
+    return _set_cell_volume(
+      step,
+      column,
+      volume,
+    );
+  }
+
+  late final _set_cell_volumePtr = _lookup<
+          ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int, ffi.Float)>>(
+      'set_cell_volume');
+  late final _set_cell_volume =
+      _set_cell_volumePtr.asFunction<int Function(int, int, double)>();
+
+  double get_cell_volume(
+    int step,
+    int column,
+  ) {
+    return _get_cell_volume(
+      step,
+      column,
+    );
+  }
+
+  late final _get_cell_volumePtr =
+      _lookup<ffi.NativeFunction<ffi.Float Function(ffi.Int, ffi.Int)>>(
+          'get_cell_volume');
+  late final _get_cell_volume =
+      _get_cell_volumePtr.asFunction<double Function(int, int)>();
+
   /// Output recording/rendering functions (captures mixed grid output to WAV file)
   int start_recording(
     ffi.Pointer<ffi.Char> output_file_path,

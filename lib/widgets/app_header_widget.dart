@@ -231,10 +231,10 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
               
-              // Play/Pause button
+              // Play/Stop button (changed from Play/Pause)
               IconButton(
                 icon: Icon(
-                  sequencer.isSequencerPlaying ? Icons.pause : Icons.play_arrow,
+                  sequencer.isSequencerPlaying ? Icons.stop : Icons.play_arrow,
                   color: Colors.greenAccent,
                 ),
                 onPressed: () {
@@ -248,16 +248,6 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                 padding: const EdgeInsets.all(4),
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               ),
-              
-              // Stop button (only show when playing)
-              if (sequencer.isSequencerPlaying)
-                IconButton(
-                  icon: const Icon(Icons.stop, color: Colors.redAccent),
-                  onPressed: () => sequencer.stopSequencer(),
-                  iconSize: 16,
-                  padding: const EdgeInsets.all(4),
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                ),
             ],
           );
         },

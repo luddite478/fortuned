@@ -114,6 +114,9 @@ COLLECTIONS_CONFIG = {
                                                                     "sample": {
                                                                         "sample_id": "string (UUID)",
                                                                         "sample_name": "string"
+                                                                    },
+                                                                    "settings": {
+                                                                        "volume": "number (0.0 to 1.0) | null"
                                                                     }
                                                                 }
                                                             ]
@@ -135,7 +138,10 @@ COLLECTIONS_CONFIG = {
                                             "id": "string (UUID)",
                                             "name": "string",
                                             "url": "string",
-                                            "is_public": "boolean"
+                                            "is_public": "boolean",
+                                            "settings": {
+                                                "volume": "number (0.0 to 1.0)"
+                                            }
                                         }
                                     ]
                                 }
@@ -181,7 +187,10 @@ COLLECTIONS_CONFIG = {
             "is_public": "boolean",
             "created_at": "datetime",
             "plays_num": "number",
-            "likes_num": "number"
+            "likes_num": "number",
+            "settings": {
+                "volume": "number (0.0 to 1.0)"
+            }
         }
     }
 }

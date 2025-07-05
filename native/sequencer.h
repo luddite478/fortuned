@@ -113,6 +113,16 @@ uint64_t get_max_total_memory_usage(void);
 __attribute__((visibility("default"))) __attribute__((used))
 uint64_t get_available_memory_capacity(void);
 
+// Volume control functions
+__attribute__((visibility("default"))) __attribute__((used))
+int set_sample_bank_volume(int bank, float volume);
+__attribute__((visibility("default"))) __attribute__((used))
+float get_sample_bank_volume(int bank);
+__attribute__((visibility("default"))) __attribute__((used))
+int set_cell_volume(int step, int column, float volume);
+__attribute__((visibility("default"))) __attribute__((used))
+float get_cell_volume(int step, int column);
+
 // Output recording/rendering functions (captures mixed grid output to WAV file)
 __attribute__((visibility("default"))) __attribute__((used))
 int start_recording(const char* output_file_path);

@@ -398,4 +398,54 @@ class SequencerLibrary {
     _bindings.set_columns(columns);
     print('🎛️ Set sequencer columns to $columns');
   }
+
+  // -------------- VOLUME CONTROL FUNCTIONS --------------
+  
+  /// Set volume for a specific sample bank (0.0 to 1.0)
+  bool setSampleBankVolume(int bank, double volume) {
+    if (volume < 0.0 || volume > 1.0) {
+      print('❌ Invalid volume: $volume (must be 0.0-1.0)');
+      return false;
+    }
+    
+    int result = _bindings.set_sample_bank_volume(bank, volume);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🔊 Sample bank $bank volume set to ${(volume * 100).toInt()}%');
+    } else {
+      print('❌ Failed to set sample bank $bank volume');
+    }
+    
+    return success;
+  }
+  
+  /// Get volume for a specific sample bank
+  double getSampleBankVolume(int bank) {
+    return _bindings.get_sample_bank_volume(bank);
+  }
+  
+  /// Set volume for a specific cell (0.0 to 1.0)
+  bool setCellVolume(int step, int column, double volume) {
+    if (volume < 0.0 || volume > 1.0) {
+      print('❌ Invalid volume: $volume (must be 0.0-1.0)');
+      return false;
+    }
+    
+    int result = _bindings.set_cell_volume(step, column, volume);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🔊 Cell [$step,$column] volume set to ${(volume * 100).toInt()}%');
+    } else {
+      print('❌ Failed to set cell [$step,$column] volume');
+    }
+    
+    return success;
+  }
+  
+  /// Get volume for a specific cell
+  double getCellVolume(int step, int column) {
+    return _bindings.get_cell_volume(step, column);
+  }
 } 

@@ -242,10 +242,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       cellColor = Colors.white.withOpacity(0.3);
     } else if (isCurrentStep) {
       cellColor = hasPlacedSample 
-          ? sequencer.bankColors[placedSample!].withOpacity(0.4)
+          ? sequencer.bankColors[placedSample!].withOpacity(0.6)
           : Colors.grey.withOpacity(0.3);
     } else if (hasPlacedSample) {
-      cellColor = sequencer.bankColors[placedSample!].withOpacity(0.3);
+      cellColor = sequencer.bankColors[placedSample!].withOpacity(0.6);
     } else {
       cellColor = const Color(0xFF404040).withOpacity(0.2);
     }
