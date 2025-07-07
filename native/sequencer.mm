@@ -82,28 +82,82 @@ typedef struct {
     ma_uint32 target_sample_rate;  // Calculated from pitch ratio
 } ma_pitch_data_source;
 
-// Simplified slot structure - uses ma_decoder for both file and memory
+// Pitch data source vtable is defined later in the file
+
+// Audio slot structure - separate systems for different playback scenarios
 typedef struct {
-    ma_decoder decoder;        // Single decoder handles both file and memory
+    // Shared sample data
     void* memory_data;         // NULL for file mode, allocated buffer for memory mode
     size_t memory_size;        // 0 for file mode, actual size for memory mode
-    int active;
-    int at_end;
     int loaded;
     char* file_path;
-
-    // Node-graph specific members.
-    ma_data_source_node node;   // Node wrapping this decoder for graph-based mixing.
-    int node_initialized;       // 1 when the node has been successfully initialised and attached.
+    
+    // Sample bank playback (when user clicks play on a sample bank)
+    ma_decoder sample_bank_decoder;        // Independent decoder for sample bank playback
+    ma_pitch_data_source sample_bank_pitch_ds; // Pitch data source for sample bank playback
+    ma_data_source_node sample_bank_node;  // Node for sample bank playback
+    int sample_bank_node_initialized;      // 1 when sample bank node is initialized
+    int sample_bank_pitch_ds_initialized;  // 1 when sample bank pitch data source is initialized
+    int sample_bank_active;                // 1 when sample bank is playing
+    int sample_bank_at_end;                // 1 when sample bank playback finished
+    
+    // Sequencer grid playback (automated sequencer triggers)
+    ma_decoder sequencer_decoder;     // Independent decoder for sequencer
+    ma_pitch_data_source sequencer_pitch_ds; // Pitch data source for sequencer playback
+    ma_data_source_node sequencer_node; // Node for sequencer playback
+    int sequencer_node_initialized;   // 1 when sequencer node is initialized
+    int sequencer_pitch_ds_initialized; // 1 when sequencer pitch data source is initialized
+    int sequencer_active;             // 1 when sequencer is playing this slot
+    int sequencer_at_end;             // 1 when sequencer playback finished
     
     // Volume control
     float volume;              // Sample bank volume (0.0 to 1.0)
     
     // Pitch control
     float pitch;               // Sample bank pitch (0.03125 to 32.0, 1.0 = normal, covers C0-C10)
-    ma_pitch_data_source pitch_ds; // Pitch data source wrapper
-    int pitch_ds_initialized;  // 1 when pitch data source is initialized
 } audio_slot_t;
+
+// Global preview systems (separate from sample banks)
+typedef struct {
+    ma_decoder decoder;
+    ma_pitch_data_source pitch_ds;
+    ma_data_source_node node;
+    int node_initialized;
+    int pitch_ds_initialized;
+    int active;
+    char* file_path;
+} preview_system_t;
+
+// Global preview instances
+static preview_system_t g_sample_preview;  // For previewing samples before adding to banks
+static preview_system_t g_cell_preview;    // For previewing individual grid cells
+
+// Preview system helper functions
+static void cleanup_preview_system(preview_system_t* preview) {
+    if (preview->node_initialized) {
+        ma_data_source_node_uninit(&preview->node, NULL);
+        preview->node_initialized = 0;
+    }
+    
+    if (preview->pitch_ds_initialized) {
+        // Clean up resampler if initialized
+        if (preview->pitch_ds.resampler_initialized) {
+            ma_resampler_uninit(&preview->pitch_ds.resampler, NULL);
+            preview->pitch_ds.resampler_initialized = 0;
+        }
+        ma_data_source_uninit(&preview->pitch_ds.ds);
+        preview->pitch_ds_initialized = 0;
+    }
+    
+    ma_decoder_uninit(&preview->decoder);
+    
+    if (preview->file_path) {
+        free(preview->file_path);
+        preview->file_path = NULL;
+    }
+    
+    preview->active = 0;
+}
 
 static ma_device g_device;
 // Node graph which will handle mixing of all slot nodes.
@@ -121,6 +175,28 @@ static uint64_t g_total_frames_written = 0;
 // Sequencer state
 #define MAX_SEQUENCER_STEPS 32
 #define MAX_TOTAL_COLUMNS 64
+#define MAX_ACTIVE_CELL_NODES 512  // Maximum number of simultaneously active cell nodes
+
+// Individual cell node structure - each active cell gets its own audio node
+typedef struct {
+    int active;                        // 1 if this cell node is currently active
+    int step;                          // Grid position (step)
+    int column;                        // Grid position (column)
+    int sample_slot;                   // Which sample this cell plays
+    
+    ma_decoder decoder;                // Independent decoder for this cell
+    ma_pitch_data_source pitch_ds;     // Cell-specific pitch control
+    ma_data_source_node node;          // Individual node in graph
+    int node_initialized;              // 1 when node is initialized
+    int pitch_ds_initialized;          // 1 when pitch data source is initialized
+    
+    float volume;                      // Cell-specific volume
+    float pitch;                       // Cell-specific pitch
+    
+    uint64_t start_frame;              // When playback started (for lifecycle tracking)
+    uint64_t id;                       // Unique ID for this cell node instance
+} cell_node_t;
+
 static int g_sequencer_playing = 0;
 static int g_sequencer_bpm = 120;
 static int g_sequencer_steps = 16;
@@ -131,10 +207,164 @@ static float g_sequencer_grid_volumes[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; /
 static float g_sequencer_grid_pitches[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = pitch (0.03125 to 32.0, 1.0 = normal, covers C0-C10)
 static uint64_t g_frames_per_step = 0;
 static uint64_t g_step_frame_counter = 0;
-static int g_column_playing_sample[MAX_TOTAL_COLUMNS]; // Track which sample is playing in each column
 static int g_step_just_changed = 0; // Flag to handle immediate step playback
 
+// Per-cell node management
+static cell_node_t g_cell_nodes[MAX_ACTIVE_CELL_NODES];  // Pool of cell nodes
+static uint64_t g_next_cell_node_id = 1;                 // Unique ID counter for cell nodes
+static uint64_t g_current_frame = 0;                     // Global frame counter for lifecycle tracking
+
 // Note: Thread safety removed for simplicity - miniaudio handles internal synchronization
+
+// Forward declarations for pitch data source functions
+static ma_result ma_pitch_data_source_init(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate);
+static void ma_pitch_data_source_uninit(ma_pitch_data_source* pPitch);
+static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, float pitchRatio);
+
+// Cell node management functions
+static cell_node_t* find_available_cell_node(void) {
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (!g_cell_nodes[i].active) {
+            return &g_cell_nodes[i];
+        }
+    }
+    prnt_err("🔴 [CELL NODES] No available cell nodes! Consider increasing MAX_ACTIVE_CELL_NODES");
+    return NULL;
+}
+
+static void cleanup_cell_node(cell_node_t* cell) {
+    if (!cell || !cell->active) return;
+    
+    prnt("🗑️ [CELL NODE] Cleaning up cell [%d,%d] with sample %d (ID: %llu)", 
+         cell->step, cell->column, cell->sample_slot, cell->id);
+    
+    // Cleanup node (detach first, then uninit)
+    if (cell->node_initialized) {
+        // Detach the node from the graph before uninitializing
+        ma_node_detach_output_bus(&cell->node, 0);
+        ma_data_source_node_uninit(&cell->node, NULL);
+        cell->node_initialized = 0;
+    }
+    
+    // Cleanup pitch data source
+    if (cell->pitch_ds_initialized) {
+        ma_pitch_data_source_uninit(&cell->pitch_ds);
+        cell->pitch_ds_initialized = 0;
+    }
+    
+    // Cleanup decoder
+    ma_decoder_uninit(&cell->decoder);
+    
+    // Reset cell state
+    memset(cell, 0, sizeof(cell_node_t));
+}
+
+static cell_node_t* create_cell_node(int step, int column, int sample_slot, float volume, float pitch) {
+    if (sample_slot < 0 || sample_slot >= MAX_SLOTS) {
+        prnt_err("🔴 [CELL NODE] Invalid sample slot: %d", sample_slot);
+        return NULL;
+    }
+    
+    audio_slot_t* sample = &g_slots[sample_slot];
+    if (!sample->loaded || !sample->file_path) {
+        prnt_err("🔴 [CELL NODE] Sample %d not loaded or missing file path", sample_slot);
+        return NULL;
+    }
+    
+    cell_node_t* cell = find_available_cell_node();
+    if (!cell) return NULL;
+    
+    // Initialize cell metadata
+    cell->active = 1;
+    cell->step = step;
+    cell->column = column;
+    cell->sample_slot = sample_slot;
+    cell->volume = volume;
+    cell->pitch = pitch;
+    cell->start_frame = g_current_frame;
+    cell->id = g_next_cell_node_id++;
+    
+    ma_result result;
+    
+    // Configure decoder properly with format, channels, and sample rate
+    ma_decoder_config decoderConfig = ma_decoder_config_init(SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
+    
+    // Initialize decoder from sample file or memory
+    if (sample->memory_data) {
+        result = ma_decoder_init_memory(sample->memory_data, sample->memory_size, &decoderConfig, &cell->decoder);
+    } else {
+        result = ma_decoder_init_file(sample->file_path, &decoderConfig, &cell->decoder);
+    }
+    
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [CELL NODE] Failed to initialize decoder for sample %d: %d", sample_slot, result);
+        cleanup_cell_node(cell);
+        return NULL;
+    }
+    
+    // Initialize pitch data source around decoder (decoder → pitch_data_source)
+    result = ma_pitch_data_source_init(&cell->pitch_ds, &cell->decoder, pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [CELL NODE] Failed to initialize pitch data source: %d", result);
+        ma_decoder_uninit(&cell->decoder);
+        cleanup_cell_node(cell);
+        return NULL;
+    }
+    cell->pitch_ds_initialized = 1;
+    
+    // Initialize data source node from pitch data source (pitch_data_source → data_source_node)
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&cell->pitch_ds);
+    
+    result = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &cell->node);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [CELL NODE] Failed to initialize node: %d", result);
+        ma_pitch_data_source_uninit(&cell->pitch_ds);
+        cell->pitch_ds_initialized = 0;
+        ma_decoder_uninit(&cell->decoder);
+        cleanup_cell_node(cell);
+        return NULL;
+    }
+    cell->node_initialized = 1;
+    
+    // Connect the node to the node graph endpoint (this is crucial!)
+    ma_node_attach_output_bus(&cell->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    
+    // Set volume
+    ma_node_set_output_bus_volume(&cell->node, 0, volume);
+    
+    prnt("✅ [CELL NODE] Created cell [%d,%d] with sample %d (vol: %.2f, pitch: %.2f, ID: %llu)", 
+         step, column, sample_slot, volume, pitch, cell->id);
+    
+    return cell;
+}
+
+static void cleanup_finished_cell_nodes(void) {
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        cell_node_t* cell = &g_cell_nodes[i];
+        if (!cell->active) continue;
+        
+        // Check if playback has finished
+        ma_bool32 at_end = MA_FALSE;
+        if (cell->node_initialized && cell->pitch_ds_initialized) {
+            // Check decoder position through the original data source
+            ma_uint64 cursor;
+            ma_result result = ma_decoder_get_cursor_in_pcm_frames(&cell->decoder, &cursor);
+            if (result == MA_SUCCESS) {
+                ma_uint64 length;
+                result = ma_decoder_get_length_in_pcm_frames(&cell->decoder, &length);
+                if (result == MA_SUCCESS && length > 0) {
+                    at_end = (cursor >= length);
+                }
+            }
+        }
+        
+        if (at_end) {
+            prnt("🏁 [CELL NODE] Cell [%d,%d] finished playing (ID: %llu)", 
+                 cell->step, cell->column, cell->id);
+            cleanup_cell_node(cell);
+        }
+    }
+}
 
 // Helper function to load entire audio file into memory buffer
 static int load_file_to_memory_buffer(const char* file_path, void** memory_data, size_t* memory_size) {
@@ -490,11 +720,22 @@ static int load_sound_to_memory(audio_slot_t* slot, const char* file_path, ma_de
         return -1;
     }
     
-    // Create decoder from memory
-    ma_result ma_res = ma_decoder_init_memory(slot->memory_data, slot->memory_size, config, &slot->decoder);
-    if (ma_res != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to create decoder from memory for slot %d: %s", 
-                 slot_index, ma_result_description(ma_res));
+    // Create dual decoders from memory (one for sample bank, one for sequencer)
+    ma_result ma_res_sample_bank = ma_decoder_init_memory(slot->memory_data, slot->memory_size, config, &slot->sample_bank_decoder);
+    if (ma_res_sample_bank != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create sample bank decoder from memory for slot %d: %s", 
+                 slot_index, ma_result_description(ma_res_sample_bank));
+        free(slot->memory_data);
+        slot->memory_data = NULL;
+        slot->memory_size = 0;
+        return -1;
+    }
+    
+    ma_result ma_res_sequencer = ma_decoder_init_memory(slot->memory_data, slot->memory_size, config, &slot->sequencer_decoder);
+    if (ma_res_sequencer != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create sequencer decoder from memory for slot %d: %s", 
+                 slot_index, ma_result_description(ma_res_sequencer));
+        ma_decoder_uninit(&slot->sample_bank_decoder);
         free(slot->memory_data);
         slot->memory_data = NULL;
         slot->memory_size = 0;
@@ -510,48 +751,90 @@ static int load_sound_to_memory(audio_slot_t* slot, const char* file_path, ma_de
     slot->volume = 1.0f;             // Default volume (full)
     
     // -------------------------------------------------------------
-    // Initialize pitch data source wrapper around the decoder
+    // Initialize pitch data sources for both sample bank and sequencer
     // -------------------------------------------------------------
-    ma_result pitchRes = ma_pitch_data_source_init(&slot->pitch_ds, &slot->decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
-    if (pitchRes != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to initialize pitch data source for slot %d: %s", slot_index, ma_result_description(pitchRes));
+    ma_result pitchRes_sample_bank = ma_pitch_data_source_init(&slot->sample_bank_pitch_ds, &slot->sample_bank_decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (pitchRes_sample_bank != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize sample bank pitch data source for slot %d: %s", slot_index, ma_result_description(pitchRes_sample_bank));
         // Roll back everything
         slot->loaded = 0;
         g_total_memory_used -= slot->memory_size;
-        ma_decoder_uninit(&slot->decoder);
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
         free(slot->memory_data);
         slot->memory_data = NULL;
         slot->memory_size = 0;
         return -1;
     }
-    slot->pitch_ds_initialized = 1;
+    slot->sample_bank_pitch_ds_initialized = 1;
     
-    // -------------------------------------------------------------
-    // Create a data_source_node for this pitch data source and attach it to
-    // the graph endpoint. The node starts muted (volume 0) and will
-    // be unmuted when the slot is explicitly played.
-    // -------------------------------------------------------------
-    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->pitch_ds);
-    ma_result nodeRes = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &slot->node);
-    if (nodeRes != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to create data source node for slot %d: %s", slot_index, ma_result_description(nodeRes));
+    ma_result pitchRes_sequencer = ma_pitch_data_source_init(&slot->sequencer_pitch_ds, &slot->sequencer_decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (pitchRes_sequencer != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize sequencer pitch data source for slot %d: %s", slot_index, ma_result_description(pitchRes_sequencer));
         // Roll back everything
         slot->loaded = 0;
         g_total_memory_used -= slot->memory_size;
-        ma_pitch_data_source_uninit(&slot->pitch_ds);
-        slot->pitch_ds_initialized = 0;
-        ma_decoder_uninit(&slot->decoder);
+        ma_pitch_data_source_uninit(&slot->sample_bank_pitch_ds);
+        slot->sample_bank_pitch_ds_initialized = 0;
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
+        free(slot->memory_data);
+        slot->memory_data = NULL;
+        slot->memory_size = 0;
+        return -1;
+    }
+    slot->sequencer_pitch_ds_initialized = 1;
+    
+    // -------------------------------------------------------------
+    // Create data source nodes for both systems
+    // -------------------------------------------------------------
+    ma_data_source_node_config nodeConfig_sample_bank = ma_data_source_node_config_init(&slot->sample_bank_pitch_ds);
+    ma_result nodeRes_sample_bank = ma_data_source_node_init(&g_nodeGraph, &nodeConfig_sample_bank, NULL, &slot->sample_bank_node);
+    if (nodeRes_sample_bank != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create sample bank data source node for slot %d: %s", slot_index, ma_result_description(nodeRes_sample_bank));
+        // Roll back everything
+        slot->loaded = 0;
+        g_total_memory_used -= slot->memory_size;
+        ma_pitch_data_source_uninit(&slot->sample_bank_pitch_ds);
+        slot->sample_bank_pitch_ds_initialized = 0;
+        ma_pitch_data_source_uninit(&slot->sequencer_pitch_ds);
+        slot->sequencer_pitch_ds_initialized = 0;
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
         free(slot->memory_data);
         slot->memory_data = NULL;
         slot->memory_size = 0;
         return -1;
     }
 
-    // Attach output bus 0 of this node to the endpoint (input bus 0)
-    ma_node_attach_output_bus(&slot->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
-    // Start muted
-    ma_node_set_output_bus_volume(&slot->node, 0, 0.0f);
-    slot->node_initialized = 1;
+    ma_data_source_node_config nodeConfig_sequencer = ma_data_source_node_config_init(&slot->sequencer_pitch_ds);
+    ma_result nodeRes_sequencer = ma_data_source_node_init(&g_nodeGraph, &nodeConfig_sequencer, NULL, &slot->sequencer_node);
+    if (nodeRes_sequencer != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create sequencer data source node for slot %d: %s", slot_index, ma_result_description(nodeRes_sequencer));
+        // Roll back everything
+        slot->loaded = 0;
+        g_total_memory_used -= slot->memory_size;
+        ma_data_source_node_uninit(&slot->sample_bank_node, NULL);
+        ma_pitch_data_source_uninit(&slot->sample_bank_pitch_ds);
+        slot->sample_bank_pitch_ds_initialized = 0;
+        ma_pitch_data_source_uninit(&slot->sequencer_pitch_ds);
+        slot->sequencer_pitch_ds_initialized = 0;
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
+        free(slot->memory_data);
+        slot->memory_data = NULL;
+        slot->memory_size = 0;
+        return -1;
+    }
+
+    // Attach both nodes to the endpoint (both start muted)
+    ma_node_attach_output_bus(&slot->sample_bank_node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&slot->sample_bank_node, 0, 0.0f);
+    slot->sample_bank_node_initialized = 1;
+    
+    ma_node_attach_output_bus(&slot->sequencer_node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&slot->sequencer_node, 0, 0.0f);
+    slot->sequencer_node_initialized = 1;
     
     prnt("✅ [MINIAUDIO] Slot %d loaded to memory (%.2f MB) [%d/%d memory slots, %.2f/%.2f MB total]", 
          slot_index, slot->memory_size / (1024.0 * 1024.0),
@@ -563,10 +846,19 @@ static int load_sound_to_memory(audio_slot_t* slot, const char* file_path, ma_de
 }
 
 static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_decoder_config* config, int slot_index) {
-    ma_result ma_res = ma_decoder_init_file(file_path, config, &slot->decoder);
-    if (ma_res != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to initialize decoder for slot %d: %s", 
-                 slot_index, ma_result_description(ma_res));
+    // Initialize dual decoders from the same file
+    ma_result ma_res_sample_bank = ma_decoder_init_file(file_path, config, &slot->sample_bank_decoder);
+    if (ma_res_sample_bank != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize sample bank decoder for slot %d: %s", 
+                 slot_index, ma_result_description(ma_res_sample_bank));
+        return -1;
+    }
+    
+    ma_result ma_res_sequencer = ma_decoder_init_file(file_path, config, &slot->sequencer_decoder);
+    if (ma_res_sequencer != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize sequencer decoder for slot %d: %s", 
+                 slot_index, ma_result_description(ma_res_sequencer));
+        ma_decoder_uninit(&slot->sample_bank_decoder);
         return -1;
     }
     
@@ -576,76 +868,79 @@ static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_de
     slot->pitch = 1.0f;              // Default pitch (no change)
     slot->volume = 1.0f;             // Default volume (full)
     
-    // Initialize pitch data source wrapper
-    ma_result pitchRes = ma_pitch_data_source_init(&slot->pitch_ds, &slot->decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
-    if (pitchRes != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to initialize pitch data source for slot %d (streaming): %s", slot_index, ma_result_description(pitchRes));
-        ma_decoder_uninit(&slot->decoder);
+    // Initialize dual pitch data source wrappers
+    ma_result pitchRes_sample_bank = ma_pitch_data_source_init(&slot->sample_bank_pitch_ds, &slot->sample_bank_decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (pitchRes_sample_bank != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize sample bank pitch data source for slot %d (streaming): %s", slot_index, ma_result_description(pitchRes_sample_bank));
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
         slot->loaded = 0;
         return -1;
     }
-    slot->pitch_ds_initialized = 1;
+    slot->sample_bank_pitch_ds_initialized = 1;
     
-    // Create and attach data source node to the graph (muted initially)
-    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->pitch_ds);
-    ma_result nodeRes = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &slot->node);
-    if (nodeRes != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to create data source node for slot %d (streaming): %s", slot_index, ma_result_description(nodeRes));
-        ma_pitch_data_source_uninit(&slot->pitch_ds);
-        slot->pitch_ds_initialized = 0;
-        ma_decoder_uninit(&slot->decoder);
+    ma_result pitchRes_sequencer = ma_pitch_data_source_init(&slot->sequencer_pitch_ds, &slot->sequencer_decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (pitchRes_sequencer != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize sequencer pitch data source for slot %d (streaming): %s", slot_index, ma_result_description(pitchRes_sequencer));
+        ma_pitch_data_source_uninit(&slot->sample_bank_pitch_ds);
+        slot->sample_bank_pitch_ds_initialized = 0;
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
         slot->loaded = 0;
         return -1;
     }
-    ma_node_attach_output_bus(&slot->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
-    ma_node_set_output_bus_volume(&slot->node, 0, 0.0f);
-    slot->node_initialized = 1;
+    slot->sequencer_pitch_ds_initialized = 1;
     
-    prnt("✅ [MINIAUDIO] Slot %d loaded for streaming", slot_index);
+    // Create and attach data source nodes to the graph (both muted initially)
+    ma_data_source_node_config nodeConfig_sample_bank = ma_data_source_node_config_init(&slot->sample_bank_pitch_ds);
+    ma_result nodeRes_sample_bank = ma_data_source_node_init(&g_nodeGraph, &nodeConfig_sample_bank, NULL, &slot->sample_bank_node);
+    if (nodeRes_sample_bank != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create sample bank data source node for slot %d (streaming): %s", slot_index, ma_result_description(nodeRes_sample_bank));
+        ma_pitch_data_source_uninit(&slot->sample_bank_pitch_ds);
+        slot->sample_bank_pitch_ds_initialized = 0;
+        ma_pitch_data_source_uninit(&slot->sequencer_pitch_ds);
+        slot->sequencer_pitch_ds_initialized = 0;
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
+        slot->loaded = 0;
+        return -1;
+    }
+    
+    ma_data_source_node_config nodeConfig_sequencer = ma_data_source_node_config_init(&slot->sequencer_pitch_ds);
+    ma_result nodeRes_sequencer = ma_data_source_node_init(&g_nodeGraph, &nodeConfig_sequencer, NULL, &slot->sequencer_node);
+    if (nodeRes_sequencer != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to create sequencer data source node for slot %d (streaming): %s", slot_index, ma_result_description(nodeRes_sequencer));
+        ma_data_source_node_uninit(&slot->sample_bank_node, NULL);
+        ma_pitch_data_source_uninit(&slot->sample_bank_pitch_ds);
+        slot->sample_bank_pitch_ds_initialized = 0;
+        ma_pitch_data_source_uninit(&slot->sequencer_pitch_ds);
+        slot->sequencer_pitch_ds_initialized = 0;
+        ma_decoder_uninit(&slot->sample_bank_decoder);
+        ma_decoder_uninit(&slot->sequencer_decoder);
+        slot->loaded = 0;
+        return -1;
+    }
+    
+    // Attach both nodes to the endpoint (both start muted)
+    ma_node_attach_output_bus(&slot->sample_bank_node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&slot->sample_bank_node, 0, 0.0f);
+    slot->sample_bank_node_initialized = 1;
+    
+    ma_node_attach_output_bus(&slot->sequencer_node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&slot->sequencer_node, 0, 0.0f);
+    slot->sequencer_node_initialized = 1;
+    
+    prnt("✅ [MINIAUDIO] Slot %d loaded for streaming with sample bank + sequencer nodes", slot_index);
     return 0;
 }
 
-// Mix one slot into the output buffer
-static void mix_slot_audio(audio_slot_t* slot, float* output, ma_uint32 frameCount) {
-    static float temp[4096];
-    static const ma_uint32 tempCapInFrames = sizeof(temp) / sizeof(float) / CHANNEL_COUNT;
-    
-    ma_uint32 totalFramesRead = 0;
-    while (totalFramesRead < frameCount) {
-        ma_uint32 framesToRead = tempCapInFrames;
-        if (framesToRead > frameCount - totalFramesRead) {
-            framesToRead = frameCount - totalFramesRead;
-        }
 
-        ma_uint64 framesReadThisIteration = 0;
-        ma_result result = ma_decoder_read_pcm_frames(&slot->decoder, temp, framesToRead, &framesReadThisIteration);
-        
-        // Check for end of audio or error
-        if (result != MA_SUCCESS || framesReadThisIteration == 0) {
-            slot->at_end = 1;
-            break;
-        }
 
-        // Mix by summing samples (official miniaudio approach)
-        for (ma_uint64 i = 0; i < framesReadThisIteration * CHANNEL_COUNT; ++i) {
-            output[totalFramesRead * CHANNEL_COUNT + i] += temp[i];
-        }
-        
-        totalFramesRead += (ma_uint32)framesReadThisIteration;
-
-        // Check if we reached end of file
-        if (framesReadThisIteration < framesToRead) {
-            slot->at_end = 1;
-            break;
-        }
-    }
-}
-
-// Play all samples that should trigger on this step across all columns
+// Play all samples that should trigger on this step across all columns (NEW: Per-cell nodes)
 static void play_samples_for_step(int step) {
     if (step < 0 || step >= g_sequencer_steps) return;
     
-    prnt("🎵 [SEQUENCER] Playing step %d across %d columns", step, g_columns);
+    prnt("🎵 [SEQUENCER] Playing step %d across %d columns (per-cell nodes)", step, g_columns);
     
     // Process all columns (which represent all UI grids concatenated horizontally)
     for (int column = 0; column < g_columns; column++) {
@@ -654,73 +949,30 @@ static void play_samples_for_step(int step) {
         // Is there a sample in this grid cell?
         if (sample_to_play >= 0 && sample_to_play < MAX_SLOTS) {
             audio_slot_t* sample = &g_slots[sample_to_play];
-            if (sample->loaded && sample->node_initialized) {
-                // prnt("🎹 [SEQUENCER] Step %d, Column %d: Want sample %d, Currently playing: %d", 
-                //      step, column, sample_to_play, g_column_playing_sample[column]);
+            if (sample->loaded) {
+                // Volume logic: cell volume overrides sample bank volume when set
+                float bank_volume = sample->volume;
+                float cell_volume = g_sequencer_grid_volumes[step][column];
+                float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
                 
-                // Different sample than what's currently playing in this column?
-                if (g_column_playing_sample[column] != sample_to_play) {
-                    // Stop the old sample in this column
-                    if (g_column_playing_sample[column] >= 0) {
-                        audio_slot_t* old_sample = &g_slots[g_column_playing_sample[column]];
-                        if (old_sample->node_initialized) {
-                            ma_node_set_output_bus_volume(&old_sample->node, 0, 0.0f);
-                            prnt("⏹️ [SEQUENCER] Stopped sample %d in column %d", g_column_playing_sample[column], column);
-                        }
-                    }
-                    
-                    // Start the new sample
-                    ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);  // Restart from beginning
-                    
-                    // Volume logic: cell volume overrides sample bank volume when set
-                    float bank_volume = sample->volume;
-                    float cell_volume = g_sequencer_grid_volumes[step][column];
-                    float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
-                    
-                    // Pitch logic: cell pitch overrides sample bank pitch when set
-                    float bank_pitch = sample->pitch;
-                    float cell_pitch = g_sequencer_grid_pitches[step][column];
-                    float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
-                    
-                    // Apply pitch to the pitch data source
-                    if (sample->pitch_ds_initialized) {
-                        ma_pitch_data_source_set_pitch(&sample->pitch_ds, final_pitch);
-                    }
-                    
-                    ma_node_set_output_bus_volume(&sample->node, 0, final_volume);
-                    g_column_playing_sample[column] = sample_to_play;  // Remember what's playing
-                    prnt("▶️ [SEQUENCER] Started sample %d in column %d (bank: %.2f, cell: %.2f → vol: %.2f, pitch: %.2f)", 
-                         sample_to_play, column, bank_volume, cell_volume, final_volume, final_pitch);
+                // Pitch logic: cell pitch overrides sample bank pitch when set
+                float bank_pitch = sample->pitch;
+                float cell_pitch = g_sequencer_grid_pitches[step][column];
+                float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
+                
+                // Create NEW individual cell node for this trigger
+                cell_node_t* cell_node = create_cell_node(step, column, sample_to_play, final_volume, final_pitch);
+                
+                if (cell_node) {
+                    prnt("▶️ [SEQUENCER] Created cell node [%d,%d] with sample %d (vol: %.2f, pitch: %.2f, ID: %llu)", 
+                         step, column, sample_to_play, final_volume, final_pitch, cell_node->id);
                 } else {
-                    // Same sample - restart it from the beginning
-                    ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);
-                    
-                    // Apply volume logic for restart too
-                    float bank_volume = sample->volume;
-                    float cell_volume = g_sequencer_grid_volumes[step][column];
-                    float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
-                    
-                    // Apply pitch logic for restart too
-                    float bank_pitch = sample->pitch;
-                    float cell_pitch = g_sequencer_grid_pitches[step][column];
-                    float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
-                    
-                    // Apply pitch to the pitch data source
-                    if (sample->pitch_ds_initialized) {
-                        ma_pitch_data_source_set_pitch(&sample->pitch_ds, final_pitch);
-                    }
-                    
-                    ma_node_set_output_bus_volume(&sample->node, 0, final_volume);
-                    
-                    prnt("🔄 [SEQUENCER] Restarted sample %d in column %d (volume: %.2f)", sample_to_play, column, final_volume);
+                    prnt_err("🔴 [SEQUENCER] Failed to create cell node for [%d,%d] sample %d", step, column, sample_to_play);
                 }
             }
-        } else {
-            // prnt("➖ [SEQUENCER] Step %d, Column %d: Empty (currently playing: %d)", 
-            //      step, column, g_column_playing_sample[column]);
         }
         // IMPORTANT: If grid cell is empty, do NOTHING
-        // Let previous samples continue playing until replaced
+        // Previous cell nodes continue playing independently
     }
 }
 
@@ -746,11 +998,9 @@ static void run_sequencer(ma_uint32 frameCount) {
             
             // Did we loop back from last step to step 0?
             if (previous_step > g_current_step) {
-                prnt("🔄 [SEQUENCER] Looping back to step 0 - clearing column memory");
-                // Clear memory of what was playing in each column
-                for (int col = 0; col < g_columns; col++) {
-                    g_column_playing_sample[col] = -1;
-                }
+                prnt("🔄 [SEQUENCER] Looping back to step 0 (cell nodes continue independently)");
+                // With per-cell nodes, we don't need to track column state
+                // Each cell node plays independently until completion
             }
             
             // Play samples for the new step
@@ -761,13 +1011,19 @@ static void run_sequencer(ma_uint32 frameCount) {
 
 // Main audio callback - called by miniaudio every ~11ms to fill the audio buffer
 static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
-    // 1. Run the sequencer (timing + sample triggering)
+    // 1. Update global frame counter for cell node lifecycle tracking
+    g_current_frame += frameCount;
+    
+    // 2. Run the sequencer (timing + sample triggering)
     run_sequencer(frameCount);
     
-    // 2. Mix all playing samples into the output buffer
+    // 3. Clean up finished cell nodes
+    cleanup_finished_cell_nodes();
+    
+    // 4. Mix all playing samples into the output buffer (includes all active cell nodes)
     ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 
-    // 3. If recording, save the mixed audio to file
+    // 5. If recording, save the mixed audio to file
     if (g_is_output_recording) {
         ma_encoder_write_pcm_frames(&g_output_encoder, pOutput, frameCount, NULL);
         g_total_frames_written += frameCount;
@@ -780,24 +1036,34 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
 static void free_slot_resources(int slot) {
     audio_slot_t* s = &g_slots[slot];
 
-    // First detach/uninit the node so it no longer references the pitch data source.
-    if (s->node_initialized) {
-        ma_data_source_node_uninit(&s->node, NULL);
-        s->node_initialized = 0;
+    // Clean up sample bank playback system
+    if (s->sample_bank_node_initialized) {
+        ma_data_source_node_uninit(&s->sample_bank_node, NULL);
+        s->sample_bank_node_initialized = 0;
     }
-
-    // Uninit the pitch data source (which will also uninit the resampler)
-    if (s->pitch_ds_initialized) {
-        ma_pitch_data_source_uninit(&s->pitch_ds);
-        s->pitch_ds_initialized = 0;
+    if (s->sample_bank_pitch_ds_initialized) {
+        ma_pitch_data_source_uninit(&s->sample_bank_pitch_ds);
+        s->sample_bank_pitch_ds_initialized = 0;
     }
-
-    // Now it is safe to uninit the decoder.
     if (s->loaded) {
-        ma_decoder_uninit(&s->decoder);
+        ma_decoder_uninit(&s->sample_bank_decoder);
+    }
+
+    // Clean up sequencer playback system
+    if (s->sequencer_node_initialized) {
+        ma_data_source_node_uninit(&s->sequencer_node, NULL);
+        s->sequencer_node_initialized = 0;
+    }
+    if (s->sequencer_pitch_ds_initialized) {
+        ma_pitch_data_source_uninit(&s->sequencer_pitch_ds);
+        s->sequencer_pitch_ds_initialized = 0;
+    }
+    if (s->loaded) {
+        ma_decoder_uninit(&s->sequencer_decoder);
         s->loaded = 0;
     }
 
+    // Clean up shared memory/file resources
     if (s->memory_data) {
         g_total_memory_used -= s->memory_size;
         free(s->memory_data);
@@ -811,8 +1077,11 @@ static void free_slot_resources(int slot) {
         s->file_path = NULL;
     }
 
-    s->active = 0;
-    s->at_end = 0;
+    // Reset state flags
+    s->sample_bank_active = 0;
+    s->sample_bank_at_end = 0;
+    s->sequencer_active = 0;
+    s->sequencer_at_end = 0;
     s->pitch = 1.0f;    // Reset pitch to default
     s->volume = 1.0f;   // Reset volume to default
 }
@@ -925,6 +1194,10 @@ int init(void) {
     }
     g_total_memory_used = 0;
     
+    // Initialize preview systems
+    memset(&g_sample_preview, 0, sizeof(preview_system_t));
+    memset(&g_cell_preview, 0, sizeof(preview_system_t));
+    
     // Initialize sequencer state
     g_sequencer_playing = 0;
     g_sequencer_bpm = 120;
@@ -943,10 +1216,10 @@ int init(void) {
         }
     }
     
-    // Initialize column tracking
-    for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
-        g_column_playing_sample[col] = -1;
-    }
+    // Initialize cell node pool
+    memset(g_cell_nodes, 0, sizeof(g_cell_nodes));
+    g_next_cell_node_id = 1;
+    g_current_frame = 0;
     
     // ---------------------------------------------------------------------
     // Initialize the node graph which will perform automatic mixing of all
@@ -1042,8 +1315,10 @@ int load_sound_to_slot(int slot, const char* file_path, int loadToMemory) {
     }
     
     if (result == 0) {
-        s->active = 0;
-        s->at_end = 0;
+        s->sample_bank_active = 0;
+        s->sample_bank_at_end = 0;
+        s->sequencer_active = 0;
+        s->sequencer_at_end = 0;
     } else {
         // Cleanup on failure
         free_slot_resources(slot);
@@ -1070,20 +1345,26 @@ int play_slot(int slot) {
         return -1;
     }
     
-    // Seek to beginning (works for both file and memory decoders)
-    ma_result ma_res = ma_decoder_seek_to_pcm_frame(&s->decoder, 0);
+    // Seek sample bank decoder to beginning for sample bank playback
+    ma_result ma_res = ma_decoder_seek_to_pcm_frame(&s->sample_bank_decoder, 0);
     if (ma_res != MA_SUCCESS) {
-        prnt_err("🔴 [MINIAUDIO] Failed to seek slot %d to beginning: %s", slot, ma_result_description(ma_res));
+        prnt_err("🔴 [MINIAUDIO] Failed to seek sample bank decoder for slot %d: %s", slot, ma_result_description(ma_res));
         return -1;
     }
     
-    // Success - start playing
-    s->active = 1;
-    s->at_end = 0;
-    if (s->node_initialized) {
-        ma_node_set_output_bus_volume(&s->node, 0, s->volume);
+    // Update pitch on sample bank pitch data source
+    if (s->sample_bank_pitch_ds_initialized) {
+        ma_pitch_data_source_set_pitch(&s->sample_bank_pitch_ds, s->pitch);
     }
-    prnt("✅ [MINIAUDIO] Slot %d started playing (%s) at volume %.2f", slot, s->memory_data ? "memory" : "file", s->volume);
+    
+    // Success - start sample bank playback
+    s->sample_bank_active = 1;
+    s->sample_bank_at_end = 0;
+    if (s->sample_bank_node_initialized) {
+        ma_node_set_output_bus_volume(&s->sample_bank_node, 0, s->volume);
+    }
+    prnt("▶️ [SAMPLE BANK] Slot %d started sample bank playback (%s) at volume %.2f, pitch %.2f", 
+         slot, s->memory_data ? "memory" : "file", s->volume, s->pitch);
     
     return 0;
 }
@@ -1099,11 +1380,11 @@ void stop_slot(int slot) {
     }
     
     audio_slot_t* s = &g_slots[slot];
-    s->active = 0;
-    if (s->node_initialized) {
-        ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
+    s->sample_bank_active = 0;
+    if (s->sample_bank_node_initialized) {
+        ma_node_set_output_bus_volume(&s->sample_bank_node, 0, 0.0f);
     }
-    prnt("⏹️ [MINIAUDIO] Slot %d stopped", slot);
+    prnt("⏹️ [SAMPLE BANK] Slot %d sample bank playback stopped", slot);
 }
 
 void unload_slot(int slot) {
@@ -1123,13 +1404,40 @@ void stop_all_sounds(void) {
         return;
     }
     
-    prnt("⏹️ [MINIAUDIO] Stopping all sounds");
+    prnt("⏹️ [MINIAUDIO] Stopping all sounds (sample bank + sequencer + previews + cell nodes)");
     
+    // Stop and cleanup all active cell nodes
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) {
+            cleanup_cell_node(&g_cell_nodes[i]);
+        }
+    }
+    
+    // Stop preview systems
+    g_sample_preview.active = 0;
+    if (g_sample_preview.node_initialized) {
+        ma_node_set_output_bus_volume(&g_sample_preview.node, 0, 0.0f);
+    }
+    
+    g_cell_preview.active = 0;
+    if (g_cell_preview.node_initialized) {
+        ma_node_set_output_bus_volume(&g_cell_preview.node, 0, 0.0f);
+    }
+    
+    // Stop all sample slots
     for (int i = 0; i < MAX_SLOTS; ++i) {
         audio_slot_t* s = &g_slots[i];
-        s->active = 0;
-        if (s->node_initialized) {
-            ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
+        
+        // Stop sample bank playback
+        s->sample_bank_active = 0;
+        if (s->sample_bank_node_initialized) {
+            ma_node_set_output_bus_volume(&s->sample_bank_node, 0, 0.0f);
+        }
+        
+        // Stop sequencer playback
+        s->sequencer_active = 0;
+        if (s->sequencer_node_initialized) {
+            ma_node_set_output_bus_volume(&s->sequencer_node, 0, 0.0f);
         }
     }
 }
@@ -1170,6 +1478,171 @@ uint64_t get_available_memory_capacity(void) {
         return 0;
     }
     return MAX_TOTAL_MEMORY_USAGE - g_total_memory_used;
+}
+
+// -----------------------------------------------------------------------------
+// Preview System Functions
+// -----------------------------------------------------------------------------
+
+int preview_sample(const char* file_path, float pitch, float volume) {
+    if (!g_is_initialized) {
+        prnt_err("🔴 [PREVIEW] Device not initialized");
+        return -1;
+    }
+    if (file_path == NULL || strlen(file_path) == 0) {
+        prnt_err("🔴 [PREVIEW] Invalid file path");
+        return -1;
+    }
+    
+    // Stop any existing preview
+    if (g_sample_preview.active) {
+        ma_node_set_output_bus_volume(&g_sample_preview.node, 0, 0.0f);
+        g_sample_preview.active = 0;
+    }
+    
+    // Clean up existing resources
+    if (g_sample_preview.node_initialized) {
+        cleanup_preview_system(&g_sample_preview);
+    }
+    
+    prnt("🔍 [PREVIEW] Starting sample preview: %s (pitch: %.2f, volume: %.2f)", file_path, pitch, volume);
+    
+    // Initialize decoder
+    ma_decoder_config decoderConfig = ma_decoder_config_init(SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
+    ma_result result = ma_decoder_init_file(file_path, &decoderConfig, &g_sample_preview.decoder);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [PREVIEW] Failed to initialize decoder: %s", ma_result_description(result));
+        return -1;
+    }
+    
+    // Initialize pitch data source
+    result = ma_pitch_data_source_init(&g_sample_preview.pitch_ds, &g_sample_preview.decoder, pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [PREVIEW] Failed to initialize pitch data source: %s", ma_result_description(result));
+        ma_decoder_uninit(&g_sample_preview.decoder);
+        return -1;
+    }
+    g_sample_preview.pitch_ds_initialized = 1;
+    
+    // Create and attach node
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&g_sample_preview.pitch_ds);
+    result = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &g_sample_preview.node);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [PREVIEW] Failed to create data source node: %s", ma_result_description(result));
+        ma_pitch_data_source_uninit(&g_sample_preview.pitch_ds);
+        g_sample_preview.pitch_ds_initialized = 0;
+        ma_decoder_uninit(&g_sample_preview.decoder);
+        return -1;
+    }
+    
+    // Attach to endpoint and start playing
+    ma_node_attach_output_bus(&g_sample_preview.node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&g_sample_preview.node, 0, volume);
+    g_sample_preview.node_initialized = 1;
+    g_sample_preview.active = 1;
+    g_sample_preview.file_path = strdup(file_path);
+    
+    prnt("✅ [PREVIEW] Sample preview started successfully");
+    return 0;
+}
+
+int preview_cell(int step, int column, float pitch, float volume) {
+    if (!g_is_initialized) {
+        prnt_err("🔴 [CELL PREVIEW] Device not initialized");
+        return -1;
+    }
+    if (step < 0 || step >= g_sequencer_steps || column < 0 || column >= g_columns) {
+        prnt_err("🔴 [CELL PREVIEW] Invalid cell coordinates: step %d, column %d", step, column);
+        return -1;
+    }
+    
+    int sample_index = g_sequencer_grid[step][column];
+    if (sample_index < 0 || sample_index >= MAX_SLOTS) {
+        prnt_err("🔴 [CELL PREVIEW] No sample in cell [%d][%d]", step, column);
+        return -1;
+    }
+    
+    audio_slot_t* sample = &g_slots[sample_index];
+    if (!sample->loaded) {
+        prnt_err("🔴 [CELL PREVIEW] Sample %d not loaded", sample_index);
+        return -1;
+    }
+    
+    // Stop any existing preview
+    if (g_cell_preview.active) {
+        ma_node_set_output_bus_volume(&g_cell_preview.node, 0, 0.0f);
+        g_cell_preview.active = 0;
+    }
+    
+    // Clean up existing resources
+    if (g_cell_preview.node_initialized) {
+        cleanup_preview_system(&g_cell_preview);
+    }
+    
+    prnt("🔍 [CELL PREVIEW] Previewing cell [%d][%d] sample %d (pitch: %.2f, volume: %.2f)", 
+         step, column, sample_index, pitch, volume);
+    
+    // Initialize decoder from same source as the sample
+    ma_decoder_config decoderConfig = ma_decoder_config_init(SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
+    ma_result result;
+    
+    if (sample->memory_data) {
+        // Use memory data
+        result = ma_decoder_init_memory(sample->memory_data, sample->memory_size, &decoderConfig, &g_cell_preview.decoder);
+    } else {
+        // Use file path
+        result = ma_decoder_init_file(sample->file_path, &decoderConfig, &g_cell_preview.decoder);
+    }
+    
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [CELL PREVIEW] Failed to initialize decoder: %s", ma_result_description(result));
+        return -1;
+    }
+    
+    // Initialize pitch data source
+    result = ma_pitch_data_source_init(&g_cell_preview.pitch_ds, &g_cell_preview.decoder, pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [CELL PREVIEW] Failed to initialize pitch data source: %s", ma_result_description(result));
+        ma_decoder_uninit(&g_cell_preview.decoder);
+        return -1;
+    }
+    g_cell_preview.pitch_ds_initialized = 1;
+    
+    // Create and attach node
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&g_cell_preview.pitch_ds);
+    result = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &g_cell_preview.node);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [CELL PREVIEW] Failed to create data source node: %s", ma_result_description(result));
+        ma_pitch_data_source_uninit(&g_cell_preview.pitch_ds);
+        g_cell_preview.pitch_ds_initialized = 0;
+        ma_decoder_uninit(&g_cell_preview.decoder);
+        return -1;
+    }
+    
+    // Attach to endpoint and start playing
+    ma_node_attach_output_bus(&g_cell_preview.node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_set_output_bus_volume(&g_cell_preview.node, 0, volume);
+    g_cell_preview.node_initialized = 1;
+    g_cell_preview.active = 1;
+    
+    prnt("✅ [CELL PREVIEW] Cell preview started successfully");
+    return 0;
+}
+
+void stop_sample_preview(void) {
+    if (g_sample_preview.active) {
+        ma_node_set_output_bus_volume(&g_sample_preview.node, 0, 0.0f);
+        g_sample_preview.active = 0;
+        prnt("⏹️ [PREVIEW] Sample preview stopped");
+    }
+}
+
+void stop_cell_preview(void) {
+    if (g_cell_preview.active) {
+        ma_node_set_output_bus_volume(&g_cell_preview.node, 0, 0.0f);
+        g_cell_preview.active = 0;
+        prnt("⏹️ [CELL PREVIEW] Cell preview stopped");
+    }
 }
 
 // Legacy compatibility functions (no longer used but kept for compatibility)
@@ -1275,14 +1748,10 @@ int start(int bpm, int steps) {
         return -1;
     }
     
-    // Stop any currently playing samples
-    for (int col = 0; col < g_columns; col++) {
-        if (g_column_playing_sample[col] >= 0) {
-            audio_slot_t* s = &g_slots[g_column_playing_sample[col]];
-            if (s->node_initialized) {
-                ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
-            }
-            g_column_playing_sample[col] = -1;
+    // Stop any currently active cell nodes
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) {
+            cleanup_cell_node(&g_cell_nodes[i]);
         }
     }
     
@@ -1305,14 +1774,10 @@ void stop(void) {
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     
-    // Stop all currently playing samples
-    for (int col = 0; col < g_columns; col++) {
-        if (g_column_playing_sample[col] >= 0) {
-            audio_slot_t* s = &g_slots[g_column_playing_sample[col]];
-            if (s->node_initialized) {
-                ma_node_set_output_bus_volume(&s->node, 0, 0.0f);
-            }
-            g_column_playing_sample[col] = -1;
+    // Stop all currently active cell nodes
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) {
+            cleanup_cell_node(&g_cell_nodes[i]);
         }
     }
     
@@ -1563,6 +2028,17 @@ void cleanup(void) {
     // Free all slot resources
     for (int i = 0; i < MAX_SLOTS; ++i) {
         free_slot_resources(i);
+    }
+    
+    // Clean up preview systems
+    if (g_sample_preview.node_initialized) {
+        cleanup_preview_system(&g_sample_preview);
+        prnt("🗑️ [PREVIEW] Sample preview system cleaned up");
+    }
+    
+    if (g_cell_preview.node_initialized) {
+        cleanup_preview_system(&g_cell_preview);
+        prnt("🗑️ [PREVIEW] Cell preview system cleaned up");
     }
     
     // Uninitialize device

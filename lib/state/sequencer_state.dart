@@ -650,22 +650,27 @@ class SequencerState extends ChangeNotifier {
 
   Future<void> previewSample(String assetPath) async {
     try {
-      // Stop any currently playing sounds first
-      stopAll();
-      
       // Copy asset to temp file for preview
       final fileName = path.basename(assetPath);
       final tempPath = await _copyAssetToTemp(assetPath, fileName);
       
-      // Load and play the preview sample in slot 0 temporarily
-      bool loadSuccess = _sequencerLibrary.loadSoundToSlot(0, tempPath, loadToMemory: true);
+      // Use a dedicated preview slot (999) that doesn't interfere with regular slots (0-7)
+      const int previewSlot = 999;
+      bool loadSuccess = _sequencerLibrary.loadSoundToSlot(previewSlot, tempPath, loadToMemory: true);
       if (loadSuccess) {
         _sequencerLibrary.reconfigureAudioSession();
-        _sequencerLibrary.playSlot(0);
+        _sequencerLibrary.playSlot(previewSlot);
       }
     } catch (e) {
       print('❌ Error previewing sample: $e');
     }
+  }
+
+  void stopSamplePreview() {
+    // Stop and unload the preview slot
+    const int previewSlot = 999;
+    _sequencerLibrary.stopSlot(previewSlot);
+    _sequencerLibrary.unloadSlot(previewSlot);
   }
 
   void loadSlot(int slot) {
