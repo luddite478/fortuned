@@ -1,0 +1,4 @@
+- pitch
+- bpm
+- contacts and all users search
+- comment(reply)-menu for chekpoints

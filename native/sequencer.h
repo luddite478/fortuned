@@ -123,6 +123,16 @@ int set_cell_volume(int step, int column, float volume);
 __attribute__((visibility("default"))) __attribute__((used))
 float get_cell_volume(int step, int column);
 
+// Pitch control functions
+__attribute__((visibility("default"))) __attribute__((used))
+int set_sample_bank_pitch(int bank, float pitch);
+__attribute__((visibility("default"))) __attribute__((used))
+float get_sample_bank_pitch(int bank);
+__attribute__((visibility("default"))) __attribute__((used))
+int set_cell_pitch(int step, int column, float pitch);
+__attribute__((visibility("default"))) __attribute__((used))
+float get_cell_pitch(int step, int column);
+
 // Output recording/rendering functions (captures mixed grid output to WAV file)
 __attribute__((visibility("default"))) __attribute__((used))
 int start_recording(const char* output_file_path);

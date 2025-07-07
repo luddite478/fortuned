@@ -55,10 +55,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <math.h>
 
-// -----------------------------------------------------------------------------
-// Simplified Mixing Implementation (Following Official miniaudio Pattern)
-// -----------------------------------------------------------------------------
+
 #define MAX_SLOTS 1024
 #define SAMPLE_FORMAT   ma_format_f32
 #define CHANNEL_COUNT   2
@@ -68,6 +67,20 @@
 #define MAX_MEMORY_SLOTS 128                          // Up to 128 fully memory-loaded sounds
 #define MAX_MEMORY_FILE_SIZE (50 * 1024 * 1024)      // 50MB per individual file
 #define MAX_TOTAL_MEMORY_USAGE (500 * 1024 * 1024)   // 500MB total memory usage limit
+
+// Pitch data source wrapper using miniaudio resampler for pitch shifting
+typedef struct {
+    ma_data_source_base ds;
+    ma_data_source* original_ds;
+    float pitch_ratio;
+    ma_uint32 channels;
+    ma_uint32 sample_rate;
+    
+    // Use miniaudio resampler for pitch shifting
+    ma_resampler resampler;
+    int resampler_initialized;
+    ma_uint32 target_sample_rate;  // Calculated from pitch ratio
+} ma_pitch_data_source;
 
 // Simplified slot structure - uses ma_decoder for both file and memory
 typedef struct {
@@ -85,6 +98,11 @@ typedef struct {
     
     // Volume control
     float volume;              // Sample bank volume (0.0 to 1.0)
+    
+    // Pitch control
+    float pitch;               // Sample bank pitch (0.03125 to 32.0, 1.0 = normal, covers C0-C10)
+    ma_pitch_data_source pitch_ds; // Pitch data source wrapper
+    int pitch_ds_initialized;  // 1 when pitch data source is initialized
 } audio_slot_t;
 
 static ma_device g_device;
@@ -110,6 +128,7 @@ static int g_current_step = 0;
 static int g_columns = 4; // Current number of columns in sequencer (starts with 1 grid × 4 columns)
 static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
 static float g_sequencer_grid_volumes[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = volume (0.0 to 1.0)
+static float g_sequencer_grid_pitches[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = pitch (0.03125 to 32.0, 1.0 = normal, covers C0-C10)
 static uint64_t g_frames_per_step = 0;
 static uint64_t g_step_frame_counter = 0;
 static int g_column_playing_sample[MAX_TOTAL_COLUMNS]; // Track which sample is playing in each column
@@ -200,6 +219,260 @@ static int check_memory_limits(size_t file_size) {
     return 0;
 }
 
+// -----------------------------------------------------------------------------
+// Custom Pitch Data Source Implementation
+// -----------------------------------------------------------------------------
+
+// Pitch data source callbacks
+static ma_result ma_pitch_data_source_read(ma_data_source* pDataSource, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead) {
+    ma_pitch_data_source* pPitch = (ma_pitch_data_source*)pDataSource;
+    
+    if (pPitch == NULL || pFramesOut == NULL || pFramesRead == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    // Initialize pFramesRead to 0
+    *pFramesRead = 0;
+    
+    // If resampler is not initialized or pitch ratio is 1.0 (no change), pass through
+    if (!pPitch->resampler_initialized || pPitch->pitch_ratio == 1.0f) {
+        return ma_data_source_read_pcm_frames(pPitch->original_ds, pFramesOut, frameCount, pFramesRead);
+    }
+    
+    // Use miniaudio resampler for pitch shifting
+    // We need a temporary input buffer since resampler expects to process input/output separately
+    static float tempInputBuffer[4096 * 2]; // 4096 frames * 2 channels max
+    const ma_uint64 tempCapacityInFrames = 4096;
+    
+    // For pitch shifting, estimate input frames needed based on pitch ratio
+    // INVERTED: Higher pitch = need fewer input frames, lower pitch = need more input frames
+    ma_uint64 inputFramesNeeded = (ma_uint64)(frameCount / pPitch->pitch_ratio);
+    if (inputFramesNeeded < 1) inputFramesNeeded = 1; // Always read at least 1 frame
+    if (inputFramesNeeded > tempCapacityInFrames) {
+        inputFramesNeeded = tempCapacityInFrames;
+    }
+    
+    // Read input frames from original data source
+    ma_uint64 inputFramesRead = 0;
+    ma_result result = ma_data_source_read_pcm_frames(pPitch->original_ds, tempInputBuffer, inputFramesNeeded, &inputFramesRead);
+    
+    if (result != MA_SUCCESS || inputFramesRead == 0) {
+        return result;
+    }
+    
+    // Process through the resampler
+    ma_uint64 inputFramesToProcess = inputFramesRead;
+    ma_uint64 outputFramesProcessed = frameCount;
+    result = ma_resampler_process_pcm_frames(&pPitch->resampler, tempInputBuffer, &inputFramesToProcess, pFramesOut, &outputFramesProcessed);
+    
+    if (result == MA_SUCCESS) {
+        *pFramesRead = outputFramesProcessed;
+    }
+    
+    return result;
+}
+
+static ma_result ma_pitch_data_source_seek(ma_data_source* pDataSource, ma_uint64 frameIndex) {
+    ma_pitch_data_source* pPitch = (ma_pitch_data_source*)pDataSource;
+    
+    if (pPitch == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    // Seek the original data source (converter doesn't need reset since we manually feed it)
+    return ma_data_source_seek_to_pcm_frame(pPitch->original_ds, frameIndex);
+}
+
+static ma_result ma_pitch_data_source_get_data_format(ma_data_source* pDataSource, ma_format* pFormat, ma_uint32* pChannels, ma_uint32* pSampleRate, ma_channel* pChannelMap, size_t channelMapCap) {
+    ma_pitch_data_source* pPitch = (ma_pitch_data_source*)pDataSource;
+    
+    if (pPitch == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    // If using resampler, return the resampler's output format
+    if (pPitch->resampler_initialized) {
+        if (pFormat) *pFormat = SAMPLE_FORMAT;
+        if (pChannels) *pChannels = pPitch->channels;
+        if (pSampleRate) *pSampleRate = pPitch->target_sample_rate;
+        
+        // For channel map, get it from the original source since channels don't change
+        if (pChannelMap && channelMapCap > 0) {
+            return ma_data_source_get_data_format(pPitch->original_ds, NULL, NULL, NULL, pChannelMap, channelMapCap);
+        }
+        
+        return MA_SUCCESS;
+    } else {
+        // No resampling, pass through original format
+        return ma_data_source_get_data_format(pPitch->original_ds, pFormat, pChannels, pSampleRate, pChannelMap, channelMapCap);
+    }
+}
+
+static ma_result ma_pitch_data_source_get_cursor(ma_data_source* pDataSource, ma_uint64* pCursor) {
+    ma_pitch_data_source* pPitch = (ma_pitch_data_source*)pDataSource;
+    
+    if (pPitch == NULL || pCursor == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    // Get cursor from original data source (input position)
+    return ma_data_source_get_cursor_in_pcm_frames(pPitch->original_ds, pCursor);
+}
+
+static ma_result ma_pitch_data_source_get_length(ma_data_source* pDataSource, ma_uint64* pLength) {
+    ma_pitch_data_source* pPitch = (ma_pitch_data_source*)pDataSource;
+    
+    if (pPitch == NULL || pLength == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    // Get original length
+    ma_result result = ma_data_source_get_length_in_pcm_frames(pPitch->original_ds, pLength);
+    
+    // If using resampler, adjust the length based on the pitch ratio
+    // INVERTED: Higher pitch = shorter duration, lower pitch = longer duration
+    if (result == MA_SUCCESS && pPitch->resampler_initialized && pPitch->pitch_ratio != 1.0f) {
+        *pLength = (ma_uint64)(*pLength * pPitch->pitch_ratio);
+    }
+    
+    return result;
+}
+
+static ma_data_source_vtable g_pitch_data_source_vtable = {
+    ma_pitch_data_source_read,
+    ma_pitch_data_source_seek,
+    ma_pitch_data_source_get_data_format,
+    ma_pitch_data_source_get_cursor,
+    ma_pitch_data_source_get_length,
+    NULL, // onSetLooping
+    0     // flags
+};
+
+// Initialize pitch data source
+static ma_result ma_pitch_data_source_init(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate) {
+    if (pPitch == NULL || pOriginalDataSource == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    ma_data_source_config config = ma_data_source_config_init();
+    config.vtable = &g_pitch_data_source_vtable;
+    
+    ma_result result = ma_data_source_init(&config, &pPitch->ds);
+    if (result != MA_SUCCESS) {
+        return result;
+    }
+    
+    pPitch->original_ds = pOriginalDataSource;
+    pPitch->pitch_ratio = pitchRatio;
+    pPitch->channels = channels;
+    pPitch->sample_rate = sampleRate;
+    pPitch->resampler_initialized = 0;
+    
+    // Initialize resampler for pitch shifting if needed
+    if (pitchRatio != 1.0f) {
+        // Calculate target sample rate for pitch shifting
+        // INVERTED: Higher pitch ratio = lower target sample rate (faster playback)
+        // Lower pitch ratio = higher target sample rate (slower playback)
+        pPitch->target_sample_rate = (ma_uint32)(sampleRate / pitchRatio);
+        
+        // Clamp to reasonable range to prevent extreme values
+        if (pPitch->target_sample_rate < 8000) pPitch->target_sample_rate = 8000;
+        if (pPitch->target_sample_rate > 192000) pPitch->target_sample_rate = 192000;
+        
+        // Configure resampler for pitch shifting
+        ma_resampler_config resamplerConfig = ma_resampler_config_init(
+            SAMPLE_FORMAT,                // format
+            channels,                     // channels
+            sampleRate,                   // input sample rate (original)
+            pPitch->target_sample_rate,   // output sample rate (pitch-shifted)
+            ma_resample_algorithm_linear  // use linear algorithm for speed
+        );
+        
+        // Initialize the resampler
+        result = ma_resampler_init(&resamplerConfig, NULL, &pPitch->resampler);
+        if (result == MA_SUCCESS) {
+            pPitch->resampler_initialized = 1;
+            prnt("✅ [PITCH] Initialized resampler: %.2fx pitch (rate: %d -> %d Hz)", 
+                 pitchRatio, sampleRate, pPitch->target_sample_rate);
+        } else {
+            prnt_err("🔴 [PITCH] Failed to initialize resampler: %s", ma_result_description(result));
+        }
+    }
+    
+    return MA_SUCCESS;
+}
+
+// Update pitch ratio
+static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, float pitchRatio) {
+    if (pPitch == NULL) {
+        return MA_INVALID_ARGS;
+    }
+    
+    // If pitch ratio hasn't changed significantly, don't recreate converter
+    if (fabs(pPitch->pitch_ratio - pitchRatio) < 0.001f) {
+        return MA_SUCCESS;
+    }
+    
+    // Clean up existing resampler
+    if (pPitch->resampler_initialized) {
+        ma_resampler_uninit(&pPitch->resampler, NULL);
+        pPitch->resampler_initialized = 0;
+    }
+    
+    pPitch->pitch_ratio = pitchRatio;
+    
+    // If pitch ratio is 1.0 (no change), don't create resampler
+    if (pitchRatio == 1.0f) {
+        prnt("🎵 [PITCH] Reset to normal pitch (no resampling)");
+        return MA_SUCCESS;
+    }
+    
+    // Calculate new target sample rate
+    // INVERTED: Higher pitch ratio = lower target sample rate (faster playback)
+    pPitch->target_sample_rate = (ma_uint32)(pPitch->sample_rate / pitchRatio);
+    
+    // Clamp to reasonable range
+    if (pPitch->target_sample_rate < 8000) pPitch->target_sample_rate = 8000;
+    if (pPitch->target_sample_rate > 192000) pPitch->target_sample_rate = 192000;
+    
+    // Configure new resampler
+    ma_resampler_config resamplerConfig = ma_resampler_config_init(
+        SAMPLE_FORMAT,                // format
+        pPitch->channels,             // channels
+        pPitch->sample_rate,          // input sample rate (original)
+        pPitch->target_sample_rate,   // output sample rate (pitch-shifted)
+        ma_resample_algorithm_linear  // use linear algorithm for speed
+    );
+    
+    // Initialize the new resampler
+    ma_result result = ma_resampler_init(&resamplerConfig, NULL, &pPitch->resampler);
+    if (result == MA_SUCCESS) {
+        pPitch->resampler_initialized = 1;
+        prnt("🎵 [PITCH] Updated resampler: %.2fx pitch (rate: %d -> %d Hz)", 
+             pitchRatio, pPitch->sample_rate, pPitch->target_sample_rate);
+    } else {
+        prnt_err("🔴 [PITCH] Failed to initialize resampler: %s", ma_result_description(result));
+        return result;
+    }
+    
+    return MA_SUCCESS;
+}
+
+// Uninitialize pitch data source
+static void ma_pitch_data_source_uninit(ma_pitch_data_source* pPitch) {
+    if (pPitch == NULL) {
+        return;
+    }
+    
+    // Clean up resampler if initialized
+    if (pPitch->resampler_initialized) {
+        ma_resampler_uninit(&pPitch->resampler, NULL);
+        pPitch->resampler_initialized = 0;
+    }
+    
+    ma_data_source_uninit(&pPitch->ds);
+}
+
 // Clean helper functions for loading sounds
 static int load_sound_to_memory(audio_slot_t* slot, const char* file_path, ma_decoder_config* config, int slot_index) {
     // Load file to memory buffer
@@ -232,18 +505,41 @@ static int load_sound_to_memory(audio_slot_t* slot, const char* file_path, ma_de
     g_total_memory_used += slot->memory_size;
     slot->loaded = 1;
     
+    // Initialize default pitch and volume
+    slot->pitch = 1.0f;              // Default pitch (no change)
+    slot->volume = 1.0f;             // Default volume (full)
+    
     // -------------------------------------------------------------
-    // Create a data_source_node for this decoder and attach it to
+    // Initialize pitch data source wrapper around the decoder
+    // -------------------------------------------------------------
+    ma_result pitchRes = ma_pitch_data_source_init(&slot->pitch_ds, &slot->decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (pitchRes != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize pitch data source for slot %d: %s", slot_index, ma_result_description(pitchRes));
+        // Roll back everything
+        slot->loaded = 0;
+        g_total_memory_used -= slot->memory_size;
+        ma_decoder_uninit(&slot->decoder);
+        free(slot->memory_data);
+        slot->memory_data = NULL;
+        slot->memory_size = 0;
+        return -1;
+    }
+    slot->pitch_ds_initialized = 1;
+    
+    // -------------------------------------------------------------
+    // Create a data_source_node for this pitch data source and attach it to
     // the graph endpoint. The node starts muted (volume 0) and will
     // be unmuted when the slot is explicitly played.
     // -------------------------------------------------------------
-    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->decoder);
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->pitch_ds);
     ma_result nodeRes = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &slot->node);
     if (nodeRes != MA_SUCCESS) {
         prnt_err("🔴 [MINIAUDIO] Failed to create data source node for slot %d: %s", slot_index, ma_result_description(nodeRes));
         // Roll back everything
         slot->loaded = 0;
         g_total_memory_used -= slot->memory_size;
+        ma_pitch_data_source_uninit(&slot->pitch_ds);
+        slot->pitch_ds_initialized = 0;
         ma_decoder_uninit(&slot->decoder);
         free(slot->memory_data);
         slot->memory_data = NULL;
@@ -275,11 +571,28 @@ static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_de
     }
     
     slot->loaded = 1;
+    
+    // Initialize default pitch and volume
+    slot->pitch = 1.0f;              // Default pitch (no change)
+    slot->volume = 1.0f;             // Default volume (full)
+    
+    // Initialize pitch data source wrapper
+    ma_result pitchRes = ma_pitch_data_source_init(&slot->pitch_ds, &slot->decoder, slot->pitch, CHANNEL_COUNT, SAMPLE_RATE);
+    if (pitchRes != MA_SUCCESS) {
+        prnt_err("🔴 [MINIAUDIO] Failed to initialize pitch data source for slot %d (streaming): %s", slot_index, ma_result_description(pitchRes));
+        ma_decoder_uninit(&slot->decoder);
+        slot->loaded = 0;
+        return -1;
+    }
+    slot->pitch_ds_initialized = 1;
+    
     // Create and attach data source node to the graph (muted initially)
-    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->decoder);
+    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&slot->pitch_ds);
     ma_result nodeRes = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &slot->node);
     if (nodeRes != MA_SUCCESS) {
         prnt_err("🔴 [MINIAUDIO] Failed to create data source node for slot %d (streaming): %s", slot_index, ma_result_description(nodeRes));
+        ma_pitch_data_source_uninit(&slot->pitch_ds);
+        slot->pitch_ds_initialized = 0;
         ma_decoder_uninit(&slot->decoder);
         slot->loaded = 0;
         return -1;
@@ -364,10 +677,20 @@ static void play_samples_for_step(int step) {
                     float cell_volume = g_sequencer_grid_volumes[step][column];
                     float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
                     
+                    // Pitch logic: cell pitch overrides sample bank pitch when set
+                    float bank_pitch = sample->pitch;
+                    float cell_pitch = g_sequencer_grid_pitches[step][column];
+                    float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
+                    
+                    // Apply pitch to the pitch data source
+                    if (sample->pitch_ds_initialized) {
+                        ma_pitch_data_source_set_pitch(&sample->pitch_ds, final_pitch);
+                    }
+                    
                     ma_node_set_output_bus_volume(&sample->node, 0, final_volume);
                     g_column_playing_sample[column] = sample_to_play;  // Remember what's playing
-                    prnt("▶️ [SEQUENCER] Started sample %d in column %d (bank: %.2f, cell: %.2f → using %.2f)", 
-                         sample_to_play, column, bank_volume, cell_volume, final_volume);
+                    prnt("▶️ [SEQUENCER] Started sample %d in column %d (bank: %.2f, cell: %.2f → vol: %.2f, pitch: %.2f)", 
+                         sample_to_play, column, bank_volume, cell_volume, final_volume, final_pitch);
                 } else {
                     // Same sample - restart it from the beginning
                     ma_decoder_seek_to_pcm_frame(&sample->decoder, 0);
@@ -376,6 +699,17 @@ static void play_samples_for_step(int step) {
                     float bank_volume = sample->volume;
                     float cell_volume = g_sequencer_grid_volumes[step][column];
                     float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
+                    
+                    // Apply pitch logic for restart too
+                    float bank_pitch = sample->pitch;
+                    float cell_pitch = g_sequencer_grid_pitches[step][column];
+                    float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
+                    
+                    // Apply pitch to the pitch data source
+                    if (sample->pitch_ds_initialized) {
+                        ma_pitch_data_source_set_pitch(&sample->pitch_ds, final_pitch);
+                    }
+                    
                     ma_node_set_output_bus_volume(&sample->node, 0, final_volume);
                     
                     prnt("🔄 [SEQUENCER] Restarted sample %d in column %d (volume: %.2f)", sample_to_play, column, final_volume);
@@ -446,10 +780,16 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
 static void free_slot_resources(int slot) {
     audio_slot_t* s = &g_slots[slot];
 
-    // First detach/uninit the node so it no longer references the decoder.
+    // First detach/uninit the node so it no longer references the pitch data source.
     if (s->node_initialized) {
         ma_data_source_node_uninit(&s->node, NULL);
         s->node_initialized = 0;
+    }
+
+    // Uninit the pitch data source (which will also uninit the resampler)
+    if (s->pitch_ds_initialized) {
+        ma_pitch_data_source_uninit(&s->pitch_ds);
+        s->pitch_ds_initialized = 0;
     }
 
     // Now it is safe to uninit the decoder.
@@ -473,6 +813,8 @@ static void free_slot_resources(int slot) {
 
     s->active = 0;
     s->at_end = 0;
+    s->pitch = 1.0f;    // Reset pitch to default
+    s->volume = 1.0f;   // Reset volume to default
 }
 
 // -----------------------------------------------------------------------------
@@ -579,6 +921,7 @@ int init(void) {
     for (int i = 0; i < MAX_SLOTS; ++i) {
         memset(&g_slots[i], 0, sizeof(audio_slot_t));
         g_slots[i].volume = 1.0f; // Default volume: 100%
+        g_slots[i].pitch = 1.0f;  // Default pitch: normal
     }
     g_total_memory_used = 0;
     
@@ -596,6 +939,7 @@ int init(void) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1; // -1 means empty
             g_sequencer_grid_volumes[step][col] = 1.0f; // Default volume: 100%
+            g_sequencer_grid_pitches[step][col] = 1.0f; // Default pitch: normal
         }
     }
     
@@ -1030,6 +1374,7 @@ void clear_all_cells(void) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1;
             g_sequencer_grid_volumes[step][col] = 1.0f; // Reset volume to 100%
+            g_sequencer_grid_pitches[step][col] = 1.0f; // Reset pitch to normal
         }
     }
     prnt("🗑️ [SEQUENCER] Cleared all grid cells (entire %dx%d table)", MAX_SEQUENCER_STEPS, MAX_TOTAL_COLUMNS);
@@ -1120,6 +1465,82 @@ float get_cell_volume(int step, int column) {
     float volume = g_sequencer_grid_volumes[step][column];
     prnt("🔍 [DEBUG] Get cell [%d,%d] volume = %.2f", step, column, volume);
     return volume;
+}
+
+// Pitch control functions
+int set_sample_bank_pitch(int bank, float pitch) {
+    if (bank < 0 || bank >= MAX_SLOTS) {
+        prnt_err("🔴 [PITCH] Invalid sample bank: %d", bank);
+        return -1;
+    }
+    
+    if (pitch < 0.03125f || pitch > 32.0f) {
+        prnt_err("🔴 [PITCH] Invalid pitch: %f (must be 0.03125-32.0 for C0-C10)", pitch);
+        return -1;
+    }
+    
+    audio_slot_t* s = &g_slots[bank];
+    s->pitch = pitch;
+    
+    // NOTE: Don't apply pitch immediately to playing samples
+    // Pitch will be applied when cells are triggered during sequencer playback
+    
+    prnt("🎵 [PITCH] Sample bank %d pitch set to %.2f (will apply on next trigger)", bank, pitch);
+    return 0;
+}
+
+float get_sample_bank_pitch(int bank) {
+    if (bank < 0 || bank >= MAX_SLOTS) {
+        prnt_err("🔴 [PITCH] Invalid sample bank: %d", bank);
+        return 1.0f;
+    }
+    
+    return g_slots[bank].pitch;
+}
+
+int set_cell_pitch(int step, int column, float pitch) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [PITCH] Invalid step: %d", step);
+        return -1;
+    }
+    
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [PITCH] Invalid column: %d", column);
+        return -1;
+    }
+    
+    if (pitch < 0.03125f || pitch > 32.0f) {
+        prnt_err("🔴 [PITCH] Invalid pitch: %f (must be 0.03125-32.0 for C0-C10)", pitch);
+        return -1;
+    }
+    
+    g_sequencer_grid_pitches[step][column] = pitch;
+    prnt("🎵 [PITCH] Cell [%d,%d] pitch set to %.2f", step, column, pitch);
+    
+    // Debug: show what sample is in this cell
+    int sample_in_cell = g_sequencer_grid[step][column];
+    if (sample_in_cell >= 0) {
+        prnt("🔍 [DEBUG] Cell [%d,%d] contains sample %d", step, column, sample_in_cell);
+    } else {
+        prnt("🔍 [DEBUG] Cell [%d,%d] is empty", step, column);
+    }
+    return 0;
+}
+
+float get_cell_pitch(int step, int column) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [PITCH] Invalid step: %d", step);
+        return 1.0f;
+    }
+    
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [PITCH] Invalid column: %d", column);
+        return 1.0f;
+    }
+    
+    float pitch = g_sequencer_grid_pitches[step][column];
+    prnt("🔍 [DEBUG] Get cell [%d,%d] pitch = %.2f", step, column, pitch);
+    return pitch;
 }
 
 // Cleanup function

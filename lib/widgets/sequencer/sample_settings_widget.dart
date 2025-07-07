@@ -1,9 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/sequencer_state.dart';
+import '../../utils/musical_notes.dart';
 
-class SampleSettingsWidget extends StatelessWidget {
+class SampleSettingsWidget extends StatefulWidget {
   const SampleSettingsWidget({super.key});
+
+  @override
+  State<SampleSettingsWidget> createState() => _SampleSettingsWidgetState();
+}
+
+class _SampleSettingsWidgetState extends State<SampleSettingsWidget> {
+  String _selectedControl = 'VOL'; // 'VOL' or 'KEY'
 
   @override
   Widget build(BuildContext context) {
@@ -37,12 +45,13 @@ class SampleSettingsWidget extends StatelessWidget {
             
             // Header element percentages (should add up to 100%)
             const double textAreaPercent = 25.0;     // Text area (Sample Settings + info)
-            const double volButtonPercent = 13.0;    // VOL button
-            const double eqButtonPercent = 13.0;      // EQ button
-            const double rvbButtonPercent = 13.0;    // RVB button
-            const double dlyButtonPercent = 13.0;    // DLY button
-            const double delButtonPercent = 13.0;    // DEL button
-            const double closeButtonPercent = 10.0;  // Close button
+            const double volButtonPercent = 11.0;    // VOL button
+            const double keyButtonPercent = 11.0;    // KEY button
+            const double eqButtonPercent = 11.0;     // EQ button
+            const double rvbButtonPercent = 11.0;    // RVB button
+            const double dlyButtonPercent = 11.0;    // DLY button
+            const double delButtonPercent = 11.0;    // DEL button
+            const double closeButtonPercent = 9.0;   // Close button
             
             // Get current sample info
             final currentSample = sequencer.activeBank;
@@ -102,31 +111,45 @@ class SampleSettingsWidget extends StatelessWidget {
                             // VOL button
                             SizedBox(
                               width: headerWidth * (volButtonPercent / 100),
-                              child: _buildSettingsButton('VOL', true, headerHeight * 0.7, labelFontSize),
+                              child: _buildSettingsButton('VOL', _selectedControl == 'VOL', headerHeight * 0.7, labelFontSize, () {
+                                setState(() {
+                                  _selectedControl = 'VOL';
+                                });
+                              }),
+                            ),
+                            
+                            // KEY button
+                            SizedBox(
+                              width: headerWidth * (keyButtonPercent / 100),
+                              child: _buildSettingsButton('KEY', _selectedControl == 'KEY', headerHeight * 0.7, labelFontSize, () {
+                                setState(() {
+                                  _selectedControl = 'KEY';
+                                });
+                              }),
                             ),
                             
                             // EQ button
                             SizedBox(
                               width: headerWidth * (eqButtonPercent / 100),
-                              child: _buildSettingsButton('EQ', false, headerHeight * 0.7, labelFontSize),
+                              child: _buildSettingsButton('EQ', false, headerHeight * 0.7, labelFontSize, null),
                             ),
                             
                             // RVB button
                             SizedBox(
                               width: headerWidth * (rvbButtonPercent / 100),
-                              child: _buildSettingsButton('RVB', false, headerHeight * 0.7, labelFontSize),
+                              child: _buildSettingsButton('RVB', false, headerHeight * 0.7, labelFontSize, null),
                             ),
                             
                             // DLY button
                             SizedBox(
                               width: headerWidth * (dlyButtonPercent / 100),
-                              child: _buildSettingsButton('DLY', false, headerHeight * 0.7, labelFontSize),
+                              child: _buildSettingsButton('DLY', false, headerHeight * 0.7, labelFontSize, null),
                             ),
                             
                             // DEL button
                             SizedBox(
                               width: headerWidth * (delButtonPercent / 100),
-                              child: _buildSettingsButton('DEL', false, headerHeight * 0.7, labelFontSize),
+                              child: _buildSettingsButton('DEL', false, headerHeight * 0.7, labelFontSize, null),
                             ),
                             
                             // Close button
@@ -169,7 +192,7 @@ class SampleSettingsWidget extends StatelessWidget {
                       builder: (context, innerConstraints) {
                         final volumeHeight = innerConstraints.maxHeight;
                         return hasActiveSample
-                            ? _buildVolumeControl(sequencer, currentSample, volumeHeight, padding, labelFontSize)
+                            ? _buildActiveControl(sequencer, currentSample, volumeHeight, padding, labelFontSize)
                             : _buildNoSampleMessage(volumeHeight, labelFontSize);
                       },
                     ),
@@ -187,6 +210,17 @@ class SampleSettingsWidget extends StatelessWidget {
     );
   }
   
+  Widget _buildActiveControl(SequencerState sequencer, int sampleIndex, double height, double padding, double fontSize) {
+    switch (_selectedControl) {
+      case 'VOL':
+        return _buildVolumeControl(sequencer, sampleIndex, height, padding, fontSize);
+      case 'KEY':
+        return _buildPitchControl(sequencer, sampleIndex, height, padding, fontSize);
+      default:
+        return _buildVolumeControl(sequencer, sampleIndex, height, padding, fontSize);
+    }
+  }
+
   Widget _buildVolumeControl(SequencerState sequencer, int sampleIndex, double height, double padding, double fontSize) {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: padding * 0.4, vertical: padding * 0.2),
@@ -249,6 +283,77 @@ class SampleSettingsWidget extends StatelessWidget {
       ),
     );
   }
+
+  Widget _buildPitchControl(SequencerState sequencer, int sampleIndex, double height, double padding, double fontSize) {
+    final currentPitch = sequencer.getSamplePitch(sampleIndex);
+    final currentPosition = pitchMultiplierToSliderPosition(currentPitch);
+    final noteName = sliderPositionToNoteName(currentPosition);
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: padding * 0.4, vertical: padding * 0.2),
+      decoration: BoxDecoration(
+        color: Colors.blueAccent.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(padding * 0.5),
+        border: Border.all(
+          color: Colors.blueAccent.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Pitch label
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Pitch',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              Text(
+                noteName,
+                style: TextStyle(
+                  color: Colors.blueAccent,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          
+          SizedBox(height: padding * 0.2),
+          
+          // Pitch slider (C0 to C10)
+          Builder(
+            builder: (context) => SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: Colors.blueAccent,
+                inactiveTrackColor: Colors.grey.withOpacity(0.3),
+                thumbColor: Colors.blueAccent,
+                trackHeight: (height * 0.06).clamp(2.0, 4.0),
+                thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.04).clamp(8.0, 12.0)),
+              ),
+              child: Slider(
+                value: currentPosition.toDouble(),
+                onChanged: (value) {
+                  final position = value.round();
+                  final pitch = sliderPositionToPitchMultiplier(position);
+                  sequencer.setSamplePitch(sampleIndex, pitch);
+                },
+                min: 0.0,
+                max: (getTotalNotes() - 1).toDouble(),
+                divisions: getTotalNotes() - 1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   
   Widget _buildNoSampleMessage(double height, double fontSize) {
     return Container(
@@ -283,24 +388,27 @@ class SampleSettingsWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsButton(String label, bool isSelected, double height, double fontSize) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: isSelected ? Colors.blueAccent : Colors.grey.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(height * 0.15),
-        border: Border.all(
-          color: Colors.grey.withOpacity(0.4),
-          width: 1,
+  Widget _buildSettingsButton(String label, bool isSelected, double height, double fontSize, VoidCallback? onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: height,
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.blueAccent : Colors.grey.withOpacity(0.2),
+          borderRadius: BorderRadius.circular(height * 0.15),
+          border: Border.all(
+            color: Colors.grey.withOpacity(0.4),
+            width: 1,
+          ),
         ),
-      ),
-      child: Center(
-        child: Text(
-          label,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: fontSize,
-            fontWeight: FontWeight.w500,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: fontSize,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ),
       ),

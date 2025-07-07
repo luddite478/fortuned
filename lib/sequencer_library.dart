@@ -448,4 +448,54 @@ class SequencerLibrary {
   double getCellVolume(int step, int column) {
     return _bindings.get_cell_volume(step, column);
   }
+
+  // -------------- PITCH CONTROL FUNCTIONS --------------
+  
+  /// Set pitch for a specific sample bank (0.03125 to 32.0, where 1.0 = normal, covers C0-C10)
+  bool setSampleBankPitch(int bank, double pitch) {
+    if (pitch < 0.03125 || pitch > 32.0) {
+      print('❌ Invalid pitch: $pitch (must be 0.03125-32.0 for C0-C10)');
+      return false;
+    }
+    
+    int result = _bindings.set_sample_bank_pitch(bank, pitch);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🎵 Sample bank $bank pitch set to ${pitch.toStringAsFixed(2)}');
+    } else {
+      print('❌ Failed to set sample bank $bank pitch');
+    }
+    
+    return success;
+  }
+  
+  /// Get pitch for a specific sample bank
+  double getSampleBankPitch(int bank) {
+    return _bindings.get_sample_bank_pitch(bank);
+  }
+  
+  /// Set pitch for a specific cell (0.03125 to 32.0, where 1.0 = normal, covers C0-C10)
+  bool setCellPitch(int step, int column, double pitch) {
+    if (pitch < 0.03125 || pitch > 32.0) {
+      print('❌ Invalid pitch: $pitch (must be 0.03125-32.0 for C0-C10)');
+      return false;
+    }
+    
+    int result = _bindings.set_cell_pitch(step, column, pitch);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🎵 Cell [$step,$column] pitch set to ${pitch.toStringAsFixed(2)}');
+    } else {
+      print('❌ Failed to set cell [$step,$column] pitch');
+    }
+    
+    return success;
+  }
+  
+  /// Get pitch for a specific cell
+  double getCellPitch(int step, int column) {
+    return _bindings.get_cell_pitch(step, column);
+  }
 } 

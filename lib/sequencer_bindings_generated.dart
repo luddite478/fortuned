@@ -457,6 +457,71 @@ class SequencerBindings {
   late final _get_cell_volume =
       _get_cell_volumePtr.asFunction<double Function(int, int)>();
 
+  /// Pitch control functions
+  int set_sample_bank_pitch(
+    int bank,
+    double pitch,
+  ) {
+    return _set_sample_bank_pitch(
+      bank,
+      pitch,
+    );
+  }
+
+  late final _set_sample_bank_pitchPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Float)>>(
+          'set_sample_bank_pitch');
+  late final _set_sample_bank_pitch =
+      _set_sample_bank_pitchPtr.asFunction<int Function(int, double)>();
+
+  double get_sample_bank_pitch(
+    int bank,
+  ) {
+    return _get_sample_bank_pitch(
+      bank,
+    );
+  }
+
+  late final _get_sample_bank_pitchPtr =
+      _lookup<ffi.NativeFunction<ffi.Float Function(ffi.Int)>>(
+          'get_sample_bank_pitch');
+  late final _get_sample_bank_pitch =
+      _get_sample_bank_pitchPtr.asFunction<double Function(int)>();
+
+  int set_cell_pitch(
+    int step,
+    int column,
+    double pitch,
+  ) {
+    return _set_cell_pitch(
+      step,
+      column,
+      pitch,
+    );
+  }
+
+  late final _set_cell_pitchPtr = _lookup<
+          ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int, ffi.Float)>>(
+      'set_cell_pitch');
+  late final _set_cell_pitch =
+      _set_cell_pitchPtr.asFunction<int Function(int, int, double)>();
+
+  double get_cell_pitch(
+    int step,
+    int column,
+  ) {
+    return _get_cell_pitch(
+      step,
+      column,
+    );
+  }
+
+  late final _get_cell_pitchPtr =
+      _lookup<ffi.NativeFunction<ffi.Float Function(ffi.Int, ffi.Int)>>(
+          'get_cell_pitch');
+  late final _get_cell_pitch =
+      _get_cell_pitchPtr.asFunction<double Function(int, int)>();
+
   /// Output recording/rendering functions (captures mixed grid output to WAV file)
   int start_recording(
     ffi.Pointer<ffi.Char> output_file_path,

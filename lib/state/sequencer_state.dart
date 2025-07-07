@@ -175,6 +175,8 @@ class SequencerState extends ChangeNotifier {
   // Volume control state
   late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
   late List<double> _cellVolumes; // Individual cell volumes
+  late List<double> _samplePitches; // Global sample pitches (affects all instances)
+  late Map<int, double> _cellPitches; // Individual cell pitch overrides
 
   // Grid labeling system
   List<String> _soundGridLabels = [];
@@ -227,6 +229,10 @@ class SequencerState extends ChangeNotifier {
     // Initialize volume control arrays
     _sampleVolumes = List.filled(_slotCount, 1.0); // Default to 100% volume
     _cellVolumes = List.filled(_gridColumns * _gridRows, 1.0); // Default to 100% volume
+    
+    // Initialize pitch control arrays
+    _samplePitches = List.filled(_slotCount, 1.0); // Default to normal pitch
+    _cellPitches = {}; // Empty map - cells use sample pitch by default
     
     // Start autosave timer
     _startAutosave();
@@ -2108,6 +2114,79 @@ Made with Demo Sequencer 🚀
       
       notifyListeners();
     }
+  }
+
+  /// Get sample pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
+  double getSamplePitch(int sampleIndex) {
+    if (sampleIndex >= 0 && sampleIndex < _samplePitches.length) {
+      return _samplePitches[sampleIndex];
+    }
+    return 1.0; // Default pitch
+  }
+
+  /// Set sample pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
+  void setSamplePitch(int sampleIndex, double pitch) {
+    if (sampleIndex >= 0 && sampleIndex < _samplePitches.length) {
+      final clampedPitch = pitch.clamp(0.03125, 32.0); // C0 to C10 range
+      _samplePitches[sampleIndex] = clampedPitch;
+      
+      // Apply pitch to native audio engine
+      _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
+      
+      notifyListeners();
+    }
+  }
+
+  /// Get cell pitch (returns cell override or sample bank pitch)
+  double getCellPitch(int cellIndex) {
+    // Check if cell has a pitch override
+    if (_cellPitches.containsKey(cellIndex)) {
+      return _cellPitches[cellIndex]!;
+    }
+    
+    // No override, use sample bank pitch
+    final gridSamples = _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length
+        ? _soundGridSamples[_currentSoundGridIndex]
+        : <int?>[];
+    final sampleSlot = cellIndex < gridSamples.length ? gridSamples[cellIndex] : null;
+    if (sampleSlot != null && sampleSlot >= 0 && sampleSlot < _samplePitches.length) {
+      return _samplePitches[sampleSlot];
+    }
+    
+    return 1.0; // Default pitch
+  }
+
+  /// Set cell pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
+  void setCellPitch(int cellIndex, double pitch) {
+    final clampedPitch = pitch.clamp(0.03125, 32.0); // C0 to C10 range
+    
+    // Store cell pitch override
+    _cellPitches[cellIndex] = clampedPitch;
+    
+    // Convert cellIndex to step and column for native call
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    // Store pitch in native grid - will be applied when cell is triggered
+    _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
+    
+    notifyListeners();
+  }
+
+  /// Reset cell pitch to use sample bank pitch
+  void resetCellPitch(int cellIndex) {
+    _cellPitches.remove(cellIndex);
+    
+    // Convert cellIndex to step and column for native call
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    // Set to default pitch (1.0) in native grid
+    _sequencerLibrary.setCellPitch(row, absoluteColumn, 1.0);
+    
+    notifyListeners();
   }
 
   /// Add a recording to local storage
