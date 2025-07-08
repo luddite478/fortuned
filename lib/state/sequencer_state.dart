@@ -78,7 +78,7 @@ class SampleSlot {
 
 // Sequencer state management - Complete sequencer functionality
 class SequencerState extends ChangeNotifier {
-  static const int maxSlots = 8;
+  static const int maxSlots = 16;
   
   late final SequencerLibrary _sequencerLibrary;
   late final int _slotCount;
@@ -144,6 +144,14 @@ class SequencerState extends ChangeNotifier {
     Colors.pink,
     Colors.indigo,
     Colors.teal,
+    Colors.cyan,
+    Colors.amber,
+    Colors.lime,
+    Colors.deepOrange,
+    Colors.blueGrey,
+    Colors.brown,
+    Colors.lightGreen,
+    Colors.deepPurple,
   ];
 
   // Track double-tap timing
@@ -747,6 +755,9 @@ class SequencerState extends ChangeNotifier {
   void handleBankChange(int bankIndex, BuildContext context) {
     final hasFile = _fileNames[bankIndex] != null;
     
+    // Always set as selected sample slot
+    _selectedSampleSlot = bankIndex;
+    
     if (!hasFile) {
       // Empty slot - open sample browser
       pickFileForSlot(bankIndex, context);
@@ -754,8 +765,46 @@ class SequencerState extends ChangeNotifier {
       // Loaded slot - update active bank and open sample settings
       _activeBank = bankIndex;
       setShowSampleSettings(true);
-      notifyListeners();
     }
+    notifyListeners();
+  }
+
+  void removeSample(int slot) {
+    if (slot < 0 || slot >= _slotCount) return;
+    
+    // Stop playing if currently playing
+    if (_slotPlaying[slot]) {
+      stopSlot(slot);
+    }
+    
+    // Unload from native audio engine
+    _sequencerLibrary.unloadSlot(slot);
+    
+    // Clear slot state
+    _slotLoaded[slot] = false;
+    _slotPlaying[slot] = false;
+    _filePaths[slot] = null;
+    _fileNames[slot] = null;
+    
+    // Clear any grid cells that were using this sample
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      final gridSamples = _soundGridSamples[gridIndex];
+      for (int cellIndex = 0; cellIndex < gridSamples.length; cellIndex++) {
+        if (gridSamples[cellIndex] == slot) {
+          gridSamples[cellIndex] = null;
+          // Also clear from native sequencer
+          final row = cellIndex ~/ _gridColumns;
+          final col = cellIndex % _gridColumns;
+          final absoluteColumn = gridIndex * _gridColumns + col;
+          _sequencerLibrary.clearGridCell(row, absoluteColumn);
+        }
+      }
+    }
+    
+    // Trigger autosave
+    _triggerAutosave();
+    
+    notifyListeners();
   }
 
   void handlePadPress(int padIndex) {
@@ -1019,6 +1068,19 @@ class SequencerState extends ChangeNotifier {
     _selectionStartCell = null;
     _currentSelectionCell = null;
     notifyListeners();
+  }
+
+  void clearCell(int cellIndex) {
+    final currentGrid = _getCurrentGridSamples();
+    if (cellIndex >= 0 && cellIndex < currentGrid.length) {
+      _setCurrentGridSample(cellIndex, null);
+      // Sync deletion to native sequencer using absolute column calculation
+      final row = cellIndex ~/ _gridColumns;
+      final col = cellIndex % _gridColumns;
+      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+      _sequencerLibrary.clearGridCell(row, absoluteColumn);
+      notifyListeners();
+    }
   }
 
   // Sequencer functionality with sample-accurate timing

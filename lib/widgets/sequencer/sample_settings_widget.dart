@@ -149,7 +149,10 @@ class _SampleSettingsWidgetState extends State<SampleSettingsWidget> {
                             // DEL button
                             SizedBox(
                               width: headerWidth * (delButtonPercent / 100),
-                              child: _buildSettingsButton('DEL', false, headerHeight * 0.7, labelFontSize, null),
+                              child: _buildSettingsButton('DEL', false, headerHeight * 0.7, labelFontSize, hasActiveSample ? () {
+                                sequencer.removeSample(currentSample);
+                                sequencer.setShowSampleSettings(false); // Close settings after deletion
+                              } : null),
                             ),
                             
                             // Close button

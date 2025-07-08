@@ -15,12 +15,11 @@ class SampleBanksWidget extends StatelessWidget {
             final panelHeight = constraints.maxHeight;
             final panelWidth = constraints.maxWidth;
             
-            // Use ALL available space - no minimums, just scale everything down
+            // Show 7.5 buttons (7 full + 0.5 partial) to indicate scrollability
             final availableWidth = panelWidth - 16; // Container padding
-            final buttonWidth = availableWidth / 8; // 8 buttons
+            final buttonWidth = availableWidth / 7.5; // 7.5 buttons visible
             final buttonHeight = panelHeight * 0.8; // Use 80% of given height
             final letterSize = (buttonHeight * 0.35).clamp(10.0, double.infinity); // Scale with height, min 10px
-            final iconSize = (buttonHeight * 0.25).clamp(8.0, double.infinity); // Scale with height, min 8px
             final padding = panelHeight * 0.05; // 5% of given height
             final borderRadius = buttonHeight * 0.15; // Scale with button height, similar to settings buttons
             
@@ -34,7 +33,7 @@ class SampleBanksWidget extends StatelessWidget {
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
-                  children: List.generate(8, (bank) {
+                  children: List.generate(16, (bank) {
                     final isActive = sequencer.activeBank == bank;
                     final isSelected = sequencer.selectedSampleSlot == bank;
                     final hasFile = sequencer.fileNames[bank] != null;
@@ -51,6 +50,7 @@ class SampleBanksWidget extends StatelessWidget {
                           color: _getBorderColor(isSelected, isActive, isPlaying),
                           width: _getBorderWidth(isSelected, isActive, isPlaying),
                         ),
+                        boxShadow: _getBoxShadow(isSelected, isActive, isPlaying),
                       ),
                       child: Center(
                         child: Column(
@@ -65,14 +65,6 @@ class SampleBanksWidget extends StatelessWidget {
                                 fontSize: letterSize,
                               ),
                             ),
-                            if (hasFile) ...[
-                              SizedBox(height: padding * 0.2),
-                              Icon(
-                                Icons.audiotrack,
-                                size: iconSize,
-                                color: _getIconColor(isSelected, isActive, hasFile),
-                              ),
-                            ],
                           ],
                         ),
                       ),
@@ -102,12 +94,6 @@ class SampleBanksWidget extends StatelessWidget {
                                         fontSize: letterSize,
                                       ),
                                     ),
-                                    SizedBox(height: padding * 0.2),
-                                    Icon(
-                                      Icons.audiotrack,
-                                      size: iconSize,
-                                      color: Colors.white,
-                                    ),
                                   ],
                                 ),
                               ),
@@ -129,20 +115,14 @@ class SampleBanksWidget extends StatelessWidget {
                                   mainAxisSize: MainAxisSize.min,
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text(
-                                      String.fromCharCode(65 + bank),
-                                      style: TextStyle(
-                                        color: Colors.grey,
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: letterSize,
-                                      ),
-                                    ),
-                                    SizedBox(height: padding * 0.2),
-                                    Icon(
-                                      Icons.audiotrack,
-                                      size: iconSize,
-                                      color: Colors.grey,
-                                    ),
+                                                                            Text(
+                                          String.fromCharCode(65 + bank),
+                                          style: TextStyle(
+                                            color: Colors.grey,
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: letterSize,
+                                          ),
+                                        ),
                                   ],
                                 ),
                               ),
@@ -169,42 +149,45 @@ class SampleBanksWidget extends StatelessWidget {
   }
 
   Color _getButtonColor(bool isSelected, bool isActive, bool hasFile, int bank, SequencerState sequencer) {
-    if (isSelected) {
-      return Colors.orangeAccent; // Selected for placement - orange instead of yellow
-    } else if (isActive) {
-      return Colors.blueAccent; // Active sample - blue instead of white
-    } else if (hasFile) {
-      return sequencer.bankColors[bank].withOpacity(0.6); // Sample loaded - softer opacity
+    if (hasFile) {
+      return sequencer.bankColors[bank].withOpacity(0.6); // Sample loaded - use bank color
     } else {
-      return Colors.grey.withOpacity(0.2); // Empty slot - similar to settings buttons
+      return Colors.grey.withOpacity(0.2); // Empty slot
     }
   }
 
   Color _getBorderColor(bool isSelected, bool isActive, bool isPlaying) {
-    if (isPlaying) {
+    if (isSelected) {
+      return Colors.yellowAccent; // Selected - yellow border
+    } else if (isPlaying) {
       return Colors.greenAccent; // Playing - green border
-    } else if (isSelected) {
-      return Colors.orangeAccent; // Selected - orange border
-    } else if (isActive) {
-      return Colors.blueAccent; // Active - blue border
     } else {
-      return Colors.grey.withOpacity(0.4); // Default - subtle grey border
+      return Colors.grey.withOpacity(0.4); // Default - grey border
     }
   }
 
   double _getBorderWidth(bool isSelected, bool isActive, bool isPlaying) {
-    if (isPlaying || isSelected || isActive) {
-      return 2.0; // Emphasized border for active states
+    if (isSelected || isPlaying) {
+      return 2.0; // Emphasized border for selected/playing
     } else {
-      return 1.0; // Subtle border for inactive
+      return 1.0; // Subtle border for default
     }
+  }
+
+  List<BoxShadow>? _getBoxShadow(bool isSelected, bool isActive, bool isPlaying) {
+    if (isSelected) {
+      return [
+        BoxShadow(
+          color: Colors.yellowAccent.withOpacity(0.3),
+          blurRadius: 4,
+          spreadRadius: 0,
+        )
+      ];
+    }
+    return null; // No shadow for other states
   }
 
   Color _getTextColor(bool isSelected, bool isActive, bool hasFile) {
     return Colors.white; // Always white text for good contrast
-  }
-
-  Color _getIconColor(bool isSelected, bool isActive, bool hasFile) {
-    return Colors.white70; // Slightly transparent white for icons
   }
 } 

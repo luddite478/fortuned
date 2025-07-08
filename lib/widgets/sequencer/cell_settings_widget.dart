@@ -152,7 +152,11 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
                             // DEL button
                             SizedBox(
                               width: headerWidth * (delButtonPercent / 100),
-                              child: _buildSettingsButton('DEL', false, headerHeight * 0.7, labelFontSize, null),
+                              child: _buildSettingsButton('DEL', false, headerHeight * 0.7, labelFontSize, (hasCellSelected && cellHasSample) ? () {
+                                // Clear the sample from this specific cell
+                                sequencer.clearCell(selectedCell!);
+                                sequencer.setShowCellSettings(false); // Close settings after clearing
+                              } : null),
                             ),
                             
                             // Close button
