@@ -1,8 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
 import '../screens/checkpoints_screen.dart';
+
+// Telephone book color scheme - same as other screens
+class PhoneBookColors {
+  static const Color pageBackground = Color.fromARGB(255, 250, 248, 236); // Aged paper yellow
+  static const Color entryBackground = Color.fromARGB(255, 251, 247, 231); // Slightly lighter
+  static const Color text = Color(0xFF2C2C2C); // Dark gray/black text
+  static const Color lightText = Color.fromARGB(255, 161, 161, 161); // Lighter text
+  static const Color border = Color(0xFFE8E0C7); // Aged border
+  static const Color onlineIndicator = Color(0xFF8B4513); // Brown instead of purple
+  static const Color buttonBackground = Color.fromARGB(255, 246, 244, 226); // Khaki for main button
+  static const Color buttonBorder = Color.fromARGB(255, 248, 246, 230); // Golden border
+}
+
+// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
+class SequencerPhoneBookColors {
+  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
+  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
+  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
+  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
+  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
+  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
+  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
+  static const Color border = Color(0xFF5A5A57); // Subtle borders
+  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
+}
 
 enum HeaderMode {
   checkpoints,
@@ -36,21 +62,60 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
+  bool get _isPhoneBookMode => mode == HeaderMode.checkpoints;
+  bool get _isSequencerMode => mode == HeaderMode.sequencer;
+
   @override
   Widget build(BuildContext context) {
-    return AppBar(
-      backgroundColor: const Color(0xFF111827),
-      foregroundColor: Colors.white,
-      elevation: 0,
-      leading: onBack != null 
-          ? IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.orangeAccent),
-              onPressed: onBack,
-              iconSize: 20,
+    return Container(
+      decoration: _isPhoneBookMode 
+          ? BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: PhoneBookColors.border,
+                  width: 1,
+                ),
+              ),
             )
-          : null,
-      title: _buildTitle(context),
-      actions: _buildActions(context),
+          : _isSequencerMode
+              ? BoxDecoration(
+                  border: Border(
+                    bottom: BorderSide(
+                      color: SequencerPhoneBookColors.border,
+                      width: 1,
+                    ),
+                  ),
+                )
+              : null,
+      child: AppBar(
+        backgroundColor: _isPhoneBookMode 
+            ? PhoneBookColors.entryBackground 
+            : _isSequencerMode 
+                ? SequencerPhoneBookColors.surfaceBase
+                : const Color(0xFF111827),
+        foregroundColor: _isPhoneBookMode 
+            ? PhoneBookColors.text 
+            : _isSequencerMode 
+                ? SequencerPhoneBookColors.text
+                : Colors.white,
+        elevation: 0,
+        leading: onBack != null 
+            ? IconButton(
+                icon: Icon(
+                  Icons.arrow_back, 
+                  color: _isPhoneBookMode 
+                      ? PhoneBookColors.text 
+                      : _isSequencerMode 
+                          ? SequencerPhoneBookColors.text
+                          : Colors.orangeAccent,
+                ),
+                onPressed: onBack,
+                iconSize: 20,
+              )
+            : null,
+        title: _buildTitle(context),
+        actions: _buildActions(context),
+      ),
     );
   }
 
@@ -70,15 +135,28 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
               children: [
                 Text(
                   title ?? thread?.title ?? 'Thread',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  style: _isPhoneBookMode 
+                      ? GoogleFonts.sourceSans3(
+                          fontSize: 16, 
+                          fontWeight: FontWeight.w700,
+                          color: PhoneBookColors.text,
+                          letterSpacing: 0.5,
+                        )
+                      : const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 if (subtitle != null || thread != null)
                   Text(
                     subtitle ?? '${thread?.users.length ?? 0} collaborators • ${thread?.checkpoints.length ?? 0} checkpoints',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[300],
-                    ),
+                    style: _isPhoneBookMode
+                        ? GoogleFonts.sourceSans3(
+                            fontSize: 11,
+                            color: PhoneBookColors.lightText,
+                            fontWeight: FontWeight.w400,
+                          )
+                        : TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[300],
+                          ),
                   ),
               ],
             );
@@ -104,9 +182,9 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
         builder: (context, sequencer, threadsState, child) {
           // Always show in sequencer mode - if no thread exists, we'll handle it in navigation
           return IconButton(
-            icon: const Icon(
+            icon: Icon(
               Icons.format_list_bulleted, // 3 horizontal lines with dots
-              color: Colors.orangeAccent,
+              color: SequencerPhoneBookColors.accent,
             ),
             onPressed: () => _navigateToCheckpoints(context, sequencer, threadsState),
             iconSize: 18,
@@ -145,7 +223,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
           return IconButton(
             icon: Icon(
               showSendIcon ? Icons.send : Icons.save,
-              color: Colors.orangeAccent,
+              color: SequencerPhoneBookColors.accent,
             ),
             onPressed: () => _sendCheckpoint(context, sequencer, threadsState),
             iconSize: 18,
@@ -162,10 +240,13 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
             onPressed: () => sequencer.setShowShareWidget(!sequencer.isShowingShareWidget),
             child: Text(
               'Share',
-              style: TextStyle(
-                color: sequencer.isShowingShareWidget ? Colors.purpleAccent : Colors.purpleAccent.withOpacity(0.7),
+              style: GoogleFonts.sourceSans3(
+                color: sequencer.isShowingShareWidget 
+                    ? SequencerPhoneBookColors.accent 
+                    : SequencerPhoneBookColors.lightText,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
+                letterSpacing: 0.3,
               ),
             ),
           );
@@ -183,8 +264,8 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
+                    color: SequencerPhoneBookColors.accent.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2), // Sharp corners
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -192,19 +273,19 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                       Container(
                         width: 4,
                         height: 4,
-                        decoration: const BoxDecoration(
-                          color: Colors.red,
+                        decoration: BoxDecoration(
+                          color: SequencerPhoneBookColors.accent,
                           shape: BoxShape.circle,
                         ),
                       ),
                       const SizedBox(width: 2),
                       Text(
                         sequencer.formattedRecordingDuration,
-                        style: const TextStyle(
-                          color: Colors.red,
+                        style: GoogleFonts.sourceSans3(
+                          color: SequencerPhoneBookColors.accent,
                           fontSize: 8,
-                          fontFamily: 'monospace',
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ],
@@ -217,7 +298,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
               IconButton(
                 icon: Icon(
                   sequencer.isRecording ? Icons.stop : Icons.fiber_manual_record,
-                  color: Colors.red,
+                  color: SequencerPhoneBookColors.accent,
                 ),
                 onPressed: () {
                   if (sequencer.isRecording) {
@@ -235,7 +316,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
               IconButton(
                 icon: Icon(
                   sequencer.isSequencerPlaying ? Icons.stop : Icons.play_arrow,
-                  color: Colors.greenAccent,
+                  color: SequencerPhoneBookColors.accent,
                 ),
                 onPressed: () {
                   if (sequencer.isSequencerPlaying) {
@@ -256,7 +337,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       // Save checkpoint - only show when callback provided
       if (onSave != null)
         IconButton(
-          icon: const Icon(Icons.save, color: Colors.amberAccent),
+          icon: Icon(Icons.save, color: SequencerPhoneBookColors.accent),
           onPressed: onSave,
           iconSize: 16,
           padding: const EdgeInsets.all(4),
@@ -269,7 +350,10 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     return [
       if (showProjectInfo && onInfo != null)
         IconButton(
-          icon: const Icon(Icons.info_outline),
+          icon: Icon(
+            Icons.info_outline,
+            color: _isPhoneBookMode ? PhoneBookColors.text : Colors.white,
+          ),
           onPressed: onInfo,
           iconSize: 18,
         ),

@@ -1,6 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../state/sequencer_state.dart';
+
+// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
+class SequencerPhoneBookColors {
+  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
+  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
+  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
+  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
+  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
+  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
+  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
+  static const Color border = Color(0xFF5A5A57); // Subtle borders
+  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
+}
 
 class EditButtonsWidget extends StatelessWidget {
   const EditButtonsWidget({super.key});
@@ -21,87 +35,101 @@ class EditButtonsWidget extends StatelessWidget {
             return Container(
               padding: EdgeInsets.symmetric(horizontal: panelHeight * 0.1), // Only horizontal padding
               decoration: BoxDecoration(
-                color: const Color.fromARGB(255, 0, 0, 0),
-                borderRadius: BorderRadius.circular(8),
-                // border: Border.all(
-                //   color: const Color.fromARGB(255, 17, 181, 22).withOpacity(0.3),
-                //   width: 4,
-                // ),
+                color: SequencerPhoneBookColors.surfaceBase,
+                borderRadius: BorderRadius.circular(2), // Sharp corners
+                border: Border.all(
+                  color: SequencerPhoneBookColors.border,
+                  width: 0.5,
+                ),
+                boxShadow: [
+                  // Protruding effect
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.shadow,
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
+                  // Undo button
+                  _buildEditButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    icon: Icons.undo,
+                    color: sequencer.canUndo
+                        ? SequencerPhoneBookColors.accent
+                        : SequencerPhoneBookColors.lightText,
+                    onPressed: sequencer.canUndo
+                        ? () => sequencer.undo()
+                        : null,
+                    tooltip: sequencer.canUndo 
+                        ? 'Undo: ${sequencer.currentUndoDescription}'
+                        : 'Nothing to Undo',
+                  ),
+                  // Redo button
+                  _buildEditButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    icon: Icons.redo,
+                    color: sequencer.canRedo
+                        ? SequencerPhoneBookColors.accent
+                        : SequencerPhoneBookColors.lightText,
+                    onPressed: sequencer.canRedo
+                        ? () => sequencer.redo()
+                        : null,
+                    tooltip: sequencer.canRedo 
+                        ? 'Redo'
+                        : 'Nothing to Redo',
+                  ),
                   // Selection Mode Toggle button
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        sequencer.isInSelectionMode ? Icons.check_box : Icons.check_box_outline_blank,
-                        color: sequencer.isInSelectionMode ? Colors.cyanAccent : Colors.grey,
-                        size: iconSize,
-                      ),
-                      onPressed: () => sequencer.toggleSelectionMode(),
-                      tooltip: sequencer.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
-                    ),
+                  _buildEditButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    icon: sequencer.isInSelectionMode ? Icons.check_box : Icons.check_box_outline_blank,
+                    color: sequencer.isInSelectionMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText,
+                    onPressed: () => sequencer.toggleSelectionMode(),
+                    tooltip: sequencer.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
                   ),
                   // Delete button
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        Icons.delete,
-                        color: sequencer.selectedGridCells.isNotEmpty
-                            ? Colors.redAccent
-                            : Colors.grey,
-                        size: iconSize,
-                      ),
-                      onPressed: sequencer.selectedGridCells.isNotEmpty
-                          ? () => sequencer.deleteSelectedCells()
-                          : null,
-                      tooltip: 'Delete Selected Cells',
-                    ),
+                  _buildEditButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    icon: Icons.delete,
+                    color: sequencer.selectedGridCells.isNotEmpty
+                        ? SequencerPhoneBookColors.accent.withOpacity(0.8)
+                        : SequencerPhoneBookColors.lightText,
+                    onPressed: sequencer.selectedGridCells.isNotEmpty
+                        ? () => sequencer.deleteSelectedCells()
+                        : null,
+                    tooltip: 'Delete Selected Cells',
                   ),
                   // Copy button
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        Icons.copy,
-                        color: sequencer.selectedGridCells.isNotEmpty
-                            ? Colors.cyanAccent
-                            : Colors.grey,
-                        size: iconSize,
-                      ),
-                      onPressed: sequencer.selectedGridCells.isNotEmpty
-                          ? () => sequencer.copySelectedCells()
-                          : null,
-                      tooltip: 'Copy Selected Cells',
-                    ),
+                  _buildEditButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    icon: Icons.copy,
+                    color: sequencer.selectedGridCells.isNotEmpty
+                        ? SequencerPhoneBookColors.accent
+                        : SequencerPhoneBookColors.lightText,
+                    onPressed: sequencer.selectedGridCells.isNotEmpty
+                        ? () => sequencer.copySelectedCells()
+                        : null,
+                    tooltip: 'Copy Selected Cells',
                   ),
                   // Paste button
-                  SizedBox(
-                    width: buttonSize,
-                    height: buttonSize,
-                    child: IconButton(
-                      padding: EdgeInsets.zero,
-                      icon: Icon(
-                        Icons.paste,
-                        color: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
-                            ? Colors.greenAccent
-                            : Colors.grey,
-                        size: iconSize,
-                      ),
-                      onPressed: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
-                          ? () => sequencer.pasteToSelectedCells()
-                          : null,
-                      tooltip: 'Paste to Selected Cells',
-                    ),
+                  _buildEditButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    icon: Icons.paste,
+                    color: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
+                        ? SequencerPhoneBookColors.accent
+                        : SequencerPhoneBookColors.lightText,
+                    onPressed: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
+                        ? () => sequencer.pasteToSelectedCells()
+                        : null,
+                    tooltip: 'Paste to Selected Cells',
                   ),
                 ],
               ),
@@ -109,6 +137,69 @@ class EditButtonsWidget extends StatelessWidget {
           },
         );
       },
+    );
+  }
+
+  Widget _buildEditButton({
+    required double size,
+    required double iconSize,
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onPressed,
+    required String tooltip,
+  }) {
+    final isEnabled = onPressed != null;
+    
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: isEnabled 
+            ? SequencerPhoneBookColors.surfaceRaised 
+            : SequencerPhoneBookColors.surfacePressed,
+        borderRadius: BorderRadius.circular(2), // Sharp corners
+        border: Border.all(
+          color: SequencerPhoneBookColors.border,
+          width: 0.5,
+        ),
+        boxShadow: isEnabled
+            ? [
+                // Protruding effect for enabled buttons
+                BoxShadow(
+                  color: SequencerPhoneBookColors.shadow,
+                  blurRadius: 1.5,
+                  offset: const Offset(0, 1),
+                ),
+                BoxShadow(
+                  color: SequencerPhoneBookColors.surfaceRaised,
+                  blurRadius: 0.5,
+                  offset: const Offset(0, -0.5),
+                ),
+              ]
+            : [
+                // Recessed effect for disabled buttons
+                BoxShadow(
+                  color: SequencerPhoneBookColors.shadow,
+                  blurRadius: 1,
+                  offset: const Offset(0, 0.5),
+                ),
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(2),
+          child: Container(
+            padding: EdgeInsets.zero,
+            child: Icon(
+              icon,
+              color: color,
+              size: iconSize,
+            ),
+          ),
+        ),
+      ),
     );
   }
 } 

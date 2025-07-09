@@ -6,7 +6,7 @@ import '../widgets/sequencer_widget.dart';
 import '../widgets/checkpoint_message_widget.dart';
 import '../widgets/app_header_widget.dart';
 import '../widgets/sequencer/top_multitask_panel_widget.dart';
-import '../widgets/sequencer/sample_banks_widget.dart';
+import '../widgets/sequencer/sample_banks_widget.dart'; // Legacy - commented out
 import '../widgets/sequencer/sound_grid_widget.dart';
 import '../widgets/sequencer/edit_buttons_widget.dart';
 

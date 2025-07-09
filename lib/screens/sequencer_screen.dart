@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../widgets/sequencer/top_multitask_panel_widget.dart';
-import '../widgets/sequencer/sample_banks_widget.dart';
+import '../widgets/sequencer/sample_banks_widget.dart'; // Legacy - commented out
 import '../widgets/sequencer/sound_grid_widget.dart';
 import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../widgets/app_header_widget.dart';
@@ -11,6 +12,19 @@ import '../state/threads_state.dart';
 import '../services/chat_client.dart';
 
 import 'checkpoints_screen.dart';
+
+// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
+class SequencerPhoneBookColors {
+  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
+  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
+  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
+  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
+  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
+  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
+  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
+  static const Color border = Color(0xFF5A5A57); // Subtle borders
+  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
+}
 
 class PatternScreen extends StatefulWidget {
   const PatternScreen({super.key});
@@ -130,7 +144,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: SequencerPhoneBookColors.pageBackground,
       appBar: AppHeaderWidget(
         mode: HeaderMode.sequencer,
         onBack: () => Navigator.of(context).pop(),

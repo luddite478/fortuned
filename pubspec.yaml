@@ -55,6 +55,7 @@ dependencies:
   flutter_dotenv: ^5.1.0
   ffi: ^2.1.0
   docman: ^1.2.0
+  google_fonts: ^6.1.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

@@ -17,6 +17,93 @@ import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
 import '../services/threads_service.dart';
 
+// Undo-Redo System for Sequencer State
+enum UndoRedoActionType {
+  gridCellChange,
+  sampleLoad,
+  sampleRemove,
+  volumeChange,
+  pitchChange,
+  gridAdd,
+  gridRemove,
+  gridReorder,
+  multipleCellChange, // For batch operations like copy/paste/delete
+}
+
+class UndoRedoAction {
+  final UndoRedoActionType type;
+  final int timestamp;
+  final Map<String, dynamic> beforeState;
+  final Map<String, dynamic> afterState;
+  final String description;
+
+  UndoRedoAction({
+    required this.type,
+    required this.beforeState,
+    required this.afterState,
+    required this.description,
+  }) : timestamp = DateTime.now().millisecondsSinceEpoch;
+
+  @override
+  String toString() => '$description (${type.name})';
+}
+
+class UndoRedoManager {
+  static const int maxHistorySize = 100;
+  final List<UndoRedoAction> _history = [];
+  int _currentIndex = -1;
+
+  bool get canUndo => _currentIndex >= 0;
+  bool get canRedo => _currentIndex < _history.length - 1;
+  int get historySize => _history.length;
+  String? get currentActionDescription => canUndo ? _history[_currentIndex].description : null;
+
+  void addAction(UndoRedoAction action) {
+    // Remove any actions after current index (when adding new action after undo)
+    if (_currentIndex < _history.length - 1) {
+      _history.removeRange(_currentIndex + 1, _history.length);
+    }
+
+    // Add new action
+    _history.add(action);
+    _currentIndex = _history.length - 1;
+
+    // Maintain max history size
+    while (_history.length > maxHistorySize) {
+      _history.removeAt(0);
+      _currentIndex--;
+    }
+
+    debugPrint('🔄 Added undo action: ${action.description} (${_history.length} actions, index: $_currentIndex)');
+  }
+
+  UndoRedoAction? undo() {
+    if (!canUndo) return null;
+    final action = _history[_currentIndex];
+    _currentIndex--;
+    debugPrint('↶ Undo: ${action.description} (index now: $_currentIndex)');
+    return action;
+  }
+
+  UndoRedoAction? redo() {
+    if (!canRedo) return null;
+    _currentIndex++;
+    final action = _history[_currentIndex];
+    debugPrint('↷ Redo: ${action.description} (index now: $_currentIndex)');
+    return action;
+  }
+
+  void clear() {
+    _history.clear();
+    _currentIndex = -1;
+    debugPrint('🗑️ Cleared undo history');
+  }
+
+  List<String> getHistoryDescriptions() {
+    return _history.map((action) => action.description).toList();
+  }
+}
+
 // Sample browser item model
 class SampleBrowserItem {
   final String name;
@@ -199,6 +286,212 @@ class SequencerState extends ChangeNotifier {
   // Collaboration getters
   bool get isCollaborating => _isCollaborating;
   Thread? get sourceThread => _sourceThread;
+
+  // Undo-Redo getters
+  bool get canUndo => _undoRedoManager.canUndo;
+  bool get canRedo => _undoRedoManager.canRedo;
+  int get undoHistorySize => _undoRedoManager.historySize;
+  String? get currentUndoDescription => _undoRedoManager.currentActionDescription;
+
+  // Undo-Redo Core Methods
+  void undo() {
+    if (!canUndo || _isPerformingUndoRedo) return;
+    
+    // Flush any pending debounced actions before undoing
+    _flushPendingUndoAction();
+    
+    _isPerformingUndoRedo = true;
+    final action = _undoRedoManager.undo();
+    if (action != null) {
+      _applyUndoRedoState(action.beforeState, isUndo: true);
+      notifyListeners();
+    }
+    _isPerformingUndoRedo = false;
+  }
+
+  void redo() {
+    if (!canRedo || _isPerformingUndoRedo) return;
+    
+    // Flush any pending debounced actions before redoing
+    _flushPendingUndoAction();
+    
+    _isPerformingUndoRedo = true;
+    final action = _undoRedoManager.redo();
+    if (action != null) {
+      _applyUndoRedoState(action.afterState, isUndo: false);
+      notifyListeners();
+    }
+    _isPerformingUndoRedo = false;
+  }
+
+  // Helper method to flush any pending debounced undo action immediately
+  void _flushPendingUndoAction() {
+    if (_pendingUndoBeforeState != null) {
+      _undoDebounceTimer?.cancel();
+      
+      final action = UndoRedoAction(
+        type: _pendingUndoType!,
+        beforeState: _pendingUndoBeforeState!,
+        afterState: _captureCurrentState(),
+        description: _pendingUndoDescription!,
+      );
+
+      _undoRedoManager.addAction(action);
+
+      // Clear pending state
+      _pendingUndoBeforeState = null;
+      _pendingUndoDescription = null;
+      _pendingUndoType = null;
+    }
+  }
+
+  void clearUndoHistory() {
+    _flushPendingUndoAction();
+    _undoRedoManager.clear();
+    notifyListeners();
+  }
+
+  // Helper method to capture current state for undo-redo
+  Map<String, dynamic> _captureCurrentState() {
+    return {
+      'soundGridSamples': _soundGridSamples.map((grid) => List<int?>.from(grid)).toList(),
+      'filePaths': List<String?>.from(_filePaths),
+      'fileNames': List<String?>.from(_fileNames),
+      'slotLoaded': List<bool>.from(_slotLoaded),
+      'sampleVolumes': List<double>.from(_sampleVolumes),
+      'samplePitches': List<double>.from(_samplePitches),
+      'cellVolumes': List<double>.from(_cellVolumes),
+      'cellPitches': Map<int, double>.from(_cellPitches),
+      'soundGridLabels': List<String>.from(_soundGridLabels),
+      'soundGridOrder': List<int>.from(_soundGridOrder),
+      'bpm': _bpm,
+    };
+  }
+
+  // Helper method to apply state from undo-redo
+  void _applyUndoRedoState(Map<String, dynamic> state, {required bool isUndo}) {
+    // Apply sound grid samples
+    if (state.containsKey('soundGridSamples')) {
+      final gridSamples = (state['soundGridSamples'] as List<dynamic>)
+          .map((grid) => (grid as List<dynamic>).cast<int?>())
+          .toList();
+      _soundGridSamples.clear();
+      _soundGridSamples.addAll(gridSamples);
+    }
+
+    // Apply sample data
+    if (state.containsKey('filePaths')) {
+      _filePaths = (state['filePaths'] as List<dynamic>).cast<String?>();
+    }
+    if (state.containsKey('fileNames')) {
+      _fileNames = (state['fileNames'] as List<dynamic>).cast<String?>();
+    }
+    if (state.containsKey('slotLoaded')) {
+      _slotLoaded = (state['slotLoaded'] as List<dynamic>).cast<bool>();
+    }
+
+    // Apply volume and pitch settings
+    if (state.containsKey('sampleVolumes')) {
+      _sampleVolumes = (state['sampleVolumes'] as List<dynamic>).cast<double>();
+    }
+    if (state.containsKey('samplePitches')) {
+      _samplePitches = (state['samplePitches'] as List<dynamic>).cast<double>();
+    }
+    if (state.containsKey('cellVolumes')) {
+      _cellVolumes = (state['cellVolumes'] as List<dynamic>).cast<double>();
+    }
+    if (state.containsKey('cellPitches')) {
+      _cellPitches = Map<int, double>.from(state['cellPitches'] as Map);
+    }
+
+    // Apply grid metadata
+    if (state.containsKey('soundGridLabels')) {
+      _soundGridLabels = (state['soundGridLabels'] as List<dynamic>).cast<String>();
+    }
+    if (state.containsKey('soundGridOrder')) {
+      _soundGridOrder = (state['soundGridOrder'] as List<dynamic>).cast<int>();
+    }
+
+    // Apply BPM
+    if (state.containsKey('bpm')) {
+      _bpm = state['bpm'] as int;
+    }
+
+    // Sync changes to native sequencer
+    _syncGridToSequencer();
+
+    debugPrint('🔄 Applied ${isUndo ? 'undo' : 'redo'} state successfully');
+  }
+
+  // Helper method to record an undo action
+  void _recordUndoAction({
+    required UndoRedoActionType type,
+    required String description,
+    Map<String, dynamic>? beforeState,
+    Map<String, dynamic>? afterState,
+  }) {
+    if (_isPerformingUndoRedo) return; // Don't record actions during undo/redo
+
+    final before = beforeState ?? _captureCurrentState();
+    final after = afterState ?? _captureCurrentState();
+
+    final action = UndoRedoAction(
+      type: type,
+      beforeState: before,
+      afterState: after,
+      description: description,
+    );
+
+    _undoRedoManager.addAction(action);
+  }
+
+  // Helper method to record undo action with debouncing for rapid changes (like sliders)
+  void _recordDebouncedUndoAction({
+    required UndoRedoActionType type,
+    required String description,
+    Map<String, dynamic>? beforeState,
+  }) {
+    if (_isPerformingUndoRedo) return; // Don't record actions during undo/redo
+
+    // If this is the first change in a sequence, capture the initial state
+    if (_pendingUndoBeforeState == null) {
+      _pendingUndoBeforeState = beforeState ?? _captureCurrentState();
+      _pendingUndoType = type;
+      _pendingUndoDescription = description;
+    } else {
+      // Update the description to reflect the latest change
+      _pendingUndoDescription = description;
+    }
+
+    // Cancel any existing timer
+    _undoDebounceTimer?.cancel();
+
+    // Start new timer - will trigger after user stops making changes
+    _undoDebounceTimer = Timer(_undoDebounceDelay, () {
+      if (_pendingUndoBeforeState != null) {
+        final action = UndoRedoAction(
+          type: _pendingUndoType!,
+          beforeState: _pendingUndoBeforeState!,
+          afterState: _captureCurrentState(),
+          description: _pendingUndoDescription!,
+        );
+
+        _undoRedoManager.addAction(action);
+
+        // Clear pending state
+        _pendingUndoBeforeState = null;
+        _pendingUndoDescription = null;
+        _pendingUndoType = null;
+      }
+    });
+  }
+
+  // Helper method to get a human-readable cell position string
+  String _getCellPositionString(int cellIndex) {
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    return 'R${row + 1}C${col + 1}'; // 1-indexed for user display
+  }
   
   // Testing/Debug getters and setters
   bool get clearSavedDataOnInit => _clearSavedDataOnInit;
@@ -220,6 +513,17 @@ class SequencerState extends ChangeNotifier {
   
   // Testing/Debug functionality
   bool _clearSavedDataOnInit = true; // Set to true to start fresh, ignoring autosaved data
+
+  // Undo-Redo Manager
+  final UndoRedoManager _undoRedoManager = UndoRedoManager();
+  bool _isPerformingUndoRedo = false; // Flag to prevent recording undo actions during undo/redo
+
+  // Debounced undo recording for rapid changes (like sliders)
+  Timer? _undoDebounceTimer;
+  Map<String, dynamic>? _pendingUndoBeforeState;
+  String? _pendingUndoDescription;
+  UndoRedoActionType? _pendingUndoType;
+  static const Duration _undoDebounceDelay = Duration(milliseconds: 800); // 800ms delay
 
   // Initialize sequencer
   SequencerState() {
@@ -565,6 +869,13 @@ class SequencerState extends ChangeNotifier {
     if (_sampleSelectionSlot == null) return;
     
     try {
+      // Flush any pending debounced actions before sample loading
+      _flushPendingUndoAction();
+      
+      // Capture state before loading sample
+      final beforeState = _captureCurrentState();
+      final slot = _sampleSelectionSlot!;
+      
       String finalPath = path;
       
       // Check if this is a bundled asset path (starts with "samples/")
@@ -574,12 +885,19 @@ class SequencerState extends ChangeNotifier {
         print('📁 Copied to temp file: $finalPath');
       }
       
-      _filePaths[_sampleSelectionSlot!] = finalPath;
-      _fileNames[_sampleSelectionSlot!] = name;
-      _slotLoaded[_sampleSelectionSlot!] = false;
+      _filePaths[slot] = finalPath;
+      _fileNames[slot] = name;
+      _slotLoaded[slot] = false;
       
       // Always load sample to memory immediately
-      loadSlot(_sampleSelectionSlot!);
+      loadSlot(slot);
+      
+      // Record undo action
+      _recordUndoAction(
+        type: UndoRedoActionType.sampleLoad,
+        description: 'Load Sample ${String.fromCharCode(65 + slot)}: $name',
+        beforeState: beforeState,
+      );
       
       // Close sample selection
       cancelSampleSelection();
@@ -772,6 +1090,13 @@ class SequencerState extends ChangeNotifier {
   void removeSample(int slot) {
     if (slot < 0 || slot >= _slotCount) return;
     
+    // Flush any pending debounced actions before sample removal
+    _flushPendingUndoAction();
+    
+    // Capture state before removal (including sample name for description)
+    final beforeState = _captureCurrentState();
+    final sampleName = _fileNames[slot] ?? 'Sample ${String.fromCharCode(65 + slot)}';
+    
     // Stop playing if currently playing
     if (_slotPlaying[slot]) {
       stopSlot(slot);
@@ -800,6 +1125,13 @@ class SequencerState extends ChangeNotifier {
         }
       }
     }
+    
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.sampleRemove,
+      description: 'Remove $sampleName',
+      beforeState: beforeState,
+    );
     
     // Trigger autosave
     _triggerAutosave();
@@ -1018,6 +1350,13 @@ class SequencerState extends ChangeNotifier {
   void pasteToSelectedCells() {
     if (!_hasClipboardData || _selectedGridCells.isEmpty) return;
 
+    // Flush any pending debounced actions before paste operation
+    _flushPendingUndoAction();
+
+    // Capture state before pasting
+    final beforeState = _captureCurrentState();
+    int pastedCells = 0;
+
     // Find the top-left corner of the current selection
     int minRow = _gridRows;
     int minCol = _gridColumns;
@@ -1044,13 +1383,29 @@ class SequencerState extends ChangeNotifier {
           targetCol >= 0 && targetCol < _gridColumns) {
         final targetIndex = targetRow * _gridColumns + targetCol;
         _setCurrentGridSample(targetIndex, sampleSlot);
+        pastedCells++;
       }
     }
+
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.multipleCellChange,
+      description: 'Paste to $pastedCells cells',
+      beforeState: beforeState,
+    );
+
     notifyListeners();
   }
 
   void deleteSelectedCells() {
     if (_selectedGridCells.isEmpty) return;
+
+    // Flush any pending debounced actions before delete operation
+    _flushPendingUndoAction();
+
+    // Capture state before deletion
+    final beforeState = _captureCurrentState();
+    final deletedCount = _selectedGridCells.length;
 
     final currentGrid = _getCurrentGridSamples();
     for (int cellIndex in _selectedGridCells) {
@@ -1063,6 +1418,14 @@ class SequencerState extends ChangeNotifier {
         _sequencerLibrary.clearGridCell(row, absoluteColumn);
       }
     }
+
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.multipleCellChange,
+      description: 'Delete $deletedCount cells',
+      beforeState: beforeState,
+    );
+
     // Clear selection after deletion
     _selectedGridCells.clear();
     _selectionStartCell = null;
@@ -1168,8 +1531,15 @@ class SequencerState extends ChangeNotifier {
   
   // Update grid cell and sync to sequencer
   void placeSampleInGrid(int sampleSlot, int cellIndex) {
+    // Flush any pending debounced actions before grid changes
+    _flushPendingUndoAction();
+    
+    // Capture state before making changes
+    final beforeState = _captureCurrentState();
+    
     if (_selectedGridCells.isNotEmpty) {
       // Place sample in all selected cells
+      final cellCount = _selectedGridCells.length;
       for (int selectedIndex in _selectedGridCells) {
         _setCurrentGridSample(selectedIndex, sampleSlot);
         // Sync to sequencer using absolute column calculation
@@ -1179,6 +1549,13 @@ class SequencerState extends ChangeNotifier {
         _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
       }
       _selectedGridCells.clear();
+      
+      // Record undo action for multiple cells
+      _recordUndoAction(
+        type: UndoRedoActionType.multipleCellChange,
+        description: 'Place Sample ${String.fromCharCode(65 + sampleSlot)} in $cellCount cells',
+        beforeState: beforeState,
+      );
     } else {
       // Place sample in just this cell
       _setCurrentGridSample(cellIndex, sampleSlot);
@@ -1187,6 +1564,14 @@ class SequencerState extends ChangeNotifier {
       final col = cellIndex % _gridColumns;
       final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
       _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+      
+      // Record undo action for single cell
+      final cellPosition = _getCellPositionString(cellIndex);
+      _recordUndoAction(
+        type: UndoRedoActionType.gridCellChange,
+        description: 'Place Sample ${String.fromCharCode(65 + sampleSlot)} at $cellPosition',
+        beforeState: beforeState,
+      );
     }
     notifyListeners();
   }
@@ -1756,6 +2141,8 @@ Made with Demo Sequencer 🚀
   }
 
   void addSoundGrid() {
+    // Capture state before adding grid
+    final beforeState = _captureCurrentState();
     final newGridIndex = _soundGridSamples.length;
     
     // Add new empty grid
@@ -1765,6 +2152,13 @@ Made with Demo Sequencer 🚀
     // Reconfigure native columns
     final nativeTableColumns = numSoundGrids * _gridColumns;
     _sequencerLibrary.configureColumns(nativeTableColumns);
+    
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.gridAdd,
+      description: 'Add Sound Grid ${newGridIndex + 1}',
+      beforeState: beforeState,
+    );
     
     print('➕ Added sound grid $newGridIndex (total: $numSoundGrids grids = $nativeTableColumns native columns)');
     notifyListeners();
@@ -1776,6 +2170,8 @@ Made with Demo Sequencer 🚀
       return;
     }
     
+    // Capture state before removing grid
+    final beforeState = _captureCurrentState();
     final removedGridIndex = _soundGridSamples.length - 1;
     
     // Remove the last grid
@@ -1790,6 +2186,13 @@ Made with Demo Sequencer 🚀
     // Reconfigure native columns
     final nativeTableColumns = numSoundGrids * _gridColumns;
     _sequencerLibrary.configureColumns(nativeTableColumns);
+    
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.gridRemove,
+      description: 'Remove Sound Grid ${removedGridIndex + 1}',
+      beforeState: beforeState,
+    );
     
     print('➖ Removed sound grid $removedGridIndex (total: $numSoundGrids grids = $nativeTableColumns native columns)');
     notifyListeners();
@@ -2147,11 +2550,21 @@ Made with Demo Sequencer 🚀
   /// Set sample volume (0.0 to 1.0)
   void setSampleVolume(int sampleIndex, double volume) {
     if (sampleIndex >= 0 && sampleIndex < _sampleVolumes.length) {
+      // Capture state before change (only if this is the first change in sequence)
+      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
       final clampedVolume = volume.clamp(0.0, 1.0);
+      
       _sampleVolumes[sampleIndex] = clampedVolume;
       
       // Apply volume to native audio engine
       _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
+      
+      // Record debounced undo action (will only record after user stops adjusting)
+      _recordDebouncedUndoAction(
+        type: UndoRedoActionType.volumeChange,
+        description: 'Set Sample ${String.fromCharCode(65 + sampleIndex)} Volume: ${(clampedVolume * 100).round()}%',
+        beforeState: beforeState,
+      );
       
       notifyListeners();
     }
@@ -2168,7 +2581,10 @@ Made with Demo Sequencer 🚀
   /// Set cell volume (0.0 to 1.0)
   void setCellVolume(int cellIndex, double volume) {
     if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
+      // Capture state before change (only if this is the first change in sequence)
+      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
       final clampedVolume = volume.clamp(0.0, 1.0);
+      
       _cellVolumes[cellIndex] = clampedVolume;
       
       // Convert cellIndex to step and column for native call
@@ -2178,6 +2594,14 @@ Made with Demo Sequencer 🚀
       
       // Store volume in native grid - will be applied when cell is triggered
       _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
+      
+      // Record debounced undo action (will only record after user stops adjusting)
+      final cellPosition = _getCellPositionString(cellIndex);
+      _recordDebouncedUndoAction(
+        type: UndoRedoActionType.volumeChange,
+        description: 'Set Cell $cellPosition Volume: ${(clampedVolume * 100).round()}%',
+        beforeState: beforeState,
+      );
       
       notifyListeners();
     }
@@ -2194,11 +2618,21 @@ Made with Demo Sequencer 🚀
   /// Set sample pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
   void setSamplePitch(int sampleIndex, double pitch) {
     if (sampleIndex >= 0 && sampleIndex < _samplePitches.length) {
+      // Capture state before change (only if this is the first change in sequence)
+      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
       final clampedPitch = pitch.clamp(0.03125, 32.0); // C0 to C10 range
+      
       _samplePitches[sampleIndex] = clampedPitch;
       
       // Apply pitch to native audio engine
       _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
+      
+      // Record debounced undo action (will only record after user stops adjusting)
+      _recordDebouncedUndoAction(
+        type: UndoRedoActionType.pitchChange,
+        description: 'Set Sample ${String.fromCharCode(65 + sampleIndex)} Pitch: ${clampedPitch.toStringAsFixed(2)}x',
+        beforeState: beforeState,
+      );
       
       notifyListeners();
     }
@@ -2225,6 +2659,8 @@ Made with Demo Sequencer 🚀
 
   /// Set cell pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
   void setCellPitch(int cellIndex, double pitch) {
+    // Capture state before change (only if this is the first change in sequence)
+    final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
     final clampedPitch = pitch.clamp(0.03125, 32.0); // C0 to C10 range
     
     // Store cell pitch override
@@ -2237,6 +2673,14 @@ Made with Demo Sequencer 🚀
     
     // Store pitch in native grid - will be applied when cell is triggered
     _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
+    
+    // Record debounced undo action (will only record after user stops adjusting)
+    final cellPosition = _getCellPositionString(cellIndex);
+    _recordDebouncedUndoAction(
+      type: UndoRedoActionType.pitchChange,
+      description: 'Set Cell $cellPosition Pitch: ${clampedPitch.toStringAsFixed(2)}x',
+      beforeState: beforeState,
+    );
     
     notifyListeners();
   }

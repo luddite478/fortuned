@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../services/chat_client.dart';
 import '../services/user_profile_service.dart';
 import '../services/auth_service.dart';
@@ -14,6 +15,18 @@ import '../state/sequencer_state.dart';
 import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:path/path.dart' as p;
+
+// Telephone book color scheme
+class PhoneBookColors {
+  static const Color pageBackground = Color.fromARGB(255, 250, 248, 236); // Aged paper yellow
+  static const Color entryBackground = Color.fromARGB(255, 251, 247, 231); // Slightly lighter
+  static const Color text = Color(0xFF2C2C2C); // Dark gray/black text
+  static const Color lightText = Color.fromARGB(255, 161, 161, 161); // Lighter text
+  static const Color border = Color(0xFFE8E0C7); // Aged border
+  static const Color onlineIndicator = Color(0xFF8B4513); // Brown instead of purple
+  static const Color buttonBackground = Color.fromARGB(255, 246, 244, 226); // Khaki for main button
+  static const Color buttonBorder = Color.fromARGB(255, 248, 246, 230); // Golden border
+}
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({Key? key}) : super(key: key);
@@ -125,8 +138,6 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       ));
     }
     
-    // REMOVED: No longer add WebSocket client IDs as fake users
-    // This was causing the "_mobile" users to appear
     
     return users;
   }
@@ -134,7 +145,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5), // Light gray background
+      backgroundColor: PhoneBookColors.pageBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -150,17 +161,23 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
             // Users List
             Expanded(
               child: _isLoading
-                  ? const Center(
-                      child: CircularProgressIndicator(color: Color(0xFF6B7280)),
+                  ? Center(
+                      child: CircularProgressIndicator(color: PhoneBookColors.lightText),
                     )
                   : _error != null
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const Icon(Icons.error_outline, color: Color(0xFF6B7280), size: 48),
+                              Icon(Icons.error_outline, color: PhoneBookColors.lightText, size: 48),
                               const SizedBox(height: 12),
-                              Text(_error!, style: const TextStyle(color: Color(0xFF6B7280))),
+                              Text(
+                                _error!, 
+                                style: GoogleFonts.sourceSans3(
+                                  color: PhoneBookColors.lightText,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
                               const SizedBox(height: 12),
                               ElevatedButton(
                                 onPressed: () {
@@ -170,7 +187,17 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                                   });
                                   _loadUserProfiles();
                                 },
-                                child: const Text('RETRY'),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: PhoneBookColors.buttonBackground,
+                                ),
+                                child: Text(
+                                  'RETRY',
+                                  style: GoogleFonts.sourceSans3(
+                                    color: PhoneBookColors.text,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.0,
+                                  ),
+                                ),
                               ),
                             ],
                           ),
@@ -199,37 +226,34 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: const Color.fromARGB(255, 255, 255, 255),
+            color: PhoneBookColors.entryBackground,
             border: Border(
               bottom: BorderSide(
-                color: const Color.fromARGB(255, 255, 255, 255)!,
+                color: PhoneBookColors.border,
                 width: 1,
               ),
             ),
           ),
           child: Row(
             children: [
-              // User avatar              
-              const SizedBox(width: 12),
-              
               // User info - clickable to view own profile
               Expanded(
                 child: GestureDetector(
                   onTap: () => _viewMyProfile(currentUser),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                                          Text(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                         currentUser.name,
-                        style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: const Color.fromARGB(255, 36, 63, 116),
-                          decoration: TextDecoration.underline, // Show it's clickable
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: PhoneBookColors.text,
+                          letterSpacing: 1.5,
                         ),
                       ),
                     ],
-                    ),
+                  ),
                 ),
               ),
               
@@ -244,7 +268,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                   child: Icon(
                     Icons.logout,
                     size: 16,
-                    color: const Color.fromARGB(255, 36, 63, 116),
+                    color: PhoneBookColors.text,
                   ),
                 ),
               ),
@@ -256,7 +280,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: Colors.green[500],
+                  color: PhoneBookColors.onlineIndicator,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -269,15 +293,19 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
 
   Widget _buildMySequencerButton() {
     return Container(
-      height: 60,
+      height: 70, // Slightly taller to emphasize importance
       decoration: BoxDecoration(
-        color: const Color(0xFFE5E7EB), // Light gray
-        borderRadius: BorderRadius.circular(8), // Sharper corners
+        color: PhoneBookColors.buttonBackground,
+        borderRadius: BorderRadius.circular(4), // Sharp, boxy corners like old directories
+        border: Border.all(
+          color: PhoneBookColors.buttonBorder,
+          width: 2,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.08),
+            color: Colors.black.withOpacity(0.15),
             blurRadius: 4,
-            offset: const Offset(0, 2),
+            offset: const Offset(2, 2),
           ),
         ],
       ),
@@ -293,25 +321,26 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
               ),
             );
           },
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(4),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'My Sequencer',
-                    style: TextStyle(
-                      color: Color(0xFF374151),
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
+                    'MY SEQUENCER',
+                    style: GoogleFonts.sourceSans3(
+                      color: PhoneBookColors.text,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 2,
                     ),
                   ),
                 ),
-                const Icon(
-                  Icons.arrow_forward_ios,
-                  color: Color(0xFF9CA3AF),
-                  size: 16,
+                Icon(
+                  Icons.arrow_forward,
+                  color: PhoneBookColors.text,
+                  size: 20,
                 ),
               ],
             ),
@@ -323,105 +352,63 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
 
   Widget _buildUserBar(User user) {
     return Container(
-      height: 56, // Smaller height
-      margin: const EdgeInsets.only(bottom: 8),
+      height: 48, // Compact like phone book entries
+      margin: const EdgeInsets.only(bottom: 2), // Tight spacing like phone book
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(8), // Sharper corners
-        border: Border.all(
-                      color: user.isWorking 
-                ? const Color.fromARGB(255, 215, 215, 215).withOpacity(0.3) 
-                : const Color(0xFFD1D5DB),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 2,
-            offset: const Offset(0, 1),
+        color: PhoneBookColors.entryBackground,
+        border: Border(
+          bottom: BorderSide(
+            color: PhoneBookColors.border,
+            width: 0.5,
           ),
-        ],
+        ),
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Stack(
-          children: [
-            // Animated background with 4 parts (only for working users)
-            if (user.isWorking) _buildAnimatedBackground(),
-            
-            // Static background for non-working users
-            if (!user.isWorking)
-              Container(
-                width: double.infinity,
-                height: double.infinity,
-                color: const Color(0xFFE5E7EB),
-              ),
-            
-            // Content layer
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: () => _startChat(user),
-                borderRadius: BorderRadius.circular(8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  child: Row(
-                    children: [
-                      // Play button avatar - same color for all users
-                      Container(
-                        width: 36,
-                        height: 36,
-                        decoration: BoxDecoration(
-                          color: user.isOnline 
-                                ? const Color.fromARGB(255, 222, 187, 255) 
-                                : const Color(0xFFD1D5DB), 
-                          borderRadius: BorderRadius.circular(15), // Almost circular (half of width/height)
-                          border: Border.all(
-                            color: user.isOnline 
-                                ? const Color.fromARGB(255, 255, 255, 255) 
-                                : const Color(0xFFD1D5DB), 
-                            width: 2,
-                          ),
-                        ),
-                        child: Icon(
-                          Icons.play_arrow,
-                          color: user.isOnline 
-                                ? const Color.fromARGB(255, 123, 22, 156) 
-                                : const Color.fromARGB(255, 119, 119, 119), 
-                          size: 20,
+      child: Stack(
+        children: [
+          // Animated background for working users (simplified)
+          if (user.isWorking) _buildAnimatedBackground(),
+          
+          // Content layer
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _startChat(user),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    // Name (main content)
+                    Expanded(
+                      child: Text(
+                        user.name,
+                        style: GoogleFonts.sourceSans3(
+                          color: PhoneBookColors.text,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
                         ),
                       ),
-                      
-                      const SizedBox(width: 12),
-                      
-                      // Name
-                      Expanded(
-                        child: Text(
-                          user.name,
-                          style: const TextStyle(
-                            color: Color(0xFF374151), // Same gray color for all users
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                    ),
+                    
+                    const SizedBox(width: 12),
+                    
+                    // Online indicator - small dot like phone book annotations
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: user.isOnline 
+                            ? PhoneBookColors.onlineIndicator 
+                            : Colors.transparent,
+                        shape: BoxShape.circle,
                       ),
-                      
-                      // Online indicator - small purple circle
-                      if (user.isOnline)
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Color.fromARGB(255, 118, 41, 195), // Purple color for online
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -491,8 +478,8 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       width: double.infinity,
       height: double.infinity,
       color: Color.lerp(
-        const Color(0xFFE5E7EB), // Base light gray
-        const Color.fromARGB(255, 199, 195, 255), // Light purple when active
+        PhoneBookColors.entryBackground,
+        const Color(0xFFF5F0D0), // Slightly highlighted yellow when active
         intensity,
       ),
     );

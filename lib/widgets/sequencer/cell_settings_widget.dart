@@ -1,7 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../state/sequencer_state.dart';
 import '../../utils/musical_notes.dart';
+
+// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
+class SequencerPhoneBookColors {
+  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
+  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
+  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
+  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
+  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
+  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
+  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
+  static const Color border = Color(0xFF5A5A57); // Subtle borders
+  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
+}
 
 class CellSettingsWidget extends StatefulWidget {
   const CellSettingsWidget({super.key});
@@ -62,12 +76,25 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
             return Container(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(8),
+                color: SequencerPhoneBookColors.surfaceBase,
+                borderRadius: BorderRadius.circular(2), // Sharp corners
                 border: Border.all(
-                  color: Colors.purpleAccent.withOpacity(0.3),
+                  color: SequencerPhoneBookColors.border,
                   width: 1,
                 ),
+                boxShadow: [
+                  // Protruding effect
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.shadow,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.surfaceRaised,
+                    blurRadius: 1,
+                    offset: const Offset(0, -1),
+                  ),
+                ],
               ),
               child: Column(
                 children: [
@@ -88,10 +115,11 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
                                 children: [
                                   Text(
                                     'Cell Settings',
-                                    style: TextStyle(
-                                      color: Colors.white,
+                                    style: GoogleFonts.sourceSans3(
+                                      color: SequencerPhoneBookColors.text,
                                       fontSize: headerFontSize,
                                       fontWeight: FontWeight.bold,
+                                      letterSpacing: 0.5,
                                     ),
                                   ),
                                   SizedBox(height: padding * 0.2),
@@ -101,9 +129,11 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
                                             ? 'Cell ${_getCellPosition(selectedCell!, sequencer)} - Sample ${String.fromCharCode(65 + cellSample!)}'
                                             : 'Cell ${_getCellPosition(selectedCell!, sequencer)} - Empty'
                                         : 'No cell selected',
-                                    style: TextStyle(
-                                      color: Colors.white70,
+                                    style: GoogleFonts.sourceSans3(
+                                      color: SequencerPhoneBookColors.lightText,
                                       fontSize: labelFontSize,
+                                      fontWeight: FontWeight.w400,
+                                      letterSpacing: 0.3,
                                     ),
                                     overflow: TextOverflow.ellipsis,
                                   ),
@@ -167,17 +197,25 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
                                 child: Container(
                                   height: headerHeight * 0.7,
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.withOpacity(0.15),
-                                    borderRadius: BorderRadius.circular(headerHeight * 0.7 * 0.15),
+                                    color: SequencerPhoneBookColors.surfacePressed,
+                                    borderRadius: BorderRadius.circular(2), // Sharp corners
                                     border: Border.all(
-                                      color: Colors.grey.withOpacity(0.4),
-                                      width: 1,
+                                      color: SequencerPhoneBookColors.border,
+                                      width: 0.5,
                                     ),
+                                    boxShadow: [
+                                      // Recessed effect for close button
+                                      BoxShadow(
+                                        color: SequencerPhoneBookColors.shadow,
+                                        blurRadius: 1,
+                                        offset: const Offset(0, 0.5),
+                                      ),
+                                    ],
                                   ),
                                   child: Center(
                                     child: Icon(
                                       Icons.close,
-                                      color: Colors.grey,
+                                      color: SequencerPhoneBookColors.lightText,
                                       size: iconSize,
                                     ),
                                   ),
@@ -232,12 +270,25 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: padding * 0.4, vertical: padding * 0.2),
       decoration: BoxDecoration(
-        color: Colors.purpleAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(padding * 0.5),
+        color: SequencerPhoneBookColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: Colors.purpleAccent.withOpacity(0.3),
+          color: SequencerPhoneBookColors.border,
           width: 1,
         ),
+        boxShadow: [
+          // Protruding effect
+          BoxShadow(
+            color: SequencerPhoneBookColors.shadow,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: SequencerPhoneBookColors.surfaceRaised,
+            blurRadius: 1,
+            offset: const Offset(0, -0.5),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -248,18 +299,20 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
             children: [
               Text(
                 'Volume',
-                style: TextStyle(
-                  color: Colors.white,
+                style: GoogleFonts.sourceSans3(
+                  color: SequencerPhoneBookColors.text,
                   fontSize: fontSize,
                   fontWeight: FontWeight.w500,
+                  letterSpacing: 0.3,
                 ),
               ),
               Text(
                 '${(sequencer.getCellVolume(cellIndex) * 100).round()}%',
-                style: TextStyle(
-                  color: Colors.purpleAccent,
+                style: GoogleFonts.sourceSans3(
+                  color: SequencerPhoneBookColors.accent,
                   fontSize: fontSize,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
                 ),
               ),
             ],
@@ -271,9 +324,9 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
           Builder(
             builder: (context) => SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Colors.purpleAccent,
-                inactiveTrackColor: Colors.grey.withOpacity(0.3),
-                thumbColor: Colors.purpleAccent,
+                activeTrackColor: SequencerPhoneBookColors.accent,
+                inactiveTrackColor: SequencerPhoneBookColors.border,
+                thumbColor: SequencerPhoneBookColors.accent,
                 trackHeight: (height * 0.06).clamp(2.0, 4.0),
                 thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.04).clamp(8.0, 12.0)),
               ),
@@ -299,12 +352,25 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: padding * 0.4, vertical: padding * 0.2),
       decoration: BoxDecoration(
-        color: Colors.purpleAccent.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(padding * 0.5),
+        color: SequencerPhoneBookColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: Colors.purpleAccent.withOpacity(0.3),
+          color: SequencerPhoneBookColors.border,
           width: 1,
         ),
+        boxShadow: [
+          // Protruding effect
+          BoxShadow(
+            color: SequencerPhoneBookColors.shadow,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: SequencerPhoneBookColors.surfaceRaised,
+            blurRadius: 1,
+            offset: const Offset(0, -0.5),
+          ),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -315,18 +381,20 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
             children: [
               Text(
                 'Pitch',
-                style: TextStyle(
-                  color: Colors.white,
+                style: GoogleFonts.sourceSans3(
+                  color: SequencerPhoneBookColors.text,
                   fontSize: fontSize,
                   fontWeight: FontWeight.w500,
+                  letterSpacing: 0.3,
                 ),
               ),
               Text(
                 noteName,
-                style: TextStyle(
-                  color: Colors.purpleAccent,
+                style: GoogleFonts.sourceSans3(
+                  color: SequencerPhoneBookColors.accent,
                   fontSize: fontSize,
                   fontWeight: FontWeight.bold,
+                  letterSpacing: 0.3,
                 ),
               ),
             ],
@@ -338,9 +406,9 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
           Builder(
             builder: (context) => SliderTheme(
               data: SliderTheme.of(context).copyWith(
-                activeTrackColor: Colors.purpleAccent,
-                inactiveTrackColor: Colors.grey.withOpacity(0.3),
-                thumbColor: Colors.purpleAccent,
+                activeTrackColor: SequencerPhoneBookColors.accent,
+                inactiveTrackColor: SequencerPhoneBookColors.border,
+                thumbColor: SequencerPhoneBookColors.accent,
                 trackHeight: (height * 0.06).clamp(2.0, 4.0),
                 thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.04).clamp(8.0, 12.0)),
               ),
@@ -365,12 +433,20 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
   Widget _buildNoCellMessage(double height, double fontSize) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(8),
+        color: SequencerPhoneBookColors.surfacePressed,
+        borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: Colors.grey.withOpacity(0.3),
+          color: SequencerPhoneBookColors.border,
           width: 1,
         ),
+        boxShadow: [
+          // Recessed effect for inactive state
+          BoxShadow(
+            color: SequencerPhoneBookColors.shadow,
+            blurRadius: 1,
+            offset: const Offset(0, 0.5),
+          ),
+        ],
       ),
       child: Center(
         child: Column(
@@ -378,15 +454,17 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
           children: [
             Icon(
               Icons.grid_off,
-              color: Colors.grey,
+              color: SequencerPhoneBookColors.lightText,
               size: height * 0.3,
             ),
             SizedBox(height: height * 0.1),
             Text(
               'Tap a cell with a sample to configure',
-              style: TextStyle(
-                color: Colors.grey,
+              style: GoogleFonts.sourceSans3(
+                color: SequencerPhoneBookColors.lightText,
                 fontSize: fontSize,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
               ),
             ),
           ],
@@ -396,25 +474,56 @@ class _CellSettingsWidgetState extends State<CellSettingsWidget> {
   }
   
   Widget _buildSettingsButton(String label, bool isSelected, double height, double fontSize, VoidCallback? onTap) {
+    final isEnabled = onTap != null;
+    
     return GestureDetector(
       onTap: onTap,
       child: Container(
         height: height,
         decoration: BoxDecoration(
-          color: isSelected ? Colors.purpleAccent : Colors.grey.withOpacity(0.2),
-          borderRadius: BorderRadius.circular(height * 0.15),
+          color: isSelected 
+              ? SequencerPhoneBookColors.accent 
+              : isEnabled 
+                  ? SequencerPhoneBookColors.surfaceRaised 
+                  : SequencerPhoneBookColors.surfacePressed,
+          borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
-            color: Colors.grey.withOpacity(0.4),
-            width: 1,
+            color: SequencerPhoneBookColors.border,
+            width: 0.5,
           ),
+          boxShadow: isEnabled
+              ? [
+                  // Protruding effect for enabled buttons
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.shadow,
+                    blurRadius: 1.5,
+                    offset: const Offset(0, 1),
+                  ),
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.surfaceRaised,
+                    blurRadius: 0.5,
+                    offset: const Offset(0, -0.5),
+                  ),
+                ]
+              : [
+                  // Recessed effect for disabled buttons
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.shadow,
+                    blurRadius: 1,
+                    offset: const Offset(0, 0.5),
+                  ),
+                ],
         ),
         child: Center(
           child: Text(
             label,
-            style: TextStyle(
-              color: Colors.white,
+            style: GoogleFonts.sourceSans3(
+              color: isSelected 
+                  ? SequencerPhoneBookColors.pageBackground 
+                  : SequencerPhoneBookColors.text,
               fontSize: fontSize,
-              fontWeight: FontWeight.w500,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
         ),

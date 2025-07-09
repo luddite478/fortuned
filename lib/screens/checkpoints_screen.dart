@@ -1,10 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
 import '../widgets/app_header_widget.dart';
 import '../services/threads_service.dart';
 import 'user_profile_screen.dart';
+
+// Telephone book color scheme - same as users screen
+class PhoneBookColors {
+  static const Color pageBackground = Color.fromARGB(255, 250, 248, 236); // Aged paper yellow
+  static const Color entryBackground = Color.fromARGB(255, 251, 247, 231); // Slightly lighter
+  static const Color text = Color(0xFF2C2C2C); // Dark gray/black text
+  static const Color lightText = Color.fromARGB(255, 161, 161, 161); // Lighter text
+  static const Color border = Color(0xFFE8E0C7); // Aged border
+  static const Color onlineIndicator = Color(0xFF8B4513); // Brown instead of purple
+  static const Color buttonBackground = Color.fromARGB(255, 246, 244, 226); // Khaki for main button
+  static const Color buttonBorder = Color.fromARGB(255, 248, 246, 230); // Golden border
+  static const Color checkpointBackground = Color.fromARGB(255, 248, 245, 228); // Checkpoint cards
+  static const Color currentUserCheckpoint = Color.fromARGB(255, 240, 235, 210); // Current user checkpoints
+}
 
 class CheckpointsScreen extends StatefulWidget {
   final String threadId;
@@ -62,40 +77,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     }
   }
 
-  void _showProjectInfo() {
-    final threadsState = context.read<ThreadsState>();
-    final thread = threadsState.currentThread;
-    
-    if (thread == null) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(thread.title),
-        content: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text('Created: ${thread.createdAt.toString().substring(0, 16)}'),
-            Text('Last updated: ${thread.updatedAt.toString().substring(0, 16)}'),
-            Text('Status: ${thread.status.name}'),
-            const SizedBox(height: 16),
-            const Text('Collaborators:', style: TextStyle(fontWeight: FontWeight.bold)),
-            ...thread.users.map((user) => Padding(
-              padding: const EdgeInsets.only(left: 16, top: 4),
-              child: Text('• ${user.name}'),
-            )),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   void _playCheckpointRender(ThreadCheckpoint checkpoint) {
     // Check if there are any renders available
@@ -167,47 +149,51 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
       appBar: AppHeaderWidget(
         mode: HeaderMode.checkpoints,
         title: 'Project Checkpoints',
-        onInfo: _showProjectInfo,
-        showProjectInfo: true,
       ),
-      backgroundColor: const Color(0xFF0f172a),
+      backgroundColor: PhoneBookColors.pageBackground,
       body: Consumer2<ThreadsState, SequencerState>(
         builder: (context, threadsState, sequencerState, child) {
           final thread = threadsState.currentThread;
           
           if (thread == null) {
-            return const Center(
+            return Center(
               child: Text(
                 'Project not found',
-                style: TextStyle(color: Colors.white70),
+                style: GoogleFonts.sourceSans3(
+                  color: PhoneBookColors.lightText,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             );
           }
 
           if (thread.checkpoints.isEmpty) {
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
                     Icons.history,
                     size: 64,
-                    color: Colors.grey,
+                    color: PhoneBookColors.lightText,
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   Text(
                     'No checkpoints yet',
-                    style: TextStyle(
-                      color: Colors.grey,
+                    style: GoogleFonts.sourceSans3(
+                      color: PhoneBookColors.text,
                       fontSize: 18,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   Text(
                     'Save your progress to create checkpoints',
-                    style: TextStyle(
-                      color: Colors.grey,
+                    style: GoogleFonts.sourceSans3(
+                      color: PhoneBookColors.lightText,
                       fontSize: 14,
+                      fontWeight: FontWeight.w400,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -221,7 +207,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
               Expanded(
                 child: ListView.builder(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   itemCount: thread.checkpoints.length,
                   itemBuilder: (context, index) {
                     final checkpoint = thread.checkpoints[index];
@@ -252,185 +238,135 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     SequencerState sequencerState,
     ThreadsState threadsState,
   ) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    
     return Container(
-      margin: EdgeInsets.only(
-        left: isCurrentUser 
-            ? screenWidth * _currentUserLeftMarginPercent 
-            : screenWidth * _baseMarginPercent,
-        right: isCurrentUser 
-            ? screenWidth * _baseMarginPercent 
-            : screenWidth * _otherUserRightMarginPercent,
-        top: 4.0,
-        bottom: 4.0,
-      ),
-      child: Row(
-        mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (!isCurrentUser) ...[
-            _buildUserAvatar(checkpoint.userName),
-            const SizedBox(width: 8),
-          ],
-          Flexible(
-            child: Container(
-              constraints: BoxConstraints(
-                maxWidth: screenWidth * _messageMaxWidthPercent,
-              ),
-              child: Column(
-                crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  if (!isCurrentUser)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, bottom: 4),
-                      child: Text(
-                        checkpoint.userName,
-                        style: TextStyle(
-                          color: _getUserColor(checkpoint.userName),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  GestureDetector(
-                    onTap: () => _applyCheckpoint(context, checkpoint, sequencerState),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: isCurrentUser 
-                            ? const Color(0xFF0084ff) 
-                            : const Color(0xFF374151),
-                        borderRadius: BorderRadius.circular(18),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          // Removed checkpoint title display - checkpoints now show only preview and timestamp
-                          
-                          const SizedBox(height: 4),
-                          
-                          // Sound grid preview
-                          _buildSoundGridPreview(checkpoint.snapshot),
-                          
-                          const SizedBox(height: 8),
-                          
-                          // Media controls and info
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.2),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Row(
-                              children: [
-                                // Play button for latest render
-                                GestureDetector(
-                                  onTap: () => _playCheckpointRender(checkpoint),
-                                  child: Container(
-                                    width: 32,
-                                    height: 32,
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF10B981),
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                    child: const Icon(
-                                      Icons.play_arrow,
-                                      color: Colors.white,
-                                      size: 20,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                
-                                // Duration info
-                                const Icon(
-                                  Icons.schedule,
-                                  size: 14,
-                                  color: Colors.white60,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatDuration(checkpoint.snapshot.audio.duration),
-                                  style: const TextStyle(
-                                    color: Colors.white60,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                
-                                const Spacer(),
-                                
-                                // Renders count (if any)
-                                if (checkpoint.snapshot.audio.renders.isNotEmpty) ...[
-                                  const Icon(
-                                    Icons.audiotrack,
-                                    size: 14,
-                                    color: Colors.white60,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${checkpoint.snapshot.audio.renders.length} renders',
-                                    style: const TextStyle(
-                                      color: Colors.white60,
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+      margin: const EdgeInsets.only(bottom: 8), // Regular messenger spacing
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: isCurrentUser 
+              ? PhoneBookColors.currentUserCheckpoint 
+              : PhoneBookColors.checkpointBackground,
+          borderRadius: BorderRadius.circular(2), // Sharp corners
+          border: Border.all(
+            color: PhoneBookColors.border,
+            width: 0.5,
+          ),
+        ),
+        padding: const EdgeInsets.all(12), // Regular messenger padding
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // User name and timestamp header
+            Row(
+              children: [
+                Text(
+                  checkpoint.userName,
+                  style: GoogleFonts.sourceSans3(
+                    color: PhoneBookColors.text,
+                    fontSize: 14, // Regular size
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.3,
                   ),
+                ),
+                const Spacer(),
+                Text(
+                  _formatTimestamp(checkpoint.timestamp),
+                  style: GoogleFonts.sourceSans3(
+                    color: PhoneBookColors.lightText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 8), // Regular spacing
+            
+            // Checkpoint content (clickable)
+            GestureDetector(
+              onTap: () => _applyCheckpoint(context, checkpoint, sequencerState),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Sound grid preview
+                  _buildSoundGridPreview(checkpoint.snapshot),
                   
-                  // Timestamp
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      _formatTimestamp(checkpoint.timestamp),
-                      style: TextStyle(
-                        color: Colors.grey[400],
-                        fontSize: 11,
+                  const SizedBox(height: 8), // Regular spacing
+                  
+                  // Media controls and info
+                  Container(
+                    padding: const EdgeInsets.all(8), // Regular padding
+                    decoration: BoxDecoration(
+                      color: PhoneBookColors.buttonBackground,
+                      borderRadius: BorderRadius.circular(2), // Sharp corners
+                      border: Border.all(
+                        color: PhoneBookColors.border,
+                        width: 0.5,
                       ),
+                    ),
+                    child: Row(
+                      children: [
+                        // Play button for latest render
+                        GestureDetector(
+                          onTap: () => _playCheckpointRender(checkpoint),
+                          child: Container(
+                            width: 28, // Regular size
+                            height: 28,
+                            decoration: BoxDecoration(
+                              color: PhoneBookColors.onlineIndicator,
+                              borderRadius: BorderRadius.circular(2), // Sharp corners
+                            ),
+                            child: const Icon(
+                              Icons.play_arrow,
+                              color: Colors.white,
+                              size: 16,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        
+                        // Duration info
+                        Icon(
+                          Icons.schedule,
+                          size: 14,
+                          color: PhoneBookColors.lightText,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _formatDuration(checkpoint.snapshot.audio.duration),
+                          style: GoogleFonts.sourceSans3(
+                            color: PhoneBookColors.lightText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        
+                        const Spacer(),
+                        
+                        // Renders count (if any)
+                        if (checkpoint.snapshot.audio.renders.isNotEmpty) ...[
+                          Icon(
+                            Icons.audiotrack,
+                            size: 14,
+                            color: PhoneBookColors.lightText,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${checkpoint.snapshot.audio.renders.length}',
+                            style: GoogleFonts.sourceSans3(
+                              color: PhoneBookColors.lightText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w400,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          if (isCurrentUser) ...[
-            const SizedBox(width: 8),
-            _buildUserAvatar(checkpoint.userName),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserAvatar(String userName) {
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: _getUserColor(userName),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Center(
-        child: Text(
-          userName.isNotEmpty ? userName[0].toUpperCase() : '?',
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
         ),
       ),
     );
@@ -441,17 +377,22 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
         snapshot.audio.sources.first.scenes.isEmpty ||
         snapshot.audio.sources.first.scenes.first.layers.isEmpty) {
       return Container(
-        height: 80,
+        height: 80, // Regular messenger size
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(8),
+          color: PhoneBookColors.border.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(2), // Sharp corners
+          border: Border.all(
+            color: PhoneBookColors.border,
+            width: 0.5,
+          ),
         ),
-        child: const Center(
+        child: Center(
           child: Text(
             'Empty Project',
-            style: TextStyle(
-              color: Colors.white60,
-              fontSize: 12,
+            style: GoogleFonts.sourceSans3(
+              color: PhoneBookColors.lightText,
+              fontSize: 12, // Regular text size
+              fontWeight: FontWeight.w400,
             ),
           ),
         ),
@@ -462,24 +403,29 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     final layers = scene.layers;
     
     return Container(
-      height: 80,
+      height: 80, // Regular messenger size
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(8),
+        color: PhoneBookColors.border.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(2), // Sharp corners
+        border: Border.all(
+          color: PhoneBookColors.border,
+          width: 0.5,
+        ),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(8), // Regular padding
         child: Column(
           children: [
             Text(
               'Sound Grid Preview',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 10,
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.lightText,
+                fontSize: 10, // Small header text
                 fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
               ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 4), // Regular spacing
             Expanded(
               child: Row(
                 children: List.generate(
@@ -491,21 +437,18 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
                         margin: const EdgeInsets.symmetric(horizontal: 1),
                         decoration: BoxDecoration(
                           color: _getLayerColor(layerIndex),
-                          borderRadius: BorderRadius.circular(2),
+                          borderRadius: BorderRadius.circular(2), // Sharp corners
                         ),
                         child: Column(
                           children: List.generate(
                             layer.rows.length.clamp(0, 8), // Show max 8 rows
                             (rowIndex) {
                               final row = layer.rows[rowIndex];
-                              final hasSample = row.cells.any(
-                                (cell) => cell.sample?.hasSample == true,
-                              );
                               return Expanded(
                                 child: Container(
                                   margin: const EdgeInsets.all(0.5),
                                   decoration: BoxDecoration(
-                                    color: hasSample 
+                                    color: row.cells.isNotEmpty && row.cells.any((cell) => cell.sample?.hasSample == true)
                                         ? Colors.white.withOpacity(0.8)
                                         : Colors.white.withOpacity(0.2),
                                     borderRadius: BorderRadius.circular(1),
@@ -534,48 +477,44 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
   ) {
     return Container(
       padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          Expanded(
-            child: ElevatedButton.icon(
-              onPressed: () => _createNewCheckpoint(context, threadsState, sequencerState),
-              icon: const Icon(Icons.add_circle_outline),
-              label: const Text('Save Checkpoint'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF10b981),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(25),
-                ),
-              ),
+      decoration: BoxDecoration(
+        color: PhoneBookColors.entryBackground,
+        border: Border(
+          top: BorderSide(
+            color: PhoneBookColors.border,
+            width: 1,
+          ),
+        ),
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: ElevatedButton.icon(
+          onPressed: () => _createNewCheckpoint(context, threadsState, sequencerState),
+          icon: Icon(Icons.save, color: PhoneBookColors.text, size: 18),
+          label: Text(
+            'Save Checkpoint',
+            style: GoogleFonts.sourceSans3(
+              color: PhoneBookColors.text,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+              fontSize: 16,
             ),
           ),
-          const SizedBox(width: 12),
-          FloatingActionButton(
-            onPressed: () => Navigator.of(context).pop(),
-            backgroundColor: const Color(0xFF374151),
-            child: const Icon(Icons.close),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: PhoneBookColors.buttonBackground,
+            foregroundColor: PhoneBookColors.text,
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(2),
+            ),
+            side: BorderSide(
+              color: PhoneBookColors.buttonBorder,
+              width: 1,
+            ),
           ),
-        ],
+        ),
       ),
     );
-  }
-
-  Color _getUserColor(String userName) {
-    final colors = [
-      const Color(0xFF10b981), // Green
-      const Color(0xFF3b82f6), // Blue
-      const Color(0xFFf59e0b), // Orange
-      const Color(0xFFef4444), // Red
-      const Color(0xFF8b5cf6), // Purple
-      const Color(0xFF06b6d4), // Cyan
-      const Color(0xFFf97316), // Orange
-      const Color(0xFFec4899), // Pink
-    ];
-    
-    final hash = userName.hashCode;
-    return colors[hash.abs() % colors.length];
   }
 
   Color _getLayerColor(int layerIndex) {
@@ -617,19 +556,31 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF374151),
-        title: const Text(
+        backgroundColor: PhoneBookColors.entryBackground,
+        title: Text(
           'Apply Checkpoint',
-          style: TextStyle(color: Colors.white),
+          style: GoogleFonts.sourceSans3(
+            color: PhoneBookColors.text,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Text(
           'This will replace your current project with this checkpoint.\n\nYour current work will be lost unless saved.',
-          style: const TextStyle(color: Colors.white70),
+          style: GoogleFonts.sourceSans3(
+            color: PhoneBookColors.lightText,
+            fontWeight: FontWeight.w400,
+          ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.lightText,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
@@ -638,15 +589,23 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
               Navigator.of(context).pop(); // Go back to sequencer
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: const Text('Applied checkpoint successfully'),
-                  backgroundColor: const Color(0xFF10b981),
+                  content: Text(
+                    'Applied checkpoint successfully',
+                    style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
+                  ),
+                  backgroundColor: PhoneBookColors.onlineIndicator,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10b981),
+              backgroundColor: PhoneBookColors.buttonBackground,
+              foregroundColor: PhoneBookColors.text,
+              side: BorderSide(color: PhoneBookColors.buttonBorder),
             ),
-            child: const Text('Apply'),
+            child: Text(
+              'Apply',
+              style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -663,28 +622,45 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF374151),
-        title: const Text(
+        backgroundColor: PhoneBookColors.entryBackground,
+        title: Text(
           'Save Checkpoint',
-          style: TextStyle(color: Colors.white),
+          style: GoogleFonts.sourceSans3(
+            color: PhoneBookColors.text,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
+            Text(
               'Add a comment to describe your changes:',
-              style: TextStyle(color: Colors.white70),
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.lightText,
+                fontWeight: FontWeight.w400,
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: commentController,
-              style: const TextStyle(color: Colors.white),
-              decoration: const InputDecoration(
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.text,
+                fontWeight: FontWeight.w400,
+              ),
+              decoration: InputDecoration(
                 hintText: 'e.g., Added bassline and drums',
-                hintStyle: TextStyle(color: Colors.white54),
-                border: OutlineInputBorder(),
+                hintStyle: GoogleFonts.sourceSans3(
+                  color: PhoneBookColors.lightText,
+                  fontWeight: FontWeight.w400,
+                ),
+                border: OutlineInputBorder(
+                  borderSide: BorderSide(color: PhoneBookColors.border),
+                ),
                 focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Color(0xFF10b981)),
+                  borderSide: BorderSide(color: PhoneBookColors.onlineIndicator),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: PhoneBookColors.border),
                 ),
               ),
               maxLines: 3,
@@ -694,7 +670,13 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.lightText,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -716,25 +698,36 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
                 });
                 
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Checkpoint saved successfully!'),
-                    backgroundColor: Color(0xFF10b981),
+                  SnackBar(
+                    content: Text(
+                      'Checkpoint saved successfully!',
+                      style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
+                    ),
+                    backgroundColor: PhoneBookColors.onlineIndicator,
                   ),
                 );
               } catch (e) {
                 Navigator.of(context).pop();
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Failed to save checkpoint: $e'),
+                    content: Text(
+                      'Failed to save checkpoint: $e',
+                      style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
+                    ),
                     backgroundColor: Colors.red,
                   ),
                 );
               }
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10b981),
+              backgroundColor: PhoneBookColors.buttonBackground,
+              foregroundColor: PhoneBookColors.text,
+              side: BorderSide(color: PhoneBookColors.buttonBorder),
             ),
-            child: const Text('Save'),
+            child: Text(
+              'Save',
+              style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w600),
+            ),
           ),
         ],
       ),
@@ -771,7 +764,7 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0f172a),
+      backgroundColor: PhoneBookColors.pageBackground,
       body: Column(
         children: [
           // User header with threads button
@@ -793,17 +786,17 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
   Widget _buildUserHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 50, 16, 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF374151),
+      decoration: BoxDecoration(
+        color: PhoneBookColors.entryBackground,
         border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+          bottom: BorderSide(color: PhoneBookColors.border, width: 1),
         ),
       ),
       child: Row(
         children: [
           // Back button
           IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: Icon(Icons.arrow_back, color: PhoneBookColors.text),
             onPressed: () => Navigator.pop(context),
           ),
           
@@ -813,19 +806,20 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
               children: [
                 Text(
                   widget.targetUserName,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: GoogleFonts.sourceSans3(
+                    color: PhoneBookColors.text,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Online indicator (assuming online for now - you can connect this to actual user status)
+                // Online indicator
                 Container(
                   width: 8,
                   height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color.fromARGB(255, 118, 41, 195),
+                  decoration: BoxDecoration(
+                    color: PhoneBookColors.onlineIndicator,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -847,17 +841,22 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 118, 41, 195),
-              foregroundColor: Colors.white,
+              backgroundColor: PhoneBookColors.buttonBackground,
+              foregroundColor: PhoneBookColors.text,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               minimumSize: const Size(0, 36),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(4),
               ),
+              side: BorderSide(color: PhoneBookColors.buttonBorder),
             ),
-            child: const Text(
+            child: Text(
               'Profile',
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              style: GoogleFonts.sourceSans3(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.5,
+              ),
             ),
           ),
         ],
@@ -875,21 +874,22 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
     
     return Container(
       padding: const EdgeInsets.all(16),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1e293b),
+      decoration: BoxDecoration(
+        color: PhoneBookColors.checkpointBackground,
         border: Border(
-          bottom: BorderSide(color: Color(0xFFE5E7EB), width: 1),
+          bottom: BorderSide(color: PhoneBookColors.border, width: 1),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             '📌 Other Common Threads',
-            style: TextStyle(
-              color: Colors.white,
+            style: GoogleFonts.sourceSans3(
+              color: PhoneBookColors.text,
               fontSize: 14,
               fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
           const SizedBox(height: 8),
@@ -904,19 +904,21 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF374151),
-        borderRadius: BorderRadius.circular(8),
+        color: PhoneBookColors.entryBackground,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: PhoneBookColors.border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.push_pin, color: Colors.white70, size: 16),
+          Icon(Icons.push_pin, color: PhoneBookColors.lightText, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               thread.title,
-              style: const TextStyle(
-                color: Colors.white,
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.text,
                 fontSize: 14,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
@@ -938,9 +940,13 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
                 ),
               );
             },
-            child: const Text(
-              'Open',
-              style: TextStyle(color: Color.fromARGB(255, 118, 41, 195)),
+            child: Text(
+              'Switch',
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.onlineIndicator,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
             ),
           ),
         ],

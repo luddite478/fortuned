@@ -1,4 +1,8 @@
-- pitch
+- master settings
+- undo redo
+- double tap jump copy
+- buttons 
+- pitch (fix artifacts)
 - bpm
 - contacts and all users search
 - comment(reply)-menu for chekpoints
