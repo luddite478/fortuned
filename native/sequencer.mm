@@ -937,6 +937,25 @@ static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_de
 
 
 // Play all samples that should trigger on this step across all columns (NEW: Per-cell nodes)
+// Silence all active cell nodes in a specific column (for column-based replacement)
+// Sets volume to 0 instead of destroying nodes to avoid audio artifacts
+static void silence_cell_nodes_in_column(int column) {
+    int silenced_count = 0;
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        cell_node_t* cell = &g_cell_nodes[i];
+        if (cell->active && cell->column == column && cell->node_initialized) {
+            // Set volume to 0 to silence immediately without audio artifacts
+            ma_node_set_output_bus_volume(&cell->node, 0, 0.0f);
+            prnt("🔇 [SEQUENCER] Silenced cell node [%d,%d] sample %d (ID: %llu) for column replacement", 
+                 cell->step, cell->column, cell->sample_slot, cell->id);
+            silenced_count++;
+        }
+    }
+    if (silenced_count > 0) {
+        prnt("🔇 [SEQUENCER] Silenced %d cell nodes in column %d", silenced_count, column);
+    }
+}
+
 static void play_samples_for_step(int step) {
     if (step < 0 || step >= g_sequencer_steps) return;
     
@@ -950,6 +969,9 @@ static void play_samples_for_step(int step) {
         if (sample_to_play >= 0 && sample_to_play < MAX_SLOTS) {
             audio_slot_t* sample = &g_slots[sample_to_play];
             if (sample->loaded) {
+                // COLUMN-BASED REPLACEMENT: Silence any active samples in this column before playing new one
+                silence_cell_nodes_in_column(column);
+                
                 // Volume logic: cell volume overrides sample bank volume when set
                 float bank_volume = sample->volume;
                 float cell_volume = g_sequencer_grid_volumes[step][column];

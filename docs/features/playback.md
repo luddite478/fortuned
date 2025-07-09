@@ -138,6 +138,19 @@ for (int column = 0; column < g_columns; column++) {
 }
 ```
 
+### Column-Based Silencing
+```c
+// Silence existing nodes in column before triggering new sample
+silence_cell_nodes_in_column(column);
+
+// Sets volume to 0 instantly without destroying nodes:
+ma_node_set_output_bus_volume(&cell->node, 0, 0.0f);
+```
+- **Immediate silencing**: Previous samples in column stop instantly when new sample triggers
+- **No audio artifacts**: Volume-based silencing avoids clicks/pops from abrupt node cleanup
+- **Clean pipeline**: Silenced nodes continue processing at 0 volume until natural completion
+- **Automatic disposal**: Normal cleanup mechanism handles silenced nodes when finished
+
 ### Automatic Resource Cleanup
 ```c
 // In audio callback:
