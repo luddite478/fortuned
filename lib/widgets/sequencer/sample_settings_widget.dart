@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../state/sequencer_state.dart';
-import 'cell_or_sample_settings.dart';
+import 'sound_settings.dart';
 
 class SampleSettingsWidget extends StatelessWidget {
   const SampleSettingsWidget({super.key});
@@ -14,6 +14,7 @@ class SampleSettingsWidget extends StatelessWidget {
         return CellOrSampleSettingsWidget(
           type: sampleWidget.type,
           title: sampleWidget.title,
+          headerButtons: sampleWidget.headerButtons,
           infoTextBuilder: sampleWidget.infoTextBuilder,
           hasDataChecker: sampleWidget.hasDataChecker,
           indexProvider: sampleWidget.indexProvider,
@@ -25,6 +26,8 @@ class SampleSettingsWidget extends StatelessWidget {
           closeAction: () => sequencer.setShowSampleSettings(false),
           noDataMessage: sampleWidget.noDataMessage,
           noDataIcon: sampleWidget.noDataIcon,
+          showDeleteButton: sampleWidget.showDeleteButton,
+          showCloseButton: sampleWidget.showCloseButton,
         );
       },
     );

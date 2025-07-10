@@ -253,6 +253,26 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
         },
       ),
       
+      // Master settings button
+      Consumer<SequencerState>(
+        builder: (context, sequencer, child) {
+          return TextButton(
+            onPressed: () => sequencer.setShowMasterSettings(!sequencer.showMasterSettings),
+            child: Text(
+              'M',
+              style: GoogleFonts.sourceSans3(
+                color: sequencer.showMasterSettings 
+                    ? SequencerPhoneBookColors.accent 
+                    : SequencerPhoneBookColors.lightText,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+                letterSpacing: 0.3,
+              ),
+            ),
+          );
+        },
+      ),
+      
       // Combined recording + sequencer controls in one Consumer
       Consumer<SequencerState>(
         builder: (context, sequencer, child) {

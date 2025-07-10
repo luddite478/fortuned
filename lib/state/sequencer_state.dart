@@ -267,6 +267,9 @@ class SequencerState extends ChangeNotifier {
   bool _isShowingCellSettings = false;
   int? _selectedCellForSettings;
   
+  // Master settings widget state
+  bool _isShowingMasterSettings = false;
+  
   // Volume control state
   late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
   late List<double> _cellVolumes; // Individual cell volumes
@@ -773,6 +776,7 @@ class SequencerState extends ChangeNotifier {
   bool get isShowingSampleSettings => _isShowingSampleSettings;
   bool get isShowingCellSettings => _isShowingCellSettings;
   int? get selectedCellForSettings => _selectedCellForSettings;
+  bool get showMasterSettings => _isShowingMasterSettings;
   List<String> get localRecordings => List.unmodifiable(_localRecordings);
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
@@ -2504,6 +2508,7 @@ Made with Demo Sequencer 🚀
     if (show) {
       _isShowingSampleSettings = false;
       _isShowingCellSettings = false;
+      _isShowingMasterSettings = false;
     }
     notifyListeners();
   }
@@ -2515,6 +2520,7 @@ Made with Demo Sequencer 🚀
     if (show) {
       _isShowingShareWidget = false;
       _isShowingCellSettings = false;
+      _isShowingMasterSettings = false;
     }
     notifyListeners();
   }
@@ -2526,6 +2532,19 @@ Made with Demo Sequencer 🚀
     if (show) {
       _isShowingShareWidget = false;
       _isShowingSampleSettings = false;
+      _isShowingMasterSettings = false;
+    }
+    notifyListeners();
+  }
+  
+  /// Show/hide master settings widget
+  void setShowMasterSettings(bool show) {
+    _isShowingMasterSettings = show;
+    // When showing master settings, hide other widgets
+    if (show) {
+      _isShowingShareWidget = false;
+      _isShowingSampleSettings = false;
+      _isShowingCellSettings = false;
     }
     notifyListeners();
   }

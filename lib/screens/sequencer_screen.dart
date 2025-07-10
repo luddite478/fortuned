@@ -153,14 +153,17 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
       body: SafeArea(
         child: Column(
           children: [
-            Expanded(flex: 18, child: const MultitaskPanelWidget()),
-            const Spacer(flex: 1),
-            Expanded(flex: 7, child: const SampleBanksWidget()),
-            const Spacer(flex: 1),
+            // const Spacer(flex: 1),
             Expanded(flex: 60, child: const SampleGridWidget()),
-            const Spacer(flex: 1),
             Expanded(flex: 8, child: const EditButtonsWidget()),
-            const Spacer(flex: 3),
+
+            // const Spacer(flex: 1),
+            Expanded(flex: 7, child: const SampleBanksWidget()),
+
+            // const Spacer(flex: 1),
+            Expanded(flex: 18, child: const MultitaskPanelWidget())
+
+            // const Spacer(flex: 3)
           ],
         ),
       ),

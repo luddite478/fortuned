@@ -7,6 +7,8 @@ import 'sample_selection_widget.dart';
 import 'share_widget.dart';
 import 'sample_settings_widget.dart';
 import 'cell_settings_widget.dart';
+import 'master_settings_widget.dart';
+import 'sound_settings.dart';
 
 // Darker Gray-Beige Telephone Book Color Scheme for Sequencer
 class SequencerPhoneBookColors {
@@ -28,7 +30,7 @@ class MultitaskPanelWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<SequencerState>(
       builder: (context, sequencerState, child) {
-        // Priority order: sample selection > cell settings > sample settings > share > recording > placeholder
+        // Priority order: sample selection > cell settings > sample settings > master settings > share > recording > placeholder
         if (sequencerState.isSelectingSample) {
           // Show sample selection widget (highest priority)
           return const SampleSelectionWidget();
@@ -38,6 +40,27 @@ class MultitaskPanelWidget extends StatelessWidget {
         } else if (sequencerState.isShowingSampleSettings) {
           // Show sample settings widget
           return const SampleSettingsWidget();
+        } else if (sequencerState.showMasterSettings) {
+          // Show master settings using unified template
+          final masterSettings = CellOrSampleSettingsWidget.forMaster();
+          return CellOrSampleSettingsWidget(
+            type: masterSettings.type,
+            title: masterSettings.title,
+            headerButtons: masterSettings.headerButtons,
+            infoTextBuilder: masterSettings.infoTextBuilder,
+            hasDataChecker: masterSettings.hasDataChecker,
+            indexProvider: masterSettings.indexProvider,
+            volumeGetter: masterSettings.volumeGetter,
+            volumeSetter: masterSettings.volumeSetter,
+            pitchGetter: masterSettings.pitchGetter,
+            pitchSetter: masterSettings.pitchSetter,
+            deleteActionProvider: masterSettings.deleteActionProvider,
+            closeAction: () => sequencerState.setShowMasterSettings(false),
+            noDataMessage: masterSettings.noDataMessage,
+            noDataIcon: masterSettings.noDataIcon,
+            showDeleteButton: masterSettings.showDeleteButton,
+            showCloseButton: masterSettings.showCloseButton,
+          );
         } else if (sequencerState.isShowingShareWidget) {
           // Show share widget
           return const ShareWidget();

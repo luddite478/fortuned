@@ -935,7 +935,6 @@ static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_de
 }
 
 
-
 // Play all samples that should trigger on this step across all columns (NEW: Per-cell nodes)
 // Silence all active cell nodes in a specific column (for column-based replacement)
 // Sets volume to 0 instead of destroying nodes to avoid audio artifacts
