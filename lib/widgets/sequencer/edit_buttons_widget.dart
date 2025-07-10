@@ -92,6 +92,12 @@ class EditButtonsWidget extends StatelessWidget {
                     onPressed: () => sequencer.toggleSelectionMode(),
                     tooltip: sequencer.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
                   ),
+                  // Step Insert Mode Toggle button with settings access
+                  _buildStepInsertToggleButton(
+                    size: buttonSize,
+                    iconSize: iconSize,
+                    sequencer: sequencer,
+                  ),
                   // Delete button
                   _buildEditButton(
                     size: buttonSize,
@@ -201,5 +207,76 @@ class EditButtonsWidget extends StatelessWidget {
         ),
       ),
     );
+      }
+  
+  Widget _buildStepInsertToggleButton({
+    required double size,
+    required double iconSize,
+    required SequencerState sequencer,
+  }) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: SequencerPhoneBookColors.surfaceRaised,
+        borderRadius: BorderRadius.circular(2), // Sharp corners
+        border: Border.all(
+          color: sequencer.isStepInsertMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.border,
+          width: sequencer.isStepInsertMode ? 1.0 : 0.5,
+        ),
+        boxShadow: [
+          // Protruding effect
+          BoxShadow(
+            color: SequencerPhoneBookColors.shadow,
+            blurRadius: 1.5,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: SequencerPhoneBookColors.surfaceRaised,
+            blurRadius: 0.5,
+            offset: const Offset(0, -0.5),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => sequencer.toggleStepInsertMode(),
+          borderRadius: BorderRadius.circular(2),
+          child: Container(
+            padding: EdgeInsets.zero,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 2), // Add 4 pixels top margin
+                    child: Text(
+                      '${sequencer.stepInsertSize}',
+                      style: GoogleFonts.sourceSans3(
+                        color: sequencer.isStepInsertMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText,
+                        fontSize: iconSize * 0.8,
+                        fontWeight: FontWeight.w600,
+                        height: 0.7,
+                      ),
+                    ),
+                  ),
+                  Transform.translate(
+                    offset: const Offset(0, -2), // Move arrow up by 2 pixels
+                    child: Icon(
+                      Icons.keyboard_double_arrow_down,
+                      color: sequencer.isStepInsertMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText,
+                      size: iconSize * 0.8,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
-} 
+ 
+  } 

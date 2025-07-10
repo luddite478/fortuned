@@ -15,7 +15,7 @@ class SequencerPhoneBookColors {
   static const Color lightText = Color(0xFFB8B6B0); // Muted light text
   static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
   static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
+  static const Color shadow = Color(0xFF4A4A47); // Dark shadows for depth
   static const Color cellEmpty = Color(0xFF3E3E3B); // Empty grid cells
   static const Color cellFilled = Color(0xFF5C5A55); // Filled grid cells
 }

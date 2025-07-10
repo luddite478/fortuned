@@ -38,7 +38,7 @@ class SequencerPhoneBookColors {
 
 enum SettingsType { cell, sample, master }
 
-class CellOrSampleSettingsWidget extends StatefulWidget {
+class SoundSettingsWidget extends StatefulWidget {
   final SettingsType type;
   final String title;
   final List<String> headerButtons;
@@ -56,7 +56,7 @@ class CellOrSampleSettingsWidget extends StatefulWidget {
   final bool showDeleteButton;
   final bool showCloseButton;
 
-  const CellOrSampleSettingsWidget({
+  const SoundSettingsWidget({
     super.key,
     required this.type,
     required this.title,
@@ -77,8 +77,8 @@ class CellOrSampleSettingsWidget extends StatefulWidget {
   });
 
   // Factory constructors for common use cases
-  factory CellOrSampleSettingsWidget.forCell() {
-    return CellOrSampleSettingsWidget(
+  factory SoundSettingsWidget.forCell() {
+    return SoundSettingsWidget(
       type: SettingsType.cell,
       title: 'Cell Settings',
       headerButtons: ['VOL', 'KEY', 'EQ', 'RVB', 'DLY'],
@@ -127,8 +127,8 @@ class CellOrSampleSettingsWidget extends StatefulWidget {
     );
   }
 
-  factory CellOrSampleSettingsWidget.forSample() {
-    return CellOrSampleSettingsWidget(
+  factory SoundSettingsWidget.forSample() {
+    return SoundSettingsWidget(
       type: SettingsType.sample,
       title: 'Sample Settings',
       headerButtons: ['VOL', 'KEY', 'EQ', 'RVB', 'DLY'],
@@ -160,8 +160,8 @@ class CellOrSampleSettingsWidget extends StatefulWidget {
     );
   }
 
-  factory CellOrSampleSettingsWidget.forMaster() {
-    return CellOrSampleSettingsWidget(
+  factory SoundSettingsWidget.forMaster() {
+    return SoundSettingsWidget(
       type: SettingsType.master,
       title: 'Master Settings',
       headerButtons: ['BPM', 'MASTER', 'COMP', 'EQ', 'RVB', 'DLY', 'FILTER', 'DIST'],
@@ -182,10 +182,10 @@ class CellOrSampleSettingsWidget extends StatefulWidget {
   }
 
   @override
-  State<CellOrSampleSettingsWidget> createState() => _CellOrSampleSettingsWidgetState();
+  State<SoundSettingsWidget> createState() => _SoundSettingsWidgetState();
 }
 
-class _CellOrSampleSettingsWidgetState extends State<CellOrSampleSettingsWidget> {
+class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
   String _selectedControl = 'VOL'; // Default to VOL for cell/sample, will be set to first button for master
   
   // Simple variables for main layout areas (same as master settings template)

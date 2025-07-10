@@ -17,6 +17,18 @@ import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
 import '../services/threads_service.dart';
 
+// Multitask panel modes
+enum MultitaskPanelMode {
+  placeholder,
+  sampleSelection,
+  cellSettings,
+  sampleSettings,
+  masterSettings,
+  stepInsertSettings,
+  shareWidget,
+  recordingWidget,
+}
+
 // Undo-Redo System for Sequencer State
 enum UndoRedoActionType {
   gridCellChange,
@@ -250,25 +262,23 @@ class SequencerState extends ChangeNotifier {
   int _currentSoundGridIndex = 0;
   List<int> _soundGridOrder = []; // Order of sound grids from back to front (initialized dynamically)
 
+  // Multitask panel state
+  MultitaskPanelMode _currentPanelMode = MultitaskPanelMode.placeholder;
+  
   // Sample selection state
-  bool _isSelectingSample = false;
   int? _sampleSelectionSlot;
   List<String> _currentSamplePath = [];
   List<SampleBrowserItem> _currentSampleItems = [];
 
   // Share widget state
-  bool _isShowingShareWidget = false;
   List<String> _localRecordings = []; // List of local recording file paths
 
-  // Sample settings widget state
-  bool _isShowingSampleSettings = false;
-  
-  // Cell settings widget state
-  bool _isShowingCellSettings = false;
+  // Cell settings state
   int? _selectedCellForSettings;
   
-  // Master settings widget state
-  bool _isShowingMasterSettings = false;
+  // Step insert feature state
+  bool _isStepInsertMode = false; // Toggle for step insert mode
+  int _stepInsertSize = 2; // Number of steps to jump (1-16)
   
   // Volume control state
   late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
@@ -771,12 +781,16 @@ class SequencerState extends ChangeNotifier {
   bool get hasUnsavedChanges => _hasUnsavedChanges;
   bool get isCurrentlySaving => _isCurrentlySaving;
   bool get autosaveEnabled => _autosaveEnabled;
-  bool get isSelectingSample => _isSelectingSample;
-  bool get isShowingShareWidget => _isShowingShareWidget;
-  bool get isShowingSampleSettings => _isShowingSampleSettings;
-  bool get isShowingCellSettings => _isShowingCellSettings;
+  MultitaskPanelMode get currentPanelMode => _currentPanelMode;
+  bool get isSelectingSample => _currentPanelMode == MultitaskPanelMode.sampleSelection;
+  bool get isShowingShareWidget => _currentPanelMode == MultitaskPanelMode.shareWidget;
+  bool get isShowingSampleSettings => _currentPanelMode == MultitaskPanelMode.sampleSettings;
+  bool get isShowingCellSettings => _currentPanelMode == MultitaskPanelMode.cellSettings;
   int? get selectedCellForSettings => _selectedCellForSettings;
-  bool get showMasterSettings => _isShowingMasterSettings;
+  bool get showMasterSettings => _currentPanelMode == MultitaskPanelMode.masterSettings;
+  bool get isStepInsertMode => _isStepInsertMode;
+  int get stepInsertSize => _stepInsertSize;
+  bool get isShowingStepInsertSettings => _currentPanelMode == MultitaskPanelMode.stepInsertSettings;
   List<String> get localRecordings => List.unmodifiable(_localRecordings);
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
@@ -834,8 +848,39 @@ class SequencerState extends ChangeNotifier {
     }
   }
 
+  // Panel mode setters
+  void setPanelMode(MultitaskPanelMode mode) {
+    _currentPanelMode = mode;
+    notifyListeners();
+  }
+  
+  void setShowSampleSettings(bool show) {
+    _currentPanelMode = show ? MultitaskPanelMode.sampleSettings : MultitaskPanelMode.placeholder;
+    notifyListeners();
+  }
+  
+  void setShowCellSettings(bool show) {
+    _currentPanelMode = show ? MultitaskPanelMode.cellSettings : MultitaskPanelMode.placeholder;
+    notifyListeners();
+  }
+  
+  void setShowMasterSettings(bool show) {
+    _currentPanelMode = show ? MultitaskPanelMode.masterSettings : MultitaskPanelMode.placeholder;
+    notifyListeners();
+  }
+  
+  void setShowStepInsertSettings(bool show) {
+    _currentPanelMode = show ? MultitaskPanelMode.stepInsertSettings : MultitaskPanelMode.placeholder;
+    notifyListeners();
+  }
+  
+  void setShowShareWidget(bool show) {
+    _currentPanelMode = show ? MultitaskPanelMode.shareWidget : MultitaskPanelMode.placeholder;
+    notifyListeners();
+  }
+
   Future<void> pickFileForSlot(int slot, BuildContext context) async {
-    _isSelectingSample = true;
+    _currentPanelMode = MultitaskPanelMode.sampleSelection;
     _sampleSelectionSlot = slot;
     _currentSamplePath.clear();
     await _loadSamples();
@@ -843,7 +888,7 @@ class SequencerState extends ChangeNotifier {
   }
 
   void cancelSampleSelection() {
-    _isSelectingSample = false;
+    _currentPanelMode = MultitaskPanelMode.placeholder;
     _sampleSelectionSlot = null;
     _currentSamplePath.clear();
     _currentSampleItems.clear();
@@ -1080,13 +1125,19 @@ class SequencerState extends ChangeNotifier {
     // Always set as selected sample slot
     _selectedSampleSlot = bankIndex;
     
+    // Always open appropriate menu based on slot content
     if (!hasFile) {
       // Empty slot - open sample browser
       pickFileForSlot(bankIndex, context);
     } else {
-      // Loaded slot - update active bank and open sample settings
+      // Loaded slot - always open sample settings
       _activeBank = bankIndex;
       setShowSampleSettings(true);
+      
+      // ALSO perform step insert if mode is active and cells are selected
+      if (_isStepInsertMode && _selectedGridCells.isNotEmpty) {
+        performStepInsert(bankIndex);
+      }
     }
     notifyListeners();
   }
@@ -2501,53 +2552,7 @@ Made with Demo Sequencer 🚀
     notifyListeners();
   }
 
-  /// Show/hide share widget
-  void setShowShareWidget(bool show) {
-    _isShowingShareWidget = show;
-    // When showing share widget, hide other widgets
-    if (show) {
-      _isShowingSampleSettings = false;
-      _isShowingCellSettings = false;
-      _isShowingMasterSettings = false;
-    }
-    notifyListeners();
-  }
 
-  /// Show/hide sample settings widget
-  void setShowSampleSettings(bool show) {
-    _isShowingSampleSettings = show;
-    // When showing sample settings, hide other widgets
-    if (show) {
-      _isShowingShareWidget = false;
-      _isShowingCellSettings = false;
-      _isShowingMasterSettings = false;
-    }
-    notifyListeners();
-  }
-
-  /// Show/hide cell settings widget
-  void setShowCellSettings(bool show) {
-    _isShowingCellSettings = show;
-    // When showing cell settings, hide other widgets
-    if (show) {
-      _isShowingShareWidget = false;
-      _isShowingSampleSettings = false;
-      _isShowingMasterSettings = false;
-    }
-    notifyListeners();
-  }
-  
-  /// Show/hide master settings widget
-  void setShowMasterSettings(bool show) {
-    _isShowingMasterSettings = show;
-    // When showing master settings, hide other widgets
-    if (show) {
-      _isShowingShareWidget = false;
-      _isShowingSampleSettings = false;
-      _isShowingCellSettings = false;
-    }
-    notifyListeners();
-  }
 
   /// Set selected cell for settings
   void setSelectedCellForSettings(int? cellIndex) {
@@ -3526,6 +3531,84 @@ Made with Demo Sequencer 🚀
         _fileNames[i] = null;
       }
     }
+  }
+
+  // Step Insert Feature Methods
+  
+  /// Toggle step insert mode on/off and show settings when turning on
+  void toggleStepInsertMode() {
+    _isStepInsertMode = !_isStepInsertMode;
+    if (_isStepInsertMode) {
+      // Show settings when turning on
+      _currentPanelMode = MultitaskPanelMode.stepInsertSettings;
+    }
+    // Don't close settings when turning off - let user close manually
+    notifyListeners();
+  }
+  
+  /// Set step insert size (1-16)
+  void setStepInsertSize(int size) {
+    if (size >= 1 && size <= _gridRows) {
+      _stepInsertSize = size;
+      notifyListeners();
+    }
+  }
+  
+  /// Perform step insert: place sample in selected cells and move based on step size
+  void performStepInsert(int sampleSlot) {
+    if (_selectedGridCells.isEmpty) {
+      return;
+    }
+    
+    // Flush any pending debounced actions before grid changes
+    _flushPendingUndoAction();
+    
+    // Capture state before making changes
+    final beforeState = _captureCurrentState();
+    
+    final newSelectedCells = <int>{};
+    
+    // For each selected cell
+    for (int cellIndex in _selectedGridCells) {
+      // Place the sample in the current cell
+      _setCurrentGridSample(cellIndex, sampleSlot);
+      
+      // Sync to sequencer using absolute column calculation
+      final row = cellIndex ~/ _gridColumns;
+      final col = cellIndex % _gridColumns;
+      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
+      
+      // Calculate next cell position (jump by step size in same column)
+      final nextRow = row + _stepInsertSize;
+      if (nextRow < _gridRows) {
+        final nextCellIndex = nextRow * _gridColumns + col;
+        newSelectedCells.add(nextCellIndex);
+      }
+    }
+    
+    // Update selection to the new cells
+    _selectedGridCells.clear();
+    _selectedGridCells.addAll(newSelectedCells);
+    
+    // Update selection tracking
+    if (newSelectedCells.isNotEmpty) {
+      _selectionStartCell = newSelectedCells.first;
+      _currentSelectionCell = newSelectedCells.first;
+    } else {
+      _selectionStartCell = null;
+      _currentSelectionCell = null;
+    }
+    
+    // Record undo action
+    final cellCount = _selectedGridCells.length + newSelectedCells.length;
+    _recordUndoAction(
+      type: UndoRedoActionType.multipleCellChange,
+      description: 'Step Insert Sample ${String.fromCharCode(65 + sampleSlot)} in $cellCount cells (+${_stepInsertSize} steps)',
+      beforeState: beforeState,
+    );
+    
+    notifyListeners();
   }
 
   @override
