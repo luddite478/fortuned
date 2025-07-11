@@ -1337,7 +1337,7 @@ static void silence_cell_nodes_in_column(int column) {
 static void play_samples_for_step(int step) {
     if (step < 0 || step >= g_sequencer_steps) return;
     
-    prnt("🎵 [SEQUENCER] Step: %d", step);
+    // prnt("🎵 [SEQUENCER] Step: %d", step);
     
     // Process all columns - just volume control, no node creation/deletion
     for (int column = 0; column < g_columns; column++) {
