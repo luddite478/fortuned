@@ -282,7 +282,7 @@ class SequencerState extends ChangeNotifier {
   
   // Volume control state
   late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
-  late List<double> _cellVolumes; // Individual cell volumes
+  late Map<int, double> _cellVolumes; // Individual cell volume overrides
   late List<double> _samplePitches; // Global sample pitches (affects all instances)
   late Map<int, double> _cellPitches; // Individual cell pitch overrides
 
@@ -373,7 +373,7 @@ class SequencerState extends ChangeNotifier {
       'slotLoaded': List<bool>.from(_slotLoaded),
       'sampleVolumes': List<double>.from(_sampleVolumes),
       'samplePitches': List<double>.from(_samplePitches),
-      'cellVolumes': List<double>.from(_cellVolumes),
+      'cellVolumes': Map<int, double>.from(_cellVolumes),
       'cellPitches': Map<int, double>.from(_cellPitches),
       'soundGridLabels': List<String>.from(_soundGridLabels),
       'soundGridOrder': List<int>.from(_soundGridOrder),
@@ -411,7 +411,7 @@ class SequencerState extends ChangeNotifier {
       _samplePitches = (state['samplePitches'] as List<dynamic>).cast<double>();
     }
     if (state.containsKey('cellVolumes')) {
-      _cellVolumes = (state['cellVolumes'] as List<dynamic>).cast<double>();
+      _cellVolumes = Map<int, double>.from(state['cellVolumes'] as Map);
     }
     if (state.containsKey('cellPitches')) {
       _cellPitches = Map<int, double>.from(state['cellPitches'] as Map);
@@ -553,7 +553,7 @@ class SequencerState extends ChangeNotifier {
     
     // Initialize volume control arrays
     _sampleVolumes = List.filled(_slotCount, 1.0); // Default to 100% volume
-    _cellVolumes = List.filled(_gridColumns * _gridRows, 1.0); // Default to 100% volume
+    _cellVolumes = {}; // Empty map - cells use sample volume by default
     
     // Initialize pitch control arrays
     _samplePitches = List.filled(_slotCount, 1.0); // Default to normal pitch
@@ -2154,7 +2154,21 @@ Made with Demo Sequencer 🚀
   // Helper method to set sample in current sound grid
   void _setCurrentGridSample(int index, int? value) {
     if (_soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length) {
+      // Check if sample is actually changing
+      final oldSample = _soundGridSamples[_currentSoundGridIndex][index];
+      final sampleChanged = oldSample != value;
+      
       _soundGridSamples[_currentSoundGridIndex][index] = value;
+      
+      // Reset cell volume/pitch overrides when sample changes or when clearing cell with sample
+      if (sampleChanged && (oldSample != null || value != null)) {
+        // Reset Flutter-side cell overrides when:
+        // 1. Sample changes to different sample (oldSample != null && value != null)
+        // 2. Cell with sample is cleared (oldSample != null && value == null)
+        _cellVolumes.remove(index);
+        _cellPitches.remove(index);
+        print('🔄 [FLUTTER] Reset cell $index volume/pitch overrides due to change ($oldSample → $value)');
+      }
       
       // 🔧 FIX: Immediately sync this change to native sequencer if sequencer is running
       _syncSingleCellToNative(index, value);
@@ -2594,41 +2608,51 @@ Made with Demo Sequencer 🚀
     }
   }
 
-  /// Get cell volume (0.0 to 1.0)
+  /// Get cell volume (returns cell override or sample bank volume)
   double getCellVolume(int cellIndex) {
-    if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
-      return _cellVolumes[cellIndex];
+    // Check if cell has a volume override
+    if (_cellVolumes.containsKey(cellIndex)) {
+      return _cellVolumes[cellIndex]!;
     }
+    
+    // No override, use sample bank volume
+    final gridSamples = _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length
+        ? _soundGridSamples[_currentSoundGridIndex]
+        : <int?>[];
+    final sampleSlot = cellIndex < gridSamples.length ? gridSamples[cellIndex] : null;
+    if (sampleSlot != null && sampleSlot >= 0 && sampleSlot < _sampleVolumes.length) {
+      return _sampleVolumes[sampleSlot];
+    }
+    
     return 1.0; // Default volume
   }
 
   /// Set cell volume (0.0 to 1.0)
   void setCellVolume(int cellIndex, double volume) {
-    if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
-      // Capture state before change (only if this is the first change in sequence)
-      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
-      final clampedVolume = volume.clamp(0.0, 1.0);
-      
-      _cellVolumes[cellIndex] = clampedVolume;
-      
-      // Convert cellIndex to step and column for native call
-      final row = cellIndex ~/ _gridColumns;
-      final col = cellIndex % _gridColumns;
-      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-      
-      // Store volume in native grid - will be applied when cell is triggered
-      _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
-      
-      // Record debounced undo action (will only record after user stops adjusting)
-      final cellPosition = _getCellPositionString(cellIndex);
-      _recordDebouncedUndoAction(
-        type: UndoRedoActionType.volumeChange,
-        description: 'Set Cell $cellPosition Volume: ${(clampedVolume * 100).round()}%',
-        beforeState: beforeState,
-      );
-      
-      notifyListeners();
-    }
+    // Capture state before change (only if this is the first change in sequence)
+    final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
+    final clampedVolume = volume.clamp(0.0, 1.0);
+    
+    // Store cell volume override
+    _cellVolumes[cellIndex] = clampedVolume;
+    
+    // Convert cellIndex to step and column for native call
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    // Store volume in native grid - will be applied when cell is triggered
+    _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
+    
+    // Record debounced undo action (will only record after user stops adjusting)
+    final cellPosition = _getCellPositionString(cellIndex);
+    _recordDebouncedUndoAction(
+      type: UndoRedoActionType.volumeChange,
+      description: 'Set Cell $cellPosition Volume: ${(clampedVolume * 100).round()}%',
+      beforeState: beforeState,
+    );
+    
+    notifyListeners();
   }
 
   /// Get sample pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
@@ -2718,8 +2742,23 @@ Made with Demo Sequencer 🚀
     final col = cellIndex % _gridColumns;
     final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
     
-    // Set to default pitch (1.0) in native grid
-    _sequencerLibrary.setCellPitch(row, absoluteColumn, 1.0);
+    // Reset to use sample bank default in native grid
+    _sequencerLibrary.resetCellPitch(row, absoluteColumn);
+    
+    notifyListeners();
+  }
+
+  /// Reset cell volume to use sample bank volume
+  void resetCellVolume(int cellIndex) {
+    _cellVolumes.remove(cellIndex);
+    
+    // Convert cellIndex to step and column for native call
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    // Reset to use sample bank default in native grid
+    _sequencerLibrary.resetCellVolume(row, absoluteColumn);
     
     notifyListeners();
   }

@@ -332,6 +332,84 @@ static float calculate_smoothing_alpha(float time_ms) {
     return 1.0f - expf(-callback_dt / time_sec);
 }
 
+// Default values indicating "no override" (use sample bank setting)
+#define DEFAULT_CELL_VOLUME -1.0f   // Special value meaning "use sample bank volume"
+#define DEFAULT_CELL_PITCH -1.0f    // Special value meaning "use sample bank pitch"
+
+// Convert UI pitch value (0.0-1.0) to pitch ratio (0.03125-32.0)
+// UI: 0.0 = -12 semitones, 0.5 = 0 semitones, 1.0 = +12 semitones
+// Native: pow(2.0, (ui_value * 24 - 12) / 12) = pow(2.0, ui_value * 2 - 1)
+static float ui_pitch_to_ratio(float ui_pitch) {
+    if (ui_pitch < 0.0f || ui_pitch > 1.0f) return 1.0f; // Fallback to original pitch
+    
+    // Convert: UI 0.0→-12 semitones, 0.5→0 semitones, 1.0→+12 semitones
+    float semitones = ui_pitch * 24.0f - 12.0f;
+    return powf(2.0f, semitones / 12.0f);
+}
+
+// Convert pitch ratio (0.03125-32.0) to UI pitch value (0.0-1.0)
+static float ratio_to_ui_pitch(float ratio) {
+    if (ratio <= 0.0f) return 0.5f; // Fallback to center
+    
+    // Convert: ratio → semitones → UI value
+    float semitones = 12.0f * log2f(ratio);
+    return (semitones + 12.0f) / 24.0f;
+}
+
+// Resolve current volume for a cell (sample bank volume or cell override)
+static float resolve_cell_volume(int step, int column, int sample_slot) {
+    audio_slot_t* sample = &g_slots[sample_slot];
+    float bank_volume = sample->volume;
+    float cell_volume = g_sequencer_grid_volumes[step][column];
+    return (cell_volume != DEFAULT_CELL_VOLUME) ? cell_volume : bank_volume;
+}
+
+// Resolve current pitch for a cell (sample bank pitch or cell override)
+static float resolve_cell_pitch(int step, int column, int sample_slot) {
+    audio_slot_t* sample = &g_slots[sample_slot];
+    float bank_pitch = sample->pitch;
+    float cell_pitch = g_sequencer_grid_pitches[step][column];
+    return (cell_pitch != DEFAULT_CELL_PITCH) ? cell_pitch : bank_pitch;
+}
+
+// Update pitch for a cell node
+static void update_cell_pitch(cell_node_t* cell, float new_pitch) {
+    if (!cell || !cell->pitch_ds_initialized) return;
+    
+    cell->pitch = new_pitch;
+    ma_pitch_data_source_set_pitch(&cell->pitch_ds, new_pitch);
+}
+
+// Find existing node for specific cell (step, column, sample)
+static cell_node_t* find_node_for_cell(int step, int column, int sample_slot) {
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        cell_node_t* cell = &g_cell_nodes[i];
+        if (cell->active && 
+            cell->step == step && 
+            cell->column == column && 
+            cell->sample_slot == sample_slot) {
+            return cell;
+        }
+    }
+    return NULL;  // No existing node found for this cell
+}
+
+// Update volume/pitch for existing nodes when settings change
+static void update_existing_nodes_for_cell(int step, int column, int sample_slot) {
+    cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
+    if (existing_node) {
+        // Update pitch
+        float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
+        update_cell_pitch(existing_node, resolved_pitch);
+        
+        // Update stored volume (for reference, smoothing uses resolved volume)
+        existing_node->volume = resolve_cell_volume(step, column, sample_slot);
+        
+        prnt("🔄 [UPDATE] Updated existing node [%d,%d] sample %d (vol: %.2f, pitch: %.2f)", 
+             step, column, sample_slot, existing_node->volume, resolved_pitch);
+    }
+}
+
 // Set target volume with exponential smoothing
 static void set_target_volume(cell_node_t* cell, float new_target_volume) {
     if (!cell) return;
@@ -347,20 +425,6 @@ static void set_target_volume(cell_node_t* cell, float new_target_volume) {
     cell->is_volume_smoothing = 1;
     cell->volume_rise_coeff = calculate_smoothing_alpha(VOLUME_RISE_TIME_MS);
     cell->volume_fall_coeff = calculate_smoothing_alpha(VOLUME_FALL_TIME_MS);
-}
-
-// Find existing node for specific cell (step, column, sample)
-static cell_node_t* find_node_for_cell(int step, int column, int sample_slot) {
-    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        cell_node_t* cell = &g_cell_nodes[i];
-        if (cell->active && 
-            cell->step == step && 
-            cell->column == column && 
-            cell->sample_slot == sample_slot) {
-            return cell;
-        }
-    }
-    return NULL;  // No existing node found for this cell
 }
 
 static cell_node_t* create_cell_node(int step, int column, int sample_slot, float volume, float pitch) {
@@ -1297,18 +1361,28 @@ static void play_samples_for_step(int step) {
                         }
                         
                         ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
-                        set_target_volume(target_node, target_node->volume);
+                        
+                        // Use current resolved volume and pitch (sample bank or cell override)
+                        float resolved_volume = resolve_cell_volume(step, column, sample_to_play);
+                        float resolved_pitch = resolve_cell_pitch(step, column, sample_to_play);
+                        update_cell_pitch(target_node, resolved_pitch);
+                        set_target_volume(target_node, resolved_volume);
                         currently_playing_nodes_per_col[column] = target_node;
                         
                         prnt("▶️ [START] Node [%d,%d] sample %d (vol: %.2f, ID: %llu) - tracking in column", 
-                             step, column, sample_to_play, target_node->volume, target_node->id);
+                             step, column, sample_to_play, resolved_volume, target_node->id);
                     } else {
                         // Same node - restart from beginning
                         ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
-                        set_target_volume(target_node, target_node->volume);
+                        
+                        // Use current resolved volume and pitch (sample bank or cell override)
+                        float resolved_volume = resolve_cell_volume(step, column, sample_to_play);
+                        float resolved_pitch = resolve_cell_pitch(step, column, sample_to_play);
+                        update_cell_pitch(target_node, resolved_pitch);
+                        set_target_volume(target_node, resolved_volume);
                         
                         prnt("🔄 [RESTART] Node [%d,%d] sample %d (vol: %.2f, ID: %llu)", 
-                             step, column, sample_to_play, target_node->volume, target_node->id);
+                             step, column, sample_to_play, resolved_volume, target_node->id);
                     }
                 } else {
                     prnt("⚠️ [SEQUENCER] No existing node found for [%d,%d] sample %d - need to create via grid management", 
@@ -1628,8 +1702,8 @@ int init(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1; // -1 means empty
-            g_sequencer_grid_volumes[step][col] = 1.0f; // Default volume: 100%
-            g_sequencer_grid_pitches[step][col] = 1.0f; // Default pitch: normal
+                    g_sequencer_grid_volumes[step][col] = DEFAULT_CELL_VOLUME; // Default: use sample bank volume
+        g_sequencer_grid_pitches[step][col] = DEFAULT_CELL_PITCH; // Default: use sample bank pitch
         }
     }
     
@@ -2276,20 +2350,20 @@ void set_cell(int step, int column, int sample_slot) {
                  step, column, old_sample, old_node->id);
             cleanup_cell_node(old_node);
         }
+        
+        // Reset cell volume and pitch to defaults when sample changes
+        g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME;
+        g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;
+        prnt("🔄 [GRID] Reset cell [%d,%d] volume/pitch to defaults for new sample %d", 
+             step, column, sample_slot);
     }
     
     // Create new node for this cell (if it doesn't exist)
     cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
     if (!existing_node) {
-        // Volume logic: cell volume overrides sample bank volume when set
-        float bank_volume = sample->volume;
-        float cell_volume = g_sequencer_grid_volumes[step][column];
-        float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
-        
-        // Pitch logic: cell pitch overrides sample bank pitch when set
-        float bank_pitch = sample->pitch;
-        float cell_pitch = g_sequencer_grid_pitches[step][column];
-        float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
+        // Use the resolution functions for consistent logic
+        float final_volume = resolve_cell_volume(step, column, sample_slot);
+        float final_pitch = resolve_cell_pitch(step, column, sample_slot);
         
         // Create node for this cell (starts silenced)
         cell_node_t* new_node = create_cell_node(step, column, sample_slot, final_volume, final_pitch);
@@ -2320,6 +2394,11 @@ void clear_cell(int step, int column) {
             prnt("🗑️ [GRID] Removing node for cell [%d,%d] (ID: %llu)", step, column, existing_node->id);
             cleanup_cell_node(existing_node);
         }
+        
+        // Reset cell volume and pitch overrides when clearing cell
+        g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME;
+        g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;
+        prnt("🔄 [GRID] Reset cell [%d,%d] volume/pitch overrides when clearing", step, column);
     }
     
     g_sequencer_grid[step][column] = -1;
@@ -2330,8 +2409,8 @@ void clear_all_cells(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1;
-            g_sequencer_grid_volumes[step][col] = 1.0f; // Reset volume to 100%
-            g_sequencer_grid_pitches[step][col] = 1.0f; // Reset pitch to normal
+                g_sequencer_grid_volumes[step][col] = DEFAULT_CELL_VOLUME; // Reset to use sample bank volume
+    g_sequencer_grid_pitches[step][col] = DEFAULT_CELL_PITCH; // Reset to use sample bank pitch
         }
     }
     prnt("🗑️ [SEQUENCER] Cleared all grid cells (entire %dx%d table)", MAX_SEQUENCER_STEPS, MAX_TOTAL_COLUMNS);
@@ -2363,10 +2442,19 @@ int set_sample_bank_volume(int bank, float volume) {
     audio_slot_t* s = &g_slots[bank];
     s->volume = volume;
     
-    // NOTE: Don't apply volume immediately to playing samples
-    // Volume will be applied when cells are triggered during sequencer playback
+    // Update existing nodes that use this sample bank (if they don't have cell overrides)
+    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
+        for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
+            if (g_sequencer_grid[step][col] == bank) {
+                // Only update if this cell doesn't have a volume override
+                if (g_sequencer_grid_volumes[step][col] == DEFAULT_CELL_VOLUME) {
+                    update_existing_nodes_for_cell(step, col, bank);
+                }
+            }
+        }
+    }
     
-    prnt("🔊 [VOLUME] Sample bank %d volume set to %.2f (will apply on next trigger)", bank, volume);
+    prnt("🔊 [VOLUME] Sample bank %d volume set to %.2f", bank, volume);
     return 0;
 }
 
@@ -2396,15 +2484,37 @@ int set_cell_volume(int step, int column, float volume) {
     }
     
     g_sequencer_grid_volumes[step][column] = volume;
-    prnt("🔊 [VOLUME] Cell [%d,%d] volume set to %.2f", step, column, volume);
     
-    // Debug: show what sample is in this cell
+    // Update existing node for this cell if it exists
     int sample_in_cell = g_sequencer_grid[step][column];
     if (sample_in_cell >= 0) {
-        prnt("🔍 [DEBUG] Cell [%d,%d] contains sample %d", step, column, sample_in_cell);
-    } else {
-        prnt("🔍 [DEBUG] Cell [%d,%d] is empty", step, column);
+        update_existing_nodes_for_cell(step, column, sample_in_cell);
     }
+    
+    prnt("🔊 [VOLUME] Cell [%d,%d] volume set to %.2f", step, column, volume);
+    return 0;
+}
+
+int reset_cell_volume(int step, int column) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [VOLUME] Invalid step: %d", step);
+        return -1;
+    }
+
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [VOLUME] Invalid column: %d", column);
+        return -1;
+    }
+
+    g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME;
+
+    // Update existing node for this cell if it exists
+    int sample_in_cell = g_sequencer_grid[step][column];
+    if (sample_in_cell >= 0) {
+        update_existing_nodes_for_cell(step, column, sample_in_cell);
+    }
+
+    prnt("🔊 [VOLUME] Cell [%d,%d] volume reset to use sample bank default", step, column);
     return 0;
 }
 
@@ -2419,9 +2529,7 @@ float get_cell_volume(int step, int column) {
         return 0.0f;
     }
     
-    float volume = g_sequencer_grid_volumes[step][column];
-    prnt("🔍 [DEBUG] Get cell [%d,%d] volume = %.2f", step, column, volume);
-    return volume;
+    return g_sequencer_grid_volumes[step][column];
 }
 
 // Pitch control functions
@@ -2439,10 +2547,19 @@ int set_sample_bank_pitch(int bank, float pitch) {
     audio_slot_t* s = &g_slots[bank];
     s->pitch = pitch;
     
-    // NOTE: Don't apply pitch immediately to playing samples
-    // Pitch will be applied when cells are triggered during sequencer playback
+    // Update existing nodes that use this sample bank (if they don't have cell overrides)
+    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
+        for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
+            if (g_sequencer_grid[step][col] == bank) {
+                // Only update if this cell doesn't have a pitch override
+                if (g_sequencer_grid_pitches[step][col] == DEFAULT_CELL_PITCH) {
+                    update_existing_nodes_for_cell(step, col, bank);
+                }
+            }
+        }
+    }
     
-    prnt("🎵 [PITCH] Sample bank %d pitch set to %.2f (will apply on next trigger)", bank, pitch);
+    prnt("🎵 [PITCH] Sample bank %d pitch set to %.2f", bank, pitch);
     return 0;
 }
 
@@ -2455,49 +2572,76 @@ float get_sample_bank_pitch(int bank) {
     return g_slots[bank].pitch;
 }
 
-int set_cell_pitch(int step, int column, float pitch) {
+int set_cell_pitch(int step, int column, float pitch_ratio) {
     if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
         prnt_err("🔴 [PITCH] Invalid step: %d", step);
         return -1;
     }
-    
+
     if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
         prnt_err("🔴 [PITCH] Invalid column: %d", column);
         return -1;
     }
-    
-    if (pitch < 0.03125f || pitch > 32.0f) {
-        prnt_err("🔴 [PITCH] Invalid pitch: %f (must be 0.03125-32.0 for C0-C10)", pitch);
+
+    if (pitch_ratio < 0.03125f || pitch_ratio > 32.0f) {
+        prnt_err("🔴 [PITCH] Invalid pitch: %f (must be 0.03125-32.0 for C0-C10)", pitch_ratio);
         return -1;
     }
-    
-    g_sequencer_grid_pitches[step][column] = pitch;
-    prnt("🎵 [PITCH] Cell [%d,%d] pitch set to %.2f", step, column, pitch);
-    
-    // Debug: show what sample is in this cell
+
+    g_sequencer_grid_pitches[step][column] = pitch_ratio;
+
+    // Update existing node for this cell if it exists
     int sample_in_cell = g_sequencer_grid[step][column];
     if (sample_in_cell >= 0) {
-        prnt("🔍 [DEBUG] Cell [%d,%d] contains sample %d", step, column, sample_in_cell);
-    } else {
-        prnt("🔍 [DEBUG] Cell [%d,%d] is empty", step, column);
+        update_existing_nodes_for_cell(step, column, sample_in_cell);
     }
+
+    prnt("🎵 [PITCH] Cell [%d,%d] pitch set to %.3f", step, column, pitch_ratio);
+    return 0;
+}
+
+int reset_cell_pitch(int step, int column) {
+    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
+        prnt_err("🔴 [PITCH] Invalid step: %d", step);
+        return -1;
+    }
+
+    if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
+        prnt_err("🔴 [PITCH] Invalid column: %d", column);
+        return -1;
+    }
+
+    g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;
+
+    // Update existing node for this cell if it exists
+    int sample_in_cell = g_sequencer_grid[step][column];
+    if (sample_in_cell >= 0) {
+        update_existing_nodes_for_cell(step, column, sample_in_cell);
+    }
+
+    prnt("🎵 [PITCH] Cell [%d,%d] pitch reset to use sample bank default", step, column);
     return 0;
 }
 
 float get_cell_pitch(int step, int column) {
     if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
         prnt_err("🔴 [PITCH] Invalid step: %d", step);
-        return 1.0f;
+        return 1.0f; // Return default pitch ratio
     }
-    
+
     if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
         prnt_err("🔴 [PITCH] Invalid column: %d", column);
-        return 1.0f;
+        return 1.0f; // Return default pitch ratio
+    }
+
+    float pitch_ratio = g_sequencer_grid_pitches[step][column];
+    
+    // If it's the default value, return 1.0 (original pitch)
+    if (pitch_ratio == DEFAULT_CELL_PITCH) {
+        return 1.0f; 
     }
     
-    float pitch = g_sequencer_grid_pitches[step][column];
-    prnt("🔍 [DEBUG] Get cell [%d,%d] pitch = %.2f", step, column, pitch);
-    return pitch;
+    return pitch_ratio;
 }
 
 // Cleanup function

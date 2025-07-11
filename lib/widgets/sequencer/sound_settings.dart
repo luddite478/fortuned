@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -20,6 +21,28 @@ class MusicalNotes {
       'note': noteName,
       'semitones': semitones.toString(),
     };
+  }
+}
+
+// Pitch conversion utilities
+class PitchConversion {
+  /// Convert UI slider value (0.0-1.0) to pitch ratio (0.03125-32.0)
+  /// UI: 0.0 = -12 semitones, 0.5 = 0 semitones, 1.0 = +12 semitones
+  static double uiValueToPitchRatio(double uiValue) {
+    if (uiValue < 0.0 || uiValue > 1.0) return 1.0; // Fallback to original pitch
+    
+    // Convert: UI 0.0→-12 semitones, 0.5→0 semitones, 1.0→+12 semitones
+    final semitones = uiValue * 24.0 - 12.0;
+    return math.pow(2.0, semitones / 12.0).toDouble();
+  }
+  
+  /// Convert pitch ratio (0.03125-32.0) to UI slider value (0.0-1.0)
+  static double pitchRatioToUiValue(double ratio) {
+    if (ratio <= 0.0) return 0.5; // Fallback to center
+    
+    // Convert: ratio → semitones → UI value
+    final semitones = 12.0 * (math.log(ratio) / math.ln2);
+    return (semitones + 12.0) / 24.0;
   }
 }
 
@@ -111,8 +134,8 @@ class SoundSettingsWidget extends StatefulWidget {
       indexProvider: (sequencer) => sequencer.selectedCellForSettings,
       volumeGetter: (sequencer, index) => sequencer.getCellVolume(index),
       volumeSetter: (sequencer, index, volume) => sequencer.setCellVolume(index, volume),
-      pitchGetter: (sequencer, index) => sequencer.getCellPitch(index),
-      pitchSetter: (sequencer, index, pitch) => sequencer.setCellPitch(index, pitch),
+      pitchGetter: (sequencer, index) => PitchConversion.pitchRatioToUiValue(sequencer.getCellPitch(index)),
+      pitchSetter: (sequencer, index, uiValue) => sequencer.setCellPitch(index, PitchConversion.uiValueToPitchRatio(uiValue)),
       deleteActionProvider: (sequencer, index) => (index != null && 
           sequencer.selectedCellForSettings != null && 
           sequencer.gridSamples[sequencer.selectedCellForSettings!] != null) 
@@ -145,8 +168,8 @@ class SoundSettingsWidget extends StatefulWidget {
       indexProvider: (sequencer) => sequencer.activeBank,
       volumeGetter: (sequencer, index) => sequencer.getSampleVolume(index),
       volumeSetter: (sequencer, index, volume) => sequencer.setSampleVolume(index, volume),
-      pitchGetter: (sequencer, index) => sequencer.getSamplePitch(index),
-      pitchSetter: (sequencer, index, pitch) => sequencer.setSamplePitch(index, pitch),
+      pitchGetter: (sequencer, index) => PitchConversion.pitchRatioToUiValue(sequencer.getSamplePitch(index)),
+      pitchSetter: (sequencer, index, uiValue) => sequencer.setSamplePitch(index, PitchConversion.uiValueToPitchRatio(uiValue)),
       deleteActionProvider: (sequencer, index) => (index != null && 
           sequencer.fileNames[index] != null) 
         ? () {

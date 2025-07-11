@@ -35,6 +35,51 @@ Sample File → Decoder → Pitch Data Source → Data Source Node → Node Grap
                                     (see docs/smoothing.md)
 ```
 
+## Volume and Pitch Control Hierarchy
+
+### Sample Bank Controls (Global)
+```c
+// Sample bank volume/pitch affect all instances of that sample
+g_slots[bank].volume = 1.0f;  // Default: 100% volume
+g_slots[bank].pitch = 1.0f;   // Default: original pitch
+```
+
+### Cell-Level Overrides
+```c
+// Cell-specific volume/pitch override sample bank settings when set
+g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME; // -1.0 = use sample bank
+g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;  // -1.0 = use sample bank
+```
+
+### Default Value System
+```c
+// Special default values indicating "no override" (use sample bank setting)
+#define DEFAULT_CELL_VOLUME -1.0f   // Use sample bank volume
+#define DEFAULT_CELL_PITCH -1.0f    // Use sample bank pitch
+
+// Resolution logic (cell overrides take precedence when not default)
+static float resolve_cell_volume(int step, int column, int sample_slot) {
+    audio_slot_t* sample = &g_slots[sample_slot];
+    float bank_volume = sample->volume;
+    float cell_volume = g_sequencer_grid_volumes[step][column];
+    return (cell_volume != DEFAULT_CELL_VOLUME) ? cell_volume : bank_volume;
+}
+
+static float resolve_cell_pitch(int step, int column, int sample_slot) {
+    audio_slot_t* sample = &g_slots[sample_slot];
+    float bank_pitch = sample->pitch;
+    float cell_pitch = g_sequencer_grid_pitches[step][column];
+    return (cell_pitch != DEFAULT_CELL_PITCH) ? cell_pitch : bank_pitch;
+}
+```
+
+### Reset Functions
+```c
+// Reset cell controls to use sample bank defaults
+int reset_cell_volume(int step, int column);
+int reset_cell_pitch(int step, int column);
+```
+
 ## Playback Flow
 
 ### 1. Node Creation (Grid Management)
@@ -46,6 +91,7 @@ set_cell(step, column, sample_slot) → create_cell_node(...) → starts at volu
 - **Timing**: Happens during grid editing, not sequencer playback
 - **State**: Nodes start silent (`volume = 0.0`)
 - **Lifecycle**: Nodes persist until cell is cleared or changed
+- **Volume/Pitch**: Uses resolved values from hierarchy system
 
 ### 2. Sequencer Playback (Volume Control)
 **Sequencer controls volume of existing nodes:**
@@ -56,8 +102,25 @@ play_samples_for_step(step) → find_node_for_cell(...) → set_target_volume(..
 - **No node creation**: Sequencer only controls volume of pre-existing nodes
 - **Column tracking**: `currently_playing_nodes_per_col[]` tracks what's audible per column
 - **Smooth transitions**: Volume changes use exponential smoothing (see `docs/smoothing.md`)
+- **Real-time resolution**: Volume/pitch resolved on every trigger
 
-### 3. Column Tracking System
+### 3. Real-time Control Updates
+```c
+// Update existing nodes when settings change
+static void update_existing_nodes_for_cell(int step, int column, int sample_slot) {
+    cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
+    if (existing_node) {
+        // Update pitch immediately
+        float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
+        update_cell_pitch(existing_node, resolved_pitch);
+        
+        // Update stored volume (smoothing uses resolved volume)
+        existing_node->volume = resolve_cell_volume(step, column, sample_slot);
+    }
+}
+```
+
+### 4. Column Tracking System
 ```c
 static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
 ```
@@ -68,7 +131,7 @@ static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
 - **Same sample triggered**: Restart from beginning with smooth volume transition
 - **Empty cell**: Keep previous node playing (intended sequencer behavior)
 
-### 4. Stop/Start Behavior
+### 5. Stop/Start Behavior
 ```c
 // stop() function:
 void stop(void) {
@@ -137,6 +200,7 @@ ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 - **Smooth transitions**: Exponential volume smoothing prevents clicks
 - **Frame-accurate timing**: Sample triggers aligned to audio frames
 - **Low latency**: Minimal processing overhead per node
+- **Real-time updates**: Settings changes applied immediately to existing nodes
 
 ## Other Playback Systems
 
@@ -191,4 +255,4 @@ if (target_node) {
 }
 ```
 
-This architecture provides smooth, click-free playback with efficient resource management and professional audio quality.
+This architecture provides smooth, click-free playback with efficient resource management, professional audio quality, and real-time control updates for both volume and pitch.

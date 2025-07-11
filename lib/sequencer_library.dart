@@ -498,4 +498,32 @@ class SequencerLibrary {
   double getCellPitch(int step, int column) {
     return _bindings.get_cell_pitch(step, column);
   }
+  
+  /// Reset cell pitch to use sample bank default
+  bool resetCellPitch(int step, int column) {
+    int result = _bindings.reset_cell_pitch(step, column);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🎵 Cell [$step,$column] pitch reset to sample bank default');
+    } else {
+      print('❌ Failed to reset cell [$step,$column] pitch');
+    }
+    
+    return success;
+  }
+  
+  /// Reset cell volume to use sample bank default
+  bool resetCellVolume(int step, int column) {
+    int result = _bindings.reset_cell_volume(step, column);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🔊 Cell [$step,$column] volume reset to sample bank default');
+    } else {
+      print('❌ Failed to reset cell [$step,$column] volume');
+    }
+    
+    return success;
+  }
 } 
