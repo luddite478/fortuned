@@ -1,10 +1,10 @@
 # 🎵 Audio Playback Implementation
 
-**Per-cell node architecture using miniaudio's node graph for perfect polyphonic mixing**
+**Per-cell node architecture with column tracking and smooth volume transitions**
 
 ## Core Architecture
 
-The audio system uses **individual nodes per playing cell** following miniaudio's node graph best practices. Each triggered grid cell creates its own independent audio pipeline that automatically mixes with all other playing cells.
+The audio system uses **individual nodes per grid cell** with **column-based tracking** for smooth transitions. Each grid cell gets its own permanent audio node that's controlled by the sequencer through volume changes.
 
 ### Per-Cell Node Structure
 ```c
@@ -15,102 +15,101 @@ typedef struct {
     ma_pitch_data_source pitch_ds; // Pitch shifting layer
     ma_data_source_node node;      // Individual node in graph
     float volume, pitch;           // Cell-specific controls
+    
+    // Volume smoothing (see docs/smoothing.md)
+    float current_volume;          // Current smoothed volume
+    float target_volume;           // Target volume we're smoothing towards
+    float volume_rise_coeff;       // Smoothing coefficient for fade-in
+    float volume_fall_coeff;       // Smoothing coefficient for fade-out
+    int is_volume_smoothing;       // Whether smoothing is active
+    
     uint64_t id;                   // Unique identifier
-    int node_initialized, pitch_ds_initialized;
 } cell_node_t;
 ```
 
 ### Audio Flow Architecture
 ```
 Sample File → Decoder → Pitch Data Source → Data Source Node → Node Graph → Output
-     ↑             ↑            ↑                 ↑              ↑
-   File/Memory   Format     Pitch Shift       Node Graph     Automatic
-   Loading      Conversion   Processing        Mixing         Mixing
+                                              ↑
+                                      Volume Smoothing
+                                    (see docs/smoothing.md)
 ```
 
-## Node Graph Implementation
+## Playback Flow
 
-**Following miniaudio's node graph pattern:**
-- **512 simultaneous voices** - `MAX_ACTIVE_CELL_NODES = 512`
-- **Cell node pool** - Pre-allocated `g_cell_nodes[512]` array
-- **Individual nodes** - Each cell gets `ma_data_source_node` connected to endpoint
-- **Automatic mixing** - Node graph handles all audio mixing internally
-- **Lifecycle management** - Nodes auto-cleanup when playback finishes
-
-### Key Functions
+### 1. Node Creation (Grid Management)
+**Nodes are created when cells are set, not during playback:**
 ```c
-// Create new cell node for triggered grid cell
-cell_node_t* create_cell_node(int step, int column, int sample_slot, float volume, float pitch)
-
-// Find available node from pool
-cell_node_t* find_available_cell_node(void)
-
-// Clean up finished nodes automatically
-void cleanup_finished_cell_nodes(void)
+// When user sets a cell:
+set_cell(step, column, sample_slot) → create_cell_node(...) → starts at volume 0.0
 ```
+- **Timing**: Happens during grid editing, not sequencer playback
+- **State**: Nodes start silent (`volume = 0.0`)
+- **Lifecycle**: Nodes persist until cell is cleared or changed
 
-## Playback Systems
-
-### 1. Sequencer Grid Playback (Per-Cell Nodes)
-- **Trigger**: Grid cell activated during sequencer playback
-- **Creates**: New `cell_node_t` with independent audio pipeline
-- **Benefits**: Perfect mixing when multiple cells play same sample
-- **Cleanup**: Automatic when sample finishes playing
-
-### 2. Sample Bank Playback (Manual Triggers)
-- **Trigger**: User clicks play button on sample bank
-- **Uses**: Dedicated sample bank audio pipeline per slot
-- **Independence**: Completely separate from sequencer grid
-- **Pipeline**: `decoder → pitch_ds → data_source_node → node_graph`
-
-### 3. Preview Systems
-**Two dedicated preview systems with their own audio nodes:**
-
-#### Sample Preview (File Browser)
+### 2. Sequencer Playback (Volume Control)
+**Sequencer controls volume of existing nodes:**
 ```c
-static preview_system_t g_sample_preview;  // For previewing samples before adding to banks
+// During playback:
+play_samples_for_step(step) → find_node_for_cell(...) → set_target_volume(...)
 ```
-- **Purpose**: Preview audio files in sample browser
-- **Trigger**: User taps sample in file browser
-- **Pipeline**: File → decoder → pitch_ds → node → endpoint
+- **No node creation**: Sequencer only controls volume of pre-existing nodes
+- **Column tracking**: `currently_playing_nodes_per_col[]` tracks what's audible per column
+- **Smooth transitions**: Volume changes use exponential smoothing (see `docs/smoothing.md`)
 
-#### Cell Preview (Grid Cells)  
+### 3. Column Tracking System
 ```c
-static preview_system_t g_cell_preview;    // For previewing individual grid cells
+static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
 ```
-- **Purpose**: Preview specific grid cell content
-- **Trigger**: User previews cell settings
-- **Pipeline**: Memory/File → decoder → pitch_ds → node → endpoint
+**Purpose**: Track which node is currently audible in each column for smooth transitions.
 
-**Both preview systems:**
-- Use dedicated audio nodes independent of all other playback
-- Support pitch control for preview matching
-- Auto-stop when new preview starts
-- Clean resource management
+**Behavior**:
+- **New sample in column**: Fade out old node, fade in new node
+- **Same sample triggered**: Restart from beginning with smooth volume transition
+- **Empty cell**: Keep previous node playing (intended sequencer behavior)
 
-## Performance Benefits
+### 4. Stop/Start Behavior
+```c
+// stop() function:
+void stop(void) {
+    // Smoothly fade out all currently playing nodes
+    for (each column) {
+        if (currently_playing_nodes_per_col[column]) {
+            set_target_volume(node, 0.0f);  // Smooth fade to silence
+        }
+    }
+    
+    // Clear tracking since nothing is currently playing
+    memset(currently_playing_nodes_per_col, 0, ...);
+}
 
-### Perfect Polyphonic Mixing
-- **Multiple cells, same sample**: No interference or audio artifacts
-- **Overlapping triggers**: Each gets independent audio node
-- **Pitch variations**: Each cell can have different pitch simultaneously
+// start() function:
+void start(int bpm, int steps) {
+    // Configure sequencer (don't clear column tracking)
+    g_current_step = 0;
+    g_step_just_changed = 1;  // Trigger step 0 immediately
+    g_sequencer_playing = 1;
+}
+```
 
-### Resource Efficiency  
-- **Node pooling**: Pre-allocated node pool prevents allocation overhead
-- **Memory sharing**: Multiple nodes can reference same sample data
-- **Automatic cleanup**: Finished nodes automatically return to pool
+**Result**: Clean stop/start cycles with proper state management.
 
-### Real-time Performance
-- **No blocking**: Cell creation/cleanup never blocks audio thread
-- **Frame-accurate timing**: Sample triggers aligned to audio frames
-- **Low latency**: Minimal processing overhead per node
+## Click Elimination
 
-## Integration with Node Graph
+**Volume smoothing prevents audio clicks during transitions.**
+See `docs/smoothing.md` for detailed implementation.
 
-**Following [miniaudio node graph documentation](https://miniaud.io/docs/examples/node_graph.html):**
+**Key points**:
+- **Exponential smoothing**: Natural fade curves (6ms rise, 12ms fall)
+- **Per-callback updates**: `update_volume_smoothing()` called every ~11ms
+- **Separate rise/fall**: Different timing for fade-in vs fade-out
+- **Click-free**: Eliminates discontinuities in audio waveform
+
+## Node Graph Integration
+
+**Following miniaudio node graph pattern:**
 ```c
 // Initialize node graph
-ma_node_graph_config nodeGraphConfig = ma_node_graph_config_init(CHANNEL_COUNT);
 ma_node_graph_init(&nodeGraphConfig, NULL, &g_nodeGraph);
 
 // Each cell node connects to endpoint
@@ -120,48 +119,76 @@ ma_node_attach_output_bus(&cell->node, 0, ma_node_graph_get_endpoint(&g_nodeGrap
 ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 ```
 
+**Benefits**:
+- **Automatic mixing**: Node graph handles all audio mixing
+- **Polyphonic playback**: Multiple cells can play same sample simultaneously
+- **Independent processing**: Each cell has its own audio pipeline
+
+## Performance Characteristics
+
+### Resource Management
+- **512 simultaneous nodes**: `MAX_ACTIVE_CELL_NODES = 512`
+- **Node pooling**: Pre-allocated `g_cell_nodes[]` array
+- **Memory efficiency**: Multiple nodes can reference same sample data
+- **Automatic cleanup**: Finished nodes automatically return to pool
+
+### Real-time Performance
+- **Volume-only control**: Sequencer just changes volume, no node creation/destruction
+- **Smooth transitions**: Exponential volume smoothing prevents clicks
+- **Frame-accurate timing**: Sample triggers aligned to audio frames
+- **Low latency**: Minimal processing overhead per node
+
+## Other Playback Systems
+
+### Sample Bank Playback
+- **Purpose**: Manual sample triggering outside sequencer
+- **Implementation**: Dedicated audio pipeline per slot
+- **Independence**: Separate from sequencer grid playback
+
+### Preview Systems
+- **Sample Preview**: For file browser (`g_sample_preview`)
+- **Cell Preview**: For grid cells (`g_cell_preview`)
+- **Implementation**: Dedicated preview nodes independent of other playback
+
 ## Technical Implementation
 
-### Cell Node Creation (Sequencer Triggers)
+### Main Audio Callback
+```c
+static void audio_callback(...) {
+    // 1. Run sequencer (timing + sample triggering)
+    run_sequencer(frameCount);
+    
+    // 2. Update volume smoothing to prevent clicks
+    update_volume_smoothing();
+    
+    // 3. Monitor cell nodes (cleanup finished)
+    monitor_cell_nodes();
+    
+    // 4. Mix all playing samples into output buffer
+    ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
+}
+```
+
+### Sample Switching Logic
 ```c
 // In play_samples_for_step():
-for (int column = 0; column < g_columns; column++) {
-    int sample_to_play = g_sequencer_grid[step][column];
-    if (sample_to_play >= 0) {
-        // Volume/pitch resolution (cell overrides sample bank)
-        float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
-        float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
-        
-        // Create new independent cell node
-        cell_node_t* cell_node = create_cell_node(step, column, sample_to_play, final_volume, final_pitch);
+cell_node_t* target_node = find_node_for_cell(step, column, sample_to_play);
+if (target_node) {
+    bool is_same_node = (currently_playing_nodes_per_col[column] == target_node);
+    
+    if (!is_same_node) {
+        // Fade out previous node, fade in new node
+        if (currently_playing_nodes_per_col[column]) {
+            set_target_volume(currently_playing_nodes_per_col[column], 0.0f);
+        }
+        set_target_volume(target_node, target_node->volume);
+        currently_playing_nodes_per_col[column] = target_node;
+    } else {
+        // Same node - restart from beginning
+        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+        set_target_volume(target_node, target_node->volume);
     }
 }
 ```
 
-### Column-Based Silencing
-```c
-// Silence existing nodes in column before triggering new sample
-silence_cell_nodes_in_column(column);
-
-// Sets volume to 0 instantly without destroying nodes:
-ma_node_set_output_bus_volume(&cell->node, 0, 0.0f);
-```
-- **Immediate silencing**: Previous samples in column stop instantly when new sample triggers
-- **No audio artifacts**: Volume-based silencing avoids clicks/pops from abrupt node cleanup
-- **Clean pipeline**: Silenced nodes continue processing at 0 volume until natural completion
-- **Automatic disposal**: Normal cleanup mechanism handles silenced nodes when finished
-
-### Automatic Resource Cleanup
-```c
-// In audio callback:
-cleanup_finished_cell_nodes();  // Called every ~11ms
-
-// Checks decoder position for completion:
-ma_decoder_get_cursor_in_pcm_frames(&cell->decoder, &cursor);
-ma_decoder_get_length_in_pcm_frames(&cell->decoder, &length);
-if (cursor >= length) {
-    cleanup_cell_node(cell);  // Return to pool
-}
-```
-
-This architecture provides perfect polyphonic playback with automatic mixing, following miniaudio's recommended patterns for complex audio applications.
+This architecture provides smooth, click-free playback with efficient resource management and professional audio quality.

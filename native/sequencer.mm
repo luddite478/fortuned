@@ -193,6 +193,16 @@ typedef struct {
     float volume;                      // Cell-specific volume
     float pitch;                       // Cell-specific pitch
     
+    int is_fading_out;                 // 1 if currently fading out to prevent clicks
+    uint64_t fade_start_frame;         // When fade out started
+    int is_fading_in;                  // 1 if currently fading in to prevent clicks
+    uint64_t fade_in_start_frame;      // When fade in started
+    float current_volume;              // Current actual volume (smoothed) 
+    float target_volume;               // Target volume we're smoothing towards
+    float volume_rise_coeff;           // Smoothing coefficient for fade-in
+    float volume_fall_coeff;           // Smoothing coefficient for fade-out
+    int is_volume_smoothing;           // 1 if volume is currently being smoothed
+    
     uint64_t start_frame;              // When playback started (for lifecycle tracking)
     uint64_t id;                       // Unique ID for this cell node instance
 } cell_node_t;
@@ -214,7 +224,13 @@ static cell_node_t g_cell_nodes[MAX_ACTIVE_CELL_NODES];  // Pool of cell nodes
 static uint64_t g_next_cell_node_id = 1;                 // Unique ID counter for cell nodes
 static uint64_t g_current_frame = 0;                     // Global frame counter for lifecycle tracking
 
-// Note: Thread safety removed for simplicity - miniaudio handles internal synchronization
+// Track currently playing node per column
+static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
+
+// Exponential volume smoothing for click elimination
+#define VOLUME_RISE_TIME_MS 6.0f      // 6ms fade-in time
+#define VOLUME_FALL_TIME_MS 12.0f     // 12ms fade-out time  
+#define VOLUME_THRESHOLD 0.0001f      // Convergence threshold 
 
 // Forward declarations for pitch data source functions
 static ma_result ma_pitch_data_source_init(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate);
@@ -223,12 +239,23 @@ static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, fl
 
 // Cell node management functions
 static cell_node_t* find_available_cell_node(void) {
+    int total_checked = 0;
+    int active_count = 0;
+    
     for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        if (!g_cell_nodes[i].active) {
+        total_checked++;
+        if (g_cell_nodes[i].active) {
+            active_count++;
+        } else {
+            // Found available node
+            prnt("♻️ [CELL POOL] Found available node #%d (pool: %d/%d active)", 
+                 i, active_count, MAX_ACTIVE_CELL_NODES);
             return &g_cell_nodes[i];
         }
     }
-    prnt_err("🔴 [CELL NODES] No available cell nodes! Consider increasing MAX_ACTIVE_CELL_NODES");
+    
+    prnt_err("🔴 [CELL POOL] POOL EXHAUSTED! %d/%d nodes active. Consider increasing MAX_ACTIVE_CELL_NODES", 
+             active_count, MAX_ACTIVE_CELL_NODES);
     return NULL;
 }
 
@@ -259,6 +286,83 @@ static void cleanup_cell_node(cell_node_t* cell) {
     memset(cell, 0, sizeof(cell_node_t));
 }
 
+// Count active cell nodes for diagnostics
+static int count_active_cell_nodes(void) {
+    int count = 0;
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) count++;
+    }
+    return count;
+}
+
+// Check if volume has converged to target
+static bool volume_has_converged(float current, float target) {
+    return fabsf(current - target) < VOLUME_THRESHOLD;
+}
+
+// Apply exponential smoothing step
+static float apply_exponential_smoothing(float current, float target, float alpha) {
+    return current + alpha * (target - current);
+}
+
+// Update volume smoothing for all active nodes
+static void update_volume_smoothing(void) {
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        cell_node_t* cell = &g_cell_nodes[i];
+        if (!cell->active || !cell->node_initialized || !cell->is_volume_smoothing) continue;
+        
+        if (volume_has_converged(cell->current_volume, cell->target_volume)) {
+            cell->current_volume = cell->target_volume;
+            cell->is_volume_smoothing = 0;
+        } else {
+            float alpha = (cell->current_volume < cell->target_volume) ? 
+                         cell->volume_rise_coeff : cell->volume_fall_coeff;
+            cell->current_volume = apply_exponential_smoothing(
+                cell->current_volume, cell->target_volume, alpha);
+        }
+        
+        ma_node_set_output_bus_volume(&cell->node, 0, cell->current_volume);
+    }
+}
+
+// Calculate alpha coefficient for exponential smoothing
+static float calculate_smoothing_alpha(float time_ms) {
+    float callback_dt = 512.0f / (float)SAMPLE_RATE;  // ~10.7ms at 48kHz
+    float time_sec = time_ms / 1000.0f;
+    return 1.0f - expf(-callback_dt / time_sec);
+}
+
+// Set target volume with exponential smoothing
+static void set_target_volume(cell_node_t* cell, float new_target_volume) {
+    if (!cell) return;
+    
+    if (volume_has_converged(cell->current_volume, new_target_volume)) {
+        cell->target_volume = new_target_volume;
+        cell->current_volume = new_target_volume;
+        cell->is_volume_smoothing = 0;
+        return;
+    }
+    
+    cell->target_volume = new_target_volume;
+    cell->is_volume_smoothing = 1;
+    cell->volume_rise_coeff = calculate_smoothing_alpha(VOLUME_RISE_TIME_MS);
+    cell->volume_fall_coeff = calculate_smoothing_alpha(VOLUME_FALL_TIME_MS);
+}
+
+// Find existing node for specific cell (step, column, sample)
+static cell_node_t* find_node_for_cell(int step, int column, int sample_slot) {
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        cell_node_t* cell = &g_cell_nodes[i];
+        if (cell->active && 
+            cell->step == step && 
+            cell->column == column && 
+            cell->sample_slot == sample_slot) {
+            return cell;
+        }
+    }
+    return NULL;  // No existing node found for this cell
+}
+
 static cell_node_t* create_cell_node(int step, int column, int sample_slot, float volume, float pitch) {
     if (sample_slot < 0 || sample_slot >= MAX_SLOTS) {
         prnt_err("🔴 [CELL NODE] Invalid sample slot: %d", sample_slot);
@@ -281,6 +385,15 @@ static cell_node_t* create_cell_node(int step, int column, int sample_slot, floa
     cell->sample_slot = sample_slot;
     cell->volume = volume;
     cell->pitch = pitch;
+    cell->is_fading_out = 0;
+    cell->fade_start_frame = 0;
+    cell->is_fading_in = 0;
+    cell->fade_in_start_frame = 0;
+    cell->current_volume = 0.0f;          // Start silent, will fade in when triggered
+    cell->target_volume = volume;         // Target is desired volume
+    cell->volume_rise_coeff = 0.0f;       // Will be calculated when smoothing starts
+    cell->volume_fall_coeff = 0.0f;       // Will be calculated when smoothing starts
+    cell->is_volume_smoothing = 0;        // No smoothing initially
     cell->start_frame = g_current_frame;
     cell->id = g_next_cell_node_id++;
     
@@ -329,8 +442,8 @@ static cell_node_t* create_cell_node(int step, int column, int sample_slot, floa
     // Connect the node to the node graph endpoint (this is crucial!)
     ma_node_attach_output_bus(&cell->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
     
-    // Set volume
-    ma_node_set_output_bus_volume(&cell->node, 0, volume);
+    // Set initial volume (start silent, will ramp to target when triggered)
+    ma_node_set_output_bus_volume(&cell->node, 0, 0.0f);
     
     prnt("✅ [CELL NODE] Created cell [%d,%d] with sample %d (vol: %.2f, pitch: %.2f, ID: %llu)", 
          step, column, sample_slot, volume, pitch, cell->id);
@@ -338,10 +451,20 @@ static cell_node_t* create_cell_node(int step, int column, int sample_slot, floa
     return cell;
 }
 
-static void cleanup_finished_cell_nodes(void) {
+static void monitor_cell_nodes(void) {
+    static uint64_t cleanup_call_count = 0;
+    static uint64_t last_cleanup_log = 0;
+    
+    cleanup_call_count++;
+    
+    int active_nodes = 0;
+    int finished_nodes = 0;
+    
     for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
         cell_node_t* cell = &g_cell_nodes[i];
         if (!cell->active) continue;
+        
+        active_nodes++;
         
         // Check if playback has finished
         ma_bool32 at_end = MA_FALSE;
@@ -359,12 +482,187 @@ static void cleanup_finished_cell_nodes(void) {
         }
         
         if (at_end) {
-            prnt("🏁 [CELL NODE] Cell [%d,%d] finished playing (ID: %llu)", 
-                 cell->step, cell->column, cell->id);
-            cleanup_cell_node(cell);
+            // Just log that sample finished - rewinding handled when triggered
+            // prnt("🏁 [FINISHED] Node #%d [%d,%d] sample %d finished playing (ID: %llu)", 
+                //  i, cell->step, cell->column, cell->sample_slot, cell->id);
+            finished_nodes++;
         }
     }
+    
+    // Log cleanup stats every 1000 calls or when nodes finish
+    if (finished_nodes > 0 || (cleanup_call_count % 1000 == 0 && cleanup_call_count > last_cleanup_log)) {
+        // prnt("📊 [MONITOR] Call #%llu: %d active nodes, %d finished playing", 
+            //  cleanup_call_count, active_nodes, finished_nodes);
+        last_cleanup_log = cleanup_call_count;
+    }
 }
+
+// -----------------------------------------------------------------------------
+// Zero-Crossing Detection for Click-Free Audio Transitions
+// -----------------------------------------------------------------------------
+
+#define ZERO_CROSSING_SEARCH_FRAMES 4800   // Search up to ~100ms at 48kHz for zero crossing
+#define ZERO_THRESHOLD 0.01f               // Consider values below this as "zero" (1% of max amplitude)
+
+// Global flag to enable/disable zero-crossing detection (for A/B testing)
+// NOTE: We use exponential volume smoothing which is superior to zero-crossing detection
+// Set to 1 to enable zero-crossing, 0 to use exponential smoothing (recommended)
+static int g_zero_crossing_enabled = 0;  // Use exponential smoothing by default
+
+// Find nearest zero-crossing point in audio data
+static ma_uint64 find_zero_crossing(float* samples, ma_uint64 start_frame, ma_uint64 max_frames, ma_uint32 channels, bool search_forward) {
+    if (!samples || channels == 0 || max_frames == 0) return start_frame;
+    
+    ma_uint64 best_frame = start_frame;
+    float best_amplitude = FLT_MAX;
+    ma_uint64 search_count = 0;
+    
+    // Determine search bounds
+    ma_uint64 search_start, search_end;
+    if (search_forward) {
+        search_start = start_frame;
+        search_end = (start_frame + ZERO_CROSSING_SEARCH_FRAMES < max_frames) ? 
+                     start_frame + ZERO_CROSSING_SEARCH_FRAMES : max_frames;
+    } else {
+        search_start = (start_frame > ZERO_CROSSING_SEARCH_FRAMES) ? 
+                       start_frame - ZERO_CROSSING_SEARCH_FRAMES : 0;
+        search_end = start_frame;
+    }
+    
+    // Get initial sample for sign comparison
+    float prev_sample = 0.0f;
+    if (search_start < max_frames) {
+        prev_sample = samples[search_start * channels]; // Use first channel
+    }
+    
+    // Search for zero crossings
+    for (ma_uint64 frame = search_start; frame < search_end && frame < max_frames; frame++) {
+        search_count++;
+        
+        float current_sample = samples[frame * channels]; // Use first channel
+        float abs_amplitude = fabsf(current_sample);
+        
+        // Check for zero crossing (sign change) or very low amplitude
+        bool is_zero_crossing = false;
+        
+        // Method 1: True zero crossing (sign change)
+        if (prev_sample * current_sample <= 0.0f && (fabsf(prev_sample) > ZERO_THRESHOLD || abs_amplitude > ZERO_THRESHOLD)) {
+            is_zero_crossing = true;
+        }
+        
+        // Method 2: Very low amplitude (close to zero)
+        if (abs_amplitude < ZERO_THRESHOLD) {
+            is_zero_crossing = true;
+        }
+        
+        if (is_zero_crossing && abs_amplitude < best_amplitude) {
+            best_frame = frame;
+            best_amplitude = abs_amplitude;
+            
+            // If we found a perfect zero or very close, use it immediately
+            if (abs_amplitude < ZERO_THRESHOLD / 10.0f) {
+                prnt("🎯 [ZERO-CROSS] Found perfect zero at frame %llu (amplitude: %.6f)", frame, abs_amplitude);
+                break;
+            }
+        }
+        
+        prev_sample = current_sample;
+    }
+    
+    prnt("🔍 [ZERO-CROSS] Searched %llu frames, start=%llu, found best at %llu (amplitude: %.6f)", 
+         search_count, start_frame, best_frame, best_amplitude);
+    
+    return best_frame;
+}
+
+// Find zero-crossing point for decoder start position
+static ma_uint64 find_decoder_start_zero_crossing(ma_decoder* decoder) {
+    if (!decoder) return 0;
+    
+    // Read some audio data from the beginning
+    float temp_buffer[ZERO_CROSSING_SEARCH_FRAMES * 2]; // Stereo support
+    ma_uint64 frames_read = 0;
+    
+    // Save current position
+    ma_uint64 original_cursor;
+    ma_decoder_get_cursor_in_pcm_frames(decoder, &original_cursor);
+    
+    // Seek to start and read data
+    ma_decoder_seek_to_pcm_frame(decoder, 0);
+    ma_result result = ma_decoder_read_pcm_frames(decoder, temp_buffer, ZERO_CROSSING_SEARCH_FRAMES, &frames_read);
+    
+    ma_uint64 zero_frame = 0;
+    if (result == MA_SUCCESS && frames_read > 0) {
+        ma_format format;
+        ma_uint32 channels;
+        ma_uint32 sample_rate;
+        ma_decoder_get_data_format(decoder, &format, &channels, &sample_rate, NULL, 0);
+        
+        prnt("🔍 [ZERO-CROSS] Analyzing start: format=%d, channels=%d, frames_read=%llu", 
+             format, channels, frames_read);
+        
+        zero_frame = find_zero_crossing(temp_buffer, 0, frames_read, channels, true);
+        
+        // Fallback: if zero-crossing didn't find a better position, skip the first few frames
+        if (zero_frame == 0 && frames_read > 48) {
+            zero_frame = 48; // Skip first 1ms to avoid potential click at exact start
+            prnt("🔄 [ZERO-CROSS] Using fallback: skipping to frame %llu", zero_frame);
+        }
+    }
+    
+    // Restore original position
+    ma_decoder_seek_to_pcm_frame(decoder, original_cursor);
+    
+    return zero_frame;
+}
+
+// Find zero-crossing point for fade-out (current position)
+static ma_uint64 find_decoder_fadeout_zero_crossing(ma_decoder* decoder) {
+    if (!decoder) return 0;
+    
+    // Get current position
+    ma_uint64 current_cursor;
+    ma_decoder_get_cursor_in_pcm_frames(decoder, &current_cursor);
+    
+    // For fadeout, we want to find a zero-crossing close to the current position
+    // But not too far ahead to avoid disrupting the audio flow
+    ma_uint64 search_window = 480; // 10ms at 48kHz - shorter window for fadeout
+    
+    // Read some audio data around current position
+    float temp_buffer[960 * 2]; // 20ms stereo buffer
+    ma_uint64 frames_read = 0;
+    
+    // Read from current position forward
+    ma_result result = ma_decoder_read_pcm_frames(decoder, temp_buffer, search_window, &frames_read);
+    
+    ma_uint64 zero_frame = current_cursor;
+    if (result == MA_SUCCESS && frames_read > 0) {
+        ma_format format;
+        ma_uint32 channels;
+        ma_uint32 sample_rate;
+        ma_decoder_get_data_format(decoder, &format, &channels, &sample_rate, NULL, 0);
+        
+        prnt("🔍 [ZERO-CROSS] Analyzing fadeout: current=%llu, search_window=%llu, frames_read=%llu", 
+             current_cursor, search_window, frames_read);
+        
+        // Find zero crossing from current position forward
+        ma_uint64 relative_zero = find_zero_crossing(temp_buffer, 0, frames_read, channels, true);
+        zero_frame = current_cursor + relative_zero;
+        
+        // Fallback: if no good zero-crossing found, just use current position
+        if (relative_zero == 0) {
+            zero_frame = current_cursor;
+            prnt("🔄 [ZERO-CROSS] Using current position for fadeout: %llu", zero_frame);
+        }
+    }
+    
+    // Restore original position
+    ma_decoder_seek_to_pcm_frame(decoder, current_cursor);
+    
+    return zero_frame;
+}
+
+// Note: Removed complex Audacity smoothing - exponential volume smoothing is more effective
 
 // Helper function to load entire audio file into memory buffer
 static int load_file_to_memory_buffer(const char* file_path, void** memory_data, size_t* memory_size) {
@@ -937,30 +1235,47 @@ static int load_sound_from_file(audio_slot_t* slot, const char* file_path, ma_de
 
 // Play all samples that should trigger on this step across all columns (NEW: Per-cell nodes)
 // Silence all active cell nodes in a specific column (for column-based replacement)
-// Sets volume to 0 instead of destroying nodes to avoid audio artifacts
+// Sets volume to 0 but keeps nodes active for logging purposes
 static void silence_cell_nodes_in_column(int column) {
     int silenced_count = 0;
+    int total_active_in_column = 0;
+    
+    // First pass: count all active nodes in this column
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active && g_cell_nodes[i].column == column) {
+            total_active_in_column++;
+        }
+    }
+    
+    if (total_active_in_column > 0) {
+        prnt("🔇 [SILENCE] Column %d has %d active nodes to silence", column, total_active_in_column);
+    }
+    
+    // Second pass: silence them (original behavior - just set volume to 0)
     for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
         cell_node_t* cell = &g_cell_nodes[i];
         if (cell->active && cell->column == column && cell->node_initialized) {
             // Set volume to 0 to silence immediately without audio artifacts
             ma_node_set_output_bus_volume(&cell->node, 0, 0.0f);
-            prnt("🔇 [SEQUENCER] Silenced cell node [%d,%d] sample %d (ID: %llu) for column replacement", 
-                 cell->step, cell->column, cell->sample_slot, cell->id);
+            
+            prnt("🔇 [SILENCE] Node #%d: [%d,%d] sample %d (ID: %llu) → volume=0 (still active)", 
+                 i, cell->step, cell->column, cell->sample_slot, cell->id);
             silenced_count++;
         }
     }
+    
     if (silenced_count > 0) {
-        prnt("🔇 [SEQUENCER] Silenced %d cell nodes in column %d", silenced_count, column);
+        prnt("🔇 [SILENCE] Column %d: silenced %d/%d nodes (volume=0, kept active)", 
+             column, silenced_count, total_active_in_column);
     }
 }
 
 static void play_samples_for_step(int step) {
     if (step < 0 || step >= g_sequencer_steps) return;
     
-    prnt("🎵 [SEQUENCER] Playing step %d across %d columns (per-cell nodes)", step, g_columns);
+    prnt("🎵 [SEQUENCER] Step: %d", step);
     
-    // Process all columns (which represent all UI grids concatenated horizontally)
+    // Process all columns - just volume control, no node creation/deletion
     for (int column = 0; column < g_columns; column++) {
         int sample_to_play = g_sequencer_grid[step][column];
         
@@ -968,32 +1283,54 @@ static void play_samples_for_step(int step) {
         if (sample_to_play >= 0 && sample_to_play < MAX_SLOTS) {
             audio_slot_t* sample = &g_slots[sample_to_play];
             if (sample->loaded) {
-                // COLUMN-BASED REPLACEMENT: Silence any active samples in this column before playing new one
-                silence_cell_nodes_in_column(column);
+                // Find the node we want to play
+                cell_node_t* target_node = find_node_for_cell(step, column, sample_to_play);
                 
-                // Volume logic: cell volume overrides sample bank volume when set
-                float bank_volume = sample->volume;
-                float cell_volume = g_sequencer_grid_volumes[step][column];
-                float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
-                
-                // Pitch logic: cell pitch overrides sample bank pitch when set
-                float bank_pitch = sample->pitch;
-                float cell_pitch = g_sequencer_grid_pitches[step][column];
-                float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
-                
-                // Create NEW individual cell node for this trigger
-                cell_node_t* cell_node = create_cell_node(step, column, sample_to_play, final_volume, final_pitch);
-                
-                if (cell_node) {
-                    prnt("▶️ [SEQUENCER] Created cell node [%d,%d] with sample %d (vol: %.2f, pitch: %.2f, ID: %llu)", 
-                         step, column, sample_to_play, final_volume, final_pitch, cell_node->id);
+                if (target_node) {
+                    // Check if this is the same node as currently playing
+                    bool is_same_node = (currently_playing_nodes_per_col[column] == target_node);
+                    
+                                        if (!is_same_node) {
+                        // Fade out previous node, fade in new node
+                        if (currently_playing_nodes_per_col[column]) {
+                            set_target_volume(currently_playing_nodes_per_col[column], 0.0f);
+                        }
+                        
+                        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        set_target_volume(target_node, target_node->volume);
+                        currently_playing_nodes_per_col[column] = target_node;
+                        
+                        prnt("▶️ [START] Node [%d,%d] sample %d (vol: %.2f, ID: %llu) - tracking in column", 
+                             step, column, sample_to_play, target_node->volume, target_node->id);
+                    } else {
+                        // Same node - restart from beginning
+                        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        set_target_volume(target_node, target_node->volume);
+                        
+                        prnt("🔄 [RESTART] Node [%d,%d] sample %d (vol: %.2f, ID: %llu)", 
+                             step, column, sample_to_play, target_node->volume, target_node->id);
+                    }
                 } else {
-                    prnt_err("🔴 [SEQUENCER] Failed to create cell node for [%d,%d] sample %d", step, column, sample_to_play);
+                    prnt("⚠️ [SEQUENCER] No existing node found for [%d,%d] sample %d - need to create via grid management", 
+                         step, column, sample_to_play);
+                    
+                    // Debug: Show what nodes exist
+                    int active_count = 0;
+                    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+                        if (g_cell_nodes[i].active) {
+                            active_count++;
+                            if (active_count <= 3) { // Show first 3 active nodes
+                                prnt("  🔍 [DEBUG] Active node #%d: [%d,%d] sample %d (ID: %llu)", 
+                                     i, g_cell_nodes[i].step, g_cell_nodes[i].column, 
+                                     g_cell_nodes[i].sample_slot, g_cell_nodes[i].id);
+                            }
+                        }
+                    }
+                    prnt("  🔍 [DEBUG] Total active nodes: %d", active_count);
                 }
             }
         }
-        // IMPORTANT: If grid cell is empty, do NOTHING
-        // Previous cell nodes continue playing independently
+        // If grid cell is empty, keep previous node playing (don't silence)
     }
 }
 
@@ -1030,24 +1367,83 @@ static void run_sequencer(ma_uint32 frameCount) {
     }
 }
 
+// Audio performance tracking
+static uint64_t g_callback_count = 0;
+static uint64_t g_total_callback_time_us = 0;
+static uint64_t g_max_callback_time_us = 0;
+static uint64_t g_last_performance_log = 0;
+
+// Get time in microseconds (cross-platform)
+static uint64_t get_time_microseconds(void) {
+#ifdef __APPLE__
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL;
+#elif defined(__ANDROID__)
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000000ULL + ts.tv_nsec / 1000ULL;
+#else
+    // Fallback for other platforms
+    return 0;
+#endif
+}
+
+
+
 // Main audio callback - called by miniaudio every ~11ms to fill the audio buffer
 static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+    uint64_t callback_start = get_time_microseconds();
+    
     // 1. Update global frame counter for cell node lifecycle tracking
     g_current_frame += frameCount;
     
     // 2. Run the sequencer (timing + sample triggering)
     run_sequencer(frameCount);
     
-    // 3. Clean up finished cell nodes
-    cleanup_finished_cell_nodes();
+    // 3. Update volume smoothing to prevent clicks
+    update_volume_smoothing();
     
-    // 4. Mix all playing samples into the output buffer (includes all active cell nodes)
+    // 4. Monitor cell nodes  
+    monitor_cell_nodes();
+    
+    // 5. Mix all playing samples into the output buffer (includes all active cell nodes)
     ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 
-    // 5. If recording, save the mixed audio to file
+    // 6. If recording, save the mixed audio to file
     if (g_is_output_recording) {
         ma_encoder_write_pcm_frames(&g_output_encoder, pOutput, frameCount, NULL);
         g_total_frames_written += frameCount;
+    }
+
+    // 7. Performance tracking and diagnostics
+    uint64_t callback_end = get_time_microseconds();
+    uint64_t callback_duration = callback_end - callback_start;
+    
+    g_callback_count++;
+    g_total_callback_time_us += callback_duration;
+    if (callback_duration > g_max_callback_time_us) {
+        g_max_callback_time_us = callback_duration;
+    }
+    
+    // Log performance every 5 seconds and when callback is slow
+    uint64_t now = callback_end / 1000000; // Convert to seconds
+    if (now > g_last_performance_log + 5 || callback_duration > 8000) { // 8ms = 73% of 11ms budget
+        int active_nodes = count_active_cell_nodes();
+        double avg_callback_time = (double)g_total_callback_time_us / g_callback_count;
+        
+        if (callback_duration > 8000) {
+            prnt_err("⚠️ [PERF] SLOW CALLBACK: %llu μs (%.1f%% of 11ms budget), active nodes: %d", 
+                     callback_duration, (callback_duration / 110.0), active_nodes);
+        }
+        
+        prnt("📊 [PERF] Callback stats: avg=%.1fμs, max=%lluμs, active_nodes=%d, callbacks=%llu", 
+             avg_callback_time, g_max_callback_time_us, active_nodes, g_callback_count);
+        
+        g_last_performance_log = now;
+        
+        // Reset max after logging
+        g_max_callback_time_us = 0;
     }
 
     (void)pInput;
@@ -1241,6 +1637,9 @@ int init(void) {
     memset(g_cell_nodes, 0, sizeof(g_cell_nodes));
     g_next_cell_node_id = 1;
     g_current_frame = 0;
+    
+    // Initialize column tracking
+    memset(currently_playing_nodes_per_col, 0, sizeof(currently_playing_nodes_per_col));
     
     // ---------------------------------------------------------------------
     // Initialize the node graph which will perform automatic mixing of all
@@ -1752,6 +2151,15 @@ uint64_t get_recording_duration(void) {
     return (g_total_frames_written * 1000) / SAMPLE_RATE;
 }
 
+// Diagnostic functions for monitoring performance
+int get_active_cell_node_count(void) {
+    return count_active_cell_nodes();
+}
+
+int get_max_cell_node_count(void) {
+    return MAX_ACTIVE_CELL_NODES;
+}
+
 // Sequencer functions (sample-accurate timing)
 int start(int bpm, int steps) {
     if (!g_is_initialized) {
@@ -1767,13 +2175,6 @@ int start(int bpm, int steps) {
     if (steps <= 0 || steps > MAX_SEQUENCER_STEPS) {
         prnt_err("🔴 [SEQUENCER] Invalid steps: %d (max: %d)", steps, MAX_SEQUENCER_STEPS);
         return -1;
-    }
-    
-    // Stop any currently active cell nodes
-    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        if (g_cell_nodes[i].active) {
-            cleanup_cell_node(&g_cell_nodes[i]);
-        }
     }
     
     // Configure sequencer
@@ -1795,12 +2196,15 @@ void stop(void) {
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     
-    // Stop all currently active cell nodes
-    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        if (g_cell_nodes[i].active) {
-            cleanup_cell_node(&g_cell_nodes[i]);
+    // Smoothly fade out all currently playing nodes
+    for (int i = 0; i < MAX_TOTAL_COLUMNS; i++) {
+        if (currently_playing_nodes_per_col[i]) {
+            set_target_volume(currently_playing_nodes_per_col[i], 0.0f);
         }
     }
+    
+    // Clear column tracking since nothing is currently playing
+    memset(currently_playing_nodes_per_col, 0, sizeof(currently_playing_nodes_per_col));
     
     prnt("⏹️ [SEQUENCER] Stopped");
 }
@@ -1843,6 +2247,63 @@ void set_cell(int step, int column, int sample_slot) {
         return;
     }
     
+    // If removing sample from cell (sample_slot = -1)
+    if (sample_slot == -1) {
+        // Find and cleanup existing node for this cell
+        cell_node_t* existing_node = find_node_for_cell(step, column, g_sequencer_grid[step][column]);
+        if (existing_node) {
+            prnt("🗑️ [GRID] Removing node for cell [%d,%d] (ID: %llu)", step, column, existing_node->id);
+            cleanup_cell_node(existing_node);
+        }
+        g_sequencer_grid[step][column] = -1;
+        prnt("🗑️ [SEQUENCER] Cleared cell [%d,%d]", step, column);
+        return;
+    }
+    
+    // Adding/changing sample in cell
+    audio_slot_t* sample = &g_slots[sample_slot];
+    if (!sample->loaded) {
+        prnt_err("🔴 [SEQUENCER] Sample %d not loaded", sample_slot);
+        return;
+    }
+    
+    // Remove existing node if there was a different sample in this cell
+    int old_sample = g_sequencer_grid[step][column];
+    if (old_sample >= 0 && old_sample != sample_slot) {
+        cell_node_t* old_node = find_node_for_cell(step, column, old_sample);
+        if (old_node) {
+            prnt("🗑️ [GRID] Replacing node for cell [%d,%d] old sample %d (ID: %llu)", 
+                 step, column, old_sample, old_node->id);
+            cleanup_cell_node(old_node);
+        }
+    }
+    
+    // Create new node for this cell (if it doesn't exist)
+    cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
+    if (!existing_node) {
+        // Volume logic: cell volume overrides sample bank volume when set
+        float bank_volume = sample->volume;
+        float cell_volume = g_sequencer_grid_volumes[step][column];
+        float final_volume = (cell_volume != 1.0f) ? cell_volume : bank_volume;
+        
+        // Pitch logic: cell pitch overrides sample bank pitch when set
+        float bank_pitch = sample->pitch;
+        float cell_pitch = g_sequencer_grid_pitches[step][column];
+        float final_pitch = (cell_pitch != 1.0f) ? cell_pitch : bank_pitch;
+        
+        // Create node for this cell (starts silenced)
+        cell_node_t* new_node = create_cell_node(step, column, sample_slot, final_volume, final_pitch);
+        if (new_node) {
+            // Start silenced - sequencer will control volume during playback
+            ma_node_set_output_bus_volume(&new_node->node, 0, 0.0f);
+            prnt("✅ [GRID] Created node for cell [%d,%d] sample %d (vol: %.2f, pitch: %.2f, ID: %llu)", 
+                 step, column, sample_slot, final_volume, final_pitch, new_node->id);
+        } else {
+            prnt_err("🔴 [GRID] Failed to create node for cell [%d,%d] sample %d", step, column, sample_slot);
+            return;
+        }
+    }
+    
     g_sequencer_grid[step][column] = sample_slot;
     prnt("🎹 [SEQUENCER] Set cell [%d,%d] = %d", step, column, sample_slot);
 }
@@ -1850,6 +2311,16 @@ void set_cell(int step, int column, int sample_slot) {
 void clear_cell(int step, int column) {
     if (step < 0 || step >= MAX_SEQUENCER_STEPS) return;
     if (column < 0 || column >= MAX_TOTAL_COLUMNS) return;
+    
+    // Find and cleanup existing node for this cell
+    int old_sample = g_sequencer_grid[step][column];
+    if (old_sample >= 0) {
+        cell_node_t* existing_node = find_node_for_cell(step, column, old_sample);
+        if (existing_node) {
+            prnt("🗑️ [GRID] Removing node for cell [%d,%d] (ID: %llu)", step, column, existing_node->id);
+            cleanup_cell_node(existing_node);
+        }
+    }
     
     g_sequencer_grid[step][column] = -1;
     prnt("🗑️ [SEQUENCER] Cleared cell [%d,%d]", step, column);

@@ -143,6 +143,12 @@ int is_recording(void);
 __attribute__((visibility("default"))) __attribute__((used))
 uint64_t get_recording_duration(void);
 
+// Diagnostic functions for performance monitoring
+__attribute__((visibility("default"))) __attribute__((used))
+int get_active_cell_node_count(void);
+__attribute__((visibility("default"))) __attribute__((used))
+int get_max_cell_node_count(void);
+
 #ifdef __cplusplus
 }
 #endif

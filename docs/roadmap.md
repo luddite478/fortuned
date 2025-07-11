@@ -1,7 +1,9 @@
+- undo redo - done
+- double tap jump - done
+- smoothing - done
+
+
 - master settings
-- undo redo
-- double tap jump copy
-- buttons 
 - pitch (fix artifacts)
 - bpm
 - contacts and all users search
