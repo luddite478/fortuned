@@ -1,5 +1,45 @@
 #include "sequencer.h"
 
+// -----------------------------------------------------------------------------
+// Pitch Shifting Implementation Selection
+// -----------------------------------------------------------------------------
+// Runtime pitch approach selection (cleaner than compile-time #if statements)
+
+typedef enum {
+    PITCH_METHOD_MINIAUDIO = 0,     // Miniaudio resampler (fast, reliable, real-time)
+    PITCH_METHOD_SOUNDTOUCH_REALTIME = 1,  // SoundTouch real-time (high quality, may have issues with multiple instances)  
+    PITCH_METHOD_SOUNDTOUCH_PREPROCESSING = 2  // SoundTouch offline preprocessing (highest quality, cached)
+} pitch_method_t;
+
+// Current pitch method (can be changed at runtime if needed)
+static pitch_method_t g_current_pitch_method = PITCH_METHOD_SOUNDTOUCH_PREPROCESSING;
+
+// SoundTouch includes (needed for both realtime and preprocessing)
+// Mobile-optimized SoundTouch configuration (must be before includes)
+#define SOUNDTOUCH_FLOAT_SAMPLES                     1  // Use floating point (better on ARM64)
+#define SOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION  1  // Enable ARM NEON optimizations
+#define SOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS         1  // Force disable x86 optimizations
+#undef  SOUNDTOUCH_INTEGER_SAMPLES                      // Explicitly disable integer samples
+
+// SoundTouch includes for high-quality pitch shifting
+#include "soundtouch/SoundTouch.h"
+
+// Include SoundTouch implementation directly (like MINIAUDIO_IMPLEMENTATION)
+#include "soundtouch/cpu_detect_arm.cpp"    // ARM-compatible CPU detection (must be first)
+#include "soundtouch/SoundTouch.cpp"
+#include "soundtouch/TDStretch.cpp"  
+#include "soundtouch/RateTransposer.cpp"
+#include "soundtouch/FIRFilter.cpp"
+#include "soundtouch/AAFilter.cpp"
+#include "soundtouch/FIFOSampleBuffer.cpp"
+#include "soundtouch/InterpolateLinear.cpp"
+#include "soundtouch/InterpolateCubic.cpp"
+#include "soundtouch/InterpolateShannon.cpp"
+#include "soundtouch/PeakFinder.cpp"
+// Skip BPMDetect.cpp - not needed for pitch shifting
+
+using namespace soundtouch;
+
 // Platform-specific includes and definitions
 #ifdef __APPLE__
     #include <os/log.h>
@@ -57,6 +97,14 @@
 #include <stdlib.h>
 #include <math.h>
 
+// Utility macros
+#ifndef MIN
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef MAX
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#endif
+
 
 #define MAX_SLOTS 1024
 #define SAMPLE_FORMAT   ma_format_f32
@@ -68,21 +116,75 @@
 #define MAX_MEMORY_FILE_SIZE (50 * 1024 * 1024)      // 50MB per individual file
 #define MAX_TOTAL_MEMORY_USAGE (500 * 1024 * 1024)   // 500MB total memory usage limit
 
-// Pitch data source wrapper using miniaudio resampler for pitch shifting
+// Unified pitch data source wrapper supporting all three implementations
 typedef struct {
     ma_data_source_base ds;
     ma_data_source* original_ds;
     float pitch_ratio;
     ma_uint32 channels;
     ma_uint32 sample_rate;
+    pitch_method_t approach;  // Which approach this instance uses
     
-    // Use miniaudio resampler for pitch shifting
+    // Miniaudio resampler fields (used by MINIAUDIO and PREPROCESSING fallback)
     ma_resampler resampler;
     int resampler_initialized;
     ma_uint32 target_sample_rate;  // Calculated from pitch ratio
+    float* temp_input_buffer;      // Instance-specific temp buffer for thread safety
+    size_t temp_input_buffer_size; // Size of temp buffer in samples
+    
+    // SoundTouch real-time fields (used by SOUNDTOUCH_REALTIME)
+    SoundTouch* soundtouch_processor;
+    int soundtouch_initialized;
+    float* temp_buffer;            // Internal processing buffer
+    size_t temp_buffer_size;       // Size of temp buffer in samples
+    ma_uint64 input_frames_pending; // Frames waiting for processing
+    
+    // SoundTouch preprocessing fields (used by SOUNDTOUCH_PREPROCESSING)
+    int sample_slot;               // Which sample this is for (for cache lookup)
+    ma_decoder* preprocessed_decoder; // Decoder for preprocessed audio data
+    int uses_preprocessed_data;    // Whether this instance uses cached data
 } ma_pitch_data_source;
 
 // Pitch data source vtable is defined later in the file
+
+// -----------------------------------------------------------------------------
+// Preprocessed Pitch System - Process samples offline, store in RAM
+// (Used when method is PITCH_METHOD_SOUNDTOUCH_PREPROCESSING)
+// -----------------------------------------------------------------------------
+
+// Hash function for pitch ratios (quantized to avoid float precision issues)
+static uint32_t hash_pitch_ratio(float pitch_ratio) {
+    // Quantize to nearest 0.001 to avoid float precision issues
+    uint32_t quantized = (uint32_t)(pitch_ratio * 1000.0f + 0.5f);
+    return quantized;
+}
+
+// Preprocessed sample entry
+typedef struct {
+    int source_slot;                    // Which slot this was preprocessed from
+    float pitch_ratio;                  // The pitch ratio used
+    uint32_t pitch_hash;               // Hash of pitch ratio for fast lookup
+    
+    void* processed_data;              // Processed audio data
+    size_t processed_size;             // Size in bytes
+    ma_uint64 processed_frames;        // Length in frames
+    
+    int in_use;                        // 1 if currently in use
+    uint64_t last_accessed;            // For LRU cache management
+    uint64_t creation_time;            // When this was created
+} preprocessed_sample_t;
+
+// Preprocessed sample cache
+#define MAX_PREPROCESSED_SAMPLES 64    // Cache up to 64 preprocessed samples
+static preprocessed_sample_t g_preprocessed_cache[MAX_PREPROCESSED_SAMPLES];
+static uint64_t g_preprocessed_access_counter = 0;  // For LRU tracking
+static uint64_t g_total_preprocessed_memory = 0;    // Track memory usage
+
+// Function declarations for preprocessed system
+static int preprocess_sample_with_pitch(int source_slot, float pitch_ratio);
+static preprocessed_sample_t* find_preprocessed_sample(int source_slot, float pitch_ratio);
+static void cleanup_preprocessed_cache(void);
+static void evict_oldest_preprocessed_sample(void);
 
 // Audio slot structure - separate systems for different playback scenarios
 typedef struct {
@@ -140,11 +242,36 @@ static void cleanup_preview_system(preview_system_t* preview) {
     }
     
     if (preview->pitch_ds_initialized) {
+#if PITCH_APPROACH_MINIAUDIO
         // Clean up resampler if initialized
         if (preview->pitch_ds.resampler_initialized) {
             ma_resampler_uninit(&preview->pitch_ds.resampler, NULL);
             preview->pitch_ds.resampler_initialized = 0;
         }
+#elif PITCH_APPROACH_SOUNDTOUCH_REALTIME
+        // Clean up SoundTouch
+        if (preview->pitch_ds.soundtouch_processor) {
+            delete preview->pitch_ds.soundtouch_processor;
+            preview->pitch_ds.soundtouch_processor = nullptr;
+        }
+        if (preview->pitch_ds.temp_buffer) {
+            free(preview->pitch_ds.temp_buffer);
+            preview->pitch_ds.temp_buffer = nullptr;
+        }
+#elif PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+        // Clean up preprocessing resources
+        if (preview->pitch_ds.uses_preprocessed_data && preview->pitch_ds.preprocessed_decoder) {
+            ma_decoder_uninit(preview->pitch_ds.preprocessed_decoder);
+            free(preview->pitch_ds.preprocessed_decoder);
+            preview->pitch_ds.preprocessed_decoder = NULL;
+            preview->pitch_ds.uses_preprocessed_data = 0;
+        }
+        // Clean up fallback resampler
+        if (preview->pitch_ds.resampler_initialized) {
+            ma_resampler_uninit(&preview->pitch_ds.resampler, NULL);
+            preview->pitch_ds.resampler_initialized = 0;
+        }
+#endif
         ma_data_source_uninit(&preview->pitch_ds.ds);
         preview->pitch_ds_initialized = 0;
     }
@@ -185,10 +312,14 @@ typedef struct {
     int sample_slot;                   // Which sample this cell plays
     
     ma_decoder decoder;                // Independent decoder for this cell
+    ma_audio_buffer audio_buffer;      // Audio buffer for preprocessed data
+    int uses_audio_buffer;             // 1 if using audio_buffer, 0 if using decoder
+    ma_uint64 audio_buffer_frame_count; // Frame count for audio buffer (stored since miniaudio doesn't provide getter)
     ma_pitch_data_source pitch_ds;     // Cell-specific pitch control
     ma_data_source_node node;          // Individual node in graph
     int node_initialized;              // 1 when node is initialized
     int pitch_ds_initialized;          // 1 when pitch data source is initialized
+    int audio_buffer_initialized;      // 1 when audio buffer is initialized
     
     float volume;                      // Cell-specific volume
     float pitch;                       // Cell-specific pitch
@@ -236,6 +367,50 @@ static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
 static ma_result ma_pitch_data_source_init(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate);
 static void ma_pitch_data_source_uninit(ma_pitch_data_source* pPitch);
 static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, float pitchRatio);
+#if PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+static ma_result ma_pitch_data_source_init_with_preprocessing(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate, int sample_slot);
+#endif
+
+// Forward declarations for cell node functions
+static cell_node_t* create_cell_node(int step, int column, int sample_slot, float volume, float pitch);
+static void set_target_volume(cell_node_t* cell, float new_target_volume);
+
+// Debug function to check SoundTouch instance isolation
+#if PITCH_APPROACH_SOUNDTOUCH_REALTIME
+static void debug_soundtouch_instance(const char* context, ma_pitch_data_source* pPitch) {
+    if (pPitch->approach != PITCH_METHOD_SOUNDTOUCH_REALTIME || !pPitch->soundtouch_initialized) return;
+    
+    static int debug_counter = 0;
+    debug_counter++;
+    
+    // Only log every 100th call to avoid spam
+    if (debug_counter % 100 == 0) {
+        prnt("🔍 [ST_DEBUG] %s: Instance %p, processor %p, buffer %p, initialized %d, pitch %.3f (call #%d)", 
+             context, 
+             (void*)pPitch, 
+             (void*)pPitch->soundtouch_processor,
+             (void*)pPitch->temp_buffer,
+             pPitch->soundtouch_initialized,
+             pPitch->pitch_ratio,
+             debug_counter);
+             
+        // Additional instance state verification
+        if (pPitch->soundtouch_processor) {
+            try {
+                uint available = pPitch->soundtouch_processor->numSamples();
+                prnt("🔍 [ST_DEBUG] Instance %p has %u samples available", (void*)pPitch, available);
+            } catch (...) {
+                prnt_err("🔴 [ST_DEBUG] Instance %p numSamples() failed", (void*)pPitch);
+            }
+        }
+    }
+}
+#else
+// Stub for non-SoundTouch approaches
+static void debug_soundtouch_instance(const char* context, ma_pitch_data_source* pPitch) {
+    // No-op for approaches that don't use SoundTouch real-time processing
+}
+#endif
 
 // Cell node management functions
 static cell_node_t* find_available_cell_node(void) {
@@ -279,8 +454,13 @@ static void cleanup_cell_node(cell_node_t* cell) {
         cell->pitch_ds_initialized = 0;
     }
     
-    // Cleanup decoder
-    ma_decoder_uninit(&cell->decoder);
+    // Cleanup decoder or audio buffer based on what was used
+    if (cell->uses_audio_buffer && cell->audio_buffer_initialized) {
+        ma_audio_buffer_uninit(&cell->audio_buffer);
+        cell->audio_buffer_initialized = 0;
+    } else {
+        ma_decoder_uninit(&cell->decoder);
+    }
     
     // Reset cell state
     memset(cell, 0, sizeof(cell_node_t));
@@ -398,15 +578,55 @@ static cell_node_t* find_node_for_cell(int step, int column, int sample_slot) {
 static void update_existing_nodes_for_cell(int step, int column, int sample_slot) {
     cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
     if (existing_node) {
-        // Update pitch
         float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
-        update_cell_pitch(existing_node, resolved_pitch);
+        float resolved_volume = resolve_cell_volume(step, column, sample_slot);
         
-        // Update stored volume (for reference, smoothing uses resolved volume)
-        existing_node->volume = resolve_cell_volume(step, column, sample_slot);
-        
-        prnt("🔄 [UPDATE] Updated existing node [%d,%d] sample %d (vol: %.2f, pitch: %.2f)", 
-             step, column, sample_slot, existing_node->volume, resolved_pitch);
+        if (g_current_pitch_method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING) {
+            // For preprocessing approach: if pitch changed, we need to recreate the node
+            // because preprocessed data can't be changed in real-time
+            if (fabs(existing_node->pitch - resolved_pitch) > 0.001f) {
+                prnt("🔄 [UPDATE] Pitch changed for preprocessed node [%d,%d] sample %d (%.3f → %.3f) - recreating node", 
+                     step, column, sample_slot, existing_node->pitch, resolved_pitch);
+                
+                // Remember if this was the currently playing node
+                bool was_currently_playing = (currently_playing_nodes_per_col[column] == existing_node);
+                
+                // Clean up existing node
+                cleanup_cell_node(existing_node);
+                
+                // Create new node with new pitch
+                cell_node_t* new_node = create_cell_node(step, column, sample_slot, resolved_volume, resolved_pitch);
+                if (new_node) {
+                    // If this was the currently playing node, update the tracking and start playing
+                    if (was_currently_playing) {
+                        currently_playing_nodes_per_col[column] = new_node;
+                        set_target_volume(new_node, resolved_volume);
+                        prnt("🔄 [UPDATE] Recreated and activated node [%d,%d] sample %d (vol: %.2f, pitch: %.3f)", 
+                             step, column, sample_slot, resolved_volume, resolved_pitch);
+                    } else {
+                        // Start silenced
+                        ma_node_set_output_bus_volume(&new_node->node, 0, 0.0f);
+                        prnt("🔄 [UPDATE] Recreated silent node [%d,%d] sample %d (vol: %.2f, pitch: %.3f)", 
+                             step, column, sample_slot, resolved_volume, resolved_pitch);
+                    }
+                } else {
+                    prnt_err("🔴 [UPDATE] Failed to recreate node for pitch change [%d,%d] sample %d", 
+                             step, column, sample_slot);
+                }
+            } else {
+                // Pitch didn't change, just update volume
+                existing_node->volume = resolved_volume;
+                prnt("🔄 [UPDATE] Updated volume for existing node [%d,%d] sample %d (vol: %.2f, pitch unchanged: %.3f)", 
+                     step, column, sample_slot, resolved_volume, resolved_pitch);
+            }
+        } else {
+            // For real-time pitch methods: update pitch directly
+            update_cell_pitch(existing_node, resolved_pitch);
+            existing_node->volume = resolved_volume;
+            
+            prnt("🔄 [UPDATE] Updated existing node [%d,%d] sample %d (vol: %.2f, pitch: %.3f)", 
+                 step, column, sample_slot, resolved_volume, resolved_pitch);
+        }
     }
 }
 
@@ -462,35 +682,114 @@ static cell_node_t* create_cell_node(int step, int column, int sample_slot, floa
     cell->id = g_next_cell_node_id++;
     
     ma_result result;
+    ma_data_source_node_config nodeConfig; // Declare once outside conditional blocks
+    preprocessed_sample_t* preprocessed = NULL; // Declare outside to avoid scope issues
     
     // Configure decoder properly with format, channels, and sample rate
     ma_decoder_config decoderConfig = ma_decoder_config_init(SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
     
-    // Initialize decoder from sample file or memory
-    if (sample->memory_data) {
-        result = ma_decoder_init_memory(sample->memory_data, sample->memory_size, &decoderConfig, &cell->decoder);
+    if (g_current_pitch_method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING) {
+        // Check for preprocessed sample first
+        preprocessed = find_preprocessed_sample(sample_slot, pitch);
+        if (!preprocessed && fabs(pitch - 1.0f) > 0.001f) {
+            // Automatically preprocess on demand if not cached and pitch is needed
+            prnt("⚡ [PREPROCESS] Auto-preprocessing sample %d at pitch %.3f (not cached)", sample_slot, pitch);
+            if (preprocess_sample_with_pitch(sample_slot, pitch) == 0) {
+                preprocessed = find_preprocessed_sample(sample_slot, pitch);
+            }
+        }
+        
+        if (preprocessed) {
+            // Use preprocessed sample data (already pitch-processed) with ma_audio_buffer
+            // Create audio buffer config for raw PCM data
+            ma_audio_buffer_config bufferConfig = ma_audio_buffer_config_init(
+                SAMPLE_FORMAT, CHANNEL_COUNT, preprocessed->processed_frames, 
+                preprocessed->processed_data, NULL
+            );
+            
+            result = ma_audio_buffer_init(&bufferConfig, &cell->audio_buffer);
+            if (result != MA_SUCCESS) {
+                prnt_err("🔴 [CELL NODE] Failed to initialize audio buffer from preprocessed data: %d", result);
+                cleanup_cell_node(cell);
+                return NULL;
+            }
+            
+            cell->audio_buffer_initialized = 1;
+            cell->uses_audio_buffer = 1;
+            cell->audio_buffer_frame_count = preprocessed->processed_frames;
+            
+            // NO pitch data source needed - sample is already pitch-processed
+            cell->pitch_ds_initialized = 0;
+            
+            // Create data source node directly from audio buffer (audio_buffer → data_source_node)
+            nodeConfig = ma_data_source_node_config_init(&cell->audio_buffer);
+            
+            prnt("🎯 [CELL NODE] Using preprocessed sample: slot %d, pitch %.3f (%.2f MB)", 
+                 sample_slot, pitch, preprocessed->processed_size / (1024.0 * 1024.0));
+        } else if (fabs(pitch - 1.0f) <= 0.001f) {
+            // Close to original pitch - use original sample directly
+            if (sample->memory_data) {
+                result = ma_decoder_init_memory(sample->memory_data, sample->memory_size, &decoderConfig, &cell->decoder);
+            } else {
+                result = ma_decoder_init_file(sample->file_path, &decoderConfig, &cell->decoder);
+            }
+            
+            if (result != MA_SUCCESS) {
+                prnt_err("🔴 [CELL NODE] Failed to initialize decoder for sample %d: %d", sample_slot, result);
+                cleanup_cell_node(cell);
+                return NULL;
+            }
+            
+            cell->uses_audio_buffer = 0;  // Using decoder, not audio buffer
+            cell->audio_buffer_initialized = 0;
+            
+            // NO pitch data source needed - using original sample
+            cell->pitch_ds_initialized = 0;
+            
+            // Create data source node directly from decoder
+            nodeConfig = ma_data_source_node_config_init(&cell->decoder);
+            
+            prnt("🎯 [CELL NODE] Using original sample (no preprocessing needed): slot %d, pitch %.3f", sample_slot, pitch);
+        } else {
+            // Significant pitch change but preprocessing failed - this shouldn't happen with auto-preprocessing
+            prnt_err("🔴 [CELL NODE] Preprocessing failed for significant pitch change: slot %d, pitch %.3f", sample_slot, pitch);
+            cleanup_cell_node(cell);
+            return NULL;
+        }
     } else {
-        result = ma_decoder_init_file(sample->file_path, &decoderConfig, &cell->decoder);
+        // Use real-time pitch processing (for other methods)
+        
+        // Initialize decoder from sample file or memory
+        if (sample->memory_data) {
+            result = ma_decoder_init_memory(sample->memory_data, sample->memory_size, &decoderConfig, &cell->decoder);
+        } else {
+            result = ma_decoder_init_file(sample->file_path, &decoderConfig, &cell->decoder);
+        }
+        
+        if (result != MA_SUCCESS) {
+            prnt_err("🔴 [CELL NODE] Failed to initialize decoder for sample %d: %d", sample_slot, result);
+            cleanup_cell_node(cell);
+            return NULL;
+        }
+        
+        cell->uses_audio_buffer = 0;  // Using decoder, not audio buffer
+        cell->audio_buffer_initialized = 0;
+        
+        // Initialize pitch data source around decoder (decoder → pitch_data_source)
+        result = ma_pitch_data_source_init(&cell->pitch_ds, &cell->decoder, pitch, CHANNEL_COUNT, SAMPLE_RATE);
+        if (result != MA_SUCCESS) {
+            prnt_err("🔴 [CELL NODE] Failed to initialize pitch data source: %d", result);
+            ma_decoder_uninit(&cell->decoder);
+            cleanup_cell_node(cell);
+            return NULL;
+        }
+        cell->pitch_ds_initialized = 1;
+        
+        // Initialize data source node from pitch data source (pitch_data_source → data_source_node)
+        nodeConfig = ma_data_source_node_config_init(&cell->pitch_ds);
+        
+        prnt("🔄 [CELL NODE] Using real-time pitch processing: slot %d, pitch %.3f", sample_slot, pitch);
     }
-    
-    if (result != MA_SUCCESS) {
-        prnt_err("🔴 [CELL NODE] Failed to initialize decoder for sample %d: %d", sample_slot, result);
-        cleanup_cell_node(cell);
-        return NULL;
-    }
-    
-    // Initialize pitch data source around decoder (decoder → pitch_data_source)
-    result = ma_pitch_data_source_init(&cell->pitch_ds, &cell->decoder, pitch, CHANNEL_COUNT, SAMPLE_RATE);
-    if (result != MA_SUCCESS) {
-        prnt_err("🔴 [CELL NODE] Failed to initialize pitch data source: %d", result);
-        ma_decoder_uninit(&cell->decoder);
-        cleanup_cell_node(cell);
-        return NULL;
-    }
-    cell->pitch_ds_initialized = 1;
-    
-    // Initialize data source node from pitch data source (pitch_data_source → data_source_node)
-    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(&cell->pitch_ds);
     
     result = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &cell->node);
     if (result != MA_SUCCESS) {
@@ -532,15 +831,24 @@ static void monitor_cell_nodes(void) {
         
         // Check if playback has finished
         ma_bool32 at_end = MA_FALSE;
-        if (cell->node_initialized && cell->pitch_ds_initialized) {
-            // Check decoder position through the original data source
-            ma_uint64 cursor;
-            ma_result result = ma_decoder_get_cursor_in_pcm_frames(&cell->decoder, &cursor);
-            if (result == MA_SUCCESS) {
-                ma_uint64 length;
-                result = ma_decoder_get_length_in_pcm_frames(&cell->decoder, &length);
-                if (result == MA_SUCCESS && length > 0) {
-                    at_end = (cursor >= length);
+        if (cell->node_initialized) {
+            if (cell->uses_audio_buffer && cell->audio_buffer_initialized) {
+                // For audio buffer (preprocessed data), check cursor position
+                ma_uint64 cursor;
+                ma_result result = ma_data_source_get_cursor_in_pcm_frames(&cell->audio_buffer, &cursor);
+                if (result == MA_SUCCESS && cell->audio_buffer_frame_count > 0) {
+                    at_end = (cursor >= cell->audio_buffer_frame_count);
+                }
+            } else if (cell->pitch_ds_initialized) {
+                // For decoder with pitch data source
+                ma_uint64 cursor;
+                ma_result result = ma_decoder_get_cursor_in_pcm_frames(&cell->decoder, &cursor);
+                if (result == MA_SUCCESS) {
+                    ma_uint64 length;
+                    result = ma_decoder_get_length_in_pcm_frames(&cell->decoder, &length);
+                    if (result == MA_SUCCESS && length > 0) {
+                        at_end = (cursor >= length);
+                    }
                 }
             }
         }
@@ -726,8 +1034,6 @@ static ma_uint64 find_decoder_fadeout_zero_crossing(ma_decoder* decoder) {
     return zero_frame;
 }
 
-// Note: Removed complex Audacity smoothing - exponential volume smoothing is more effective
-
 // Helper function to load entire audio file into memory buffer
 static int load_file_to_memory_buffer(const char* file_path, void** memory_data, size_t* memory_size) {
     FILE* file = fopen(file_path, "rb");
@@ -815,6 +1121,151 @@ static int check_memory_limits(size_t file_size) {
 // Custom Pitch Data Source Implementation
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Modular Pitch Processing Functions - Clean separation of approaches
+// -----------------------------------------------------------------------------
+
+// Approach 1: Miniaudio resampler pitch processing
+static ma_result pitch_read_miniaudio(ma_pitch_data_source* pPitch, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead) {
+    // If resampler is not initialized or pitch ratio is 1.0 (no change), pass through
+    if (!pPitch->resampler_initialized || pPitch->pitch_ratio == 1.0f) {
+        return ma_data_source_read_pcm_frames(pPitch->original_ds, pFramesOut, frameCount, pFramesRead);
+    }
+    
+    // Use miniaudio resampler for pitch shifting
+    const ma_uint64 tempCapacityInFrames = pPitch->temp_input_buffer_size / pPitch->channels;
+    
+    // For pitch shifting, estimate input frames needed based on pitch ratio
+    // INVERTED: Higher pitch = need fewer input frames, lower pitch = need more input frames
+    ma_uint64 inputFramesNeeded = (ma_uint64)(frameCount / pPitch->pitch_ratio);
+    if (inputFramesNeeded < 1) inputFramesNeeded = 1; // Always read at least 1 frame
+    if (inputFramesNeeded > tempCapacityInFrames) {
+        inputFramesNeeded = tempCapacityInFrames;
+    }
+    
+    // Read input frames from original data source using instance-specific buffer
+    ma_uint64 inputFramesRead = 0;
+    ma_result result = ma_data_source_read_pcm_frames(pPitch->original_ds, pPitch->temp_input_buffer, inputFramesNeeded, &inputFramesRead);
+    
+    if (result != MA_SUCCESS || inputFramesRead == 0) {
+        return result;
+    }
+    
+    // Process through the resampler
+    ma_uint64 inputFramesToProcess = inputFramesRead;
+    ma_uint64 outputFramesProcessed = frameCount;
+    result = ma_resampler_process_pcm_frames(&pPitch->resampler, pPitch->temp_input_buffer, &inputFramesToProcess, pFramesOut, &outputFramesProcessed);
+    
+    if (result == MA_SUCCESS) {
+        *pFramesRead = outputFramesProcessed;
+    }
+    
+    return result;
+}
+
+// Approach 2: SoundTouch real-time pitch processing
+static ma_result pitch_read_soundtouch_realtime(ma_pitch_data_source* pPitch, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead) {
+    // Bypass SoundTouch for normal pitch (no processing needed) or if not initialized
+    if (!pPitch->soundtouch_initialized || fabs(pPitch->pitch_ratio - 1.0f) < 0.001f) {
+        return ma_data_source_read_pcm_frames(pPitch->original_ds, pFramesOut, frameCount, pFramesRead);
+    }
+    
+    // Skip processing for very small frame counts to reduce overhead
+    if (frameCount < 128) {  // Increased from 64 to 128 for better isolation
+        return ma_data_source_read_pcm_frames(pPitch->original_ds, pFramesOut, frameCount, pFramesRead);
+    }
+    
+    float* outputBuffer = (float*)pFramesOut;
+    ma_uint64 totalFramesRead = 0;
+    ma_uint64 framesToProcess = frameCount;
+    
+    try {
+        // Process audio through SoundTouch in chunks for mobile efficiency
+        while (totalFramesRead < frameCount && framesToProcess > 0) {
+            // Debug instance state every 100 calls
+            debug_soundtouch_instance("READ_PCM", pPitch);
+            
+            // ISOLATION CHECK: Verify instance integrity before processing
+            if (!pPitch->soundtouch_processor) {
+                prnt_err("🔴 [PITCH] SoundTouch processor became null during processing");
+                break;
+            }
+            
+            // Try to get processed samples from SoundTouch first
+            uint outputSamplesAvailable = pPitch->soundtouch_processor->numSamples();
+            
+            if (outputSamplesAvailable > 0) {
+                // Get available processed samples from SoundTouch
+                uint framesToReceive = (uint)MIN(framesToProcess, outputSamplesAvailable);
+                uint samplesReceived = pPitch->soundtouch_processor->receiveSamples(
+                    outputBuffer + (totalFramesRead * pPitch->channels), 
+                    framesToReceive
+                );
+                
+                totalFramesRead += samplesReceived;
+                framesToProcess -= samplesReceived;
+                
+                if (samplesReceived == 0) break; // No more output available
+            }
+            
+            // If we need more output, feed more input to SoundTouch
+            if (framesToProcess > 0) {
+                // BUFFER SAFETY: Ensure temp buffer is valid and isolated
+                if (!pPitch->temp_buffer || pPitch->temp_buffer_size == 0) {
+                    prnt_err("🔴 [PITCH] Invalid temp buffer for instance %p", (void*)pPitch);
+                    break;
+                }
+                
+                // Read input frames from original data source - use very small chunks for real-time
+                ma_uint64 inputFramesToRead = MIN(128, pPitch->temp_buffer_size / pPitch->channels); // Ultra-small chunks for isolation
+                ma_uint64 inputFramesRead = 0;
+                
+                ma_result result = ma_data_source_read_pcm_frames(
+                    pPitch->original_ds, 
+                    pPitch->temp_buffer, 
+                    inputFramesToRead, 
+                    &inputFramesRead
+                );
+                
+                if (result != MA_SUCCESS || inputFramesRead == 0) {
+                    // No more input available, flush remaining samples
+                    pPitch->soundtouch_processor->flush();
+                    break;
+                }
+                
+                // ISOLATION: Verify processor is still valid before feeding data
+                if (!pPitch->soundtouch_processor) {
+                    prnt_err("🔴 [PITCH] SoundTouch processor became null before putSamples");
+                    break;
+                }
+                
+                // Feed input samples to SoundTouch
+                pPitch->soundtouch_processor->putSamples(pPitch->temp_buffer, (uint)inputFramesRead);
+                pPitch->input_frames_pending += inputFramesRead;
+            }
+        }
+        
+        *pFramesRead = totalFramesRead;
+        return (totalFramesRead > 0) ? MA_SUCCESS : MA_AT_END;
+        
+    } catch (...) {
+        prnt_err("🔴 [PITCH] SoundTouch processing error");
+        return MA_ERROR;
+    }
+}
+
+// Approach 3: SoundTouch preprocessing pitch processing
+static ma_result pitch_read_soundtouch_preprocessing(ma_pitch_data_source* pPitch, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead) {
+    // Check if this instance uses preprocessed data
+    if (pPitch->uses_preprocessed_data && pPitch->preprocessed_decoder) {
+        // Read directly from preprocessed decoder (no real-time processing)
+        return ma_data_source_read_pcm_frames((ma_data_source*)pPitch->preprocessed_decoder, pFramesOut, frameCount, pFramesRead);
+    }
+    
+    // Fallback to miniaudio resampler if no cached data available
+    return pitch_read_miniaudio(pPitch, pFramesOut, frameCount, pFramesRead);
+}
+
 // Pitch data source callbacks
 static ma_result ma_pitch_data_source_read(ma_data_source* pDataSource, void* pFramesOut, ma_uint64 frameCount, ma_uint64* pFramesRead) {
     ma_pitch_data_source* pPitch = (ma_pitch_data_source*)pDataSource;
@@ -826,42 +1277,21 @@ static ma_result ma_pitch_data_source_read(ma_data_source* pDataSource, void* pF
     // Initialize pFramesRead to 0
     *pFramesRead = 0;
     
-    // If resampler is not initialized or pitch ratio is 1.0 (no change), pass through
-    if (!pPitch->resampler_initialized || pPitch->pitch_ratio == 1.0f) {
-        return ma_data_source_read_pcm_frames(pPitch->original_ds, pFramesOut, frameCount, pFramesRead);
+    // Runtime method selection - clean and modular
+    switch (pPitch->approach) {
+        case PITCH_METHOD_MINIAUDIO:
+            return pitch_read_miniaudio(pPitch, pFramesOut, frameCount, pFramesRead);
+            
+        case PITCH_METHOD_SOUNDTOUCH_REALTIME:
+            return pitch_read_soundtouch_realtime(pPitch, pFramesOut, frameCount, pFramesRead);
+            
+        case PITCH_METHOD_SOUNDTOUCH_PREPROCESSING:
+            return pitch_read_soundtouch_preprocessing(pPitch, pFramesOut, frameCount, pFramesRead);
+            
+        default:
+            prnt_err("🔴 [PITCH] Unknown pitch method: %d", pPitch->approach);
+            return MA_INVALID_ARGS;
     }
-    
-    // Use miniaudio resampler for pitch shifting
-    // We need a temporary input buffer since resampler expects to process input/output separately
-    static float tempInputBuffer[4096 * 2]; // 4096 frames * 2 channels max
-    const ma_uint64 tempCapacityInFrames = 4096;
-    
-    // For pitch shifting, estimate input frames needed based on pitch ratio
-    // INVERTED: Higher pitch = need fewer input frames, lower pitch = need more input frames
-    ma_uint64 inputFramesNeeded = (ma_uint64)(frameCount / pPitch->pitch_ratio);
-    if (inputFramesNeeded < 1) inputFramesNeeded = 1; // Always read at least 1 frame
-    if (inputFramesNeeded > tempCapacityInFrames) {
-        inputFramesNeeded = tempCapacityInFrames;
-    }
-    
-    // Read input frames from original data source
-    ma_uint64 inputFramesRead = 0;
-    ma_result result = ma_data_source_read_pcm_frames(pPitch->original_ds, tempInputBuffer, inputFramesNeeded, &inputFramesRead);
-    
-    if (result != MA_SUCCESS || inputFramesRead == 0) {
-        return result;
-    }
-    
-    // Process through the resampler
-    ma_uint64 inputFramesToProcess = inputFramesRead;
-    ma_uint64 outputFramesProcessed = frameCount;
-    result = ma_resampler_process_pcm_frames(&pPitch->resampler, tempInputBuffer, &inputFramesToProcess, pFramesOut, &outputFramesProcessed);
-    
-    if (result == MA_SUCCESS) {
-        *pFramesRead = outputFramesProcessed;
-    }
-    
-    return result;
 }
 
 static ma_result ma_pitch_data_source_seek(ma_data_source* pDataSource, ma_uint64 frameIndex) {
@@ -871,7 +1301,27 @@ static ma_result ma_pitch_data_source_seek(ma_data_source* pDataSource, ma_uint6
         return MA_INVALID_ARGS;
     }
     
-    // Seek the original data source (converter doesn't need reset since we manually feed it)
+#if PITCH_APPROACH_MINIAUDIO
+    // miniaudio resampler - no special handling needed
+#elif PITCH_APPROACH_SOUNDTOUCH_REALTIME
+    // SoundTouch implementation - clear processor state on seek
+    if (pPitch->soundtouch_initialized && pPitch->soundtouch_processor) {
+        try {
+            pPitch->soundtouch_processor->clear();
+            pPitch->input_frames_pending = 0;
+        } catch (...) {
+            prnt_err("🔴 [PITCH] SoundTouch seek error");
+        }
+    }
+#elif PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+    // Preprocessing approach - seek preprocessed decoder if available
+    if (pPitch->uses_preprocessed_data && pPitch->preprocessed_decoder) {
+        return ma_data_source_seek_to_pcm_frame((ma_data_source*)pPitch->preprocessed_decoder, frameIndex);
+    }
+    // Otherwise no special handling needed for fallback resampler
+#endif
+    
+    // Seek the original data source 
     return ma_data_source_seek_to_pcm_frame(pPitch->original_ds, frameIndex);
 }
 
@@ -882,6 +1332,10 @@ static ma_result ma_pitch_data_source_get_data_format(ma_data_source* pDataSourc
         return MA_INVALID_ARGS;
     }
     
+#if PITCH_APPROACH_SOUNDTOUCH_REALTIME || PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+    // SoundTouch: always return the same format as input
+    return ma_data_source_get_data_format(pPitch->original_ds, pFormat, pChannels, pSampleRate, pChannelMap, channelMapCap);
+#else
     // If using resampler, return the resampler's output format
     if (pPitch->resampler_initialized) {
         if (pFormat) *pFormat = SAMPLE_FORMAT;
@@ -898,6 +1352,7 @@ static ma_result ma_pitch_data_source_get_data_format(ma_data_source* pDataSourc
         // No resampling, pass through original format
         return ma_data_source_get_data_format(pPitch->original_ds, pFormat, pChannels, pSampleRate, pChannelMap, channelMapCap);
     }
+#endif
 }
 
 static ma_result ma_pitch_data_source_get_cursor(ma_data_source* pDataSource, ma_uint64* pCursor) {
@@ -921,11 +1376,14 @@ static ma_result ma_pitch_data_source_get_length(ma_data_source* pDataSource, ma
     // Get original length
     ma_result result = ma_data_source_get_length_in_pcm_frames(pPitch->original_ds, pLength);
     
-    // If using resampler, adjust the length based on the pitch ratio
-    // INVERTED: Higher pitch = shorter duration, lower pitch = longer duration
-    if (result == MA_SUCCESS && pPitch->resampler_initialized && pPitch->pitch_ratio != 1.0f) {
-        *pLength = (ma_uint64)(*pLength * pPitch->pitch_ratio);
+    if (result == MA_SUCCESS && pPitch->approach == PITCH_METHOD_MINIAUDIO) {
+        // If using resampler, adjust the length based on the pitch ratio
+        // INVERTED: Higher pitch = shorter duration, lower pitch = longer duration
+        if (pPitch->resampler_initialized && pPitch->pitch_ratio != 1.0f) {
+            *pLength = (ma_uint64)(*pLength * pPitch->pitch_ratio);
+        }
     }
+    // For SoundTouch approaches: length stays the same regardless of pitch
     
     return result;
 }
@@ -939,6 +1397,112 @@ static ma_data_source_vtable g_pitch_data_source_vtable = {
     NULL, // onSetLooping
     0     // flags
 };
+
+// -----------------------------------------------------------------------------
+// Modular Pitch Initialization Functions - Clean separation of approaches
+// -----------------------------------------------------------------------------
+
+// Initialize for miniaudio resampler approach
+static ma_result pitch_init_miniaudio(ma_pitch_data_source* pPitch, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate) {
+    pPitch->resampler_initialized = 0;
+    pPitch->temp_input_buffer = NULL;
+    pPitch->temp_input_buffer_size = 0;
+    
+    if (pitchRatio != 1.0f) {
+        // Calculate target sample rate for pitch shifting
+        pPitch->target_sample_rate = (ma_uint32)(sampleRate / pitchRatio);
+        
+        // Clamp to reasonable range
+        if (pPitch->target_sample_rate < 8000) pPitch->target_sample_rate = 8000;
+        if (pPitch->target_sample_rate > 192000) pPitch->target_sample_rate = 192000;
+        
+        // Allocate temp buffer
+        pPitch->temp_input_buffer_size = 4096 * channels;
+        pPitch->temp_input_buffer = (float*)malloc(pPitch->temp_input_buffer_size * sizeof(float));
+        
+        if (!pPitch->temp_input_buffer) {
+            prnt_err("🔴 [PITCH] Failed to allocate temp input buffer");
+            return MA_OUT_OF_MEMORY;
+        }
+        
+        // Configure resampler
+        ma_resampler_config resamplerConfig = ma_resampler_config_init(
+            SAMPLE_FORMAT, channels, sampleRate, pPitch->target_sample_rate, ma_resample_algorithm_linear
+        );
+        
+        ma_result result = ma_resampler_init(&resamplerConfig, NULL, &pPitch->resampler);
+        if (result == MA_SUCCESS) {
+            pPitch->resampler_initialized = 1;
+            prnt("✅ [PITCH] Initialized miniaudio resampler: %.2fx pitch", pitchRatio);
+        } else {
+            prnt_err("🔴 [PITCH] Failed to initialize resampler: %s", ma_result_description(result));
+            free(pPitch->temp_input_buffer);
+            pPitch->temp_input_buffer = NULL;
+            return result;
+        }
+    }
+    return MA_SUCCESS;
+}
+
+// Initialize for SoundTouch real-time approach
+static ma_result pitch_init_soundtouch_realtime(ma_pitch_data_source* pPitch, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate) {
+    pPitch->soundtouch_processor = NULL;
+    pPitch->soundtouch_initialized = 0;
+    pPitch->temp_buffer = NULL;
+    pPitch->temp_buffer_size = 0;
+    pPitch->input_frames_pending = 0;
+    
+    // Only create SoundTouch for significant pitch changes
+    if (fabs(pitchRatio - 1.0f) > 0.10f) {
+        try {
+            pPitch->soundtouch_processor = new SoundTouch();
+            pPitch->soundtouch_processor->setSampleRate(sampleRate);
+            pPitch->soundtouch_processor->setChannels(channels);
+            pPitch->soundtouch_processor->clear();
+            
+            // Mobile-optimized settings
+            pPitch->soundtouch_processor->setSetting(SETTING_USE_QUICKSEEK, 1);
+            pPitch->soundtouch_processor->setSetting(SETTING_USE_AA_FILTER, 0);
+            pPitch->soundtouch_processor->setSetting(SETTING_SEQUENCE_MS, 10);
+            pPitch->soundtouch_processor->setSetting(SETTING_SEEKWINDOW_MS, 4);
+            pPitch->soundtouch_processor->setSetting(SETTING_OVERLAP_MS, 2);
+            
+            pPitch->soundtouch_processor->setPitch(pitchRatio);
+            
+            pPitch->temp_buffer_size = 256 * channels;
+            pPitch->temp_buffer = (float*)malloc(pPitch->temp_buffer_size * sizeof(float));
+            
+            if (pPitch->temp_buffer) {
+                pPitch->soundtouch_initialized = 1;
+                prnt("✅ [PITCH] Initialized SoundTouch realtime: %.2fx pitch", pitchRatio);
+            } else {
+                delete pPitch->soundtouch_processor;
+                pPitch->soundtouch_processor = NULL;
+                return MA_OUT_OF_MEMORY;
+            }
+        } catch (...) {
+            prnt_err("🔴 [PITCH] Failed to initialize SoundTouch processor");
+            return MA_ERROR;
+        }
+    } else {
+        prnt("✅ [PITCH] Skipping SoundTouch for small pitch change: %.2fx", pitchRatio);
+    }
+    return MA_SUCCESS;
+}
+
+// Initialize for SoundTouch preprocessing approach
+static ma_result pitch_init_soundtouch_preprocessing(ma_pitch_data_source* pPitch, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate) {
+    pPitch->sample_slot = -1;
+    pPitch->preprocessed_decoder = NULL;
+    pPitch->uses_preprocessed_data = 0;
+    
+    // Initialize fallback miniaudio resampler
+    ma_result result = pitch_init_miniaudio(pPitch, pitchRatio, channels, sampleRate);
+    if (result == MA_SUCCESS) {
+        prnt("✅ [PITCH] Initialized preprocessing with fallback resampler: %.2fx pitch", pitchRatio);
+    }
+    return result;
+}
 
 // Initialize pitch data source
 static ma_result ma_pitch_data_source_init(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate) {
@@ -958,41 +1522,57 @@ static ma_result ma_pitch_data_source_init(ma_pitch_data_source* pPitch, ma_data
     pPitch->pitch_ratio = pitchRatio;
     pPitch->channels = channels;
     pPitch->sample_rate = sampleRate;
-    pPitch->resampler_initialized = 0;
+    pPitch->approach = g_current_pitch_method;  // Use global method setting
     
-    // Initialize resampler for pitch shifting if needed
-    if (pitchRatio != 1.0f) {
-        // Calculate target sample rate for pitch shifting
-        // INVERTED: Higher pitch ratio = lower target sample rate (faster playback)
-        // Lower pitch ratio = higher target sample rate (slower playback)
-        pPitch->target_sample_rate = (ma_uint32)(sampleRate / pitchRatio);
-        
-        // Clamp to reasonable range to prevent extreme values
-        if (pPitch->target_sample_rate < 8000) pPitch->target_sample_rate = 8000;
-        if (pPitch->target_sample_rate > 192000) pPitch->target_sample_rate = 192000;
-        
-        // Configure resampler for pitch shifting
-        ma_resampler_config resamplerConfig = ma_resampler_config_init(
-            SAMPLE_FORMAT,                // format
-            channels,                     // channels
-            sampleRate,                   // input sample rate (original)
-            pPitch->target_sample_rate,   // output sample rate (pitch-shifted)
-            ma_resample_algorithm_linear  // use linear algorithm for speed
-        );
-        
-        // Initialize the resampler
-        result = ma_resampler_init(&resamplerConfig, NULL, &pPitch->resampler);
-        if (result == MA_SUCCESS) {
-            pPitch->resampler_initialized = 1;
-            prnt("✅ [PITCH] Initialized resampler: %.2fx pitch (rate: %d -> %d Hz)", 
-                 pitchRatio, sampleRate, pPitch->target_sample_rate);
-        } else {
-            prnt_err("🔴 [PITCH] Failed to initialize resampler: %s", ma_result_description(result));
+    // Initialize fields based on current pitch method
+    switch (pPitch->approach) {
+        case PITCH_METHOD_MINIAUDIO:
+            return pitch_init_miniaudio(pPitch, pitchRatio, channels, sampleRate);
+            
+        case PITCH_METHOD_SOUNDTOUCH_REALTIME:
+            return pitch_init_soundtouch_realtime(pPitch, pitchRatio, channels, sampleRate);
+            
+        case PITCH_METHOD_SOUNDTOUCH_PREPROCESSING:
+            return pitch_init_soundtouch_preprocessing(pPitch, pitchRatio, channels, sampleRate);
+            
+        default:
+            prnt_err("🔴 [PITCH] Unknown pitch method: %d", pPitch->approach);
+            return MA_INVALID_ARGS;
+    }
+}
+
+// Special init function for preprocessing approach with sample slot info
+#if PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+static ma_result ma_pitch_data_source_init_with_preprocessing(ma_pitch_data_source* pPitch, ma_data_source* pOriginalDataSource, float pitchRatio, ma_uint32 channels, ma_uint32 sampleRate, int sample_slot) {
+    ma_result result = ma_pitch_data_source_init(pPitch, pOriginalDataSource, pitchRatio, channels, sampleRate);
+    if (result != MA_SUCCESS) {
+        return result;
+    }
+    
+    pPitch->sample_slot = sample_slot;
+    
+    // Check for preprocessed data
+    preprocessed_sample_t* preprocessed = find_preprocessed_sample(sample_slot, pitchRatio);
+    if (preprocessed) {
+        // Create decoder for preprocessed data
+        pPitch->preprocessed_decoder = (ma_decoder*)malloc(sizeof(ma_decoder));
+        if (pPitch->preprocessed_decoder) {
+            ma_decoder_config decoderConfig = ma_decoder_config_init(SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
+            result = ma_decoder_init_memory(preprocessed->processed_data, preprocessed->processed_size, &decoderConfig, pPitch->preprocessed_decoder);
+            if (result == MA_SUCCESS) {
+                pPitch->uses_preprocessed_data = 1;
+                prnt("✅ [PITCH] Using preprocessed data for sample %d at %.2fx pitch", sample_slot, pitchRatio);
+            } else {
+                free(pPitch->preprocessed_decoder);
+                pPitch->preprocessed_decoder = NULL;
+                prnt_err("🔴 [PITCH] Failed to create decoder for preprocessed data");
+            }
         }
     }
     
     return MA_SUCCESS;
 }
+#endif
 
 // Update pitch ratio
 static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, float pitchRatio) {
@@ -1005,13 +1585,23 @@ static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, fl
         return MA_SUCCESS;
     }
     
-    // Clean up existing resampler
+    pPitch->pitch_ratio = pitchRatio;
+    
+#if PITCH_APPROACH_MINIAUDIO
+    // ========================================================================
+    // APPROACH 1: Miniaudio Resampler
+    // ========================================================================
+    
+    // Clean up existing resampler and temp buffer
     if (pPitch->resampler_initialized) {
         ma_resampler_uninit(&pPitch->resampler, NULL);
         pPitch->resampler_initialized = 0;
     }
-    
-    pPitch->pitch_ratio = pitchRatio;
+    if (pPitch->temp_input_buffer) {
+        free(pPitch->temp_input_buffer);
+        pPitch->temp_input_buffer = NULL;
+        pPitch->temp_input_buffer_size = 0;
+    }
     
     // If pitch ratio is 1.0 (no change), don't create resampler
     if (pitchRatio == 1.0f) {
@@ -1027,6 +1617,15 @@ static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, fl
     if (pPitch->target_sample_rate < 8000) pPitch->target_sample_rate = 8000;
     if (pPitch->target_sample_rate > 192000) pPitch->target_sample_rate = 192000;
     
+    // Allocate instance-specific temp buffer
+    pPitch->temp_input_buffer_size = 4096 * pPitch->channels;
+    pPitch->temp_input_buffer = (float*)malloc(pPitch->temp_input_buffer_size * sizeof(float));
+    
+    if (!pPitch->temp_input_buffer) {
+        prnt_err("🔴 [PITCH] Failed to allocate temp input buffer");
+        return MA_OUT_OF_MEMORY;
+    }
+    
     // Configure new resampler
     ma_resampler_config resamplerConfig = ma_resampler_config_init(
         SAMPLE_FORMAT,                // format
@@ -1040,12 +1639,153 @@ static ma_result ma_pitch_data_source_set_pitch(ma_pitch_data_source* pPitch, fl
     ma_result result = ma_resampler_init(&resamplerConfig, NULL, &pPitch->resampler);
     if (result == MA_SUCCESS) {
         pPitch->resampler_initialized = 1;
-        prnt("🎵 [PITCH] Updated resampler: %.2fx pitch (rate: %d -> %d Hz)", 
-             pitchRatio, pPitch->sample_rate, pPitch->target_sample_rate);
+        prnt("🎵 [PITCH] Updated miniaudio resampler: %.2fx pitch (rate: %d -> %d Hz, buffer: %zu samples)", 
+             pitchRatio, pPitch->sample_rate, pPitch->target_sample_rate, pPitch->temp_input_buffer_size);
     } else {
         prnt_err("🔴 [PITCH] Failed to initialize resampler: %s", ma_result_description(result));
+        free(pPitch->temp_input_buffer);
+        pPitch->temp_input_buffer = NULL;
+        pPitch->temp_input_buffer_size = 0;
         return result;
     }
+
+#elif PITCH_APPROACH_SOUNDTOUCH_REALTIME
+    // ========================================================================
+    // APPROACH 2: SoundTouch Real-time
+    // ========================================================================
+    
+    // If new pitch change is small (<10%), clean up SoundTouch to save resources
+    if (fabs(pitchRatio - 1.0f) <= 0.10f) {
+        if (pPitch->soundtouch_initialized) {
+            // Clean up existing SoundTouch processor
+            if (pPitch->soundtouch_processor) {
+                delete pPitch->soundtouch_processor;
+                pPitch->soundtouch_processor = NULL;
+            }
+            if (pPitch->temp_buffer) {
+                free(pPitch->temp_buffer);
+                pPitch->temp_buffer = NULL;
+            }
+            pPitch->soundtouch_initialized = 0;
+            pPitch->temp_buffer_size = 0;
+            pPitch->input_frames_pending = 0;
+            prnt("🗑️ [PITCH] Cleaned up SoundTouch for small pitch change: %.2fx (using passthrough)", pitchRatio);
+        }
+        return MA_SUCCESS;
+    }
+    
+    // If we have SoundTouch and it's for a significant pitch change, just update it
+    if (pPitch->soundtouch_initialized && pPitch->soundtouch_processor) {
+        try {
+            // Update pitch ratio in SoundTouch (real-time)
+            pPitch->soundtouch_processor->setPitch(pitchRatio);
+            
+            // Clear any pending samples to avoid artifacts
+            pPitch->soundtouch_processor->clear();
+            pPitch->input_frames_pending = 0;
+            
+            prnt("🎵 [PITCH] Updated SoundTouch pitch: %.2fx", pitchRatio);
+            return MA_SUCCESS;
+        } catch (...) {
+            prnt_err("🔴 [PITCH] Failed to update SoundTouch pitch");
+            return MA_ERROR;
+        }
+    }
+    
+    // Need to create new SoundTouch for significant pitch change
+    if (fabs(pitchRatio - 1.0f) > 0.10f) {
+        try {
+            // Create SoundTouch processor for significant pitch changes
+            pPitch->soundtouch_processor = new SoundTouch();
+            
+            // Configure for mobile performance
+            pPitch->soundtouch_processor->setSampleRate(pPitch->sample_rate);
+            pPitch->soundtouch_processor->setChannels(pPitch->channels);
+            
+            // Extremely aggressive real-time mobile settings
+            pPitch->soundtouch_processor->setSetting(SETTING_USE_QUICKSEEK, 1);
+            pPitch->soundtouch_processor->setSetting(SETTING_USE_AA_FILTER, 0);
+            pPitch->soundtouch_processor->setSetting(SETTING_SEQUENCE_MS, 15);
+            pPitch->soundtouch_processor->setSetting(SETTING_SEEKWINDOW_MS, 6);
+            pPitch->soundtouch_processor->setSetting(SETTING_OVERLAP_MS, 3);
+            
+            // Set pitch
+            pPitch->soundtouch_processor->setPitch(pitchRatio);
+            
+            // Allocate temp buffer
+            pPitch->temp_buffer_size = 512 * pPitch->channels;
+            pPitch->temp_buffer = (float*)malloc(pPitch->temp_buffer_size * sizeof(float));
+            
+            if (pPitch->temp_buffer) {
+                pPitch->soundtouch_initialized = 1;
+                pPitch->input_frames_pending = 0;
+                prnt("✅ [PITCH] Created new SoundTouch: %.2fx pitch (aggressive mobile optimized)", pitchRatio);
+            } else {
+                delete pPitch->soundtouch_processor;
+                pPitch->soundtouch_processor = NULL;
+                prnt_err("🔴 [PITCH] Failed to allocate SoundTouch buffer");
+                return MA_OUT_OF_MEMORY;
+            }
+        } catch (...) {
+            prnt_err("🔴 [PITCH] Failed to create SoundTouch processor");
+            return MA_ERROR;
+        }
+    }
+
+#elif PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+    // ========================================================================
+    // APPROACH 3: SoundTouch Preprocessing
+    // ========================================================================
+    
+    // For preprocessing approach, pitch changes require re-processing the sample
+    // For now, we'll just update the fallback resampler
+    
+    // Clean up existing fallback resampler
+    if (pPitch->resampler_initialized) {
+        ma_resampler_uninit(&pPitch->resampler, NULL);
+        pPitch->resampler_initialized = 0;
+    }
+    if (pPitch->temp_input_buffer) {
+        free(pPitch->temp_input_buffer);
+        pPitch->temp_input_buffer = NULL;
+        pPitch->temp_input_buffer_size = 0;
+    }
+    
+    // If pitch ratio is 1.0 (no change), don't create resampler
+    if (pitchRatio == 1.0f) {
+        prnt("🎵 [PITCH] Reset to normal pitch (preprocessing will handle this)");
+        return MA_SUCCESS;
+    }
+    
+    // Setup fallback resampler for real-time changes
+    pPitch->target_sample_rate = (ma_uint32)(pPitch->sample_rate / pitchRatio);
+    if (pPitch->target_sample_rate < 8000) pPitch->target_sample_rate = 8000;
+    if (pPitch->target_sample_rate > 192000) pPitch->target_sample_rate = 192000;
+    
+    pPitch->temp_input_buffer_size = 4096 * pPitch->channels;
+    pPitch->temp_input_buffer = (float*)malloc(pPitch->temp_input_buffer_size * sizeof(float));
+    
+    if (!pPitch->temp_input_buffer) {
+        prnt_err("🔴 [PITCH] Failed to allocate fallback temp buffer");
+        return MA_OUT_OF_MEMORY;
+    }
+    
+    ma_resampler_config resamplerConfig = ma_resampler_config_init(
+        SAMPLE_FORMAT, pPitch->channels, pPitch->sample_rate, pPitch->target_sample_rate, ma_resample_algorithm_linear
+    );
+    
+    ma_result result = ma_resampler_init(&resamplerConfig, NULL, &pPitch->resampler);
+    if (result == MA_SUCCESS) {
+        pPitch->resampler_initialized = 1;
+        prnt("🎵 [PITCH] Updated preprocessing fallback resampler: %.2fx pitch", pitchRatio);
+    } else {
+        prnt_err("🔴 [PITCH] Failed to initialize fallback resampler: %s", ma_result_description(result));
+        free(pPitch->temp_input_buffer);
+        pPitch->temp_input_buffer = NULL;
+        pPitch->temp_input_buffer_size = 0;
+        return result;
+    }
+#endif
     
     return MA_SUCCESS;
 }
@@ -1056,11 +1796,62 @@ static void ma_pitch_data_source_uninit(ma_pitch_data_source* pPitch) {
         return;
     }
     
-    // Clean up resampler if initialized
+#if PITCH_APPROACH_MINIAUDIO
+    // ========================================================================
+    // APPROACH 1: Miniaudio Resampler cleanup
+    // ========================================================================
     if (pPitch->resampler_initialized) {
         ma_resampler_uninit(&pPitch->resampler, NULL);
         pPitch->resampler_initialized = 0;
     }
+    if (pPitch->temp_input_buffer) {
+        free(pPitch->temp_input_buffer);
+        pPitch->temp_input_buffer = NULL;
+        pPitch->temp_input_buffer_size = 0;
+    }
+
+#elif PITCH_APPROACH_SOUNDTOUCH_REALTIME
+    // ========================================================================
+    // APPROACH 2: SoundTouch Real-time cleanup
+    // ========================================================================
+    if (pPitch->soundtouch_initialized) {
+        if (pPitch->soundtouch_processor) {
+            delete pPitch->soundtouch_processor;
+            pPitch->soundtouch_processor = NULL;
+        }
+        if (pPitch->temp_buffer) {
+            free(pPitch->temp_buffer);
+            pPitch->temp_buffer = NULL;
+        }
+        pPitch->soundtouch_initialized = 0;
+        pPitch->temp_buffer_size = 0;
+        pPitch->input_frames_pending = 0;
+    }
+
+#elif PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+    // ========================================================================
+    // APPROACH 3: SoundTouch Preprocessing cleanup
+    // ========================================================================
+    if (pPitch->uses_preprocessed_data && pPitch->preprocessed_decoder) {
+        ma_decoder_uninit(pPitch->preprocessed_decoder);
+        free(pPitch->preprocessed_decoder);
+        pPitch->preprocessed_decoder = NULL;
+        pPitch->uses_preprocessed_data = 0;
+    }
+    
+    // Clean up fallback resampler
+    if (pPitch->resampler_initialized) {
+        ma_resampler_uninit(&pPitch->resampler, NULL);
+        pPitch->resampler_initialized = 0;
+    }
+    if (pPitch->temp_input_buffer) {
+        free(pPitch->temp_input_buffer);
+        pPitch->temp_input_buffer = NULL;
+        pPitch->temp_input_buffer_size = 0;
+    }
+    
+    pPitch->sample_slot = -1;
+#endif
     
     ma_data_source_uninit(&pPitch->ds);
 }
@@ -1360,7 +2151,12 @@ static void play_samples_for_step(int step) {
                             set_target_volume(currently_playing_nodes_per_col[column], 0.0f);
                         }
                         
-                        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        // Seek to beginning based on data source type
+                        if (target_node->uses_audio_buffer && target_node->audio_buffer_initialized) {
+                            ma_data_source_seek_to_pcm_frame(&target_node->audio_buffer, 0);
+                        } else {
+                            ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        }
                         
                         // Use current resolved volume and pitch (sample bank or cell override)
                         float resolved_volume = resolve_cell_volume(step, column, sample_to_play);
@@ -1373,7 +2169,11 @@ static void play_samples_for_step(int step) {
                              step, column, sample_to_play, resolved_volume, target_node->id);
                     } else {
                         // Same node - restart from beginning
-                        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        if (target_node->uses_audio_buffer && target_node->audio_buffer_initialized) {
+                            ma_data_source_seek_to_pcm_frame(&target_node->audio_buffer, 0);
+                        } else {
+                            ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        }
                         
                         // Use current resolved volume and pitch (sample bank or cell override)
                         float resolved_volume = resolve_cell_volume(step, column, sample_to_play);
@@ -1715,6 +2515,14 @@ int init(void) {
     // Initialize column tracking
     memset(currently_playing_nodes_per_col, 0, sizeof(currently_playing_nodes_per_col));
     
+#if PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+    // Initialize preprocessed pitch cache
+    memset(g_preprocessed_cache, 0, sizeof(g_preprocessed_cache));
+    g_preprocessed_access_counter = 0;
+    g_total_preprocessed_memory = 0;
+    prnt("✅ [PREPROCESS] Preprocessed pitch cache initialized");
+#endif
+    
     // ---------------------------------------------------------------------
     // Initialize the node graph which will perform automatic mixing of all
     // slot nodes. Every slot's data_source_node will connect directly to
@@ -1848,7 +2656,29 @@ int play_slot(int slot) {
     
     // Update pitch on sample bank pitch data source
     if (s->sample_bank_pitch_ds_initialized) {
+#if PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+        // For preprocessing approach, check if we should preprocess this sample
+        if (fabs(s->pitch - 1.0f) > 0.001f) {
+            // Try to use preprocessing for manual sample playback too
+            preprocessed_sample_t* preprocessed = find_preprocessed_sample(slot, s->pitch);
+            if (!preprocessed) {
+                prnt("⚡ [PREPROCESS] Auto-preprocessing sample %d at pitch %.3f for manual playback", slot, s->pitch);
+                if (preprocess_sample_with_pitch(slot, s->pitch) == 0) {
+                    preprocessed = find_preprocessed_sample(slot, s->pitch);
+                }
+            }
+            if (preprocessed) {
+                prnt("🎯 [SAMPLE BANK] Using preprocessed data for manual playback: slot %d, pitch %.3f", slot, s->pitch);
+            } else {
+                prnt("⚠️ [SAMPLE BANK] Preprocessing failed, using fallback for manual playback: slot %d, pitch %.3f", slot, s->pitch);
+                ma_pitch_data_source_set_pitch(&s->sample_bank_pitch_ds, s->pitch);
+            }
+        } else {
+            prnt("🎯 [SAMPLE BANK] Using original pitch for manual playback: slot %d, pitch %.3f", slot, s->pitch);
+        }
+#else
         ma_pitch_data_source_set_pitch(&s->sample_bank_pitch_ds, s->pitch);
+#endif
     }
     
     // Success - start sample bank playback
@@ -2270,10 +3100,10 @@ void stop(void) {
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     
-    // Smoothly fade out all currently playing nodes
-    for (int i = 0; i < MAX_TOTAL_COLUMNS; i++) {
-        if (currently_playing_nodes_per_col[i]) {
-            set_target_volume(currently_playing_nodes_per_col[i], 0.0f);
+    // Stop and cleanup all active cell nodes to prevent background processing
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) {
+            cleanup_cell_node(&g_cell_nodes[i]);
         }
     }
     
@@ -2677,6 +3507,11 @@ void cleanup(void) {
         prnt("🗑️ [PREVIEW] Cell preview system cleaned up");
     }
     
+#if PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
+    // Clean up preprocessed pitch cache
+    cleanup_preprocessed_cache();
+#endif
+    
     // Uninitialize device
     ma_device_uninit(&g_device);
     
@@ -2686,4 +3521,274 @@ void cleanup(void) {
     g_total_memory_used = 0;
     g_is_initialized = 0;
     prnt("✅ [MINIAUDIO] Cleanup completed successfully");
+}
+
+// -----------------------------------------------------------------------------
+// Preprocessed Pitch System Implementation
+// -----------------------------------------------------------------------------
+
+// Find cached preprocessed sample
+static preprocessed_sample_t* find_preprocessed_sample(int source_slot, float pitch_ratio) {
+    uint32_t pitch_hash = hash_pitch_ratio(pitch_ratio);
+    
+    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
+        preprocessed_sample_t* entry = &g_preprocessed_cache[i];
+        if (entry->in_use && 
+            entry->source_slot == source_slot && 
+            entry->pitch_hash == pitch_hash) {
+            // Update access time for LRU
+            entry->last_accessed = ++g_preprocessed_access_counter;
+            prnt("✅ [PREPROCESS] Found cached sample: slot %d, pitch %.3f", source_slot, pitch_ratio);
+            return entry;
+        }
+    }
+    return NULL; // Not found
+}
+
+// Evict oldest preprocessed sample to make space
+static void evict_oldest_preprocessed_sample(void) {
+    int oldest_index = -1;
+    uint64_t oldest_time = UINT64_MAX;
+    
+    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
+        if (g_preprocessed_cache[i].in_use && 
+            g_preprocessed_cache[i].last_accessed < oldest_time) {
+            oldest_time = g_preprocessed_cache[i].last_accessed;
+            oldest_index = i;
+        }
+    }
+    
+    if (oldest_index >= 0) {
+        preprocessed_sample_t* entry = &g_preprocessed_cache[oldest_index];
+        prnt("🗑️ [PREPROCESS] Evicting old sample: slot %d, pitch %.3f (%.2f MB)", 
+             entry->source_slot, entry->pitch_ratio, entry->processed_size / (1024.0 * 1024.0));
+        
+        if (entry->processed_data) {
+            g_total_preprocessed_memory -= entry->processed_size;
+            free(entry->processed_data);
+        }
+        memset(entry, 0, sizeof(preprocessed_sample_t));
+    }
+}
+
+// Process entire sample with SoundTouch and store result
+static int preprocess_sample_with_pitch(int source_slot, float pitch_ratio) {
+    if (source_slot < 0 || source_slot >= MAX_SLOTS) {
+        prnt_err("🔴 [PREPROCESS] Invalid source slot: %d", source_slot);
+        return -1;
+    }
+    
+    audio_slot_t* source = &g_slots[source_slot];
+    if (!source->loaded) {
+        prnt_err("🔴 [PREPROCESS] Source slot %d not loaded", source_slot);
+        return -1;
+    }
+    
+    // Skip preprocessing for normal pitch (1.0)
+    if (fabs(pitch_ratio - 1.0f) < 0.001f) {
+        prnt("⚠️ [PREPROCESS] Skipping preprocessing for normal pitch %.3f", pitch_ratio);
+        return 0; // Don't cache normal pitch samples
+    }
+    
+    prnt("🔄 [PREPROCESS] Processing slot %d with pitch %.3f...", source_slot, pitch_ratio);
+    
+    // Find empty cache slot or evict oldest
+    int cache_index = -1;
+    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
+        if (!g_preprocessed_cache[i].in_use) {
+            cache_index = i;
+            break;
+        }
+    }
+    
+    if (cache_index == -1) {
+        evict_oldest_preprocessed_sample();
+        // Try again to find empty slot
+        for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
+            if (!g_preprocessed_cache[i].in_use) {
+                cache_index = i;
+                break;
+            }
+        }
+    }
+    
+    if (cache_index == -1) {
+        prnt_err("🔴 [PREPROCESS] No cache slots available");
+        return -1;
+    }
+    
+    // Create temporary decoder for processing
+    ma_decoder temp_decoder;
+    ma_decoder_config config = ma_decoder_config_init(SAMPLE_FORMAT, CHANNEL_COUNT, SAMPLE_RATE);
+    ma_result result;
+    
+    if (source->memory_data) {
+        result = ma_decoder_init_memory(source->memory_data, source->memory_size, &config, &temp_decoder);
+    } else {
+        result = ma_decoder_init_file(source->file_path, &config, &temp_decoder);
+    }
+    
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [PREPROCESS] Failed to create temp decoder: %s", ma_result_description(result));
+        return -1;
+    }
+    
+    // Get sample length
+    ma_uint64 total_frames;
+    result = ma_decoder_get_length_in_pcm_frames(&temp_decoder, &total_frames);
+    if (result != MA_SUCCESS) {
+        prnt_err("🔴 [PREPROCESS] Failed to get sample length: %s", ma_result_description(result));
+        ma_decoder_uninit(&temp_decoder);
+        return -1;
+    }
+    
+    prnt("📏 [PREPROCESS] Sample length: %llu frames (%.2f seconds)", 
+         total_frames, (double)total_frames / SAMPLE_RATE);
+    
+    // Create SoundTouch processor for offline processing
+    SoundTouch processor;
+    processor.setSampleRate(SAMPLE_RATE);
+    processor.setChannels(CHANNEL_COUNT);
+    processor.setPitch(pitch_ratio);
+    
+    // Use high-quality settings for offline processing (we have time)
+    processor.setSetting(SETTING_USE_QUICKSEEK, 0);        // Use high quality
+    processor.setSetting(SETTING_USE_AA_FILTER, 1);        // Enable anti-aliasing
+    processor.setSetting(SETTING_SEQUENCE_MS, 40);         // Longer sequences for quality
+    processor.setSetting(SETTING_SEEKWINDOW_MS, 15);       // Larger search window
+    processor.setSetting(SETTING_OVERLAP_MS, 8);           // More overlap for quality
+    
+    // Allocate output buffer (estimate 1.5x input size for worst case)
+    ma_uint64 estimated_output_frames = total_frames + (total_frames / 2);
+    size_t output_buffer_size = estimated_output_frames * CHANNEL_COUNT * sizeof(float);
+    float* output_buffer = (float*)malloc(output_buffer_size);
+    
+    if (!output_buffer) {
+        prnt_err("🔴 [PREPROCESS] Failed to allocate output buffer (%.2f MB)", 
+                 output_buffer_size / (1024.0 * 1024.0));
+        ma_decoder_uninit(&temp_decoder);
+        return -1;
+    }
+    
+    // Process in chunks
+    const ma_uint64 chunk_size = 4096;
+    float chunk_buffer[chunk_size * CHANNEL_COUNT];
+    ma_uint64 total_output_frames = 0;
+    ma_uint64 frames_read;
+    
+    // Feed all input to SoundTouch
+    ma_decoder_seek_to_pcm_frame(&temp_decoder, 0);
+    while (total_output_frames < estimated_output_frames) {
+        result = ma_decoder_read_pcm_frames(&temp_decoder, chunk_buffer, chunk_size, &frames_read);
+        if (result != MA_SUCCESS || frames_read == 0) break;
+        
+        // Feed to SoundTouch
+        processor.putSamples(chunk_buffer, (uint)frames_read);
+        
+        // Get processed samples
+        uint samples_available = processor.numSamples();
+        if (samples_available > 0) {
+            uint max_receive = (uint)(estimated_output_frames - total_output_frames);
+            if (max_receive > samples_available) max_receive = samples_available;
+            
+            uint received = processor.receiveSamples(
+                output_buffer + (total_output_frames * CHANNEL_COUNT), 
+                max_receive
+            );
+            total_output_frames += received;
+        }
+    }
+    
+    // Flush remaining samples
+    processor.flush();
+    uint samples_available = processor.numSamples();
+    if (samples_available > 0 && total_output_frames < estimated_output_frames) {
+        uint max_receive = (uint)(estimated_output_frames - total_output_frames);
+        if (max_receive > samples_available) max_receive = samples_available;
+        
+        uint received = processor.receiveSamples(
+            output_buffer + (total_output_frames * CHANNEL_COUNT), 
+            max_receive
+        );
+        total_output_frames += received;
+    }
+    
+    ma_decoder_uninit(&temp_decoder);
+    
+    if (total_output_frames == 0) {
+        prnt_err("🔴 [PREPROCESS] No output frames generated");
+        free(output_buffer);
+        return -1;
+    }
+    
+    // Store in cache
+    preprocessed_sample_t* entry = &g_preprocessed_cache[cache_index];
+    entry->source_slot = source_slot;
+    entry->pitch_ratio = pitch_ratio;
+    entry->pitch_hash = hash_pitch_ratio(pitch_ratio);
+    entry->processed_data = output_buffer;
+    entry->processed_size = total_output_frames * CHANNEL_COUNT * sizeof(float);
+    entry->processed_frames = total_output_frames;
+    entry->in_use = 1;
+    entry->last_accessed = ++g_preprocessed_access_counter;
+    entry->creation_time = g_preprocessed_access_counter;
+    
+    g_total_preprocessed_memory += entry->processed_size;
+    
+    prnt("✅ [PREPROCESS] Processed slot %d with pitch %.3f: %llu frames → %llu frames (%.2f MB cached)", 
+         source_slot, pitch_ratio, total_frames, total_output_frames, 
+         entry->processed_size / (1024.0 * 1024.0));
+    
+    return 0;
+}
+
+// Cleanup all preprocessed samples
+static void cleanup_preprocessed_cache(void) {
+    prnt("🧹 [PREPROCESS] Cleaning up cache...");
+    
+    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
+        if (g_preprocessed_cache[i].in_use && g_preprocessed_cache[i].processed_data) {
+            free(g_preprocessed_cache[i].processed_data);
+        }
+    }
+    
+    memset(g_preprocessed_cache, 0, sizeof(g_preprocessed_cache));
+    g_total_preprocessed_memory = 0;
+    g_preprocessed_access_counter = 0;
+    
+    prnt("✅ [PREPROCESS] Cache cleaned up");
+}
+
+// Preprocessed pitch system API
+int preprocess_sample_pitch(int source_slot, float pitch_ratio) {
+    if (!g_is_initialized) {
+        prnt_err("🔴 [PREPROCESS] Device not initialized");
+        return -1;
+    }
+    
+    // Check if already cached
+    preprocessed_sample_t* existing = find_preprocessed_sample(source_slot, pitch_ratio);
+    if (existing) {
+        prnt("ℹ️ [PREPROCESS] Sample already cached: slot %d, pitch %.3f", source_slot, pitch_ratio);
+        return 0; // Already processed
+    }
+    
+    return preprocess_sample_with_pitch(source_slot, pitch_ratio);
+}
+
+uint64_t get_preprocessed_memory_usage(void) {
+    return g_total_preprocessed_memory;
+}
+
+int get_preprocessed_cache_count(void) {
+    int count = 0;
+    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
+        if (g_preprocessed_cache[i].in_use) count++;
+    }
+    return count;
+}
+
+void clear_preprocessed_cache(void) {
+    cleanup_preprocessed_cache();
+    prnt("🗑️ [PREPROCESS] Cache cleared manually");
 }
