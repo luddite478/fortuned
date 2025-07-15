@@ -1564,9 +1564,15 @@ class SequencerState extends ChangeNotifier {
   }
   
   void _startUIUpdateTimer() {
-    // This timer is ONLY for UI updates, not audio timing
-    // Audio timing is handled by sequencer in audio callback
-    const uiUpdateIntervalMs = 50; // 20 FPS UI updates
+    // TEMPORARILY DISABLED FOR PERFORMANCE TESTING
+    // This eliminates all FFI polling calls to test if they're causing audio issues
+    print('🧪 UI polling DISABLED for performance test');
+    
+    // No timer = no FFI calls = no scheduling conflicts with audio callback
+    // Note: Step indicator will be frozen, but audio should be smoother
+    
+    /* ORIGINAL CODE (re-enable by uncommenting):
+    const uiUpdateIntervalMs = 100; // 10 FPS UI updates
     
     _sequencerTimer = Timer.periodic(Duration(milliseconds: uiUpdateIntervalMs), (timer) {
       if (!_sequencerLibrary.isSequencerPlaying) {
@@ -1575,13 +1581,19 @@ class SequencerState extends ChangeNotifier {
         return;
       }
       
-      // Get current step from sequencer
       final currentStep = _sequencerLibrary.currentStep;
       if (currentStep != _currentStep) {
         _currentStep = currentStep;
-        notifyListeners(); // Only update UI when step actually changes
+        notifyListeners();
       }
     });
+    */
+  }
+  
+  // Alternative: Disable UI polling entirely for performance testing
+  void _startUIUpdateTimerMinimal() {
+    // NO UI polling - for testing if FFI calls are causing audio stuttering
+    print('🧪 [PERF TEST] UI polling disabled - step indicator will not update');
   }
   
   // Update grid cell and sync to sequencer
