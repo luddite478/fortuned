@@ -153,6 +153,10 @@ int get_active_cell_node_count(void);
 __attribute__((visibility("default"))) __attribute__((used))
 int get_max_cell_node_count(void);
 
+// Performance testing mode for diagnosing bottlenecks
+__attribute__((visibility("default"))) __attribute__((used))
+void set_perf_test_mode(int mode);
+
 #ifdef __cplusplus
 }
 #endif

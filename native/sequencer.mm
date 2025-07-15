@@ -2266,6 +2266,9 @@ static uint64_t g_total_callback_time_us = 0;
 static uint64_t g_max_callback_time_us = 0;
 static uint64_t g_last_performance_log = 0;
 
+// Performance testing mode for diagnostic purposes
+static int g_perf_test_mode = 0; // 0=normal, 1=skip_soundtouch, 2=skip_monitor, 3=skip_smoothing
+
 // Get time in microseconds (cross-platform)
 static uint64_t get_time_microseconds(void) {
 #ifdef __APPLE__
@@ -2386,6 +2389,11 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
                          timing_5_recording, (timing_5_recording * 100.0) / callback_duration);
             }
         }
+        
+        // Export performance counters to systrace for visual analysis
+        TRACE_INT("audio_callback_us", (int32_t)callback_duration);
+        TRACE_INT("audio_mixing_us", (int32_t)timing_4_mixing);
+        TRACE_INT("active_nodes", active_nodes);
         
         prnt("📊 [PERF] Callback stats: avg=%.1fμs, max=%lluμs, active_nodes=%d, callbacks=%llu", 
              avg_callback_time, g_max_callback_time_us, active_nodes, g_callback_count);
@@ -3873,8 +3881,6 @@ void clear_preprocessed_cache(void) {
 // -----------------------------------------------------------------------------
 // Performance Diagnostic Function (for testing bottlenecks)
 // -----------------------------------------------------------------------------
-static int g_perf_test_mode = 0; // 0=normal, 1=skip_soundtouch, 2=skip_monitor, 3=skip_smoothing
-
 void set_performance_test_mode(int mode) {
     g_perf_test_mode = mode;
     switch(mode) {
