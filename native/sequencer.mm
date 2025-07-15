@@ -2339,7 +2339,33 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
     // 5. Mix all playing samples into the output buffer (includes all active cell nodes)
     TRACE_BEGIN("audio_mixing");
     step_start = get_time_microseconds();
-    ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
+    
+    // Add counter for active nodes to correlate with performance
+    int active_nodes_count = count_active_cell_nodes();
+    TRACE_INT("mixing_active_nodes", active_nodes_count);
+    
+    if (g_perf_test_mode == 5) {
+        // Skip mixing entirely - zero out buffer to test callback overhead
+        memset(pOutput, 0, frameCount * CHANNEL_COUNT * sizeof(float));
+    } else if (g_perf_test_mode == 4) {
+        // Test pure mixing overhead by silencing all nodes first
+        for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+            if (g_cell_nodes[i].active && g_cell_nodes[i].node_initialized) {
+                ma_node_set_output_bus_volume(&g_cell_nodes[i].node, 0, 0.0f);
+            }
+        }
+        ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
+        // Restore volumes after test
+        for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+            if (g_cell_nodes[i].active && g_cell_nodes[i].node_initialized) {
+                ma_node_set_output_bus_volume(&g_cell_nodes[i].node, 0, g_cell_nodes[i].current_volume);
+            }
+        }
+    } else {
+        // Normal mixing
+        ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
+    }
+    
     step_end = get_time_microseconds();
     timing_4_mixing = step_end - step_start;
     TRACE_END();
@@ -3893,6 +3919,8 @@ void set_performance_test_mode(int mode) {
         case 1: prnt("🧪 [PERF TEST] Skip SoundTouch processing"); break;
         case 2: prnt("🧪 [PERF TEST] Skip cell monitoring"); break;
         case 3: prnt("🧪 [PERF TEST] Skip volume smoothing"); break;
+        case 4: prnt("🧪 [PERF TEST] Silence all nodes (test mixing overhead)"); break;
+        case 5: prnt("🧪 [PERF TEST] Skip mixing entirely (test callback overhead)"); break;
         default: prnt("🧪 [PERF TEST] Unknown mode %d", mode); break;
     }
 }
