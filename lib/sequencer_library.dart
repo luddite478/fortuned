@@ -17,15 +17,33 @@ final free = stdlib.lookupFunction<
     Void Function(Pointer<Void>),
     void Function(Pointer<Void>)>('free');
 
+// Manual FFI types for performance test function
+typedef SetPerfTestModeNative = Void Function(Int32 mode);
+typedef SetPerfTestModeDart = void Function(int mode);
+
 class SequencerLibrary {
   static SequencerLibrary? _instance;
   late final DynamicLibrary _dylib;
   late final SequencerBindings _bindings;
   bool _isInitialized = false;
+  
+  // Manual FFI function for performance testing
+  late final SetPerfTestModeDart _setPerfTestMode;
 
   SequencerLibrary._() {
     _dylib = _loadLibrary();
     _bindings = SequencerBindings(_dylib);
+    
+    // Initialize manual FFI function
+    try {
+      final setPerfTestModePtr = _dylib.lookup<NativeFunction<SetPerfTestModeNative>>('set_perf_test_mode');
+      _setPerfTestMode = setPerfTestModePtr.asFunction<SetPerfTestModeDart>();
+    } catch (e) {
+      print('⚠️ Performance test function not available: $e');
+      _setPerfTestMode = (int mode) {
+        print('🧪 [MOCK] Performance test mode: $mode (function not available)');
+      };
+    }
   }
 
   static SequencerLibrary get instance {
@@ -525,5 +543,23 @@ class SequencerLibrary {
     }
     
     return success;
+  }
+
+  // -------------- PERFORMANCE TEST FUNCTIONS --------------
+  
+  /// Set performance test mode for diagnostics
+  /// 0 = Normal mode (all operations enabled)
+  /// 1 = Skip SoundTouch processing
+  /// 2 = Skip cell monitoring
+  /// 3 = Skip volume smoothing
+  /// 4 = Silence all nodes (test mixing overhead)
+  /// 5 = Skip mixing entirely (test callback overhead)
+  void setPerformanceTestMode(int mode) {
+    try {
+      _setPerfTestMode(mode);
+      print('🧪 Performance test mode set to: $mode');
+    } catch (e) {
+      print('❌ Error setting performance test mode: $e');
+    }
   }
 } 
