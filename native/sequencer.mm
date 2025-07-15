@@ -1,6 +1,25 @@
 #include "sequencer.h"
 
 // -----------------------------------------------------------------------------
+// Android Systrace/Atrace Integration for Performance Analysis
+// -----------------------------------------------------------------------------
+#ifdef __ANDROID__
+    #include <android/trace.h>
+    #define ATRACE_TAG ATRACE_TAG_AUDIO
+    #define TRACE_BEGIN(name) ATrace_beginSection(name)
+    #define TRACE_END() ATrace_endSection()
+    #define TRACE_ASYNC_BEGIN(name, cookie) ATrace_beginAsyncSection(name, cookie)
+    #define TRACE_ASYNC_END(name, cookie) ATrace_endAsyncSection(name, cookie)
+    #define TRACE_INT(name, value) ATrace_setCounter(name, value)
+#else
+    #define TRACE_BEGIN(name)
+    #define TRACE_END()
+    #define TRACE_ASYNC_BEGIN(name, cookie)
+    #define TRACE_ASYNC_END(name, cookie)
+    #define TRACE_INT(name, value)
+#endif
+
+// -----------------------------------------------------------------------------
 // Pitch Shifting Implementation Selection
 // -----------------------------------------------------------------------------
 // Runtime pitch approach selection (cleaner than compile-time #if statements)
@@ -2267,28 +2286,66 @@ static uint64_t get_time_microseconds(void) {
 
 // Main audio callback - called by miniaudio every ~11ms to fill the audio buffer
 static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount) {
+    TRACE_BEGIN("audio_callback");
     uint64_t callback_start = get_time_microseconds();
+    uint64_t step_start, step_end;
+    
+    // Track individual step timings for detailed profiling
+    uint64_t timing_1_sequencer = 0;
+    uint64_t timing_2_volume = 0; 
+    uint64_t timing_3_monitor = 0;
+    uint64_t timing_4_mixing = 0;
+    uint64_t timing_5_recording = 0;
     
     // 1. Update global frame counter for cell node lifecycle tracking
     g_current_frame += frameCount;
     
     // 2. Run the sequencer (timing + sample triggering)
+    TRACE_BEGIN("sequencer");
+    step_start = get_time_microseconds();
     run_sequencer(frameCount);
+    step_end = get_time_microseconds();
+    timing_1_sequencer = step_end - step_start;
+    TRACE_END();
     
     // 3. Update volume smoothing to prevent clicks
-    update_volume_smoothing();
+    TRACE_BEGIN("volume_smoothing");
+    step_start = get_time_microseconds();
+    if (g_perf_test_mode != 3) {
+        update_volume_smoothing();
+    }
+    step_end = get_time_microseconds();
+    timing_2_volume = step_end - step_start;
+    TRACE_END();
     
     // 4. Monitor cell nodes  
-    monitor_cell_nodes();
+    TRACE_BEGIN("monitor_nodes");
+    step_start = get_time_microseconds();
+    if (g_perf_test_mode != 2) {
+        monitor_cell_nodes();
+    }
+    step_end = get_time_microseconds();
+    timing_3_monitor = step_end - step_start;
+    TRACE_END();
     
     // 5. Mix all playing samples into the output buffer (includes all active cell nodes)
+    TRACE_BEGIN("audio_mixing");
+    step_start = get_time_microseconds();
     ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
+    step_end = get_time_microseconds();
+    timing_4_mixing = step_end - step_start;
+    TRACE_END();
 
     // 6. If recording, save the mixed audio to file
+    TRACE_BEGIN("recording");
+    step_start = get_time_microseconds();
     if (g_is_output_recording) {
         ma_encoder_write_pcm_frames(&g_output_encoder, pOutput, frameCount, NULL);
         g_total_frames_written += frameCount;
     }
+    step_end = get_time_microseconds();
+    timing_5_recording = step_end - step_start;
+    TRACE_END();
 
     // 7. Performance tracking and diagnostics
     uint64_t callback_end = get_time_microseconds();
@@ -2309,6 +2366,25 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
         if (callback_duration > 8000) {
             prnt_err("⚠️ [PERF] SLOW CALLBACK: %llu μs (%.1f%% of 11ms budget), active nodes: %d", 
                      callback_duration, (callback_duration / 110.0), active_nodes);
+            
+            // Log detailed breakdown when callback is slow
+            prnt_err("🔍 [PERF BREAKDOWN] seq:%lluμs vol:%lluμs mon:%lluμs mix:%lluμs rec:%lluμs", 
+                     timing_1_sequencer, timing_2_volume, timing_3_monitor, 
+                     timing_4_mixing, timing_5_recording);
+            
+            // Calculate percentages of slow operations
+            if (timing_4_mixing > 2000) {
+                prnt_err("🔴 [PERF] MIXING BOTTLENECK: %lluμs (%.1f%% of callback)", 
+                         timing_4_mixing, (timing_4_mixing * 100.0) / callback_duration);
+            }
+            if (timing_1_sequencer > 1000) {
+                prnt_err("🔴 [PERF] SEQUENCER BOTTLENECK: %lluμs (%.1f%% of callback)", 
+                         timing_1_sequencer, (timing_1_sequencer * 100.0) / callback_duration);
+            }
+            if (timing_5_recording > 1000) {
+                prnt_err("🔴 [PERF] RECORDING BOTTLENECK: %lluμs (%.1f%% of callback)", 
+                         timing_5_recording, (timing_5_recording * 100.0) / callback_duration);
+            }
         }
         
         prnt("📊 [PERF] Callback stats: avg=%.1fμs, max=%lluμs, active_nodes=%d, callbacks=%llu", 
@@ -2322,6 +2398,7 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
 
     (void)pInput;
     (void)pDevice;
+    TRACE_END(); // Close audio_callback trace
 }
 
 static void free_slot_resources(int slot) {
@@ -3791,4 +3868,27 @@ int get_preprocessed_cache_count(void) {
 void clear_preprocessed_cache(void) {
     cleanup_preprocessed_cache();
     prnt("🗑️ [PREPROCESS] Cache cleared manually");
+}
+
+// -----------------------------------------------------------------------------
+// Performance Diagnostic Function (for testing bottlenecks)
+// -----------------------------------------------------------------------------
+static int g_perf_test_mode = 0; // 0=normal, 1=skip_soundtouch, 2=skip_monitor, 3=skip_smoothing
+
+void set_performance_test_mode(int mode) {
+    g_perf_test_mode = mode;
+    switch(mode) {
+        case 0: prnt("🧪 [PERF TEST] Normal mode (all operations enabled)"); break;
+        case 1: prnt("🧪 [PERF TEST] Skip SoundTouch processing"); break;
+        case 2: prnt("🧪 [PERF TEST] Skip cell monitoring"); break;
+        case 3: prnt("🧪 [PERF TEST] Skip volume smoothing"); break;
+        default: prnt("🧪 [PERF TEST] Unknown mode %d", mode); break;
+    }
+}
+
+// Export for FFI
+extern "C" {
+    void set_perf_test_mode(int mode) {
+        set_performance_test_mode(mode);
+    }
 }

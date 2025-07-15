@@ -138,5 +138,5 @@ endif()
 add_library(sequencer SHARED ${SEQUENCER_SOURCES})
 
 if(ANDROID)
-  target_link_libraries(sequencer OpenSLES log)
+  target_link_libraries(sequencer OpenSLES log android)
 endif()
