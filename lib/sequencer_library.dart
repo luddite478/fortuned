@@ -34,14 +34,20 @@ class SequencerLibrary {
     _dylib = _loadLibrary();
     _bindings = SequencerBindings(_dylib);
     
-    // Initialize manual FFI function
+    // Initialize manual FFI function after main library is ready (completely safe)
+    _initializePerformanceTestFunction();
+  }
+  
+  void _initializePerformanceTestFunction() {
+    // This initialization is completely optional and should never affect main functionality
     try {
       final setPerfTestModePtr = _dylib.lookup<NativeFunction<SetPerfTestModeNative>>('set_perf_test_mode');
       _setPerfTestMode = setPerfTestModePtr.asFunction<SetPerfTestModeDart>();
+      print('✅ Performance test function loaded successfully');
     } catch (e) {
-      print('⚠️ Performance test function not available: $e');
+      // Completely silent fallback - don't even log this as it's expected on some platforms
       _setPerfTestMode = (int mode) {
-        print('🧪 [MOCK] Performance test mode: $mode (function not available)');
+        // Silent mock - no logging to avoid spam
       };
     }
   }
