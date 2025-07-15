@@ -10,7 +10,12 @@
     #define TRACE_END() ATrace_endSection()
     #define TRACE_ASYNC_BEGIN(name, cookie) ATrace_beginAsyncSection(name, cookie)
     #define TRACE_ASYNC_END(name, cookie) ATrace_endAsyncSection(name, cookie)
-    #define TRACE_INT(name, value) ATrace_setCounter(name, value)
+    // ATrace_setCounter is only available in Android API 29+
+    #if __ANDROID_API__ >= 29
+        #define TRACE_INT(name, value) ATrace_setCounter(name, value)
+    #else
+        #define TRACE_INT(name, value) // No-op for older Android versions
+    #endif
 #else
     #define TRACE_BEGIN(name)
     #define TRACE_END()
