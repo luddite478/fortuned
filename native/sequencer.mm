@@ -2254,7 +2254,7 @@ static void run_sequencer(ma_uint32 frameCount) {
             
             // Did we loop back from last step to step 0?
             if (previous_step > g_current_step) {
-                prnt("🔄 [SEQUENCER] Looping back to step 0 (cell nodes continue independently)");
+                // prnt("🔄 [SEQUENCER] Looping back to step 0 (cell nodes continue independently)");
                 // With per-cell nodes, we don't need to track column state
                 // Each cell node plays independently until completion
             }
