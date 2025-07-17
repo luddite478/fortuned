@@ -43,7 +43,7 @@ jobs:
         key: ${{ secrets.DROPLET_SSH_KEY }}
         envs: REPO_DIR_PATH,DOMAIN
         script: |
-          cd "$REPO_DIR_PATH/server"
+          cd "$REPO_DIR_PATH"
           docker-compose down -v
           rm docker-compose.envsubst.yaml || true
           export TAILSCALE_IP="$(tailscale ip --4)" 
