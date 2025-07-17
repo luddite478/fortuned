@@ -55,7 +55,7 @@ jobs:
       run: |
         echo "Waiting for server to be ready..."
         timeout=180 # 3 minutes
-        while ! curl -s http://${{ secrets.HOST_IP }}:8888/get_sound_series > /dev/null; do
+        while ! curl -s http://${{ secrets.HOST_IP }}:443/get_sound_series > /dev/null; do
           sleep 1
           timeout=$((timeout-1))
           if [ "$timeout" -le 0 ]; then
@@ -64,4 +64,3 @@ jobs:
           fi
         done
         echo "Server is up and responding."
-        
