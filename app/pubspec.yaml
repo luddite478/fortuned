@@ -1,0 +1,63 @@
+publish_to: none
+description: A new Flutter project.
+environment:
+  sdk: '>=3.4.4 <4.0.0'
+version: 1.0.0+1
+flutter:
+  assets:
+    - samples/acoustic/
+    - samples/drums/
+    - samples/drums/China/
+    - samples/drums/Crash A/
+    - samples/drums/Crash B/
+    - samples/drums/Crash C/
+    - samples/drums/Hi Hat/
+    - samples/drums/Kick/
+    - samples/drums/Ride Cymbal/
+    - samples/drums/Snare Off/
+    - samples/drums/Snare On/
+    - samples/drums/Splash/
+    - samples/drums/Tom Floor/
+    - samples/drums/Tom High/
+    - samples/drums/Tom Mid/
+    - samples/noise/
+    - samples/other/
+    - samples/synth/
+    - samples/synth/Korg MS-20/
+    - samples/synth/Korg MS-20/Bass/
+    - samples/synth/Korg MS-20/Leads and Keys/
+    - samples/synth/Yamaha CS40M/
+    - samples/synth/Yamaha CS40M/Bass/
+    - samples/synth/Yamaha CS40M/Keys/
+    - samples/wavparty-braids-vol-1/
+    - samples/wavparty-braids-vol-1/chords-tunedC/
+    - samples/wavparty-braids-vol-1/hats/
+    - samples/wavparty-braids-vol-1/kicks/
+    - samples/wavparty-braids-vol-1/perc/
+    - samples/wavparty-braids-vol-1/snares/
+    - samples/wavparty-braids-vol-1/synth-tunedC/
+    - samples/wavparty-braids-vol-1/vox-tunedC/
+    - .env
+    - samples_manifest.json
+  uses-material-design: true
+name: niyya
+dependencies:
+  share_plus: ^7.2.2
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+  shared_preferences: ^2.2.2
+  file_picker: ^8.0.7
+  provider: ^6.1.1
+  http: ^1.1.0
+  flutter_dotenv: ^5.1.0
+  path_provider: ^2.1.1
+  ffi: ^2.1.0
+  path: ^1.9.0
+  docman: ^1.2.0
+  google_fonts: ^6.1.0
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  ffigen: ^13.0.0
+  flutter_lints: ^3.0.0

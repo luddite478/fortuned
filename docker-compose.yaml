@@ -1,0 +1,81 @@
+version: '3'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8888:8888"
+      - "8765:8765"
+    env_file:
+      - .env
+    environment:
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - mongodb
+    restart: on-failure
+
+  haproxy:
+    image: haproxy:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    env_file:
+      - .env
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+      - ./certs:/usr/local/etc/haproxy/certs:ro
+    depends_on:
+      - server
+    restart: unless-stopped
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./letsencrypt:/etc/letsencrypt
+      - ./certs:/certs
+    env_file:
+      - .env
+    entrypoint: /bin/sh
+    command: 
+      - -c
+      - |
+        while :; do
+          if [ ! -f /etc/letsencrypt/live/$$DOMAIN/fullchain.pem ]; then
+            echo "Generating certificate for $$DOMAIN..."
+            certbot certonly --standalone --agree-tos --no-eff-email --email admin@$$DOMAIN -d $$DOMAIN --non-interactive --keep-until-expiring
+            if [ $$? -eq 0 ]; then
+              cat /etc/letsencrypt/live/$$DOMAIN/fullchain.pem /etc/letsencrypt/live/$$DOMAIN/privkey.pem > /certs/haproxy.pem
+              echo "Certificate created successfully"
+            fi
+          else
+            echo "Certificate already exists, checking for renewal..."
+            certbot renew --quiet
+            if [ $$? -eq 0 ]; then
+              cat /etc/letsencrypt/live/$$DOMAIN/fullchain.pem /etc/letsencrypt/live/$$DOMAIN/privkey.pem > /certs/haproxy.pem
+              echo "Certificate renewed successfully"
+            fi
+          fi
+          sleep 12h
+        done
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mongodb
+    env_file:
+      - .env
+    ports:
+      - ${TAILSCALE_IP}:27017:27017
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    restart: on-failure
+    command: mongod --auth
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local 

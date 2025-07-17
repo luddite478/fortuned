@@ -1,106 +1,106 @@
 # Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.build/
-.buildlog/
-.history
-.svn/
-.swiftpm/
-migrate_working_dir/
+app/*.class
+app/*.log
+app/*.pyc
+app/*.swp
+app/.DS_Store
+app/.atom/
+app/.build/
+app/.buildlog/
+app/.history
+app/.svn/
+app/.swiftpm/
+app/migrate_working_dir/
 
 # IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+app/*.iml
+app/*.ipr
+app/*.iws
+app/.idea/
 
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
-#.vscode/
+#app/.vscode/
 
 # Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.pub-cache/
-.pub/
-/build/
+app/**/doc/api/
+app/**/ios/Flutter/.last_build_id
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.pub-cache/
+app/.pub/
+app/build/
 
 # Symbolication related
-app.*.symbols
+app/app.*.symbols
 
 # Obfuscation related
-app.*.map.json
+app/app.*.map.json
 
 # Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+app/android/app/debug
+app/android/app/profile
+app/android/app/release
 
 
 # iOS
-ios/Pods/
-ios/.symlinks/
-ios/Runner.xcworkspace/
-ios/build/
-ios/Flutter/ephemeral/
-ios/Flutter/Flutter.framework/
-ios/Flutter/Flutter.podspec
-ios/Flutter/App.framework
+app/ios/Pods/
+app/ios/.symlinks/
+app/ios/Runner.xcworkspace/
+app/ios/build/
+app/ios/Flutter/ephemeral/
+app/ios/Flutter/Flutter.framework/
+app/ios/Flutter/Flutter.podspec
+app/ios/Flutter/App.framework
 
 # macOS
-macos/Pods/
-macos/Runner.xcworkspace/
-macos/build/
-macos/Flutter/ephemeral/
+app/macos/Pods/
+app/macos/Runner.xcworkspace/
+app/macos/build/
+app/macos/Flutter/ephemeral/
 
 # Linux
-linux/build/
-linux/Flutter/ephemeral/
+app/linux/build/
+app/linux/Flutter/ephemeral/
 
 # Windows
-windows/build/
-windows/Flutter/ephemeral/
+app/windows/build/
+app/windows/Flutter/ephemeral/
 
 # Android
-android/.gradle/
-android/local.properties
-android/.idea/
-android/.kotlin/
-android/.cxx/
-android/build/
-android/app/build/
-android/app/.cxx/
-android/app/.cxx/**
-android/app/.cxx/Debug/
-android/app/.cxx/RelWithDebInfo/
-android/app/.cxx/tools/
+app/android/.gradle/
+app/android/local.properties
+app/android/.idea/
+app/android/.kotlin/
+app/android/.cxx/
+app/android/build/
+app/android/app/build/
+app/android/app/.cxx/
+app/android/app/.cxx/**
+app/android/app/.cxx/Debug/
+app/android/app/.cxx/RelWithDebInfo/
+app/android/app/.cxx/tools/
 
 # Android memory dumps
-android/java_pid*.hprof
+app/android/java_pid*.hprof
 
 # Flutter ephemeral files
-.metadata
-.flutter-versions
-.flutter-plugins-dependencies
+app/.metadata
+app/.flutter-versions
+app/.flutter-plugins-dependencies
 
 # Optional
 # Uncomment if you don't want to track VS Code settings
-# .vscode/
-working_example
+# app/.vscode/
+app/working_example
 
 # Environment files
-.env
+**/.env
 
 # Keep example file for reference
-!env.example
-samples/
-samples-old/
+!app/env.example
+app/samples/
+app/samples-old/
 **/__pycache__/
