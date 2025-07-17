@@ -1,17 +1,17 @@
-FROM haproxy:alpine
+FROM alpine:latest AS cert-builder
 
-# Switch to root to install packages
-USER root
-
-# Install OpenSSL for certificate generation
 RUN apk add --no-cache openssl
 
-# Copy the entrypoint script
-COPY entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh
+# Generate temporary self-signed certificate
+RUN openssl req -x509 -newkey rsa:2048 \
+    -keyout /tmp/temp-key.pem \
+    -out /tmp/temp-cert.pem \
+    -days 365 -nodes \
+    -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=localhost"
 
-# Switch back to haproxy user
-USER haproxy
+# Combine certificate and key for HAProxy
+RUN cat /tmp/temp-cert.pem /tmp/temp-key.pem > /tmp/haproxy.pem
 
-# Use our custom entrypoint
-ENTRYPOINT ["/usr/local/bin/entrypoint.sh"] 
+FROM haproxy:alpine
+
+COPY --from=cert-builder /tmp/haproxy.pem /usr/local/etc/haproxy/certs/haproxy.pem
