@@ -41,7 +41,7 @@ jobs:
         host: ${{ secrets.HOST_IP }}
         username: ${{ secrets.SSH_USER }}
         key: ${{ secrets.DROPLET_SSH_KEY }}
-        envs: REPO_DIR_PATH,DOMAIN
+        envs: REPO_DIR_PATH
         script: |
           cd "$REPO_DIR_PATH"
           docker-compose -f docker-compose.envsubst.yaml down
@@ -64,3 +64,4 @@ jobs:
           fi
         done
         echo "Server is up and responding."
+        
