@@ -1,5 +1,3 @@
-version: '3'
-
 services:
   server:
     build:
@@ -13,32 +11,21 @@ services:
       - mongodb
     restart: on-failure
 
-  haproxy:
+  nginx:
     build:
-      context: haproxy
+      context: nginx
       dockerfile: Dockerfile
     ports:
       - "80:80"
       - "443:443"
     env_file:
-      - haproxy/.env
+      - nginx/.env
     volumes:
-      - ./haproxy/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
-      - ./certs:/usr/local/etc/haproxy/certs
+      - ./letsencrypt:/etc/letsencrypt
+      - ./certbot-webroot:/var/www/certbot
     depends_on:
       - server
     restart: on-failure
-
-  certbot:
-    build:
-      context: certbot
-      dockerfile: Dockerfile
-    volumes:
-      - ./letsencrypt:/etc/letsencrypt
-      - ./certs:/certs
-    env_file:
-      - certbot/.env
-    restart: unless-stopped
 
   mongodb:
     image: mongo:7.0
