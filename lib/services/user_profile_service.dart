@@ -241,7 +241,10 @@ class AuthResponse {
 class UserProfileService {
   static String get _baseUrl {
     final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
-    return 'http://$serverIp:8888/api/v1';
+    // Use HTTPS for production, HTTP for localhost development
+    final protocol = serverIp == 'localhost' ? 'http' : 'https';
+    final port = serverIp == 'localhost' ? ':8888' : '';
+    return '$protocol://$serverIp$port/api/v1';
   }
   
   static String get _apiToken {

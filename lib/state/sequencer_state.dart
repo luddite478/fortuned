@@ -3052,7 +3052,7 @@ Made with Demo Sequencer 🚀
       // Send update to server
       final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
       final apiToken = dotenv.env['API_TOKEN'] ?? '';
-      final url = 'http://$serverIp:8888/api/v1/threads/$threadId';
+      final url = _buildApiUrl('threads/$threadId');
       
       debugPrint('🌐 Updating thread at URL: $url');
       debugPrint('📝 Making thread public: $isPublic');
@@ -3158,7 +3158,7 @@ Made with Demo Sequencer 🚀
       // Send thread creation request
       final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
       final apiToken = dotenv.env['API_TOKEN'] ?? '';
-      final threadsUrl = 'http://$serverIp:8888/api/v1/threads';
+      final threadsUrl = _buildApiUrl('threads');
       
       debugPrint('🌐 Creating thread at URL: $threadsUrl');
       
@@ -3236,7 +3236,7 @@ Made with Demo Sequencer 🚀
       };
       
       // Add checkpoint to the thread
-      final checkpointUrl = 'http://$serverIp:8888/api/v1/threads/$newThreadId/checkpoints';
+      final checkpointUrl = _buildApiUrl('threads/$newThreadId/checkpoints');
       debugPrint('🌐 Adding checkpoint at URL: $checkpointUrl');
       
       final checkpointData = {
@@ -3713,6 +3713,15 @@ Made with Demo Sequencer 🚀
       debugPrint('❌ Error creating project fork: $e');
       return false;
     }
+  }
+
+  /// Helper method to build API URLs with proper protocol and port
+  String _buildApiUrl(String endpoint) {
+    final serverIp = dotenv.env['SERVER_IP'] ?? 'localhost';
+    // Use HTTPS for production, HTTP for localhost development
+    final protocol = serverIp == 'localhost' ? 'http' : 'https';
+    final port = serverIp == 'localhost' ? ':8888' : '';
+    return '$protocol://$serverIp$port/api/v1/$endpoint';
   }
 
   /// Clear all loaded sample slots

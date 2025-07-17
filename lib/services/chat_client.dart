@@ -22,7 +22,10 @@ class ChatClient {
   static String get serverUrl {
     final host = dotenv.env['WEBSOCKET_HOST'] ?? 'localhost';
     final port = dotenv.env['WEBSOCKET_PORT'] ?? '8765';
-    return 'ws://$host:$port';
+    // Use WSS for production, WS for localhost development
+    final protocol = host == 'localhost' ? 'ws' : 'wss';
+    final portSuffix = host == 'localhost' ? ':$port' : (port == '443' ? '' : ':$port');
+    return '$protocol://$host$portSuffix';
   }
   
   static String get authToken => dotenv.env['API_TOKEN'] ?? '';
