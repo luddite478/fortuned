@@ -6,8 +6,8 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "127.0.0.1:8888:8888"  # HTTP API port (only accessible from localhost)
-      - "127.0.0.1:8765:8765"  # WebSocket port (only accessible from localhost)
+      - "8888:8888"
+      - "8765:8765"
     env_file:
       - .env
     environment:
@@ -31,27 +31,34 @@ services:
   certbot:
     image: certbot/certbot
     volumes:
-      - ./certs:/certs
       - ./letsencrypt:/etc/letsencrypt
-    entrypoint: ""
+      - ./certs:/certs
     command: >
       sh -c "
-        if [ ! -f /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem ]; then
-          certbot certonly --standalone --agree-tos --register-unsafely-without-email
-          -d $${DOMAIN} --non-interactive --staging &&
-          cat /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem
-              /etc/letsencrypt/live/$${DOMAIN}/privkey.pem
-              > /certs/haproxy.pem
-        else
-          echo 'Certificate already exists'
-        fi
+        while :; do
+          if [ ! -f /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem ]; then
+            certbot certonly --standalone --agree-tos --no-eff-email --email admin@$${DOMAIN}
+            -d $${DOMAIN} --non-interactive --keep-until-expiring &&
+            cat /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem
+                /etc/letsencrypt/live/$${DOMAIN}/privkey.pem
+                > /certs/haproxy.pem &&
+            echo 'Certificate created successfully'
+          else
+            echo 'Certificate already exists, checking for renewal...'
+            certbot renew --quiet &&
+            cat /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem
+                /etc/letsencrypt/live/$${DOMAIN}/privkey.pem
+                > /certs/haproxy.pem &&
+            echo 'Certificate renewed successfully'
+          fi
+          sleep 12h
+        done
       "
     ports:
-      - "8081:80"  # Required only temporarily for Let's Encrypt challenge
+      - "8080:80"
     environment:
       - DOMAIN=${DOMAIN}
-    profiles:
-      - cert-generation  # This service only runs when explicitly called
+    restart: unless-stopped
 
   mongodb:
     image: mongo:7.0
