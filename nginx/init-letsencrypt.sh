@@ -18,9 +18,59 @@ data_path="/etc/letsencrypt"
 rsa_key_size=4096
 domain_path="$data_path/live/$DOMAIN"
 
+echo "================================================"
+echo "Let's Encrypt SSL Certificate Manager"
+echo "Domain: $DOMAIN"
+echo "Certificate path: $domain_path"
+echo "================================================"
+
+# Function to validate existing certificate
+validate_certificate() {
+    local cert_path="$domain_path/fullchain.pem"
+    local key_path="$domain_path/privkey.pem"
+    
+    echo "Checking for existing certificate..."
+    
+    # Check if certificate files exist
+    if [ ! -f "$cert_path" ] || [ ! -f "$key_path" ]; then
+        echo "❌ Certificate files do not exist"
+        return 1
+    fi
+    
+    echo "✅ Certificate files found"
+    
+    # Check if certificate is valid (not expired and expires in more than 30 days)
+    if ! openssl x509 -in "$cert_path" -checkend 2592000 -noout > /dev/null 2>&1; then
+        echo "❌ Certificate is expired or expires within 30 days"
+        return 1
+    fi
+    
+    echo "✅ Certificate is valid and has more than 30 days remaining"
+    
+    # Check if certificate is for the correct domain
+    if ! openssl x509 -in "$cert_path" -text -noout | grep -q "DNS:$DOMAIN"; then
+        echo "❌ Certificate is not for domain $DOMAIN"
+        return 1
+    fi
+    
+    echo "✅ Certificate is for the correct domain: $DOMAIN"
+    
+    # Check if certificate is issued by Let's Encrypt (not a dummy/self-signed certificate)
+    if openssl x509 -in "$cert_path" -text -noout | grep -q "Issuer:.*Let's Encrypt"; then
+        # Get certificate expiration date for logging
+        local expiry_date=$(openssl x509 -in "$cert_path" -noout -enddate | cut -d= -f2)
+        echo "✅ Valid Let's Encrypt certificate found"
+        echo "   Expires: $expiry_date"
+        return 0
+    else
+        echo "❌ Certificate exists but is not issued by Let's Encrypt (likely dummy certificate)"
+        return 1
+    fi
+}
+
 # Function to create dummy certificate
 create_dummy_certificate() {
-    echo "Creating dummy certificate for $DOMAIN..."
+    echo "Creating temporary dummy certificate for $DOMAIN..."
     
     mkdir -p "$domain_path"
     
@@ -29,14 +79,14 @@ create_dummy_certificate() {
         -out "$domain_path/fullchain.pem" -days 365 -nodes \
         -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=$DOMAIN"
     
-    echo "Dummy certificate created for $DOMAIN"
+    echo "✅ Temporary dummy certificate created (will be replaced with real certificate)"
 }
 
 # Function to delete dummy certificate
 delete_dummy_certificate() {
-    echo "Deleting dummy certificate for $DOMAIN..."
+    echo "Removing temporary dummy certificate..."
     rm -rf "$domain_path"
-    echo "Dummy certificate deleted for $DOMAIN"
+    echo "✅ Temporary dummy certificate removed"
 }
 
 # Function to start nginx
@@ -53,14 +103,14 @@ start_nginx() {
     nginx -g "daemon off;" &
     nginx_pid=$!
     
-    echo "Nginx started with PID $nginx_pid"
+    echo "✅ Nginx started with PID $nginx_pid"
 }
 
 # Function to reload nginx
 reload_nginx() {
-    echo "Reloading nginx..."
+    echo "Reloading nginx configuration..."
     nginx -s reload
-    echo "Nginx reloaded"
+    echo "✅ Nginx configuration reloaded"
 }
 
 # Function to request certificate
@@ -75,30 +125,50 @@ request_certificate() {
         --email "$EMAIL" --agree-tos --no-eff-email \
         --force-renewal -d "$DOMAIN"
     
-    echo "Certificate obtained for $DOMAIN"
+    echo "✅ Real Let's Encrypt certificate obtained for $DOMAIN"
 }
 
 # Main logic
-echo "Starting Let's Encrypt initialization for $DOMAIN..."
+echo "Starting certificate validation process..."
 
-# Check if certificate already exists
-if [ -f "$domain_path/fullchain.pem" ] && [ -f "$domain_path/privkey.pem" ]; then
-    echo "Certificate already exists for $DOMAIN"
+# Check if we have a valid certificate (this handles container restarts)
+if validate_certificate; then
+    echo ""
+    echo "🎉 CONTAINER RESTART DETECTED: Using existing valid certificate"
+    echo "   No new certificate needed - skipping certificate request"
+    echo ""
+    needs_new_cert=false
 else
-    echo "No certificate found for $DOMAIN"
+    echo ""
+    echo "🔄 NEW SETUP OR INVALID CERTIFICATE: Will obtain new certificate"
+    echo ""
+    needs_new_cert=true
+    # Create dummy certificate for nginx to start
     create_dummy_certificate
 fi
 
-# Start nginx
+# Start nginx (works with either existing cert or dummy cert)
 start_nginx
 
-# If using dummy certificate, request real certificate
-if openssl x509 -in "$domain_path/fullchain.pem" -text -noout | grep -q "CN=$DOMAIN"; then
-    # This is likely our dummy certificate, request real one
-    sleep 5  # Give nginx time to start
+# If we need a new certificate, request it
+if [ "$needs_new_cert" = true ]; then
+    echo "Waiting for nginx to fully start..."
+    sleep 5
+    echo "Requesting new certificate from Let's Encrypt..."
     request_certificate
     reload_nginx
+    echo ""
+    echo "🎉 NEW CERTIFICATE SETUP COMPLETE"
+else
+    echo ""
+    echo "🎉 USING EXISTING CERTIFICATE - READY TO SERVE TRAFFIC"
 fi
+
+echo ""
+echo "================================================"
+echo "SSL Certificate status: READY"
+echo "Nginx is running and serving HTTPS traffic"
+echo "================================================"
 
 # Keep the script running
 wait $nginx_pid 
