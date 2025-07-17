@@ -33,40 +33,41 @@ services:
     volumes:
       - ./letsencrypt:/etc/letsencrypt
       - ./certs:/certs
-    command: >
-      sh -c "
+    environment:
+      DOMAIN: ${DOMAIN}
+    entrypoint: /bin/sh
+    command: 
+      - -c
+      - |
         while :; do
-          if [ ! -f /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem ]; then
-            certbot certonly --standalone --agree-tos --no-eff-email --email admin@$${DOMAIN}
-            -d $${DOMAIN} --non-interactive --keep-until-expiring &&
-            cat /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem
-                /etc/letsencrypt/live/$${DOMAIN}/privkey.pem
-                > /certs/haproxy.pem &&
-            echo 'Certificate created successfully'
+          if [ ! -f /etc/letsencrypt/live/$$DOMAIN/fullchain.pem ]; then
+            echo "Generating certificate for $$DOMAIN..."
+            certbot certonly --standalone --agree-tos --no-eff-email --email admin@$$DOMAIN -d $$DOMAIN --non-interactive --keep-until-expiring
+            if [ $$? -eq 0 ]; then
+              cat /etc/letsencrypt/live/$$DOMAIN/fullchain.pem /etc/letsencrypt/live/$$DOMAIN/privkey.pem > /certs/haproxy.pem
+              echo "Certificate created successfully"
+            fi
           else
-            echo 'Certificate already exists, checking for renewal...'
-            certbot renew --quiet &&
-            cat /etc/letsencrypt/live/$${DOMAIN}/fullchain.pem
-                /etc/letsencrypt/live/$${DOMAIN}/privkey.pem
-                > /certs/haproxy.pem &&
-            echo 'Certificate renewed successfully'
+            echo "Certificate already exists, checking for renewal..."
+            certbot renew --quiet
+            if [ $$? -eq 0 ]; then
+              cat /etc/letsencrypt/live/$$DOMAIN/fullchain.pem /etc/letsencrypt/live/$$DOMAIN/privkey.pem > /certs/haproxy.pem
+              echo "Certificate renewed successfully"
+            fi
           fi
           sleep 12h
         done
-      "
     ports:
       - "8080:80"
-    environment:
-      - DOMAIN=${DOMAIN}
     restart: unless-stopped
 
   mongodb:
     image: mongo:7.0
     container_name: mongodb
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: test
-      MONGO_INITDB_DATABASE: admin
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE}
     ports:
       - ${TAILSCALE_IP}:27017:27017
     volumes:
