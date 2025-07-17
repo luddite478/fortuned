@@ -5,9 +5,6 @@ services:
     build:
       context: server
       dockerfile: Dockerfile
-    # ports:
-    #   - "8888:8888"
-    #   - "8765:8765"
     env_file:
       - server/.env
     environment:
@@ -79,3 +76,4 @@ volumes:
     driver: local
   mongodb_config:
     driver: local 
+    
