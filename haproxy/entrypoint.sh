@@ -1,5 +1,6 @@
 #!/bin/sh
 
+# Generate temporary self-signed certificate until letsencrypt is ready
 # Create certs directory if it doesn't exist
 mkdir -p /usr/local/etc/haproxy/certs
 
