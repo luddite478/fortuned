@@ -17,15 +17,39 @@ final free = stdlib.lookupFunction<
     Void Function(Pointer<Void>),
     void Function(Pointer<Void>)>('free');
 
+// Manual FFI types for performance test function
+typedef SetPerfTestModeNative = Void Function(Int32 mode);
+typedef SetPerfTestModeDart = void Function(int mode);
+
 class SequencerLibrary {
   static SequencerLibrary? _instance;
   late final DynamicLibrary _dylib;
   late final SequencerBindings _bindings;
   bool _isInitialized = false;
+  
+  // Manual FFI function for performance testing
+  late final SetPerfTestModeDart _setPerfTestMode;
 
   SequencerLibrary._() {
     _dylib = _loadLibrary();
     _bindings = SequencerBindings(_dylib);
+    
+    // Initialize manual FFI function after main library is ready (completely safe)
+    _initializePerformanceTestFunction();
+  }
+  
+  void _initializePerformanceTestFunction() {
+    // This initialization is completely optional and should never affect main functionality
+    try {
+      final setPerfTestModePtr = _dylib.lookup<NativeFunction<SetPerfTestModeNative>>('set_perf_test_mode');
+      _setPerfTestMode = setPerfTestModePtr.asFunction<SetPerfTestModeDart>();
+      print('✅ Performance test function loaded successfully');
+    } catch (e) {
+      // Completely silent fallback - don't even log this as it's expected on some platforms
+      _setPerfTestMode = (int mode) {
+        // Silent mock - no logging to avoid spam
+      };
+    }
   }
 
   static SequencerLibrary get instance {
@@ -497,5 +521,51 @@ class SequencerLibrary {
   /// Get pitch for a specific cell
   double getCellPitch(int step, int column) {
     return _bindings.get_cell_pitch(step, column);
+  }
+  
+  /// Reset cell pitch to use sample bank default
+  bool resetCellPitch(int step, int column) {
+    int result = _bindings.reset_cell_pitch(step, column);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🎵 Cell [$step,$column] pitch reset to sample bank default');
+    } else {
+      print('❌ Failed to reset cell [$step,$column] pitch');
+    }
+    
+    return success;
+  }
+  
+  /// Reset cell volume to use sample bank default
+  bool resetCellVolume(int step, int column) {
+    int result = _bindings.reset_cell_volume(step, column);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🔊 Cell [$step,$column] volume reset to sample bank default');
+    } else {
+      print('❌ Failed to reset cell [$step,$column] volume');
+    }
+    
+    return success;
+  }
+
+  // -------------- PERFORMANCE TEST FUNCTIONS --------------
+  
+  /// Set performance test mode for diagnostics
+  /// 0 = Normal mode (all operations enabled)
+  /// 1 = Skip SoundTouch processing
+  /// 2 = Skip cell monitoring
+  /// 3 = Skip volume smoothing
+  /// 4 = Silence all nodes (test mixing overhead)
+  /// 5 = Skip mixing entirely (test callback overhead)
+  void setPerformanceTestMode(int mode) {
+    try {
+      _setPerfTestMode(mode);
+      print('🧪 Performance test mode set to: $mode');
+    } catch (e) {
+      print('❌ Error setting performance test mode: $e');
+    }
   }
 } 

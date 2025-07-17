@@ -1,6 +1,16 @@
+param(
+    [string]$deviceType = "simulator"  # Default to simulator if not provided
+)
+
 # Step 0: Set JAVA_HOME and update PATH
 $env:JAVA_HOME = "C:\Program Files\Java\jdk-17"
 $env:Path = "$env:JAVA_HOME\bin;$env:Path"
+
+# Set adb device selector based on argument
+$adbDeviceSelector = ""
+if ($deviceType -eq "physical") {
+    $adbDeviceSelector = "-s ec23c4f7"
+}
 
 Import-Module powershell-yaml
 
@@ -81,11 +91,27 @@ Set-Location ..
 # adb uninstall com.example.niyya
 
 $apkPath = "android\app\build\outputs\apk\debug\app-debug.apk"
+# Set adb argument arrays based on device type
+$adbArgs = @()
+if ($deviceType -eq "physical") {
+    $adbArgs += "-s"
+    $adbArgs += "ec23c4f7"
+}
+if ($deviceType -eq "simulator") {
+    $emulatorId = (& adb devices | Select-String "^emulator-[0-9]+").ToString().Split("`t")[0]
+    if ($emulatorId) {
+        $adbArgs += "-s"
+        $adbArgs += $emulatorId
+    }
+}
+$adbArgsInstall = $adbArgs + @("install", "-r", $apkPath)
+$adbArgsLogcat = $adbArgs + @("logcat", "-s", "flutter")
+
 if (Test-Path $apkPath) {
     Write-Output "Installing APK via ADB..."
-    & adb install -r $apkPath
+    & adb @adbArgsInstall
 } else {
     Write-Error "APK not found at: $apkPath"
 }
 
-adb logcat -s flutter
+& adb @adbArgsLogcat

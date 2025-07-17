@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
 import '../screens/checkpoints_screen.dart';
+import '../screens/sequencer_settings_screen.dart';
 
 // Telephone book color scheme - same as other screens
 class PhoneBookColors {
@@ -176,142 +177,121 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
   }
 
   List<Widget> _buildSequencerActions(BuildContext context) {
+    // 🎛️ MASTER SPACING CONTROL: Adjust this one variable (0.5% to 3.0% of screen width)
+    final double spacingPercentage = 0; // ← Change this to control all spacing
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final spacingWidth = screenWidth * (spacingPercentage / 100);
+    
     return [
+      // Settings gear button - access to all other functions
+      IconButton(
+        icon: Icon(
+          Icons.settings,
+          color: SequencerPhoneBookColors.accent,
+        ),
+        onPressed: () => _navigateToSequencerSettings(context),
+        iconSize: 14,
+        padding: const EdgeInsets.all(2),
+        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+      ),
+      
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
       // Checkpoints menu button
       Consumer2<SequencerState, ThreadsState>(
         builder: (context, sequencer, threadsState, child) {
-          // Always show in sequencer mode - if no thread exists, we'll handle it in navigation
           return IconButton(
             icon: Icon(
-              Icons.format_list_bulleted, // 3 horizontal lines with dots
+              Icons.format_list_bulleted,
               color: SequencerPhoneBookColors.accent,
             ),
             onPressed: () => _navigateToCheckpoints(context, sequencer, threadsState),
-            iconSize: 18,
-            padding: const EdgeInsets.all(4),
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            iconSize: 14,
+            padding: const EdgeInsets.all(2),
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           );
         },
       ),
       
-
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
       
-      // Save/Send button (always visible, context-aware icon)
+      // Save/Send button
       Consumer2<SequencerState, ThreadsState>(
         builder: (context, sequencer, threadsState, child) {
-          // Check thread context for Save vs Send
-          final activeThread = threadsState.activeThread;
-          final sourceThread = sequencer.sourceThread;
-          
-          // Show SEND icon when:
-          // 1. There's a sourceThread (working on someone else's project)
-          // 2. There's an active thread with more than 1 user (collaborative thread)
-          bool showSendIcon = false;
-          
-          if (sourceThread != null) {
-            // Case 1: Working on a sourced project - always show SEND
-            showSendIcon = true;
-          } else if (activeThread != null && activeThread.users.length > 1) {
-            // Case 2: Collaborative thread - show SEND
-            showSendIcon = true;
-          }
-          
-          // Show SAVE icon for:
-          // - No active thread (new/unpublished project)
-          // - Unpublished solo thread (only current user, not public)
-          
           return IconButton(
             icon: Icon(
-              showSendIcon ? Icons.send : Icons.save,
+              Icons.save,
               color: SequencerPhoneBookColors.accent,
             ),
             onPressed: () => _sendCheckpoint(context, sequencer, threadsState),
-            iconSize: 18,
-            padding: const EdgeInsets.all(4),
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+            iconSize: 14,
+            padding: const EdgeInsets.all(2),
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           );
         },
       ),
       
-      // Share button (only recordings menu)
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // Share button
       Consumer<SequencerState>(
         builder: (context, sequencer, child) {
-          return TextButton(
+          return IconButton(
+            icon: Icon(
+              Icons.share,
+              color: SequencerPhoneBookColors.accent,
+            ),
             onPressed: () => sequencer.setShowShareWidget(!sequencer.isShowingShareWidget),
-            child: Text(
-              'Share',
-              style: GoogleFonts.sourceSans3(
-                color: sequencer.isShowingShareWidget 
-                    ? SequencerPhoneBookColors.accent 
-                    : SequencerPhoneBookColors.lightText,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                letterSpacing: 0.3,
-              ),
-            ),
+            iconSize: 14,
+            padding: const EdgeInsets.all(2),
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           );
         },
       ),
       
-      // Master settings button
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // Mix (Master Settings) button
       Consumer<SequencerState>(
         builder: (context, sequencer, child) {
-          return TextButton(
-            onPressed: () => sequencer.setShowMasterSettings(!sequencer.showMasterSettings),
-            child: Text(
-              'M',
-              style: GoogleFonts.sourceSans3(
-                color: sequencer.showMasterSettings 
-                    ? SequencerPhoneBookColors.accent 
-                    : SequencerPhoneBookColors.lightText,
-                fontWeight: FontWeight.w600,
-                fontSize: 12,
-                letterSpacing: 0.3,
-              ),
+          return IconButton(
+            icon: Icon(
+              Icons.tune,
+              color: SequencerPhoneBookColors.accent,
             ),
+            onPressed: () => sequencer.setShowMasterSettings(!sequencer.showMasterSettings),
+            iconSize: 14,
+            padding: const EdgeInsets.all(2),
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
           );
         },
       ),
       
-      // Combined recording + sequencer controls in one Consumer
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // Recording controls - core functionality
       Consumer<SequencerState>(
         builder: (context, sequencer, child) {
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Recording control - compact version
+              // Recording status dot when recording
               if (sequencer.isRecording) ...[
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                  width: 8,
+                  height: 8,
                   decoration: BoxDecoration(
-                    color: SequencerPhoneBookColors.accent.withOpacity(0.3),
-                    borderRadius: BorderRadius.circular(2), // Sharp corners
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 4,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: SequencerPhoneBookColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Text(
-                        sequencer.formattedRecordingDuration,
-                        style: GoogleFonts.sourceSans3(
-                          color: SequencerPhoneBookColors.accent,
-                          fontSize: 8,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                    ],
+                    color: SequencerPhoneBookColors.accent,
+                    shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 1),
+                SizedBox(width: spacingWidth * 0.3), // Smaller spacing within controls
               ],
               
               // Recording button
@@ -328,11 +308,14 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                   }
                 },
                 iconSize: 16,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
               
-              // Play/Stop button (changed from Play/Pause)
+              // Smaller spacing between recording controls
+              SizedBox(width: spacingWidth * 0.3),
+              
+              // Play/Stop button
               IconButton(
                 icon: Icon(
                   sequencer.isSequencerPlaying ? Icons.stop : Icons.play_arrow,
@@ -346,23 +329,13 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                   }
                 },
                 iconSize: 16,
-                padding: const EdgeInsets.all(4),
-                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: const EdgeInsets.all(2),
+                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
             ],
           );
         },
       ),
-      
-      // Save checkpoint - only show when callback provided
-      if (onSave != null)
-        IconButton(
-          icon: Icon(Icons.save, color: SequencerPhoneBookColors.accent),
-          onPressed: onSave,
-          iconSize: 16,
-          padding: const EdgeInsets.all(4),
-          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-        ),
     ];
   }
 
@@ -407,6 +380,15 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
         ),
       );
     }
+  }
+
+  void _navigateToSequencerSettings(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SequencerSettingsScreen(),
+      ),
+    );
   }
 
   void _sendCheckpoint(BuildContext context, SequencerState sequencer, ThreadsState threadsState) async {

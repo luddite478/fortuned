@@ -34,7 +34,8 @@
 		5571F8E32DF7772F0025EF91 /* vbrquantize.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D02DF7770F0025EF91 /* vbrquantize.c */; };
 		5571F8E42DF777300025EF91 /* VbrTag.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D12DF777100025EF91 /* VbrTag.c */; };
 		5571F8E52DF777310025EF91 /* version.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D22DF777110025EF91 /* version.c */; };
-		5571F8E62DF777320025EF91 /* gain_analysis.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8D32DF777120025EF91 /* gain_analysis.c */; };
+		5571F8E62DF777320025EF91 /* gain_analysis.c in Sources */ = {isa = PBXBuildFile;
+ fileRef = 5571F8D32DF777120025EF91 /* gain_analysis.c */; };
 		74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74858FAE1ED2DC5600515810 /* AppDelegate.swift */; };
 		97C146FC1CF9000F007C117D /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FA1CF9000F007C117D /* Main.storyboard */; };
 		97C146FE1CF9000F007C117D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 97C146FD1CF9000F007C117D /* Assets.xcassets */; };
@@ -103,6 +104,32 @@
 		5571F8D12DF777100025EF91 /* VbrTag.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = VbrTag.c; path = ../native/lame_ios/VbrTag.c; sourceTree = "<group>"; };
 		5571F8D22DF777110025EF91 /* version.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = version.c; path = ../native/lame_ios/version.c; sourceTree = "<group>"; };
 		5571F8D32DF777120025EF91 /* gain_analysis.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = gain_analysis.c; path = ../native/lame_ios/gain_analysis.c; sourceTree = "<group>"; };
+		ED50771697404BA7AC634852 /* SoundTouch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = SoundTouch.cpp; path = ../native/soundtouch/SoundTouch.cpp; sourceTree = "<group>"; };
+		A224D142035348FC8041CE27 /* SoundTouch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = SoundTouch.h; path = ../native/soundtouch/SoundTouch.h; sourceTree = "<group>"; };
+		AEA63C1CAF2F4471A4289C2F /* STTypes.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = STTypes.h; path = ../native/soundtouch/STTypes.h; sourceTree = "<group>"; };
+		7AB19ACD7B944B9D8FA186FB /* soundtouch_config.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = soundtouch_config.h; path = ../native/soundtouch/soundtouch_config.h; sourceTree = "<group>"; };
+		AA3AF4A3912A4ABDAD9E838A /* TDStretch.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = TDStretch.cpp; path = ../native/soundtouch/TDStretch.cpp; sourceTree = "<group>"; };
+		DD3EFFA71AE240FEACDB0D2F /* TDStretch.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = TDStretch.h; path = ../native/soundtouch/TDStretch.h; sourceTree = "<group>"; };
+		3C4F1830049B42E0AFD95848 /* RateTransposer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = RateTransposer.cpp; path = ../native/soundtouch/RateTransposer.cpp; sourceTree = "<group>"; };
+		947DB2DC836E4687AF7F9EBB /* RateTransposer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = RateTransposer.h; path = ../native/soundtouch/RateTransposer.h; sourceTree = "<group>"; };
+		F2A7EF79040044F2A2CAB030 /* InterpolateLinear.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = InterpolateLinear.cpp; path = ../native/soundtouch/InterpolateLinear.cpp; sourceTree = "<group>"; };
+		8FAC6091AC51448E9E69E324 /* InterpolateLinear.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = InterpolateLinear.h; path = ../native/soundtouch/InterpolateLinear.h; sourceTree = "<group>"; };
+		6100C7612C034A51B4EF35D5 /* InterpolateCubic.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = InterpolateCubic.cpp; path = ../native/soundtouch/InterpolateCubic.cpp; sourceTree = "<group>"; };
+		BB08394B15D645068018EF1E /* InterpolateCubic.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = InterpolateCubic.h; path = ../native/soundtouch/InterpolateCubic.h; sourceTree = "<group>"; };
+		49324DCB3E834AE8B7C08767 /* InterpolateShannon.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = InterpolateShannon.cpp; path = ../native/soundtouch/InterpolateShannon.cpp; sourceTree = "<group>"; };
+		A9942E929D0942EC8E7D76AF /* InterpolateShannon.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = InterpolateShannon.h; path = ../native/soundtouch/InterpolateShannon.h; sourceTree = "<group>"; };
+		D5AB5CA5AB3F43E0BAC124D5 /* FIRFilter.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = FIRFilter.cpp; path = ../native/soundtouch/FIRFilter.cpp; sourceTree = "<group>"; };
+		B3BC2528E9FF4CCA99C6025B /* FIRFilter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FIRFilter.h; path = ../native/soundtouch/FIRFilter.h; sourceTree = "<group>"; };
+		35847BE15FCA42C5A76FA2CF /* AAFilter.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = AAFilter.cpp; path = ../native/soundtouch/AAFilter.cpp; sourceTree = "<group>"; };
+		EE6540D7503E4217848FE8F9 /* AAFilter.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = AAFilter.h; path = ../native/soundtouch/AAFilter.h; sourceTree = "<group>"; };
+		782A46936B534678A89417F0 /* FIFOSampleBuffer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = FIFOSampleBuffer.cpp; path = ../native/soundtouch/FIFOSampleBuffer.cpp; sourceTree = "<group>"; };
+		10561410D4B14A368E1A00DD /* FIFOSampleBuffer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FIFOSampleBuffer.h; path = ../native/soundtouch/FIFOSampleBuffer.h; sourceTree = "<group>"; };
+		20A3ED9871664DB181FDB477 /* FIFOSamplePipe.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = FIFOSamplePipe.h; path = ../native/soundtouch/FIFOSamplePipe.h; sourceTree = "<group>"; };
+		3555A7DCA0E24B44AC4B5D8A /* PeakFinder.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = PeakFinder.cpp; path = ../native/soundtouch/PeakFinder.cpp; sourceTree = "<group>"; };
+		D2BAE377A02F416390C01826 /* PeakFinder.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = PeakFinder.h; path = ../native/soundtouch/PeakFinder.h; sourceTree = "<group>"; };
+		DD419E9814714B40BE47A23E /* BPMDetect.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = BPMDetect.cpp; path = ../native/soundtouch/BPMDetect.cpp; sourceTree = "<group>"; };
+		C789BE9BABEA4EB3B9E974CE /* BPMDetect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = BPMDetect.h; path = ../native/soundtouch/BPMDetect.h; sourceTree = "<group>"; };
+		99AD0DE492574B8CA254485B /* cpu_detect.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = cpu_detect.h; path = ../native/soundtouch/cpu_detect.h; sourceTree = "<group>"; };
 		73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_Runner.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		74858FAD1ED2DC5600515810 /* Runner-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Runner-Bridging-Header.h"; sourceTree = "<group>"; };
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -480,6 +507,8 @@
 				5571F8E42DF777300025EF91 /* VbrTag.c in Sources */,
 				5571F8E52DF777310025EF91 /* version.c in Sources */,
 				5571F8E62DF777320025EF91 /* gain_analysis.c in Sources */,
+
+
 				74858FAF1ED2DC5600515810 /* AppDelegate.swift in Sources */,
 				1498D2341E8E89220040F4C2 /* GeneratedPluginRegistrant.m in Sources */,
 			);

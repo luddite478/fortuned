@@ -441,6 +441,22 @@ class SequencerBindings {
   late final _set_cell_volume =
       _set_cell_volumePtr.asFunction<int Function(int, int, double)>();
 
+  int reset_cell_volume(
+    int step,
+    int column,
+  ) {
+    return _reset_cell_volume(
+      step,
+      column,
+    );
+  }
+
+  late final _reset_cell_volumePtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
+          'reset_cell_volume');
+  late final _reset_cell_volume =
+      _reset_cell_volumePtr.asFunction<int Function(int, int)>();
+
   double get_cell_volume(
     int step,
     int column,
@@ -506,6 +522,22 @@ class SequencerBindings {
   late final _set_cell_pitch =
       _set_cell_pitchPtr.asFunction<int Function(int, int, double)>();
 
+  int reset_cell_pitch(
+    int step,
+    int column,
+  ) {
+    return _reset_cell_pitch(
+      step,
+      column,
+    );
+  }
+
+  late final _reset_cell_pitchPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
+          'reset_cell_pitch');
+  late final _reset_cell_pitch =
+      _reset_cell_pitchPtr.asFunction<int Function(int, int)>();
+
   double get_cell_pitch(
     int step,
     int column,
@@ -562,6 +594,27 @@ class SequencerBindings {
           'get_recording_duration');
   late final _get_recording_duration =
       _get_recording_durationPtr.asFunction<int Function()>();
+
+  /// Diagnostic functions for performance monitoring
+  int get_active_cell_node_count() {
+    return _get_active_cell_node_count();
+  }
+
+  late final _get_active_cell_node_countPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'get_active_cell_node_count');
+  late final _get_active_cell_node_count =
+      _get_active_cell_node_countPtr.asFunction<int Function()>();
+
+  int get_max_cell_node_count() {
+    return _get_max_cell_node_count();
+  }
+
+  late final _get_max_cell_node_countPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>(
+          'get_max_cell_node_count');
+  late final _get_max_cell_node_count =
+      _get_max_cell_node_countPtr.asFunction<int Function()>();
 }
 
 /// mbstate_t is an opaque object to keep conversion state, during multibyte

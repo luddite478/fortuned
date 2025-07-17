@@ -121,6 +121,8 @@ float get_sample_bank_volume(int bank);
 __attribute__((visibility("default"))) __attribute__((used))
 int set_cell_volume(int step, int column, float volume);
 __attribute__((visibility("default"))) __attribute__((used))
+int reset_cell_volume(int step, int column);
+__attribute__((visibility("default"))) __attribute__((used))
 float get_cell_volume(int step, int column);
 
 // Pitch control functions
@@ -130,6 +132,8 @@ __attribute__((visibility("default"))) __attribute__((used))
 float get_sample_bank_pitch(int bank);
 __attribute__((visibility("default"))) __attribute__((used))
 int set_cell_pitch(int step, int column, float pitch);
+__attribute__((visibility("default"))) __attribute__((used))
+int reset_cell_pitch(int step, int column);
 __attribute__((visibility("default"))) __attribute__((used))
 float get_cell_pitch(int step, int column);
 
@@ -142,6 +146,16 @@ __attribute__((visibility("default"))) __attribute__((used))
 int is_recording(void);
 __attribute__((visibility("default"))) __attribute__((used))
 uint64_t get_recording_duration(void);
+
+// Diagnostic functions for performance monitoring
+__attribute__((visibility("default"))) __attribute__((used))
+int get_active_cell_node_count(void);
+__attribute__((visibility("default"))) __attribute__((used))
+int get_max_cell_node_count(void);
+
+// Performance testing mode for diagnosing bottlenecks
+__attribute__((visibility("default"))) __attribute__((used))
+void set_perf_test_mode(int mode);
 
 #ifdef __cplusplus
 }

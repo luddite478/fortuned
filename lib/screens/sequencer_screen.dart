@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../widgets/sequencer/top_multitask_panel_widget.dart';
-import '../widgets/sequencer/sample_banks_widget.dart'; // Legacy - commented out
+import '../widgets/sequencer/sample_banks_widget.dart';
 import '../widgets/sequencer/sound_grid_widget.dart';
 import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../widgets/app_header_widget.dart';
@@ -150,23 +148,86 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
         onBack: () => Navigator.of(context).pop(),
         chatClient: _chatClient,
       ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            // const Spacer(flex: 1),
-            Expanded(flex: 60, child: const SampleGridWidget()),
-            Expanded(flex: 8, child: const EditButtonsWidget()),
-
-            // const Spacer(flex: 1),
-            Expanded(flex: 7, child: const SampleBanksWidget()),
-
-            // const Spacer(flex: 1),
-            Expanded(flex: 18, child: const MultitaskPanelWidget())
-
-            // const Spacer(flex: 3)
-          ],
-        ),
+      body: const SafeArea(
+        child: SequencerBody(),
       ),
+    );
+  }
+}
+
+// 🎯 PERFORMANCE: Sequencer body with selective rebuilding
+class SequencerBody extends StatelessWidget {
+  const SequencerBody({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // 🎯 PERFORMANCE: Sample grid with cell-level step highlighting
+        Expanded(
+          flex: 60,
+          child: RepaintBoundary(
+            child: Selector<SequencerState, ({List<int?> currentGridSamples, Set<int> selectedCells})>(
+              selector: (context, state) => (
+                currentGridSamples: state.currentGridSamplesForSelector,
+                selectedCells: state.selectedGridCellsForSelector,
+                // Note: currentStep tracking moved to individual cells via ValueListenableBuilder
+              ),
+              builder: (context, data, child) {
+                return const SampleGridWidget();
+              },
+            ),
+          ),
+        ),
+
+        // 🎯 PERFORMANCE: Edit buttons only rebuild when selection or mode changes
+        Expanded(
+          flex: 8,
+          child: RepaintBoundary(
+            child: Selector<SequencerState, ({Set<int> selectedCells, bool isStepInsertMode, bool canUndo, bool canRedo})>(
+              selector: (context, state) => (
+                selectedCells: state.selectedGridCellsForSelector,
+                isStepInsertMode: state.isStepInsertMode,
+                canUndo: state.canUndo,
+                canRedo: state.canRedo,
+              ),
+              builder: (context, data, child) {
+                return const EditButtonsWidget();
+              },
+            ),
+          ),
+        ),
+
+        // 🎯 PERFORMANCE: Sample banks only rebuild when file names or loading state changes
+        Expanded(
+          flex: 7,
+          child: RepaintBoundary(
+            child: Selector<SequencerState, ({List<String?> fileNames, List<bool> slotLoaded, int activeBank})>(
+              selector: (context, state) => (
+                fileNames: state.fileNamesForSelector,
+                slotLoaded: state.slotLoadedForSelector, 
+                activeBank: state.activeBank,
+              ),
+              builder: (context, data, child) {
+                return const SampleBanksWidget();
+              },
+            ),
+          ),
+        ),
+
+        // 🎯 PERFORMANCE: Multitask panel only rebuilds when panel mode changes
+        Expanded(
+          flex: 18,
+          child: RepaintBoundary(
+            child: Selector<SequencerState, MultitaskPanelMode>(
+              selector: (context, state) => state.currentPanelModeForSelector,
+                          builder: (context, panelMode, child) {
+              return const MultitaskPanelWidget();
+            },
+            ),
+          ),
+        ),
+      ],
     );
   }
 } 

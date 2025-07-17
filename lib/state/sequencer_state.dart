@@ -175,12 +175,37 @@ class SampleSlot {
   bool get hasFile => filePath != null;
 }
 
+// 🎯 PERFORMANCE: Add change type enum for smart notifications
+enum SequencerChangeType {
+  volume,
+  pitch,
+  grid,
+  sampleBank,
+  playback,
+  ui,
+  selection,
+  all,
+}
+
 // Sequencer state management - Complete sequencer functionality
 class SequencerState extends ChangeNotifier {
   static const int maxSlots = 16;
   
   late final SequencerLibrary _sequencerLibrary;
   late final int _slotCount;
+
+  // 🎯 PERFORMANCE: ValueNotifiers for high-frequency updates
+  final Map<int, ValueNotifier<double>> _sampleVolumeNotifiers = {};
+  final Map<int, ValueNotifier<double>> _samplePitchNotifiers = {};
+  final Map<int, ValueNotifier<double>> _cellVolumeNotifiers = {};
+  final Map<int, ValueNotifier<double>> _cellPitchNotifiers = {};
+  final ValueNotifier<int> _currentStepNotifier = ValueNotifier(-1);
+  final ValueNotifier<bool> _isSequencerPlayingNotifier = ValueNotifier(false);
+  
+  // 🎯 PERFORMANCE: Batched notification system
+  Timer? _notificationBatchTimer;
+  Set<SequencerChangeType> _pendingChanges = {};
+  static const Duration _batchDelay = Duration(milliseconds: 16); // ~60fps
 
   // Audio state
   late List<String?> _filePaths;
@@ -282,7 +307,7 @@ class SequencerState extends ChangeNotifier {
   
   // Volume control state
   late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
-  late List<double> _cellVolumes; // Individual cell volumes
+  late Map<int, double> _cellVolumes; // Individual cell volume overrides
   late List<double> _samplePitches; // Global sample pitches (affects all instances)
   late Map<int, double> _cellPitches; // Individual cell pitch overrides
 
@@ -373,7 +398,7 @@ class SequencerState extends ChangeNotifier {
       'slotLoaded': List<bool>.from(_slotLoaded),
       'sampleVolumes': List<double>.from(_sampleVolumes),
       'samplePitches': List<double>.from(_samplePitches),
-      'cellVolumes': List<double>.from(_cellVolumes),
+      'cellVolumes': Map<int, double>.from(_cellVolumes),
       'cellPitches': Map<int, double>.from(_cellPitches),
       'soundGridLabels': List<String>.from(_soundGridLabels),
       'soundGridOrder': List<int>.from(_soundGridOrder),
@@ -411,7 +436,7 @@ class SequencerState extends ChangeNotifier {
       _samplePitches = (state['samplePitches'] as List<dynamic>).cast<double>();
     }
     if (state.containsKey('cellVolumes')) {
-      _cellVolumes = (state['cellVolumes'] as List<dynamic>).cast<double>();
+      _cellVolumes = Map<int, double>.from(state['cellVolumes'] as Map);
     }
     if (state.containsKey('cellPitches')) {
       _cellPitches = Map<int, double>.from(state['cellPitches'] as Map);
@@ -538,6 +563,67 @@ class SequencerState extends ChangeNotifier {
   UndoRedoActionType? _pendingUndoType;
   static const Duration _undoDebounceDelay = Duration(milliseconds: 800); // 800ms delay
 
+  // 🎯 PERFORMANCE: ValueNotifier getters for high-frequency updates
+  ValueNotifier<double> getSampleVolumeNotifier(int sampleIndex) {
+    return _sampleVolumeNotifiers.putIfAbsent(sampleIndex, () {
+      final initialValue = sampleIndex < _sampleVolumes.length ? _sampleVolumes[sampleIndex] : 1.0;
+      return ValueNotifier(initialValue);
+    });
+  }
+  
+  ValueNotifier<double> getSamplePitchNotifier(int sampleIndex) {
+    return _samplePitchNotifiers.putIfAbsent(sampleIndex, () {
+      final initialValue = sampleIndex < _samplePitches.length ? _samplePitches[sampleIndex] : 1.0;
+      return ValueNotifier(initialValue);
+    });
+  }
+  
+  ValueNotifier<double> getCellVolumeNotifier(int cellIndex) {
+    return _cellVolumeNotifiers.putIfAbsent(cellIndex, () {
+      return ValueNotifier(getCellVolume(cellIndex));
+    });
+  }
+  
+  ValueNotifier<double> getCellPitchNotifier(int cellIndex) {
+    return _cellPitchNotifiers.putIfAbsent(cellIndex, () {
+      return ValueNotifier(getCellPitch(cellIndex));
+    });
+  }
+  
+  ValueNotifier<int> get currentStepNotifier => _currentStepNotifier;
+  ValueNotifier<bool> get isSequencerPlayingNotifier => _isSequencerPlayingNotifier;
+
+  // 🎯 PERFORMANCE: Selector-friendly getters (prevent unnecessary rebuilds)
+  List<int?> get currentGridSamplesForSelector => 
+    _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length 
+      ? List.unmodifiable(_soundGridSamples[_currentSoundGridIndex]) 
+      : List.filled(_gridColumns * _gridRows, null);
+      
+  List<String?> get fileNamesForSelector => List.unmodifiable(_fileNames);
+  List<bool> get slotLoadedForSelector => List.unmodifiable(_slotLoaded);
+  Set<int> get selectedGridCellsForSelector => Set.unmodifiable(_selectedGridCells);
+  MultitaskPanelMode get currentPanelModeForSelector => _currentPanelMode;
+  
+  // 🎯 PERFORMANCE: Smart notification system
+  void _scheduleNotification(SequencerChangeType changeType) {
+    _pendingChanges.add(changeType);
+    
+    _notificationBatchTimer?.cancel();
+    _notificationBatchTimer = Timer(_batchDelay, () {
+      if (_pendingChanges.isNotEmpty) {
+        // Only notify if we have actual changes
+        notifyListeners();
+        _pendingChanges.clear();
+      }
+    });
+  }
+  
+  void _notifyImmediately(SequencerChangeType changeType) {
+    _notificationBatchTimer?.cancel();
+    _pendingChanges.clear();
+    notifyListeners();
+  }
+
   // Initialize sequencer
   SequencerState() {
     _sequencerLibrary = SequencerLibrary.instance;
@@ -553,7 +639,7 @@ class SequencerState extends ChangeNotifier {
     
     // Initialize volume control arrays
     _sampleVolumes = List.filled(_slotCount, 1.0); // Default to 100% volume
-    _cellVolumes = List.filled(_gridColumns * _gridRows, 1.0); // Default to 100% volume
+    _cellVolumes = {}; // Empty map - cells use sample volume by default
     
     // Initialize pitch control arrays
     _samplePitches = List.filled(_slotCount, 1.0); // Default to normal pitch
@@ -848,10 +934,14 @@ class SequencerState extends ChangeNotifier {
     }
   }
 
-  // Panel mode setters
+  // Panel mode setters - 🎯 PERFORMANCE OPTIMIZED
   void setPanelMode(MultitaskPanelMode mode) {
-    _currentPanelMode = mode;
-    notifyListeners();
+    // 🎯 PERFORMANCE: Only update if mode actually changed
+    if (_currentPanelMode != mode) {
+      _currentPanelMode = mode;
+      // UI changes need immediate notification for responsiveness
+      _notifyImmediately(SequencerChangeType.ui);
+    }
   }
   
   void setShowSampleSettings(bool show) {
@@ -1512,16 +1602,26 @@ class SequencerState extends ChangeNotifier {
     bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows);
     if (success) {
       _isSequencerPlaying = true;
+      
+      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+      _isSequencerPlayingNotifier.value = true;
+      
       // Start a timer just for UI updates (not audio timing)
       _startUIUpdateTimer();
+      
+      // 🎯 PERFORMANCE: Immediate notification for playback state changes
+      _notifyImmediately(SequencerChangeType.playback);
     }
-    notifyListeners();
   }
   
   void stopSequencer() {
     _sequencerLibrary.stopSequencer();
     _isSequencerPlaying = false;
     _currentStep = -1;
+    
+    // 🎯 PERFORMANCE: Update ValueNotifiers for instant UI feedback
+    _isSequencerPlayingNotifier.value = false;
+    _currentStepNotifier.value = -1;
     
     _sequencerTimer?.cancel();
     _sequencerTimer = null;
@@ -1530,7 +1630,9 @@ class SequencerState extends ChangeNotifier {
     for (int i = 0; i < _gridColumns; i++) {
       _columnPlayingSample[i] = null;
     }
-    notifyListeners();
+    
+    // 🎯 PERFORMANCE: Immediate notification for playback state changes
+    _notifyImmediately(SequencerChangeType.playback);
   }
   
   void _syncGridToSequencer() {
@@ -1564,9 +1666,8 @@ class SequencerState extends ChangeNotifier {
   }
   
   void _startUIUpdateTimer() {
-    // This timer is ONLY for UI updates, not audio timing
-    // Audio timing is handled by sequencer in audio callback
-    const uiUpdateIntervalMs = 50; // 20 FPS UI updates
+    // 🎯 PERFORMANCE: Optimized UI polling with ValueNotifier
+    const uiUpdateIntervalMs = 100; // 10 FPS UI updates
     
     _sequencerTimer = Timer.periodic(Duration(milliseconds: uiUpdateIntervalMs), (timer) {
       if (!_sequencerLibrary.isSequencerPlaying) {
@@ -1575,13 +1676,23 @@ class SequencerState extends ChangeNotifier {
         return;
       }
       
-      // Get current step from sequencer
       final currentStep = _sequencerLibrary.currentStep;
       if (currentStep != _currentStep) {
         _currentStep = currentStep;
-        notifyListeners(); // Only update UI when step actually changes
+        
+        // 🎯 PERFORMANCE: Update ValueNotifier for step indicator (instant UI update)
+        _currentStepNotifier.value = currentStep;
+        
+        // 🎯 PERFORMANCE: No notifyListeners() call - only ValueNotifier updates!
+        // This eliminates unnecessary widget rebuilds during playback
       }
     });
+  }
+  
+  // Alternative: Disable UI polling entirely for performance testing
+  void _startUIUpdateTimerMinimal() {
+    // NO UI polling - for testing if FFI calls are causing audio stuttering
+    print('🧪 [PERF TEST] UI polling disabled - step indicator will not update');
   }
   
   // Update grid cell and sync to sequencer
@@ -2151,16 +2262,41 @@ Made with Demo Sequencer 🚀
     return _soundGridSamples[_currentSoundGridIndex];
   }
 
-  // Helper method to set sample in current sound grid
+  // Helper method to set sample in current sound grid - 🎯 PERFORMANCE OPTIMIZED
   void _setCurrentGridSample(int index, int? value) {
     if (_soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length) {
-      _soundGridSamples[_currentSoundGridIndex][index] = value;
+      // Check if sample is actually changing
+      final oldSample = _soundGridSamples[_currentSoundGridIndex][index];
+      final sampleChanged = oldSample != value;
       
-      // 🔧 FIX: Immediately sync this change to native sequencer if sequencer is running
-      _syncSingleCellToNative(index, value);
-      
-      // Trigger autosave when grid changes
-      _triggerAutosave();
+      // 🎯 PERFORMANCE: Only update if value actually changed
+      if (sampleChanged) {
+        _soundGridSamples[_currentSoundGridIndex][index] = value;
+        
+        // Reset cell volume/pitch overrides when sample changes or when clearing cell with sample
+        if (oldSample != null || value != null) {
+          // Reset Flutter-side cell overrides when:
+          // 1. Sample changes to different sample (oldSample != null && value != null)
+          // 2. Cell with sample is cleared (oldSample != null && value == null)
+          _cellVolumes.remove(index);
+          _cellPitches.remove(index);
+          
+          // 🎯 PERFORMANCE: Update ValueNotifiers for cell controls
+          _cellVolumeNotifiers[index]?.value = getCellVolume(index);
+          _cellPitchNotifiers[index]?.value = getCellPitch(index);
+          
+          print('🔄 [FLUTTER] Reset cell $index volume/pitch overrides due to change ($oldSample → $value)');
+        }
+        
+        // 🔧 FIX: Immediately sync this change to native sequencer if sequencer is running
+        _syncSingleCellToNative(index, value);
+        
+        // Trigger autosave when grid changes
+        _triggerAutosave();
+        
+        // 🎯 PERFORMANCE: Use batched notification for grid changes
+        _scheduleNotification(SequencerChangeType.grid);
+      }
     }
   }
 
@@ -2571,44 +2707,67 @@ Made with Demo Sequencer 🚀
     return 1.0; // Default volume
   }
 
-  /// Set sample volume (0.0 to 1.0)
+  /// Set sample volume (0.0 to 1.0) - 🎯 PERFORMANCE ENHANCED
   void setSampleVolume(int sampleIndex, double volume) {
     if (sampleIndex >= 0 && sampleIndex < _sampleVolumes.length) {
-      // Capture state before change (only if this is the first change in sequence)
-      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
       final clampedVolume = volume.clamp(0.0, 1.0);
       
-      _sampleVolumes[sampleIndex] = clampedVolume;
-      
-      // Apply volume to native audio engine
-      _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
-      
-      // Record debounced undo action (will only record after user stops adjusting)
-      _recordDebouncedUndoAction(
-        type: UndoRedoActionType.volumeChange,
-        description: 'Set Sample ${String.fromCharCode(65 + sampleIndex)} Volume: ${(clampedVolume * 100).round()}%',
-        beforeState: beforeState,
-      );
-      
-      notifyListeners();
+      // 🎯 PERFORMANCE: Only update if value actually changed
+      if (_sampleVolumes[sampleIndex] != clampedVolume) {
+        // Capture state before change (only if this is the first change in sequence)
+        final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
+        
+        _sampleVolumes[sampleIndex] = clampedVolume;
+        
+        // Apply volume to native audio engine immediately (no UI delay)
+        _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
+        
+        // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+        _sampleVolumeNotifiers[sampleIndex]?.value = clampedVolume;
+        
+        // Record debounced undo action (will only record after user stops adjusting)
+        _recordDebouncedUndoAction(
+          type: UndoRedoActionType.volumeChange,
+          description: 'Set Sample ${String.fromCharCode(65 + sampleIndex)} Volume: ${(clampedVolume * 100).round()}%',
+          beforeState: beforeState,
+        );
+        
+        // 🎯 PERFORMANCE: Use batched notification for non-critical UI updates
+        _scheduleNotification(SequencerChangeType.volume);
+      }
     }
   }
 
-  /// Get cell volume (0.0 to 1.0)
+  /// Get cell volume (returns cell override or sample bank volume)
   double getCellVolume(int cellIndex) {
-    if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
-      return _cellVolumes[cellIndex];
+    // Check if cell has a volume override
+    if (_cellVolumes.containsKey(cellIndex)) {
+      return _cellVolumes[cellIndex]!;
     }
+    
+    // No override, use sample bank volume
+    final gridSamples = _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length
+        ? _soundGridSamples[_currentSoundGridIndex]
+        : <int?>[];
+    final sampleSlot = cellIndex < gridSamples.length ? gridSamples[cellIndex] : null;
+    if (sampleSlot != null && sampleSlot >= 0 && sampleSlot < _sampleVolumes.length) {
+      return _sampleVolumes[sampleSlot];
+    }
+    
     return 1.0; // Default volume
   }
 
-  /// Set cell volume (0.0 to 1.0)
+  /// Set cell volume (0.0 to 1.0) - 🎯 PERFORMANCE OPTIMIZED
   void setCellVolume(int cellIndex, double volume) {
-    if (cellIndex >= 0 && cellIndex < _cellVolumes.length) {
+    final clampedVolume = volume.clamp(0.0, 1.0);
+    
+    // 🎯 PERFORMANCE: Only update if value actually changed
+    final currentVolume = _cellVolumes[cellIndex] ?? getCellVolume(cellIndex);
+    if (currentVolume != clampedVolume) {
       // Capture state before change (only if this is the first change in sequence)
       final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
-      final clampedVolume = volume.clamp(0.0, 1.0);
       
+      // Store cell volume override
       _cellVolumes[cellIndex] = clampedVolume;
       
       // Convert cellIndex to step and column for native call
@@ -2619,6 +2778,9 @@ Made with Demo Sequencer 🚀
       // Store volume in native grid - will be applied when cell is triggered
       _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
       
+      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+      _cellVolumeNotifiers[cellIndex]?.value = clampedVolume;
+      
       // Record debounced undo action (will only record after user stops adjusting)
       final cellPosition = _getCellPositionString(cellIndex);
       _recordDebouncedUndoAction(
@@ -2627,7 +2789,8 @@ Made with Demo Sequencer 🚀
         beforeState: beforeState,
       );
       
-      notifyListeners();
+      // 🎯 PERFORMANCE: Use batched notification for non-critical UI updates
+      _scheduleNotification(SequencerChangeType.volume);
     }
   }
 
@@ -2639,26 +2802,34 @@ Made with Demo Sequencer 🚀
     return 1.0; // Default pitch
   }
 
-  /// Set sample pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
+  /// Set sample pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10) - 🎯 PERFORMANCE OPTIMIZED
   void setSamplePitch(int sampleIndex, double pitch) {
     if (sampleIndex >= 0 && sampleIndex < _samplePitches.length) {
-      // Capture state before change (only if this is the first change in sequence)
-      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
       final clampedPitch = pitch.clamp(0.03125, 32.0); // C0 to C10 range
       
-      _samplePitches[sampleIndex] = clampedPitch;
-      
-      // Apply pitch to native audio engine
-      _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
-      
-      // Record debounced undo action (will only record after user stops adjusting)
-      _recordDebouncedUndoAction(
-        type: UndoRedoActionType.pitchChange,
-        description: 'Set Sample ${String.fromCharCode(65 + sampleIndex)} Pitch: ${clampedPitch.toStringAsFixed(2)}x',
-        beforeState: beforeState,
-      );
-      
-      notifyListeners();
+      // 🎯 PERFORMANCE: Only update if value actually changed
+      if (_samplePitches[sampleIndex] != clampedPitch) {
+        // Capture state before change (only if this is the first change in sequence)
+        final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
+        
+        _samplePitches[sampleIndex] = clampedPitch;
+        
+        // Apply pitch to native audio engine immediately (no UI delay)
+        _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
+        
+        // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+        _samplePitchNotifiers[sampleIndex]?.value = clampedPitch;
+        
+        // Record debounced undo action (will only record after user stops adjusting)
+        _recordDebouncedUndoAction(
+          type: UndoRedoActionType.pitchChange,
+          description: 'Set Sample ${String.fromCharCode(65 + sampleIndex)} Pitch: ${clampedPitch.toStringAsFixed(2)}x',
+          beforeState: beforeState,
+        );
+        
+        // 🎯 PERFORMANCE: Use batched notification for non-critical UI updates
+        _scheduleNotification(SequencerChangeType.pitch);
+      }
     }
   }
 
@@ -2681,32 +2852,41 @@ Made with Demo Sequencer 🚀
     return 1.0; // Default pitch
   }
 
-  /// Set cell pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10)
+  /// Set cell pitch (0.03125 to 32.0, where 1.0 = normal, covers C0 to C10) - 🎯 PERFORMANCE OPTIMIZED
   void setCellPitch(int cellIndex, double pitch) {
-    // Capture state before change (only if this is the first change in sequence)
-    final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
     final clampedPitch = pitch.clamp(0.03125, 32.0); // C0 to C10 range
     
-    // Store cell pitch override
-    _cellPitches[cellIndex] = clampedPitch;
-    
-    // Convert cellIndex to step and column for native call
-    final row = cellIndex ~/ _gridColumns;
-    final col = cellIndex % _gridColumns;
-    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-    
-    // Store pitch in native grid - will be applied when cell is triggered
-    _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
-    
-    // Record debounced undo action (will only record after user stops adjusting)
-    final cellPosition = _getCellPositionString(cellIndex);
-    _recordDebouncedUndoAction(
-      type: UndoRedoActionType.pitchChange,
-      description: 'Set Cell $cellPosition Pitch: ${clampedPitch.toStringAsFixed(2)}x',
-      beforeState: beforeState,
-    );
-    
-    notifyListeners();
+    // 🎯 PERFORMANCE: Only update if value actually changed
+    final currentPitch = _cellPitches[cellIndex] ?? getCellPitch(cellIndex);
+    if (currentPitch != clampedPitch) {
+      // Capture state before change (only if this is the first change in sequence)
+      final beforeState = _pendingUndoBeforeState ?? _captureCurrentState();
+      
+      // Store cell pitch override
+      _cellPitches[cellIndex] = clampedPitch;
+      
+      // Convert cellIndex to step and column for native call
+      final row = cellIndex ~/ _gridColumns;
+      final col = cellIndex % _gridColumns;
+      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+      
+      // Store pitch in native grid - will be applied when cell is triggered
+      _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
+      
+      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+      _cellPitchNotifiers[cellIndex]?.value = clampedPitch;
+      
+      // Record debounced undo action (will only record after user stops adjusting)
+      final cellPosition = _getCellPositionString(cellIndex);
+      _recordDebouncedUndoAction(
+        type: UndoRedoActionType.pitchChange,
+        description: 'Set Cell $cellPosition Pitch: ${clampedPitch.toStringAsFixed(2)}x',
+        beforeState: beforeState,
+      );
+      
+      // 🎯 PERFORMANCE: Use batched notification for non-critical UI updates
+      _scheduleNotification(SequencerChangeType.pitch);
+    }
   }
 
   /// Reset cell pitch to use sample bank pitch
@@ -2718,8 +2898,23 @@ Made with Demo Sequencer 🚀
     final col = cellIndex % _gridColumns;
     final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
     
-    // Set to default pitch (1.0) in native grid
-    _sequencerLibrary.setCellPitch(row, absoluteColumn, 1.0);
+    // Reset to use sample bank default in native grid
+    _sequencerLibrary.resetCellPitch(row, absoluteColumn);
+    
+    notifyListeners();
+  }
+
+  /// Reset cell volume to use sample bank volume
+  void resetCellVolume(int cellIndex) {
+    _cellVolumes.remove(cellIndex);
+    
+    // Convert cellIndex to step and column for native call
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    // Reset to use sample bank default in native grid
+    _sequencerLibrary.resetCellVolume(row, absoluteColumn);
     
     notifyListeners();
   }
@@ -3613,9 +3808,28 @@ Made with Demo Sequencer 🚀
 
   @override
   void dispose() {
+    // 🎯 PERFORMANCE: Dispose of all ValueNotifiers
+    for (final notifier in _sampleVolumeNotifiers.values) {
+      notifier.dispose();
+    }
+    for (final notifier in _samplePitchNotifiers.values) {
+      notifier.dispose();
+    }
+    for (final notifier in _cellVolumeNotifiers.values) {
+      notifier.dispose();
+    }
+    for (final notifier in _cellPitchNotifiers.values) {
+      notifier.dispose();
+    }
+    _currentStepNotifier.dispose();
+    _isSequencerPlayingNotifier.dispose();
+    
+    // Cancel all timers
     _autosaveTimer?.cancel();
     _debounceTimer?.cancel();
     _sequencerTimer?.cancel();
+    _notificationBatchTimer?.cancel(); // 🎯 PERFORMANCE: Cancel batch timer
+    
     if (_isRecording) {
       stopRecording();
     }

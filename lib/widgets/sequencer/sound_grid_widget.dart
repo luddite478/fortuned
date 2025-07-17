@@ -259,122 +259,152 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
-  Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index) {
+  // 🎯 PERFORMANCE: Cell that only rebuilds when current step changes
+  Widget _buildEnhancedGridCell(BuildContext context, SequencerState sequencer, int index) {
     final row = index ~/ sequencer.gridColumns;
-    final col = index % sequencer.gridColumns;
-    final isActivePad = sequencer.activePad == index;
-    final isCurrentStep = sequencer.currentStep == row && sequencer.isSequencerPlaying;
-    final placedSample = sequencer.gridSamples[index];
-    final hasPlacedSample = placedSample != null;
-    final isSelected = sequencer.selectedGridCells.contains(index);
     
-    Color cellColor;
-    if (isActivePad) {
-      cellColor = SequencerPhoneBookColors.accent.withOpacity(0.6);
-    } else if (isCurrentStep) {
-      cellColor = hasPlacedSample 
-          ? _getSampleColorForGrid(placedSample!, sequencer)
-          : SequencerPhoneBookColors.surfacePressed;
-    } else if (hasPlacedSample) {
-      cellColor = _getSampleColorForGrid(placedSample!, sequencer);
-    } else {
-      cellColor = SequencerPhoneBookColors.cellEmpty;
-    }
-    
-    return DragTarget<int>(
-      onAccept: (int sampleSlot) {
-        sequencer.placeSampleInGrid(sampleSlot, index);
-      },
-      builder: (context, candidateData, rejectedData) {
-        final bool isDragHovering = candidateData.isNotEmpty;
+    return ValueListenableBuilder<int>(
+      valueListenable: sequencer.currentStepNotifier,
+      builder: (context, currentStep, child) {
+        final isActivePad = sequencer.activePad == index;
+        final isCurrentStep = currentStep == row && sequencer.isSequencerPlaying;
+        final placedSample = sequencer.gridSamples[index];
+        final hasPlacedSample = placedSample != null;
+        final isSelected = sequencer.selectedGridCells.contains(index);
         
-                  return GestureDetector(
-            onTap: () {
-              sequencer.handlePadPress(index);
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
-              decoration: BoxDecoration(
-                color: isDragHovering 
-                    ? SequencerPhoneBookColors.accent.withOpacity(0.8)
-                    : cellColor,
-                borderRadius: BorderRadius.circular(2), // Sharp corners
-                border: isSelected 
-                    ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
-                    : isCurrentStep 
-                        ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
-                        : isDragHovering
-                            ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
-                            : hasPlacedSample && !isActivePad
-                                ? Border.all(color: SequencerPhoneBookColors.border, width: 0.5)
-                                : Border.all(color: SequencerPhoneBookColors.border.withOpacity(0.3), width: 0.5),
-                boxShadow: isSelected 
-                    ? [
-                        BoxShadow(
-                          color: SequencerPhoneBookColors.accent.withOpacity(0.4),
-                          blurRadius: 3,
-                          spreadRadius: 0,
-                          offset: const Offset(0, 1),
-                        )
-                      ]
-                    : [
-                        // All cells get protruding effect
-                        BoxShadow(
-                          color: SequencerPhoneBookColors.shadow,
-                          blurRadius: 1,
-                          offset: const Offset(0, 0.5),
+        // 🎯 PERFORMANCE: Light bulb-bluish-white highlight for current step
+        Color cellColor;
+        if (isActivePad) {
+          cellColor = SequencerPhoneBookColors.accent.withOpacity(0.6);
+                 } else if (isCurrentStep) {
+           // Light bulb-bluish-white highlight for current step
+           cellColor = hasPlacedSample 
+               ? _getSampleColorForGrid(placedSample, sequencer).withOpacity(0.9)
+               : const Color(0xFF87CEEB).withOpacity(0.4); // Light blue highlight
+         } else if (hasPlacedSample) {
+           cellColor = _getSampleColorForGrid(placedSample, sequencer);
+        } else {
+          cellColor = SequencerPhoneBookColors.cellEmpty;
+        }
+        
+        return DragTarget<int>(
+          onAccept: (int sampleSlot) {
+            sequencer.placeSampleInGrid(sampleSlot, index);
+          },
+          builder: (context, candidateData, rejectedData) {
+            final bool isDragHovering = candidateData.isNotEmpty;
+            
+            return GestureDetector(
+              onTap: () {
+                sequencer.handlePadPress(index);
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 100),
+                decoration: BoxDecoration(
+                  color: isDragHovering 
+                      ? SequencerPhoneBookColors.accent.withOpacity(0.8)
+                      : cellColor,
+                  borderRadius: BorderRadius.circular(2),
+                  border: isSelected 
+                      ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
+                      : isCurrentStep 
+                          ? Border.all(color: const Color(0xFF87CEEB), width: 1.5) // Light blue border for current step
+                          : isDragHovering
+                              ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
+                              : hasPlacedSample && !isActivePad
+                                  ? Border.all(color: SequencerPhoneBookColors.border, width: 0.5)
+                                  : Border.all(color: SequencerPhoneBookColors.border.withOpacity(0.3), width: 0.5),
+                  boxShadow: isSelected 
+                      ? [
+                          BoxShadow(
+                            color: SequencerPhoneBookColors.accent.withOpacity(0.4),
+                            blurRadius: 3,
+                            spreadRadius: 0,
+                            offset: const Offset(0, 1),
+                          )
+                        ]
+                      : isCurrentStep
+                          ? [
+                              // Extra glow for current step - light bulb effect
+                              BoxShadow(
+                                color: const Color(0xFF87CEEB).withOpacity(0.3),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 0),
+                              ),
+                              BoxShadow(
+                                color: SequencerPhoneBookColors.shadow,
+                                blurRadius: 1,
+                                offset: const Offset(0, 0.5),
+                              ),
+                            ]
+                          : [
+                              BoxShadow(
+                                color: SequencerPhoneBookColors.shadow,
+                                blurRadius: 1,
+                                offset: const Offset(0, 0.5),
+                              ),
+                            ],
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                                             Text(
+                         hasPlacedSample 
+                             ? String.fromCharCode(65 + placedSample)
+                             : '${row + 1}',
+                        style: GoogleFonts.sourceSans3(
+                          color: (isActivePad || isDragHovering) 
+                              ? SequencerPhoneBookColors.pageBackground 
+                              : isCurrentStep
+                                  ? Colors.white // Bright white text for current step
+                                  : SequencerPhoneBookColors.text,
+                          fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.w600,
+                          fontSize: 12,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      if (isSelected) ...[
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: SequencerPhoneBookColors.accent,
+                            borderRadius: BorderRadius.circular(1),
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          'C-4',
+                          style: GoogleFonts.sourceSans3(
+                            color: (isActivePad || isDragHovering)
+                                ? SequencerPhoneBookColors.pageBackground
+                                : isCurrentStep
+                                    ? Colors.white.withOpacity(0.8) // Bright text for current step
+                                    : SequencerPhoneBookColors.lightText.withOpacity(0.6),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.3,
+                          ),
                         ),
                       ],
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      hasPlacedSample 
-                          ? String.fromCharCode(65 + placedSample!)
-                          : '${row + 1}',
-                      style: GoogleFonts.sourceSans3(
-                        color: (isActivePad || isDragHovering) 
-                            ? SequencerPhoneBookColors.pageBackground 
-                            : SequencerPhoneBookColors.text,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                    if (isSelected) ...[
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: BoxDecoration(
-                          color: SequencerPhoneBookColors.accent,
-                          borderRadius: BorderRadius.circular(1),
-                        ),
-                      ),
-                    ] else ...[
-                      Text(
-                        'C-4',
-                        style: GoogleFonts.sourceSans3(
-                          color: (isActivePad || isDragHovering)
-                              ? SequencerPhoneBookColors.pageBackground.withOpacity(0.7)
-                              : SequencerPhoneBookColors.lightText,
-                          fontSize: 10,
-                          fontWeight: FontWeight.w400,
-                          letterSpacing: 0.3,
-                        ),
-                      ),
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          );
+            );
+          },
+        );
       },
     );
   }
 
+  Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index) {
+    // 🎯 PERFORMANCE: Use enhanced cell that listens to currentStepNotifier
+    return _buildEnhancedGridCell(context, sequencer, index);
+  }
 
 
   Widget _buildClickableTabLabel({
