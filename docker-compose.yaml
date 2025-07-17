@@ -3,13 +3,13 @@ version: '3'
 services:
   server:
     build:
-      context: .
+      context: server
       dockerfile: Dockerfile
-    ports:
-      - "8888:8888"
-      - "8765:8765"
+    # ports:
+    #   - "8888:8888"
+    #   - "8765:8765"
     env_file:
-      - .env
+      - server/.env
     environment:
       - PYTHONUNBUFFERED=1
     depends_on:
@@ -36,7 +36,7 @@ services:
       - ./letsencrypt:/etc/letsencrypt
       - ./certs:/certs
     env_file:
-      - .env
+      - certbot/.env
     entrypoint: /bin/sh
     command: 
       - -c
@@ -65,7 +65,7 @@ services:
     image: mongo:7.0
     container_name: mongodb
     env_file:
-      - .env
+      - mongodb/.env
     ports:
       - ${TAILSCALE_IP}:27017:27017
     volumes:
