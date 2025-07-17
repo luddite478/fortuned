@@ -44,7 +44,7 @@ jobs:
         envs: REPO_DIR_PATH,DOMAIN
         script: |
           cd "$REPO_DIR_PATH"
-          docker-compose down -v
+          docker-compose -f docker-compose.envsubst.yaml down
           rm docker-compose.envsubst.yaml || true
           export TAILSCALE_IP="$(tailscale ip --4)" 
           envsubst < docker-compose.yaml > docker-compose.envsubst.yaml

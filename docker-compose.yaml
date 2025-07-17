@@ -25,7 +25,7 @@ services:
       - ./certs:/usr/local/etc/haproxy/certs:ro
     depends_on:
       - server
-    restart: unless-stopped
+    restart: on-failure
 
   certbot:
     image: certbot/certbot
