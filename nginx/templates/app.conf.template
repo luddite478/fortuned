@@ -7,8 +7,8 @@ upstream websocket_backend {
 }
 
 server {
-    listen 80;
-    listen [::]:80;
+    listen ${HTTP_API_PORT};
+    listen [::]:${HTTP_API_PORT};
     
     server_name ${SERVER_HOST};
     server_tokens off;
@@ -18,15 +18,19 @@ server {
         root /var/www/certbot;
     }
 
-    # Redirect all other HTTP requests to HTTPS
+    # API endpoints over HTTP
     location / {
-        return 301 https://$host$request_uri;
+        proxy_pass http://api_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
 server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
+    listen ${HTTPS_API_PORT} ssl http2;
+    listen [::]:${HTTPS_API_PORT} ssl http2;
     
     server_name ${SERVER_HOST};
     server_tokens off;
@@ -62,5 +66,26 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen ${WEBSOCKET_PORT};
+    listen [::]:${WEBSOCKET_PORT};
+    
+    server_name ${SERVER_HOST};
+    server_tokens off;
+
+    # WebSocket endpoints
+    location / {
+        proxy_pass http://websocket_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
     }
 } 

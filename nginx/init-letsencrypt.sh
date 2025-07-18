@@ -14,6 +14,26 @@ if [ -z "$EMAIL" ]; then
     exit 1
 fi
 
+# Check if HTTP_API_PORT is set
+if [ -z "$HTTP_API_PORT" ]; then
+    echo "Error: HTTP_API_PORT environment variable is not set"
+    exit 1
+fi
+
+# Check if HTTPS_API_PORT is set
+if [ -z "$HTTPS_API_PORT" ]; then
+    echo "Error: HTTPS_API_PORT environment variable is not set"
+    exit 1
+fi
+
+# Check if WEBSOCKET_PORT is set
+if [ -z "$WEBSOCKET_PORT" ]; then
+    echo "Error: WEBSOCKET_PORT environment variable is not set"
+    exit 1
+fi
+
+
+
 # Set environment (default to prod if not set)
 if [ -z "$ENV" ]; then
     ENV=prod
@@ -124,7 +144,7 @@ start_nginx() {
     echo "Starting nginx..."
     
     # Process template and create final config
-    envsubst '${SERVER_HOST}' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf
+    envsubst '${SERVER_HOST},${HTTP_API_PORT},${HTTPS_API_PORT},${WEBSOCKET_PORT}' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf
     
     # Test nginx configuration
     nginx -t
