@@ -3,7 +3,7 @@
 set -e
 
 # Check if domain is set
-if [ -z "$DOMAIN" ]; then
+if [ -z "$SERVER_HOST" ]; then
     echo "Error: DOMAIN environment variable is not set"
     exit 1
 fi
@@ -16,11 +16,11 @@ fi
 
 data_path="/etc/letsencrypt"
 rsa_key_size=4096
-domain_path="$data_path/live/$DOMAIN"
+domain_path="$data_path/live/$SERVER_HOST"
 
 echo "================================================"
 echo "Let's Encrypt SSL Certificate Manager"
-echo "Domain: $DOMAIN"
+echo "Domain: $SERVER_HOST"
 echo "Certificate path: $domain_path"
 echo "================================================"
 
@@ -48,12 +48,12 @@ validate_certificate() {
     echo "✅ Certificate is valid and has more than 30 days remaining"
     
     # Check if certificate is for the correct domain
-    if ! openssl x509 -in "$cert_path" -text -noout | grep -q "DNS:$DOMAIN"; then
-        echo "❌ Certificate is not for domain $DOMAIN"
+    if ! openssl x509 -in "$cert_path" -text -noout | grep -q "DNS:$SERVER_HOST"; then
+        echo "❌ Certificate is not for domain $SERVER_HOST"
         return 1
     fi
     
-    echo "✅ Certificate is for the correct domain: $DOMAIN"
+    echo "✅ Certificate is for the correct domain: $SERVER_HOST"
     
     # Check if certificate is issued by Let's Encrypt (not a dummy/self-signed certificate)
     if openssl x509 -in "$cert_path" -text -noout | grep -q "Issuer:.*Let's Encrypt"; then
@@ -70,14 +70,14 @@ validate_certificate() {
 
 # Function to create dummy certificate
 create_dummy_certificate() {
-    echo "Creating temporary dummy certificate for $DOMAIN..."
+    echo "Creating temporary dummy certificate for $SERVER_HOST..."
     
     mkdir -p "$domain_path"
     
     # Generate dummy certificate
     openssl req -x509 -newkey rsa:$rsa_key_size -keyout "$domain_path/privkey.pem" \
         -out "$domain_path/fullchain.pem" -days 365 -nodes \
-        -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=$DOMAIN"
+        -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=$SERVER_HOST"
     
     echo "✅ Temporary dummy certificate created (will be replaced with real certificate)"
 }
@@ -115,7 +115,7 @@ reload_nginx() {
 
 # Function to request certificate
 request_certificate() {
-    echo "Requesting Let's Encrypt certificate for $DOMAIN..."
+    echo "Requesting Let's Encrypt certificate for $SERVER_HOST..."
     
     # Delete dummy certificate
     delete_dummy_certificate
@@ -123,9 +123,9 @@ request_certificate() {
     # Request certificate
     certbot certonly --webroot --webroot-path=/var/www/certbot \
         --email "$EMAIL" --agree-tos --no-eff-email \
-        --force-renewal -d "$DOMAIN"
+        --force-renewal -d "$SERVER_HOST"
     
-    echo "✅ Real Let's Encrypt certificate obtained for $DOMAIN"
+    echo "✅ Real Let's Encrypt certificate obtained for $SERVER_HOST"
 }
 
 # Main logic
