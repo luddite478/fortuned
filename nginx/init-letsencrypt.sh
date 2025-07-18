@@ -129,6 +129,7 @@ reload_nginx() {
 
 # Function to request certificate
 request_certificate() {
+    echo "ENV - $ENV"
     if [ "$ENV" = "stage" ]; then
         echo "Requesting Let's Encrypt STAGING certificate for $SERVER_HOST..."
         staging_flag="--staging"
