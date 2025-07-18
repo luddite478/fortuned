@@ -9,58 +9,79 @@ on:
       - 'README.md'
       - 'docs/**'
 
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        type: choice
+        options:
+          - production
+
 env:
   REPO_DIR_PATH: /home/luddite478/niyya
 
 jobs:
-  redeploy:
+  deploy:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: staging
+            trigger: push
+          - name: production
+            trigger: workflow_dispatch
+    if: |
+      (github.event_name == 'push' && matrix.name == 'staging') ||
+      (github.event_name == 'workflow_dispatch' && matrix.name == 'production')
+    environment: ${{ matrix.name }}
+    name: Deploy to ${{ matrix.name }}
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Sync latest changes on remote server
-      uses: appleboy/ssh-action@v1.1.0
-      env:
-        REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
-      with:
-        host: ${{ secrets.HOST_IP }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.DROPLET_SSH_KEY }}
-        envs: REPO_DIR_PATH
-        script: |
-          cd "$REPO_DIR_PATH"
-          git config --global --add safe.directory "$REPO_DIR_PATH"
-          git pull origin main || git pull origin master
+      - name: Sync latest changes on ${{ matrix.name }} server
+        uses: appleboy/ssh-action@v1.1.0
+        env:
+          REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REPO_DIR_PATH
+          script: |
+            cd "$REPO_DIR_PATH"
+            git config --global --add safe.directory "$REPO_DIR_PATH"
+            git pull origin main || git pull origin master
 
-    - name: Stop and rerun Docker Compose on remote server
-      uses: appleboy/ssh-action@v1.1.0
-      env:
-        REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
-      with:
-        host: ${{ secrets.HOST_IP }}
-        username: ${{ secrets.SSH_USER }}
-        key: ${{ secrets.DROPLET_SSH_KEY }}
-        envs: REPO_DIR_PATH
-        script: |
-          cd "$REPO_DIR_PATH"
-          docker-compose -f docker-compose.envsubst.yaml down
-          rm docker-compose.envsubst.yaml || true
-          export TAILSCALE_IP="$(tailscale ip --4)" 
-          envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
-          docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
+      - name: Restart Docker Compose on ${{ matrix.name }} server
+        uses: appleboy/ssh-action@v1.1.0
+        env:
+          REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: REPO_DIR_PATH
+          script: |
+            cd "$REPO_DIR_PATH"
+            docker-compose -f docker-compose.envsubst.yaml down
+            rm docker-compose.envsubst.yaml || true
+            export TAILSCALE_IP="$(tailscale ip --4)"
+            envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
+            docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
 
-    - name: Wait for server to be ready
-      timeout-minutes: 3
-      run: |
-        echo "Waiting for server to be ready..."
-        timeout=180 # 3 minutes
-        while ! curl -s http://${{ secrets.HOST_IP }}:443/get_sound_series > /dev/null; do
-          sleep 1
-          timeout=$((timeout-1))
-          if [ "$timeout" -le 0 ]; then
-            echo "Timed out waiting for server to respond."
-            exit 1
-          fi
-        done
-        echo "Server is up and responding."
+      - name: Wait for ${{ matrix.name }} server
+        timeout-minutes: 3
+        run: |
+          echo "Waiting for ${{ matrix.name }} server..."
+          timeout=180
+          while ! curl -s http://${{ secrets.SERVER_HOST }}:443/get_sound_series > /dev/null; do
+            sleep 1
+            timeout=$((timeout-1))
+            if [ "$timeout" -le 0 ]; then
+              echo "Timed out waiting for server to respond."
+              exit 1
+            fi
+          done
+          echo "${{ matrix.name }} server is up."

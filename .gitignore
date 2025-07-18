@@ -97,7 +97,7 @@ app/.flutter-plugins-dependencies
 app/working_example
 
 # Environment files
-**/.env
+**/*.env
 
 # Keep example file for reference
 !app/env.example
