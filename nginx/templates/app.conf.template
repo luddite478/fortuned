@@ -59,8 +59,25 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
 
-    # WebSocket endpoint over HTTPS
-    location /ws {
+    # API endpoints over HTTPS
+    location / {
+        proxy_pass http://api_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Optional: WebSocket raw TCP port (only if needed separately)
+server {
+    listen ${WEBSOCKET_PORT};
+    listen [::]:${WEBSOCKET_PORT};
+    
+    server_name ${SERVER_HOST};
+    server_tokens off;
+
+    location / {
         proxy_pass http://websocket_backend;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
@@ -70,14 +87,5 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_read_timeout 86400;
-    }
-
-    # API endpoints over HTTPS
-    location / {
-        proxy_pass http://api_backend;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
