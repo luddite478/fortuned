@@ -18,71 +18,17 @@ on:
         options:
           - production
 
-env:
-  REPO_DIR_PATH: /home/luddite478/niyya
-
-# YAML Anchors for reusable steps
-x-deploy-steps: &deploy-steps
-  - name: Checkout code
-    uses: actions/checkout@v4
-
-  - name: Sync latest changes on server
-    uses: appleboy/ssh-action@v1.1.0
-    env:
-      REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
-    with:
-      host: ${{ secrets.SERVER_HOST }}
-      username: ${{ secrets.SSH_USER }}
-      key: ${{ secrets.DROPLET_SSH_KEY }}
-      envs: REPO_DIR_PATH
-      script: |
-        cd "$REPO_DIR_PATH"
-        git config --global --add safe.directory "$REPO_DIR_PATH"
-        git pull origin main || git pull origin master
-
-  - name: Restart Docker Compose on server
-    uses: appleboy/ssh-action@v1.1.0
-    env:
-      REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
-    with:
-      host: ${{ secrets.SERVER_HOST }}
-      username: ${{ secrets.SSH_USER }}
-      key: ${{ secrets.DROPLET_SSH_KEY }}
-      envs: REPO_DIR_PATH
-      script: |
-        cd "$REPO_DIR_PATH"
-        docker-compose -f docker-compose.envsubst.yaml down
-        rm docker-compose.envsubst.yaml || true
-        export TAILSCALE_IP="$(tailscale ip --4)"
-        envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
-        docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
-
-  - name: Wait for server
-    timeout-minutes: 3
-    run: |
-      echo "Waiting for server..."
-      timeout=180
-      while ! curl -s http://${{ secrets.SERVER_HOST }}:443/get_sound_series > /dev/null; do
-        sleep 1
-        timeout=$((timeout-1))
-        if [ "$timeout" -le 0 ]; then
-          echo "Timed out waiting for server to respond."
-          exit 1
-        fi
-      done
-      echo "Server is up."
-
 jobs:
   deploy-staging:
-    runs-on: ubuntu-latest
     if: github.event_name == 'push'
-    environment: staging
-    name: Deploy to staging
-    steps: *deploy-steps
+    uses: ./.github/workflows/deploy-reusable.yml
+    with:
+      environment: staging
+    secrets: inherit
 
   deploy-production:
-    runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
-    environment: production
-    name: Deploy to production
-    steps: *deploy-steps
+    uses: ./.github/workflows/deploy-reusable.yml
+    with:
+      environment: production
+    secrets: inherit
