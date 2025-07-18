@@ -29,6 +29,4 @@ COPY --from=builder --chown=app:app /server/app ./app
 
 USER app
 
-EXPOSE 8888
-
 CMD ["/server/.venv/bin/python", "app/main.py"]

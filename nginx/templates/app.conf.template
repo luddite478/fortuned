@@ -1,5 +1,5 @@
 upstream api_backend {
-    server server:8888;
+    server server:5000;
 }
 
 upstream websocket_backend {
@@ -68,24 +68,3 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
-
-server {
-    listen ${WEBSOCKET_PORT};
-    listen [::]:${WEBSOCKET_PORT};
-    
-    server_name ${SERVER_HOST};
-    server_tokens off;
-
-    # WebSocket endpoints
-    location / {
-        proxy_pass http://websocket_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 86400;
-    }
-} 

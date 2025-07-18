@@ -306,6 +306,7 @@ async def start_websocket_server():
         handler,
         "0.0.0.0",
         8765,
+        path="/ws",
         close_timeout=10,
         max_size=2**20,
         max_queue=32,
