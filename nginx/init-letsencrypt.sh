@@ -65,35 +65,51 @@ validate_certificate() {
     
     echo "✅ Certificate is for the correct domain: $SERVER_HOST"
     
-    # Check if certificate is issued by Let's Encrypt
-    if openssl x509 -in "$cert_path" -text -noout | grep -q "Issuer:.*Let's Encrypt"; then
+    # For staging, accept self-signed certificates
+    if [ "$ENV" = "stage" ]; then
         # Get certificate expiration date for logging
         local expiry_date=$(openssl x509 -in "$cert_path" -noout -enddate | cut -d= -f2)
-        if [ "$ENV" = "stage" ]; then
-            echo "✅ Valid Let's Encrypt STAGING certificate found"
-        else
-            echo "✅ Valid Let's Encrypt PRODUCTION certificate found"
-        fi
+        echo "✅ Valid SELF-SIGNED certificate found for staging"
         echo "   Expires: $expiry_date"
         return 0
     else
-        echo "❌ Certificate exists but is not issued by Let's Encrypt (likely dummy certificate)"
-        return 1
+        # For production, check if certificate is issued by Let's Encrypt
+        if openssl x509 -in "$cert_path" -text -noout | grep -q "Issuer:.*Let's Encrypt"; then
+            # Get certificate expiration date for logging
+            local expiry_date=$(openssl x509 -in "$cert_path" -noout -enddate | cut -d= -f2)
+            echo "✅ Valid Let's Encrypt PRODUCTION certificate found"
+            echo "   Expires: $expiry_date"
+            return 0
+        else
+            echo "❌ Certificate exists but is not issued by Let's Encrypt (likely dummy certificate)"
+            return 1
+        fi
     fi
 }
 
-# Function to create dummy certificate
+# Function to create self-signed certificate
 create_dummy_certificate() {
-    echo "Creating temporary dummy certificate for $SERVER_HOST..."
+    if [ "$ENV" = "stage" ]; then
+        echo "Creating self-signed certificate for $SERVER_HOST (staging mode)..."
+        cert_purpose="staging environment"
+    else
+        echo "Creating temporary dummy certificate for $SERVER_HOST..."
+        cert_purpose="temporary use (will be replaced with real certificate)"
+    fi
     
     mkdir -p "$domain_path"
     
-    # Generate dummy certificate
+    # Generate self-signed certificate
     openssl req -x509 -newkey rsa:$rsa_key_size -keyout "$domain_path/privkey.pem" \
         -out "$domain_path/fullchain.pem" -days 365 -nodes \
-        -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=$SERVER_HOST"
+        -subj "/C=US/ST=State/L=City/O=Organization/OU=OrgUnit/CN=$SERVER_HOST" \
+        -addext "subjectAltName=DNS:$SERVER_HOST,DNS:localhost"
     
-    echo "✅ Temporary dummy certificate created (will be replaced with real certificate)"
+    echo "✅ Self-signed certificate created for $cert_purpose"
+    if [ "$ENV" = "stage" ]; then
+        echo "   Valid for: 365 days"
+        echo "   Note: This certificate will show as untrusted in browsers (expected for staging)"
+    fi
 }
 
 # Function to delete dummy certificate
@@ -127,16 +143,9 @@ reload_nginx() {
     echo "✅ Nginx configuration reloaded"
 }
 
-# Function to request certificate
+# Function to request certificate from Let's Encrypt
 request_certificate() {
-    echo "ENV - $ENV"
-    if [ "$ENV" = "stage" ]; then
-        echo "Requesting Let's Encrypt STAGING certificate for $SERVER_HOST..."
-        staging_flag="--staging"
-    else
-        echo "Requesting Let's Encrypt PRODUCTION certificate for $SERVER_HOST..."
-        staging_flag=""
-    fi
+    echo "Requesting Let's Encrypt PRODUCTION certificate for $SERVER_HOST..."
     
     # Delete dummy certificate
     delete_dummy_certificate
@@ -144,66 +153,89 @@ request_certificate() {
     # Request certificate
     certbot certonly --webroot --webroot-path=/var/www/certbot \
         --email "$EMAIL" --agree-tos --no-eff-email \
-        --force-renewal $staging_flag -d "$SERVER_HOST"
+        --force-renewal -d "$SERVER_HOST"
     
-    if [ "$ENV" = "stage" ]; then
-        echo "✅ Let's Encrypt STAGING certificate obtained for $SERVER_HOST"
-        echo "   Note: This is a test certificate and will show as untrusted in browsers"
+    echo "✅ Let's Encrypt PRODUCTION certificate obtained for $SERVER_HOST"
+}
+
+# Function to setup certificates
+setup_certificates() {
+    echo "Starting certificate validation process..."
+    
+    # Check if we have a valid certificate (this handles container restarts)
+    if validate_certificate; then
+        echo ""
+        echo "🎉 CONTAINER RESTART DETECTED: Using existing valid certificate"
+        echo "   No new certificate needed - skipping certificate request"
+        echo ""
+        return 0  # No new certificate needed
     else
-        echo "✅ Let's Encrypt PRODUCTION certificate obtained for $SERVER_HOST"
+        echo ""
+        if [ "$ENV" = "stage" ]; then
+            echo "🔄 NEW SETUP OR INVALID CERTIFICATE: Will create self-signed certificate"
+        else
+            echo "🔄 NEW SETUP OR INVALID CERTIFICATE: Will obtain new certificate"
+        fi
+        echo ""
+        # Create self-signed certificate for nginx to start
+        create_dummy_certificate
+        return 1  # New certificate needed
     fi
 }
 
-# Main logic
-echo "Starting certificate validation process..."
-
-# Check if we have a valid certificate (this handles container restarts)
-if validate_certificate; then
-    echo ""
-    echo "🎉 CONTAINER RESTART DETECTED: Using existing valid certificate"
-    echo "   No new certificate needed - skipping certificate request"
-    echo ""
-    needs_new_cert=false
-else
-    echo ""
-    echo "🔄 NEW SETUP OR INVALID CERTIFICATE: Will obtain new certificate"
-    echo ""
-    needs_new_cert=true
-    # Create dummy certificate for nginx to start
-    create_dummy_certificate
-fi
-
-# Start nginx (works with either existing cert or dummy cert)
-start_nginx
-
-# If we need a new certificate, request it
-if [ "$needs_new_cert" = true ]; then
-    echo "Waiting for nginx to fully start..."
-    sleep 5
-    echo "Requesting new certificate from Let's Encrypt..."
-    request_certificate
-    reload_nginx
-    echo ""
+# Function to handle certificate request flow
+handle_certificate_request() {
     if [ "$ENV" = "stage" ]; then
-        echo "🎉 STAGING CERTIFICATE SETUP COMPLETE"
+        echo ""
+        echo "🎉 STAGING SELF-SIGNED CERTIFICATE SETUP COMPLETE"
+        echo "   Self-signed certificate is already in place and ready to use"
     else
+        echo "Waiting for nginx to fully start..."
+        sleep 5
+        request_certificate
+        reload_nginx
+        echo ""
         echo "🎉 PRODUCTION CERTIFICATE SETUP COMPLETE"
     fi
-else
+}
+
+# Function to show final status
+show_final_status() {
     echo ""
-    echo "🎉 USING EXISTING CERTIFICATE - READY TO SERVE TRAFFIC"
-fi
+    echo "================================================"
+    echo "SSL Certificate status: READY"
+    if [ "$ENV" = "stage" ]; then
+        echo "Nginx is running with SELF-SIGNED certificate"
+        echo "Note: Browsers will show security warnings for self-signed certificates"
+    else
+        echo "Nginx is running and serving HTTPS traffic"
+    fi
+    echo "================================================"
+}
 
-echo ""
-echo "================================================"
-echo "SSL Certificate status: READY"
-if [ "$ENV" = "stage" ]; then
-    echo "Nginx is running with STAGING certificate"
-    echo "Note: Browsers will show security warnings for staging certificates"
-else
-    echo "Nginx is running and serving HTTPS traffic"
-fi
-echo "================================================"
+# Function to run the main application
+run_main() {
+    # Setup certificates and check if new certificate is needed
+    setup_certificates
+    needs_new_cert=$?
+    
+    # Start nginx (works with either existing cert or dummy cert)
+    start_nginx
+    
+    # If we need a new certificate, request it
+    if [ "$needs_new_cert" = 1 ]; then
+        handle_certificate_request
+    else
+        echo ""
+        echo "🎉 USING EXISTING CERTIFICATE - READY TO SERVE TRAFFIC"
+    fi
+    
+    # Show final status
+    show_final_status
+    
+    # Keep the script running
+    wait $nginx_pid
+}
 
-# Keep the script running
-wait $nginx_pid 
+# Main execution
+run_main 
