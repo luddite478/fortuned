@@ -10,7 +10,7 @@ server {
     listen 80;
     listen [::]:80;
     
-    server_name ${DOMAIN};
+    server_name ${SERVER_HOST};
     server_tokens off;
 
     # Let's Encrypt ACME challenge
@@ -28,12 +28,12 @@ server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
     
-    server_name ${DOMAIN};
+    server_name ${SERVER_HOST};
     server_tokens off;
 
     # SSL configuration
-    ssl_certificate /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+    ssl_certificate /etc/letsencrypt/live/${SERVER_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${SERVER_HOST}/privkey.pem;
     
     # SSL security settings
     ssl_protocols TLSv1.2 TLSv1.3;

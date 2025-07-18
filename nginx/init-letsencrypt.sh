@@ -2,9 +2,9 @@
 
 set -e
 
-# Check if domain is set
+# Check if SERVER_HOST is set
 if [ -z "$SERVER_HOST" ]; then
-    echo "Error: DOMAIN environment variable is not set"
+    echo "Error: SERVER_HOST environment variable is not set"
     exit 1
 fi
 
@@ -94,7 +94,7 @@ start_nginx() {
     echo "Starting nginx..."
     
     # Process template and create final config
-    envsubst '${DOMAIN}' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf
+    envsubst '${SERVER_HOST}' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf
     
     # Test nginx configuration
     nginx -t
