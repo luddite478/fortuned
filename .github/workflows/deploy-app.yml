@@ -16,7 +16,7 @@ on:
         required: true
         type: choice
         options:
-          - production
+          - prod
 
 env:
   REPO_DIR_PATH: /home/luddite478/niyya
@@ -29,19 +29,29 @@ jobs:
         include:
           - name: staging
             trigger: push
-          - name: production
+          - name: prod
             trigger: workflow_dispatch
-    # Only run the relevant job based on the event and environment
-    if: |
-      (github.event_name == 'push' && matrix.trigger == 'push') ||
-      (github.event_name == 'workflow_dispatch' && matrix.trigger == 'workflow_dispatch' && github.event.inputs.environment == matrix.name)
     environment: ${{ matrix.name }}
     name: Deploy to ${{ matrix.name }}
     steps:
+      - name: Check if should deploy
+        id: should_deploy
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ matrix.name }}" == "staging" ]]; then
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ matrix.name }}" == "prod" && "${{ github.event.inputs.environment }}" == "prod" ]]; then
+            echo "deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "deploy=false" >> $GITHUB_OUTPUT
+            echo "Skipping ${{ matrix.name }} deployment for ${{ github.event_name }} trigger"
+          fi
+
       - name: Checkout code
+        if: steps.should_deploy.outputs.deploy == 'true'
         uses: actions/checkout@v4
 
       - name: Sync latest changes on ${{ matrix.name }} server
+        if: steps.should_deploy.outputs.deploy == 'true'
         uses: appleboy/ssh-action@v1.1.0
         env:
           REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
@@ -56,6 +66,7 @@ jobs:
             git pull origin main || git pull origin master
 
       - name: Restart Docker Compose on ${{ matrix.name }} server
+        if: steps.should_deploy.outputs.deploy == 'true'
         uses: appleboy/ssh-action@v1.1.0
         env:
           REPO_DIR_PATH: ${{ env.REPO_DIR_PATH }}
@@ -73,6 +84,7 @@ jobs:
             docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
 
       - name: Wait for ${{ matrix.name }} server
+        if: steps.should_deploy.outputs.deploy == 'true'
         timeout-minutes: 3
         run: |
           echo "Waiting for ${{ matrix.name }} server..."
