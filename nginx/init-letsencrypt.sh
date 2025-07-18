@@ -121,7 +121,7 @@ request_certificate() {
     delete_dummy_certificate
     
     # Request certificate
-    certbot certonly --webroot --webroot-path=/var/www/certbot \
+    certbot certonly --staging --webroot --webroot-path=/var/www/certbot \
         --email "$EMAIL" --agree-tos --no-eff-email \
         --force-renewal -d "$SERVER_HOST"
     
