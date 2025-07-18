@@ -16,7 +16,7 @@ on:
         required: true
         type: choice
         options:
-          - prod
+          - production
 
 env:
   REPO_DIR_PATH: /home/luddite478/niyya
@@ -29,7 +29,7 @@ jobs:
         include:
           - name: staging
             trigger: push
-          - name: prod
+          - name: production
             trigger: workflow_dispatch
     environment: ${{ matrix.name }}
     name: Deploy to ${{ matrix.name }}
@@ -39,7 +39,7 @@ jobs:
         run: |
           if [[ "${{ github.event_name }}" == "push" && "${{ matrix.name }}" == "staging" ]]; then
             echo "deploy=true" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ matrix.name }}" == "prod" && "${{ github.event.inputs.environment }}" == "prod" ]]; then
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ matrix.name }}" == "production" ]]; then
             echo "deploy=true" >> $GITHUB_OUTPUT
           else
             echo "deploy=false" >> $GITHUB_OUTPUT
