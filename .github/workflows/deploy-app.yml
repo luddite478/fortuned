@@ -23,12 +23,12 @@ jobs:
     if: github.event_name == 'push'
     uses: ./.github/workflows/deploy-reusable.yml
     with:
-      environment: staging
+      environment: stage
     secrets: inherit
 
   deploy-production:
     if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/deploy-reusable.yml
     with:
-      environment: production
+      environment: prod
     secrets: inherit

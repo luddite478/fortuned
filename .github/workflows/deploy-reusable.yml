@@ -14,7 +14,7 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: stage
+    environment: ${{ inputs.environment }}
     name: Deploy to ${{ inputs.environment }}
     steps:
       - name: Checkout code
