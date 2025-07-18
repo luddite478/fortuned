@@ -16,19 +16,19 @@ on:
         required: true
         type: choice
         options:
-          - production
+          - prod
 
 jobs:
-  deploy-staging:
+  deploy-stage:
     if: github.event_name == 'push'
-    uses: ./.github/workflows/deploy-reusable.yml
+    uses: ./.github/workflows/deploy.yml
     with:
       environment: stage
     secrets: inherit
 
-  deploy-production:
+  deploy-prod:
     if: github.event_name == 'workflow_dispatch'
-    uses: ./.github/workflows/deploy-reusable.yml
+    uses: ./.github/workflows/deploy.yml
     with:
       environment: prod
     secrets: inherit

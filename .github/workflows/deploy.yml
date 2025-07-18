@@ -20,18 +20,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Test available secrets
-        run: |
-          echo "Environment: ${{ inputs.environment }}"
-          echo "Available secrets (names only):"
-          echo '${{ toJSON(secrets) }}' | jq -r 'keys[]' | sort
-          echo "---"
-          echo "Checking specific secrets:"
-          echo "HOST_IP exists: ${{ secrets.HOST_IP != '' }}"
-          echo "SERVER_HOST exists: ${{ secrets.SERVER_HOST != '' }}"
-          echo "SSH_USER exists: ${{ secrets.SSH_USER != '' }}"
-          echo "DROPLET_SSH_KEY exists: ${{ secrets.DROPLET_SSH_KEY != '' }}"
-
       - name: Sync latest changes on ${{ inputs.environment }} server
         uses: appleboy/ssh-action@v1.1.0
         env:
