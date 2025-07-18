@@ -45,13 +45,12 @@ jobs:
           envs: REPO_DIR_PATH
           script: |
             cd "$REPO_DIR_PATH"
-            docker-compose -f docker-compose.envsubst.yaml down
-            rm docker-compose.envsubst.yaml || true
-            export TAILSCALE_IP="$(tailscale ip --4)"
             set -a
             source nginx/.env
             set +a
-            env
+            export TAILSCALE_IP="$(tailscale ip --4)"
+            docker-compose -f docker-compose.envsubst.yaml down
+            rm docker-compose.envsubst.yaml || true
             envsubst < docker-compose.yaml > docker-compose.envsubst.yaml
             docker-compose -f docker-compose.envsubst.yaml up -d --build --force-recreate
 
