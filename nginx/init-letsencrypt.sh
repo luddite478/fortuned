@@ -14,14 +14,24 @@ if [ -z "$EMAIL" ]; then
     exit 1
 fi
 
+# Set environment (default to prod if not set)
+if [ -z "$ENV" ]; then
+    ENV=prod
+fi
+
 data_path="/etc/letsencrypt"
 rsa_key_size=4096
 domain_path="$data_path/live/$SERVER_HOST"
 
 echo "================================================"
 echo "Let's Encrypt SSL Certificate Manager"
-echo "Domain: $SERVER_HOST"
+echo "Host: $SERVER_HOST"
 echo "Certificate path: $domain_path"
+if [ "$ENV" = "stage" ]; then
+    echo "Mode: STAGING (test certificates)"
+else
+    echo "Mode: PRODUCTION (trusted certificates)"
+fi
 echo "================================================"
 
 # Function to validate existing certificate
@@ -55,11 +65,15 @@ validate_certificate() {
     
     echo "✅ Certificate is for the correct domain: $SERVER_HOST"
     
-    # Check if certificate is issued by Let's Encrypt (not a dummy/self-signed certificate)
+    # Check if certificate is issued by Let's Encrypt
     if openssl x509 -in "$cert_path" -text -noout | grep -q "Issuer:.*Let's Encrypt"; then
         # Get certificate expiration date for logging
         local expiry_date=$(openssl x509 -in "$cert_path" -noout -enddate | cut -d= -f2)
-        echo "✅ Valid Let's Encrypt certificate found"
+        if [ "$ENV" = "stage" ]; then
+            echo "✅ Valid Let's Encrypt STAGING certificate found"
+        else
+            echo "✅ Valid Let's Encrypt PRODUCTION certificate found"
+        fi
         echo "   Expires: $expiry_date"
         return 0
     else
@@ -115,17 +129,28 @@ reload_nginx() {
 
 # Function to request certificate
 request_certificate() {
-    echo "Requesting Let's Encrypt certificate for $SERVER_HOST..."
+    if [ "$ENV" = "stage" ]; then
+        echo "Requesting Let's Encrypt STAGING certificate for $SERVER_HOST..."
+        staging_flag="--staging"
+    else
+        echo "Requesting Let's Encrypt PRODUCTION certificate for $SERVER_HOST..."
+        staging_flag=""
+    fi
     
     # Delete dummy certificate
     delete_dummy_certificate
     
     # Request certificate
-    certbot certonly --staging --webroot --webroot-path=/var/www/certbot \
+    certbot certonly --webroot --webroot-path=/var/www/certbot \
         --email "$EMAIL" --agree-tos --no-eff-email \
-        --force-renewal -d "$SERVER_HOST"
+        --force-renewal $staging_flag -d "$SERVER_HOST"
     
-    echo "✅ Real Let's Encrypt certificate obtained for $SERVER_HOST"
+    if [ "$ENV" = "stage" ]; then
+        echo "✅ Let's Encrypt STAGING certificate obtained for $SERVER_HOST"
+        echo "   Note: This is a test certificate and will show as untrusted in browsers"
+    else
+        echo "✅ Let's Encrypt PRODUCTION certificate obtained for $SERVER_HOST"
+    fi
 }
 
 # Main logic
@@ -158,7 +183,11 @@ if [ "$needs_new_cert" = true ]; then
     request_certificate
     reload_nginx
     echo ""
-    echo "🎉 NEW CERTIFICATE SETUP COMPLETE"
+    if [ "$ENV" = "stage" ]; then
+        echo "🎉 STAGING CERTIFICATE SETUP COMPLETE"
+    else
+        echo "🎉 PRODUCTION CERTIFICATE SETUP COMPLETE"
+    fi
 else
     echo ""
     echo "🎉 USING EXISTING CERTIFICATE - READY TO SERVE TRAFFIC"
@@ -167,7 +196,12 @@ fi
 echo ""
 echo "================================================"
 echo "SSL Certificate status: READY"
-echo "Nginx is running and serving HTTPS traffic"
+if [ "$ENV" = "stage" ]; then
+    echo "Nginx is running with STAGING certificate"
+    echo "Note: Browsers will show security warnings for staging certificates"
+else
+    echo "Nginx is running and serving HTTPS traffic"
+fi
 echo "================================================"
 
 # Keep the script running
