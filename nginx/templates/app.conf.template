@@ -6,7 +6,6 @@ upstream websocket_backend {
     server server:8765;
 }
 
-# HTTP server (port 80 or custom)
 server {
     listen ${HTTP_API_PORT};
     listen [::]:${HTTP_API_PORT};
@@ -14,25 +13,10 @@ server {
     server_name ${SERVER_HOST};
     server_tokens off;
 
-    # Let's Encrypt ACME challenge
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
     }
 
-    # WebSocket support on HTTP (optional but useful)
-    location /ws {
-        proxy_pass http://websocket_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection "upgrade";
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_read_timeout 86400;
-    }
-
-    # API endpoints over HTTP
     location / {
         proxy_pass http://api_backend;
         proxy_set_header Host $host;
@@ -42,7 +26,6 @@ server {
     }
 }
 
-# HTTPS server
 server {
     listen ${HTTPS_API_PORT} ssl http2;
     listen [::]:${HTTPS_API_PORT} ssl http2;
@@ -69,13 +52,13 @@ server {
     }
 }
 
-# Optional: WebSocket raw TCP port (only if needed separately)
 server {
     listen ${WEBSOCKET_PORT};
     listen [::]:${WEBSOCKET_PORT};
     
     server_name ${SERVER_HOST};
     server_tokens off;
+    tcp_nodelay on;
 
     location / {
         proxy_pass http://websocket_backend;
