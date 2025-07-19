@@ -6,7 +6,6 @@ from fastapi import Request, Query, HTTPException
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any
 import os
-from http_api.rate_limiter import check_rate_limit
 from pymongo import MongoClient
 from pydantic import BaseModel
 from db.connection import get_database

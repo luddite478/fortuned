@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Request, Query, Body
 from typing import Optional
-from http_api.rate_limiter import check_rate_limit
 from http_api.users import (
     login_handler, 
     register_handler, 
@@ -70,27 +69,6 @@ async def create_thread(request: Request, thread_data: dict):
 async def create_thread_alias(request: Request, thread_data: dict):
     """Create new thread - alias for /threads/create"""
     return await create_thread_handler(request, thread_data)
-
-# Legacy generic endpoint
-# @router.get("/")
-# async def api_handler(
-#     request: Request, 
-#     action: str = Query(..., description="Action to perform"),
-#     data: Optional[str] = Query(None, description="Optional JSON data"),
-#     payload: Optional[str] = Query(None, description="Alternative: full JSON payload")
-# ):
-#     """Single API endpoint - supports both query params and JSON payload"""
-#     check_rate_limit(request)
-    
-#     if payload is None:
-#         result = {
-#             "action": action,
-#             "data": json.loads(data) if data else None
-#         }
-#     else:
-#         result = json.loads(payload)
-    
-#     return {"received": result}
 
 # Project endpoints (aliases for threads for backward compatibility)  
 @router.get("/projects/user")

@@ -11,6 +11,7 @@ current_dir = os.path.dirname(__file__)
 sys.path.insert(0, current_dir)
 
 from http_api.router import router as api_router
+from http_api.rate_limiter import RateLimitMiddleware
 from ws.router import start_websocket_server
 
 # Import database initialization
@@ -33,7 +34,8 @@ app = FastAPI(
     version="0.0.1"
 )
 
-# Include API routes under /api/v1 prefix
+app.add_middleware(RateLimitMiddleware)
+
 app.include_router(api_router, prefix="/api/v1", tags=["API v1"])
 
 def run_ws_server():

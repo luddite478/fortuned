@@ -19,7 +19,6 @@ def verify_token(token: str):
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = Body(...)):
-    check_rate_limit(request)
     verify_token(thread_data.get("token", ""))
     try:
         db = get_db()
@@ -57,7 +56,6 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 async def add_checkpoint_handler(request: Request, thread_id: str, checkpoint_data: Dict[str, Any] = Body(...)):
-    check_rate_limit(request)
     verify_token(checkpoint_data.get("token", ""))
     try:
         db = get_db()
@@ -84,7 +82,6 @@ async def add_checkpoint_handler(request: Request, thread_id: str, checkpoint_da
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
-    check_rate_limit(request)
     verify_token(user_data.get("token", ""))
     try:
         db = get_db()
@@ -119,7 +116,6 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 async def get_threads_handler(request: Request, token: str, limit: int = 50, offset: int = 0, user_id: Optional[str] = None):
-    check_rate_limit(request)
     verify_token(token)
     try:
         db = get_db()
@@ -143,7 +139,6 @@ async def get_threads_handler(request: Request, token: str, limit: int = 50, off
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 async def get_thread_handler(request: Request, thread_id: str, token: str = Query(...)):
-    check_rate_limit(request)
     verify_token(token)
     try:
         db = get_db()
@@ -156,7 +151,6 @@ async def get_thread_handler(request: Request, thread_id: str, token: str = Quer
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 async def update_thread_handler(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
-    check_rate_limit(request)
     verify_token(update_data.get("token", ""))
     try:
         db = get_db()
