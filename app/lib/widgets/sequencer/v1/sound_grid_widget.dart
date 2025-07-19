@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
-import '../../state/sequencer_state.dart';
-import '../stacked_cards_widget.dart';
+import '../../../state/sequencer_state.dart';
+import '../../stacked_cards_widget.dart';
 
 // Darker Gray-Beige Telephone Book Color Scheme for Sequencer
 class SequencerPhoneBookColors {

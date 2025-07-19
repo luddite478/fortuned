@@ -30,6 +30,37 @@ enum MultitaskPanelMode {
   recordingWidget,
 }
 
+// Sequencer layout options
+enum SequencerLayoutVersion {
+  v1,
+  v2,
+  v3,
+}
+
+extension SequencerLayoutVersionExtension on SequencerLayoutVersion {
+  String get displayName {
+    switch (this) {
+      case SequencerLayoutVersion.v1:
+        return 'V1';
+      case SequencerLayoutVersion.v2:
+        return 'V2';
+      case SequencerLayoutVersion.v3:
+        return 'V3';
+    }
+  }
+  
+  String get folderName {
+    switch (this) {
+      case SequencerLayoutVersion.v1:
+        return 'v1';
+      case SequencerLayoutVersion.v2:
+        return 'v2';
+      case SequencerLayoutVersion.v3:
+        return 'v3';
+    }
+  }
+}
+
 // Undo-Redo System for Sequencer State
 enum UndoRedoActionType {
   gridCellChange,
@@ -218,6 +249,9 @@ class SequencerState extends ChangeNotifier {
   int _activeBank = 0;
   int? _activePad;
   int? _selectedSampleSlot; // Track which sample is selected for placement
+  
+  // Layout settings
+  SequencerLayoutVersion _selectedLayout = SequencerLayoutVersion.v1;
   
   // Grid configuration
   int _gridColumns = 4;
@@ -873,6 +907,7 @@ class SequencerState extends ChangeNotifier {
   bool get isShowingShareWidget => _currentPanelMode == MultitaskPanelMode.shareWidget;
   bool get isShowingSampleSettings => _currentPanelMode == MultitaskPanelMode.sampleSettings;
   bool get isShowingCellSettings => _currentPanelMode == MultitaskPanelMode.cellSettings;
+  SequencerLayoutVersion get selectedLayout => _selectedLayout;
   int? get selectedCellForSettings => _selectedCellForSettings;
   bool get showMasterSettings => _currentPanelMode == MultitaskPanelMode.masterSettings;
   bool get isStepInsertMode => _isStepInsertMode;
@@ -942,6 +977,18 @@ class SequencerState extends ChangeNotifier {
       _currentPanelMode = mode;
       // UI changes need immediate notification for responsiveness
       _notifyImmediately(SequencerChangeType.ui);
+    }
+  }
+  
+  // Layout selection setter
+  void setSelectedLayout(SequencerLayoutVersion layout) {
+    if (_selectedLayout != layout) {
+      _selectedLayout = layout;
+      // Trigger autosave when layout changes
+      _triggerAutosave();
+      // UI changes need immediate notification
+      _notifyImmediately(SequencerChangeType.ui);
+      debugPrint('🎨 Layout changed to ${layout.displayName}');
     }
   }
   
@@ -2557,6 +2604,7 @@ Made with Demo Sequencer 🚀
       'gridRows': _gridRows,
       'currentSoundGridIndex': _currentSoundGridIndex,
       'activeBank': _activeBank,
+      'selectedLayout': _selectedLayout.name, // Save layout as string
       'filePaths': _filePaths,
       'fileNames': _fileNames,
       'slotLoaded': _slotLoaded,
@@ -2578,6 +2626,19 @@ Made with Demo Sequencer 🚀
       _gridRows = state['gridRows'] ?? 16;
       _currentSoundGridIndex = state['currentSoundGridIndex'] ?? 0;
       _activeBank = state['activeBank'] ?? 0;
+      
+      // Apply layout selection
+      final layoutName = state['selectedLayout'] as String?;
+      if (layoutName != null) {
+        try {
+          _selectedLayout = SequencerLayoutVersion.values.firstWhere(
+            (layout) => layout.name == layoutName,
+            orElse: () => SequencerLayoutVersion.v1,
+          );
+        } catch (e) {
+          _selectedLayout = SequencerLayoutVersion.v1; // Default fallback
+        }
+      }
       
       // Apply file paths and names
       final filePaths = List<String?>.from(state['filePaths'] ?? []);

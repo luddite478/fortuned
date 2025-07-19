@@ -62,6 +62,8 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     }
   }
 
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -78,6 +80,13 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // General Settings Section
+              const SizedBox(height: 24),
+              
+              // Layout Settings Section
+              _buildSectionHeader('Layout Settings'),
+              const SizedBox(height: 16),
+              _buildLayoutSelection(),
+              
               const SizedBox(height: 24),
               
               // Debug Settings Section
@@ -171,6 +180,83 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
         ),
         onTap: onTap,
       ),
+    );
+  }
+
+  Widget _buildLayoutSelection() {
+    return Consumer<SequencerState>(
+      builder: (context, sequencerState, child) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: SequencerPhoneBookColors.surfaceBase,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: SequencerPhoneBookColors.border,
+              width: 1,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.dashboard,
+                    color: SequencerPhoneBookColors.accent,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Sequencer Layout',
+                    style: GoogleFonts.sourceSans3(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: SequencerPhoneBookColors.text,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              
+              const SizedBox(height: 8),
+              
+              // Layout options
+              ...SequencerLayoutVersion.values.map((layout) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  child: RadioListTile<SequencerLayoutVersion>(
+                    value: layout,
+                    groupValue: sequencerState.selectedLayout,
+                    onChanged: (value) {
+                      if (value != null) {
+                        sequencerState.setSelectedLayout(value);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Layout changed to ${value.displayName}'),
+                            backgroundColor: Colors.green,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    title: Text(
+                      layout.displayName,
+                      style: GoogleFonts.sourceSans3(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: SequencerPhoneBookColors.text,
+                      ),
+                    ),
+                    activeColor: SequencerPhoneBookColors.accent,
+                    dense: true,
+                  ),
+                );
+              }).toList(),
+            ],
+          ),
+        );
+      },
     );
   }
 

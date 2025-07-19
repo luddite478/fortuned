@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../state/sequencer_state.dart';
+import '../../../state/sequencer_state.dart';
 
 // 🎯 PERFORMANCE: Volume slider using ValueListenableBuilder
 // This widget only rebuilds when the specific volume value changes,

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../state/sequencer_state.dart';
+import '../../../state/sequencer_state.dart';
 import 'recording_widget.dart';
 import 'sample_selection_widget.dart';
 import 'share_widget.dart';

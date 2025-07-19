@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
-import '../../state/sequencer_state.dart';
-import '../../state/threads_state.dart';
+import '../../../state/sequencer_state.dart';
+import '../../../state/threads_state.dart';
 
 class ShareWidget extends StatelessWidget {
   const ShareWidget({super.key});

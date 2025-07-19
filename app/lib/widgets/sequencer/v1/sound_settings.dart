@@ -2,8 +2,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../../state/sequencer_state.dart';
-import '../../utils/musical_notes.dart';
+import '../../../state/sequencer_state.dart';
+import '../../../utils/musical_notes.dart';
 
 // Simple musical notes helper
 class MusicalNotes {

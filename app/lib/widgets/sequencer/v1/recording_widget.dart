@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
-import '../../state/sequencer_state.dart';
+import '../../../state/sequencer_state.dart';
 
 class RecordingWidget extends StatelessWidget {
   const RecordingWidget({super.key});
