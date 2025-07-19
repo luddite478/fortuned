@@ -1,11 +1,13 @@
-from fastapi import Request, Body, HTTPException, Query
-from http_api.rate_limiter import check_rate_limit
-from pymongo import MongoClient
-from typing import Dict, Any, Optional
-from datetime import datetime
 import uuid
+import json
+from datetime import datetime, timezone
+from fastapi import Request, Query, HTTPException, Body
+from typing import Optional, Dict, Any, List
 import os
 from db.connection import get_database
+
+# Initialize database connection
+db = get_database()
 
 API_TOKEN = os.getenv("API_TOKEN")
 

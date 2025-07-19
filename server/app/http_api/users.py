@@ -11,6 +11,9 @@ from pymongo import MongoClient
 from pydantic import BaseModel
 from db.connection import get_database
 
+# Initialize database connection
+db = get_database()
+
 API_TOKEN = os.getenv("API_TOKEN")
 
 # Pydantic models for request/response
