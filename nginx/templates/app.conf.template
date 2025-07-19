@@ -1,3 +1,7 @@
+log_format upstream_log '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
+                        '$request_time $upstream_response_time $upstream_addr $upstream_status';
+
 upstream api_backend {
     server server:5000;
 }
@@ -12,6 +16,8 @@ server {
     
     server_name ${SERVER_HOST};
     server_tokens off;
+
+    access_log /var/log/nginx/access.log upstream_log;
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
@@ -32,6 +38,8 @@ server {
     
     server_name ${SERVER_HOST};
     server_tokens off;
+
+    access_log /var/log/nginx/access.log upstream_log;
 
     ssl_certificate /etc/letsencrypt/live/${SERVER_HOST}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${SERVER_HOST}/privkey.pem;
@@ -55,6 +63,8 @@ server {
 server {
     listen ${WEBSOCKET_PORT};
     listen [::]:${WEBSOCKET_PORT};
+
+    access_log /var/log/nginx/access.log upstream_log;
     
     server_name ${SERVER_HOST};
     server_tokens off;

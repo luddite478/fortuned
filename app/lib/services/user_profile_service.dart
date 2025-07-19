@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../state/threads_state.dart';
+import 'http_client.dart';
 
 class UserProfile {
   final String id;
@@ -240,10 +241,10 @@ class AuthResponse {
 
 class UserProfileService {
   static String get _baseUrl {
-    final serverIp = dotenv.env['SERVER_HOST'] ?? 'localhost';
-    // Use HTTPS for production, HTTP for localhost development
-    final protocol = serverIp == 'localhost' ? 'http' : 'https';
-    final port = serverIp == 'localhost' ? ':8888' : '';
+    final serverIp = dotenv.env['SERVER_HOST'] ?? '';
+    final apiPort = dotenv.env['HTTPS_API_PORT'] ?? '443';
+    final protocol = 'https';
+    final port = apiPort == '443' ? '' : ':$apiPort';
     return '$protocol://$serverIp$port/api/v1';
   }
   
@@ -258,14 +259,11 @@ class UserProfileService {
   static Future<AuthResponse> login(String email, String password) async {
     try {
       final loginRequest = LoginRequest(email: email, password: password);
-      final url = Uri.parse('$_baseUrl/auth/login');
+      
+      print('Attempting login to: /auth/login');
 
-      print('Attempting login to: $url');
-
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(loginRequest.toJson()),
+      final response = await ApiHttpClient.post('/auth/login', 
+        body: loginRequest.toJson(),
       );
 
       print('Login response status: ${response.statusCode}');
@@ -290,14 +288,11 @@ class UserProfileService {
         email: email,
         password: password,
       );
-      final url = Uri.parse('$_baseUrl/auth/register');
 
-      print('Attempting registration to: $url');
+      print('Attempting registration to: /auth/register');
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode(registerRequest.toJson()),
+      final response = await ApiHttpClient.post('/auth/register', 
+        body: registerRequest.toJson(),
       );
 
       print('Register response status: ${response.statusCode}');
@@ -325,22 +320,15 @@ class UserProfileService {
         await dotenv.load(fileName: ".env");
       }
       
-      final token = _apiToken;
-      print('Using token: "$token"');
-      
       final queryParams = {
-        'token': token,
         'limit': limit.toString(),
         'offset': offset.toString(),
       };
       print('Query params: $queryParams');
       
-      final url = Uri.parse('$_baseUrl/users/list')
-          .replace(queryParameters: queryParams);
+      print('Fetching users from: /users/list');
 
-      print('Fetching users from: $url');
-
-      final response = await http.get(url);
+      final response = await ApiHttpClient.getWithAuth('/users/list', queryParams: queryParams);
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
@@ -361,15 +349,13 @@ class UserProfileService {
 
   static Future<UserProfile> getUser(String userId) async {
     try {
-      final url = Uri.parse('$_baseUrl/users/user')
-          .replace(queryParameters: {
+      final queryParams = {
         'id': userId,
-        'token': _apiToken,
-      });
+      };
 
-      print('Fetching user from: $url');
+      print('Fetching user from: /users/user');
 
-      final response = await http.get(url);
+      final response = await ApiHttpClient.getWithAuth('/users/user', queryParams: queryParams);
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');

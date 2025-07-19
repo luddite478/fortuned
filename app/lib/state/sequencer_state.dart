@@ -13,6 +13,7 @@ import '../services/reliable_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../sequencer_library.dart';
+import '../services/http_client.dart';
 import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
 import '../services/threads_service.dart';
@@ -3050,22 +3051,11 @@ Made with Demo Sequencer 🚀
       };
 
       // Send update to server
-      final serverIp = dotenv.env['SERVER_HOST'] ?? 'localhost';
-      final apiToken = dotenv.env['API_TOKEN'] ?? '';
-      final url = _buildApiUrl('threads/$threadId');
-      
-      debugPrint('🌐 Updating thread at URL: $url');
+      debugPrint('🌐 Updating thread at URL: /threads/$threadId');
       debugPrint('📝 Making thread public: $isPublic');
       debugPrint('🆔 Thread ID: $threadId');
       
-      // Add token to the data
-      updateData['token'] = apiToken;
-      
-      final response = await http.put(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(updateData),
-      );
+      final response = await ApiHttpClient.putWithAuth('/threads/$threadId', body: updateData);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('✅ Successfully updated thread to public (status: ${response.statusCode})');
@@ -3156,19 +3146,9 @@ Made with Demo Sequencer 🚀
       };
 
       // Send thread creation request
-      final serverIp = dotenv.env['SERVER_HOST'] ?? 'localhost';
-      final apiToken = dotenv.env['API_TOKEN'] ?? '';
-      final threadsUrl = _buildApiUrl('threads');
+      debugPrint('🌐 Creating thread at URL: /threads');
       
-      debugPrint('🌐 Creating thread at URL: $threadsUrl');
-      
-      threadData['token'] = apiToken;
-      
-      final threadResponse = await http.post(
-        Uri.parse(threadsUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(threadData),
-      );
+      final threadResponse = await ApiHttpClient.postWithAuth('/threads', body: threadData);
 
       if (threadResponse.statusCode != 200 && threadResponse.statusCode != 201) {
         debugPrint('❌ Failed to create thread: ${threadResponse.statusCode} - ${threadResponse.body}');
@@ -3236,19 +3216,13 @@ Made with Demo Sequencer 🚀
       };
       
       // Add checkpoint to the thread
-      final checkpointUrl = _buildApiUrl('threads/$newThreadId/checkpoints');
-      debugPrint('🌐 Adding checkpoint at URL: $checkpointUrl');
+      debugPrint('🌐 Adding checkpoint at URL: /threads/$newThreadId/checkpoints');
       
       final checkpointData = {
         'checkpoint': checkpoint,
-        'token': apiToken,
       };
       
-      final checkpointResponse = await http.post(
-        Uri.parse(checkpointUrl),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(checkpointData),
-      );
+      final checkpointResponse = await ApiHttpClient.postWithAuth('/threads/$newThreadId/checkpoints', body: checkpointData);
 
       if (checkpointResponse.statusCode != 200 && checkpointResponse.statusCode != 201) {
         debugPrint('❌ Failed to add checkpoint: ${checkpointResponse.statusCode} - ${checkpointResponse.body}');
@@ -3717,10 +3691,10 @@ Made with Demo Sequencer 🚀
 
   /// Helper method to build API URLs with proper protocol and port
   String _buildApiUrl(String endpoint) {
-    final serverIp = dotenv.env['SERVER_HOST'] ?? 'localhost';
-    // Use HTTPS for production, HTTP for localhost development
-    final protocol = serverIp == 'localhost' ? 'http' : 'https';
-    final port = serverIp == 'localhost' ? ':8888' : '';
+    final serverIp = dotenv.env['SERVER_HOST'] ?? '';
+    final apiPort = dotenv.env['HTTPS_API_PORT'] ?? '443';
+    final protocol = 'https';
+    final port = apiPort == '443' ? '' : ':$apiPort';
     return '$protocol://$serverIp$port/api/v1/$endpoint';
   }
 

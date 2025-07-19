@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import 'screens/users_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/chat_client.dart';
+import 'services/http_client.dart';
 import 'state/sequencer_state.dart';
 import 'state/threads_state.dart';
 // import 'state/patterns_state.dart';
@@ -16,6 +18,14 @@ void main() async {
   print('Loaded .env file');
   print('API_TOKEN: "${dotenv.env['API_TOKEN']}"');
   print('All env keys: ${dotenv.env.keys.toList()}');
+  
+  // Apply DevHttpOverrides for stage environment to trust self-signed certificates
+  final env = dotenv.env['ENV'] ?? '';
+  if (env == 'stage') {
+    HttpOverrides.global = DevHttpOverrides();
+    print('Applied DevHttpOverrides for stage environment');
+  }
+  
   runApp(const NiyyaApp());
 }
 

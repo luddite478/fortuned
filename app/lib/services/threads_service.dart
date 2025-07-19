@@ -2,13 +2,14 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../state/threads_state.dart';
+import 'http_client.dart';
 
 class ThreadsService {
   static String get _baseUrl {
-    final serverIp = dotenv.env['SERVER_HOST'] ?? 'localhost';
-    // Use HTTPS for production, HTTP for localhost development
-    final protocol = serverIp == 'localhost' ? 'http' : 'https';
-    final port = serverIp == 'localhost' ? ':8888' : '';
+    final serverIp = dotenv.env['SERVER_HOST'] ?? '';
+    final apiPort = dotenv.env['HTTPS_API_PORT'] ?? '443';
+    final protocol = 'https';
+    final port = apiPort == '443' ? '' : ':$apiPort';
     return '$protocol://$serverIp$port/api/v1';
   }
   
@@ -25,24 +26,17 @@ class ThreadsService {
     Map<String, dynamic> metadata = const {},
   }) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads');
-      
       final body = <String, dynamic>{
         'title': title,
         'users': users.map((u) => u.toJson()).toList(),
         'metadata': metadata,
-        'token': _apiToken,
       };
       
       if (initialCheckpoint != null) {
         body['initial_checkpoint'] = initialCheckpoint.toJson();
       }
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode(body),
-      );
+      final response = await ApiHttpClient.postWithAuth('/threads', body: body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final jsonData = json.decode(response.body);
@@ -58,18 +52,11 @@ class ThreadsService {
   // Add a checkpoint to an existing thread
   static Future<void> addCheckpoint(String threadId, ThreadCheckpoint checkpoint) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/$threadId/checkpoints');
-      
-      final body = jsonEncode({
+      final body = {
         'checkpoint': checkpoint.toJson(),
-        'token': _apiToken,
-      });
+      };
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await ApiHttpClient.postWithAuth('/threads/$threadId/checkpoints', body: body);
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Failed to add checkpoint: ${response.statusCode} ${response.body}');
@@ -82,19 +69,12 @@ class ThreadsService {
   // Join an existing thread
   static Future<void> joinThread(String threadId, String userId, String userName) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/$threadId/users');
-      
-      final body = jsonEncode({
+      final body = {
         'user_id': userId,
         'user_name': userName,
-        'token': _apiToken,
-      });
+      };
 
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await ApiHttpClient.postWithAuth('/threads/$threadId/users', body: body);
 
       if (response.statusCode != 200 && response.statusCode != 201) {
         throw Exception('Failed to join thread: ${response.statusCode} ${response.body}');
@@ -114,16 +94,13 @@ class ThreadsService {
       final queryParams = {
         'limit': limit.toString(),
         'offset': offset.toString(),
-        'token': _apiToken,
       };
       
       if (userId != null) {
         queryParams['user_id'] = userId;
       }
 
-      final url = Uri.parse('$_baseUrl/threads/list').replace(queryParameters: queryParams);
-      
-      final response = await http.get(url);
+      final response = await ApiHttpClient.getWithAuth('/threads/list', queryParams: queryParams);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -141,12 +118,11 @@ class ThreadsService {
   // Get a specific thread
   static Future<Thread?> getThread(String threadId) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/thread').replace(queryParameters: {
+      final queryParams = {
         'id': threadId,
-        'token': _apiToken,
-      });
+      };
       
-      final response = await http.get(url);
+      final response = await ApiHttpClient.getWithAuth('/threads/thread', queryParams: queryParams);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -176,23 +152,13 @@ class ThreadsService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/$threadId');
-      
-      final updateData = <String, dynamic>{
-        'token': _apiToken,
-      };
+      final updateData = <String, dynamic>{};
       
       if (title != null) updateData['title'] = title;
       if (status != null) updateData['status'] = status.name;
       if (metadata != null) updateData['metadata'] = metadata;
 
-      final body = jsonEncode(updateData);
-
-      final response = await http.put(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+      final response = await ApiHttpClient.putWithAuth('/threads/$threadId', body: updateData);
 
       if (response.statusCode != 200) {
         throw Exception('Failed to update thread: ${response.statusCode} ${response.body}');
@@ -205,11 +171,7 @@ class ThreadsService {
   // Delete a thread (archive it)
   static Future<void> deleteThread(String threadId) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/$threadId').replace(queryParameters: {
-        'token': _apiToken,
-      });
-      
-      final response = await http.delete(url);
+      final response = await ApiHttpClient.deleteWithAuth('/threads/$threadId');
 
       if (response.statusCode != 200 && response.statusCode != 204) {
         throw Exception('Failed to delete thread: ${response.statusCode} ${response.body}');
@@ -222,11 +184,7 @@ class ThreadsService {
   // Get thread statistics
   static Future<Map<String, dynamic>> getThreadStats() async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/stats').replace(queryParameters: {
-        'token': _apiToken,
-      });
-      
-      final response = await http.get(url);
+      final response = await ApiHttpClient.getWithAuth('/threads/stats');
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
@@ -245,14 +203,13 @@ class ThreadsService {
     int offset = 0,
   }) async {
     try {
-      final url = Uri.parse('$_baseUrl/threads/search').replace(queryParameters: {
+      final queryParams = {
         'q': query,
         'limit': limit.toString(),
         'offset': offset.toString(),
-        'token': _apiToken,
-      });
+      };
       
-      final response = await http.get(url);
+      final response = await ApiHttpClient.getWithAuth('/threads/search', queryParams: queryParams);
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);

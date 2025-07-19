@@ -2,23 +2,23 @@
 
 set -e
 
-DEVICE_TYPE="$1"
-IPHONE_MODEL="$2"
-
-if [[ "$DEVICE_TYPE" != "simulator" && "$DEVICE_TYPE" != "physical" ]]; then
-  echo "Usage: $0 [simulator|physical] [iPhone_model]"
-  echo "Examples:"
-  echo "  $0 simulator \"iPhone 15\""
-  echo "  $0 simulator \"iPhone 15 Pro\""
-  echo "  $0 simulator \"iPhone SE (3rd generation)\""
-  echo "  $0 physical"
-  exit 1
-fi
+ENVIRONMENT="$1"
+DEVICE_TYPE="$2"
+IPHONE_MODEL="$3"
 
 # Set default iPhone model if not provided for simulator
 if [[ "$DEVICE_TYPE" == "simulator" && -z "$IPHONE_MODEL" ]]; then
   IPHONE_MODEL="iPhone 15"
   echo "No iPhone model specified, using default: $IPHONE_MODEL"
+fi
+
+# Copy appropriate environment file
+if [[ "$ENVIRONMENT" == "stage" ]]; then
+  cp .stage.env .env
+  echo "Using stage environment (.stage.env)"
+elif [[ "$ENVIRONMENT" == "prod" ]]; then
+  cp .prod.env .env
+  echo "Using production environment (.prod.env)"
 fi
 
 # Step 1: Find all directories (including empty ones) in samples folder

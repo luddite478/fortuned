@@ -20,11 +20,10 @@ class ChatClient {
   
   // Simple server configuration from environment
   static String get serverUrl {
-    final host = dotenv.env['WEBSOCKET_HOST'] ?? 'localhost';
+    final host = dotenv.env['WEBSOCKET_HOST'] ?? '';
     final port = dotenv.env['WEBSOCKET_PORT'] ?? '8765';
-    // Use WSS for production, WS for localhost development
-    final protocol = host == 'localhost' ? 'ws' : 'wss';
-    final portSuffix = host == 'localhost' ? ':$port' : (port == '443' ? '' : ':$port');
+    final protocol = 'wss';
+    final portSuffix = port == '443' ? '' : ':$port';
     return '$protocol://$host$portSuffix';
   }
   
