@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'sequencer/top_multitask_panel_widget.dart';
-import 'sequencer/sample_banks_widget.dart'; // Legacy - commented out
-import 'sequencer/sound_grid_widget.dart';
-import 'sequencer/edit_buttons_widget.dart';
+import 'sequencer/v1/top_multitask_panel_widget.dart';
+import 'sequencer/v1/sample_banks_widget.dart'; // Legacy - commented out
+import 'sequencer/v1/sound_grid_widget.dart';
+import 'sequencer/v1/edit_buttons_widget.dart';
 import '../state/sequencer_state.dart';
 
 class SequencerWidget extends StatelessWidget {

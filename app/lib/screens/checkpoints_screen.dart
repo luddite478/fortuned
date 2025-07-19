@@ -23,18 +23,23 @@ class PhoneBookColors {
 
 class CheckpointsScreen extends StatefulWidget {
   final String threadId;
+  final bool highlightNewest;
   
   const CheckpointsScreen({
     super.key,
     required this.threadId,
+    this.highlightNewest = false,
   });
 
   @override
   State<CheckpointsScreen> createState() => _CheckpointsScreenState();
 }
 
-class _CheckpointsScreenState extends State<CheckpointsScreen> {
+class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+  AnimationController? _colorAnimationController;
+  Animation<Color?>? _colorAnimation;
+  String? _highlightCheckpointId;
 
   // Chat layout configuration - easily adjustable percentages
   static const double _currentUserLeftMarginPercent = 0.25;   // 25% margin on left for current user messages
@@ -45,6 +50,39 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // Set up color transition animation if highlighting newest checkpoint
+    if (widget.highlightNewest) {
+      _colorAnimationController = AnimationController(
+        duration: const Duration(seconds: 1),
+        vsync: this,
+      );
+      
+      // Define colors for the animation
+      final Color originalColor = PhoneBookColors.checkpointBackground;
+      final Color highlightColor = Colors.lightBlue.withOpacity(0.3);
+      
+      _colorAnimation = ColorTween(
+        begin: originalColor,
+        end: highlightColor,
+      ).animate(CurvedAnimation(
+        parent: _colorAnimationController!,
+        curve: Curves.easeInOut,
+      ));
+      
+      // Start color transition after a short delay
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          // Forward to light blue, then reverse back to original
+          _colorAnimationController?.forward().then((_) {
+            if (mounted) {
+              _colorAnimationController?.reverse();
+            }
+          });
+        }
+      });
+    }
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshThreadData();
       _scrollToBottom();
@@ -212,14 +250,31 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
                   itemBuilder: (context, index) {
                     final checkpoint = thread.checkpoints[index];
                     final isCurrentUser = checkpoint.userId == threadsState.currentUserId;
+                    final isNewest = index == thread.checkpoints.length - 1;
+                    final shouldHighlight = widget.highlightNewest && isNewest && _colorAnimation != null;
                     
-                    return _buildCheckpointMessage(
-                      context,
-                      checkpoint,
-                      isCurrentUser,
-                      sequencerState,
-                      threadsState,
-                    );
+                    // Apply color animation to newest checkpoint if highlighting enabled
+                    return shouldHighlight
+                        ? AnimatedBuilder(
+                            animation: _colorAnimation!,
+                            builder: (context, child) {
+                              return _buildCheckpointMessage(
+                                context,
+                                checkpoint,
+                                isCurrentUser,
+                                sequencerState,
+                                threadsState,
+                                highlightColor: _colorAnimation!.value,
+                              );
+                            },
+                          )
+                        : _buildCheckpointMessage(
+                            context,
+                            checkpoint,
+                            isCurrentUser,
+                            sequencerState,
+                            threadsState,
+                          );
                   },
                 ),
               ),
@@ -237,15 +292,16 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
     bool isCurrentUser,
     SequencerState sequencerState,
     ThreadsState threadsState,
+    {Color? highlightColor}
   ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 8), // Regular messenger spacing
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: isCurrentUser 
+          color: highlightColor ?? (isCurrentUser 
               ? PhoneBookColors.currentUserCheckpoint 
-              : PhoneBookColors.checkpointBackground,
+              : PhoneBookColors.checkpointBackground),
           borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
             color: PhoneBookColors.border,
@@ -737,6 +793,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _colorAnimationController?.dispose();
     super.dispose();
   }
 }

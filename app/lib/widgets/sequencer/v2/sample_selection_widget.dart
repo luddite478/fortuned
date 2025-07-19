@@ -16,6 +16,23 @@ class SequencerPhoneBookColors {
   static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
 }
 
+// Main sizing control variables for easy adjustment
+class SampleBrowserSizing {
+  // Tile dimensions
+  static const double tileAspectRatio = 2.0; // Width:Height ratio (makes tiles shorter)
+  static const double tileSpacing = 2.0; // Spacing between tiles in percent of screen width
+  static const double tilePadding = 1.5; // Internal padding in percent of tile size
+  
+  // File tile split ratios
+  static const double playButtonAreaRatio = 0.5; // Top 50% for play button
+  static const double pickAreaRatio = 0.5; // Bottom 50% for file info
+  
+  // Button sizes
+  static const double headerButtonHeight = 12.0; // Header buttons height in percent of header
+  static const double closeButtonSize = 8.0; // Close button size in percent of screen width
+  static const double backButtonHeight = 8.0; // Back button height in percent of header
+}
+
 class SampleSelectionWidget extends StatelessWidget {
   const SampleSelectionWidget({super.key});
 
@@ -57,100 +74,123 @@ class SampleSelectionWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header with sample selection info
-          Row(
-            children: [
-              if (sequencerState.currentSamplePath.isNotEmpty) ...[
-                GestureDetector(
-                  onTap: () => sequencerState.navigateBackInSamples(),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: SequencerPhoneBookColors.surfaceRaised,
-                      borderRadius: BorderRadius.circular(2), // Sharp corners
-                      border: Border.all(
-                        color: SequencerPhoneBookColors.border,
-                        width: 0.5,
-                      ),
-                      boxShadow: [
-                        // Protruding effect for back button
-                        BoxShadow(
-                          color: SequencerPhoneBookColors.shadow,
-                          blurRadius: 1,
-                          offset: const Offset(0, 1),
+          // Header with sample selection info - using responsive sizing
+          LayoutBuilder(
+            builder: (context, headerConstraints) {
+              final screenWidth = headerConstraints.maxWidth;
+              final backButtonHeight = screenWidth * (SampleBrowserSizing.backButtonHeight / 100);
+              final closeButtonSize = screenWidth * (SampleBrowserSizing.closeButtonSize / 100);
+              final headerFontSize = screenWidth * 0.035;
+              final pathFontSize = screenWidth * 0.025;
+              
+              return Row(
+                children: [
+                  if (sequencerState.currentSamplePath.isNotEmpty) ...[
+                                          GestureDetector(
+                        onTap: () {
+                          // Navigation works the same for both browsers
+                          sequencerState.navigateBackInSamples();
+                        },
+                      child: Container(
+                        height: backButtonHeight.clamp(32.0, 50.0),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: screenWidth * 0.03,
+                          vertical: screenWidth * 0.01,
                         ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.arrow_back, 
-                          color: SequencerPhoneBookColors.text, 
-                          size: 12
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          'BACK',
-                          style: GoogleFonts.sourceSans3(
-                            color: SequencerPhoneBookColors.text,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1,
+                        decoration: BoxDecoration(
+                          color: SequencerPhoneBookColors.surfaceRaised,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: SequencerPhoneBookColors.border,
+                            width: 1,
                           ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: SequencerPhoneBookColors.shadow,
+                              blurRadius: 3,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
-              Expanded(
-                child: Text(
-                  sequencerState.currentSamplePath.isEmpty 
-                      ? 'samples/' 
-                      : 'samples/${sequencerState.currentSamplePath.join('/')}/',
-                  style: GoogleFonts.sourceSans3(
-                    color: SequencerPhoneBookColors.lightText,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w400,
-                    letterSpacing: 0.3,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              GestureDetector(
-                onTap: () => sequencerState.cancelSampleSelection(),
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: SequencerPhoneBookColors.surfacePressed,
-                    borderRadius: BorderRadius.circular(2), // Sharp corners
-                    border: Border.all(
-                      color: SequencerPhoneBookColors.accent.withOpacity(0.8),
-                      width: 0.5,
-                    ),
-                    boxShadow: [
-                      // Recessed effect for close button
-                      BoxShadow(
-                        color: SequencerPhoneBookColors.shadow,
-                        blurRadius: 1,
-                        offset: const Offset(0, 0.5),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.arrow_back, 
+                              color: SequencerPhoneBookColors.text, 
+                              size: (headerFontSize * 1.2).clamp(14.0, 20.0),
+                            ),
+                            SizedBox(width: screenWidth * 0.015),
+                            Text(
+                              'BACK',
+                              style: GoogleFonts.sourceSans3(
+                                color: SequencerPhoneBookColors.text,
+                                fontSize: headerFontSize.clamp(12.0, 16.0),
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
+                    ),
+                    SizedBox(width: screenWidth * 0.02),
+                  ],
+                  Expanded(
+                    child: Text(
+                      sequencerState.currentSamplePath.isEmpty 
+                          ? 'samples/' 
+                          : 'samples/${sequencerState.currentSamplePath.join('/')}/',
+                      style: GoogleFonts.sourceSans3(
+                        color: SequencerPhoneBookColors.lightText,
+                        fontSize: pathFontSize.clamp(10.0, 14.0),
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: 0.3,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  child: Icon(
-                    Icons.close,
-                    color: SequencerPhoneBookColors.accent,
-                    size: 14,
+                  GestureDetector(
+                    onTap: () {
+                      // Use appropriate close method based on usage context
+                      if (sequencerState.isBodyElementSampleBrowserOpen) {
+                        sequencerState.closeBodyElementSampleBrowser();
+                      } else {
+                        sequencerState.cancelSampleSelection();
+                      }
+                    },
+                    child: Container(
+                      width: closeButtonSize.clamp(40.0, 60.0),
+                      height: closeButtonSize.clamp(40.0, 60.0),
+                      decoration: BoxDecoration(
+                        color: SequencerPhoneBookColors.surfacePressed,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: SequencerPhoneBookColors.accent.withOpacity(0.8),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: SequencerPhoneBookColors.shadow,
+                            blurRadius: 3,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        Icons.close,
+                        color: SequencerPhoneBookColors.accent,
+                        size: (closeButtonSize * 0.5).clamp(18.0, 28.0),
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           
-          // Horizontal scrollable sample list showing 3 full items + partial 4th
+          // Vertical scrolling 2-column grid as requested
           Expanded(
             child: sequencerState.currentSampleItems.isEmpty
                 ? Center(
@@ -176,212 +216,204 @@ class SampleSelectionWidget extends StatelessWidget {
                   )
                 : LayoutBuilder(
                     builder: (context, constraints) {
-                      // Calculate item width: show 3 full items + 40% of 4th item
-                      final itemWidth = (constraints.maxWidth - 24) / 3.4; // 3 items + 0.4 of next + margins
+                      final screenWidth = constraints.maxWidth;
+                      final spacing = screenWidth * (SampleBrowserSizing.tileSpacing / 100);
                       
-                      return SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: sequencerState.currentSampleItems.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final item = entry.value;
+                      return GridView.builder(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2, // 2 columns as requested
+                          crossAxisSpacing: spacing,
+                          mainAxisSpacing: spacing,
+                          childAspectRatio: SampleBrowserSizing.tileAspectRatio, // Controlled aspect ratio
+                        ),
+                        itemCount: sequencerState.currentSampleItems.length,
+                        padding: EdgeInsets.all(spacing),
+                    itemBuilder: (context, index) {
+                      final item = sequencerState.currentSampleItems[index];
                             
-                            return Container(
-                              width: itemWidth,
-                              height: constraints.maxHeight,
-                              margin: EdgeInsets.only(right: index < sequencerState.currentSampleItems.length - 1 ? 8 : 0),
-                              child: GestureDetector(
-                                onTap: () => sequencerState.selectSampleItem(item),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: item.isFolder 
-                                        ? SequencerPhoneBookColors.surfaceRaised
-                                        : SequencerPhoneBookColors.accent.withOpacity(0.3),
-                                    borderRadius: BorderRadius.circular(2), // Sharp corners
-                                    border: Border.all(
-                                      color: item.isFolder 
-                                          ? SequencerPhoneBookColors.border
-                                          : SequencerPhoneBookColors.accent.withOpacity(0.6),
-                                      width: 1,
-                                    ),
-                                    boxShadow: [
-                                      // Protruding effect for all items
-                                      BoxShadow(
-                                        color: SequencerPhoneBookColors.shadow,
-                                        blurRadius: 2,
-                                        offset: const Offset(0, 1),
+                      return GestureDetector(
+                        onTap: () => sequencerState.selectSampleItem(item),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: item.isFolder 
+                                ? SequencerPhoneBookColors.surfaceRaised
+                                : SequencerPhoneBookColors.accent.withOpacity(0.3),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: item.isFolder 
+                                  ? SequencerPhoneBookColors.border
+                                  : SequencerPhoneBookColors.accent.withOpacity(0.6),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              // Protruding effect for all items
+                              BoxShadow(
+                                color: SequencerPhoneBookColors.shadow,
+                                blurRadius: 2,
+                                offset: const Offset(0, 1),
+                              ),
+                              BoxShadow(
+                                color: SequencerPhoneBookColors.surfaceRaised,
+                                blurRadius: 1,
+                                offset: const Offset(0, -0.5),
+                              ),
+                            ],
+                          ),
+                          child: LayoutBuilder(
+                            builder: (context, tileConstraints) {
+                              final tilePadding = tileConstraints.maxWidth * (SampleBrowserSizing.tilePadding / 100);
+                              final iconSize = tileConstraints.maxHeight * 0.4;
+                              final fontSize = tileConstraints.maxWidth * 0.08;
+                              
+                              return item.isFolder 
+                                  ? // Folder layout
+                                    Center(
+                                      child: Padding(
+                                        padding: EdgeInsets.all(tilePadding),
+                                        child: Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(
+                                              Icons.folder,
+                                              color: SequencerPhoneBookColors.accent,
+                                              size: iconSize.clamp(20.0, 40.0),
+                                            ),
+                                            SizedBox(height: tilePadding * 0.5),
+                                            Flexible(
+                                              child: Text(
+                                                item.name,
+                                                style: GoogleFonts.sourceSans3(
+                                                  color: SequencerPhoneBookColors.text,
+                                                  fontSize: fontSize.clamp(8.0, 14.0),
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                                textAlign: TextAlign.center,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                       ),
-                                      BoxShadow(
-                                        color: SequencerPhoneBookColors.surfaceRaised,
-                                        blurRadius: 1,
-                                        offset: const Offset(0, -0.5),
-                                      ),
-                                    ],
-                                  ),
-                                  child: item.isFolder 
-                                      ? // Folder layout
-                                        LayoutBuilder(
-                                          builder: (context, itemConstraints) {
-                                            final iconSize = itemConstraints.maxHeight * 0.3; // 30% of height
-                                            final fontSize = itemConstraints.maxHeight * 0.12; // 12% of height
-                                            
-                                            return Center(
-                                              child: Padding(
-                                                padding: EdgeInsets.all(itemConstraints.maxHeight * 0.08), // 8% padding
-                                                child: Column(
-                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.folder,
-                                                      color: SequencerPhoneBookColors.accent,
-                                                      size: iconSize.clamp(16.0, 32.0), // min 16, max 32
-                                                    ),
-                                                    SizedBox(height: itemConstraints.maxHeight * 0.08),
-                                                    Flexible(
-                                                      child: Text(
-                                                        item.name,
-                                                        style: GoogleFonts.sourceSans3(
-                                                          color: SequencerPhoneBookColors.text,
-                                                          fontSize: fontSize.clamp(8.0, 14.0), // min 8, max 14
-                                                          fontWeight: FontWeight.w500,
-                                                        ),
-                                                        textAlign: TextAlign.center,
-                                                        maxLines: 2,
-                                                        overflow: TextOverflow.ellipsis,
-                                                      ),
-                                                    ),
-                                                  ],
+                                    )
+                                  : // File layout with 50/50 split
+                                    Column(
+                                      children: [
+                                        // Top 50% - Play button area
+                                        Expanded(
+                                          flex: (SampleBrowserSizing.playButtonAreaRatio * 100).round(),
+                                          child: GestureDetector(
+                                            onTap: () => sequencerState.previewSample(item.path),
+                                            child: Container(
+                                              width: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: SequencerPhoneBookColors.surfacePressed,
+                                                borderRadius: const BorderRadius.only(
+                                                  topLeft: Radius.circular(4),
+                                                  topRight: Radius.circular(4),
+                                                ),
+                                                border: const Border(
+                                                  bottom: BorderSide(
+                                                    color: SequencerPhoneBookColors.border,
+                                                    width: 1,
+                                                  ),
                                                 ),
                                               ),
-                                            );
-                                          },
-                                        )
-                                      : // File layout
-                                        LayoutBuilder(
-                                          builder: (context, itemConstraints) {
-                                            final playButtonSize = itemConstraints.maxHeight * 0.4; // Play button size
-                                            final fontSize = itemConstraints.maxHeight * 0.2; 
-                                            final pickAreaWidth = itemConstraints.maxWidth * 0.66; // Left side - larger
-                                            final playAreaWidth = itemConstraints.maxWidth * 0.34; // Right side - smaller
-                                            final separatorWidth = 2.0; // Visual separator
-                                            
-                                            return Row(
-                                              children: [
-                                                // Left section - Pick area (larger, easier to target)
-                                                GestureDetector(
-                                                  onTap: () => sequencerState.selectSampleItem(item),
-                                                  child: Container(
-                                                    width: pickAreaWidth - separatorWidth,
-                                                    height: double.infinity,
-                                                    decoration: BoxDecoration(
-                                                      color: SequencerPhoneBookColors.accent.withOpacity(0.3),
-                                                      borderRadius: const BorderRadius.only(
-                                                        topLeft: Radius.circular(2),
-                                                        bottomLeft: Radius.circular(2),
+                                              child: Center(
+                                                child: Container(
+                                                  width: tileConstraints.maxHeight * 0.25,
+                                                  height: tileConstraints.maxHeight * 0.25,
+                                                  decoration: BoxDecoration(
+                                                    color: SequencerPhoneBookColors.accent.withOpacity(0.9),
+                                                    borderRadius: BorderRadius.circular(tileConstraints.maxHeight * 0.125),
+                                                    border: Border.all(
+                                                      color: SequencerPhoneBookColors.border,
+                                                      width: 1,
+                                                    ),
+                                                    boxShadow: [
+                                                      BoxShadow(
+                                                        color: SequencerPhoneBookColors.shadow,
+                                                        blurRadius: 2,
+                                                        offset: const Offset(0, 1),
                                                       ),
-                                                    ),
-                                                    padding: EdgeInsets.symmetric(
-                                                      horizontal: itemConstraints.maxWidth * 0.03,
-                                                      vertical: itemConstraints.maxHeight * 0.08,
-                                                    ),
-                                                    child: Column(
-                                                      mainAxisAlignment: MainAxisAlignment.center,
-                                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                                      children: [
-                                                        // File name
-                                                        Flexible(
-                                                          child: Text(
-                                                            item.name,
-                                                            style: GoogleFonts.sourceSans3(
-                                                              color: SequencerPhoneBookColors.text,
-                                                              fontSize: fontSize.clamp(6.0, 12.0),
-                                                              fontWeight: FontWeight.w500,
-                                                            ),
-                                                            textAlign: TextAlign.left,
-                                                            maxLines: 3,
-                                                            overflow: TextOverflow.ellipsis,
-                                                          ),
-                                                        ),
-                                                        const SizedBox(height: 4),
-                                                        // "TAP TO SELECT" hint
-                                                        Text(
-                                                          'TAP TO SELECT',
-                                                          style: GoogleFonts.sourceSans3(
-                                                            color: SequencerPhoneBookColors.lightText,
-                                                            fontSize: (fontSize * 0.6).clamp(5.0, 8.0),
-                                                            fontWeight: FontWeight.w600,
-                                                            letterSpacing: 0.5,
-                                                          ),
-                                                          textAlign: TextAlign.left,
-                                                        ),
-                                                      ],
-                                                    ),
+                                                    ],
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.play_arrow,
+                                                    color: SequencerPhoneBookColors.pageBackground,
+                                                    size: (tileConstraints.maxHeight * 0.15).clamp(12.0, 20.0),
                                                   ),
                                                 ),
-                                                // Visual separator
-                                                Container(
-                                                  width: separatorWidth,
-                                                  color: SequencerPhoneBookColors.border,
-                                                ),
-                                                // Right section - Play button area (smaller, focused)
-                                                GestureDetector(
-                                                  onTap: () => sequencerState.previewSample(item.path),
-                                                  child: Container(
-                                                    width: playAreaWidth - separatorWidth,
-                                                    height: double.infinity,
-                                                    decoration: BoxDecoration(
-                                                      color: SequencerPhoneBookColors.surfacePressed,
-                                                      borderRadius: const BorderRadius.only(
-                                                        topRight: Radius.circular(2),
-                                                        bottomRight: Radius.circular(2),
-                                                      ),
-                                                    ),
-                                                    child: Center(
-                                                      child: Container(
-                                                        width: playButtonSize,
-                                                        height: playButtonSize,
-                                                        decoration: BoxDecoration(
-                                                          color: SequencerPhoneBookColors.accent.withOpacity(0.9),
-                                                          borderRadius: BorderRadius.circular(2),
-                                                          border: Border.all(
-                                                            color: SequencerPhoneBookColors.border,
-                                                            width: 1,
-                                                          ),
-                                                          boxShadow: [
-                                                            // Strong protruding effect for play button
-                                                            BoxShadow(
-                                                              color: SequencerPhoneBookColors.shadow,
-                                                              blurRadius: 2,
-                                                              offset: const Offset(0, 2),
-                                                            ),
-                                                            BoxShadow(
-                                                              color: SequencerPhoneBookColors.surfaceRaised,
-                                                              blurRadius: 1,
-                                                              offset: const Offset(0, -1),
-                                                            ),
-                                                          ],
-                                                        ),
-                                                        child: Icon(
-                                                          Icons.play_arrow,
-                                                          color: SequencerPhoneBookColors.pageBackground,
-                                                          size: (playButtonSize * 0.6).clamp(10.0, 18.0),
-                                                        ),
-                                                      ),
-                                                    ),
-                                                  ),
-                                                ),
-                                              ],
-                                            );
-                                          },
+                                              ),
+                                            ),
+                                          ),
                                         ),
-                                ),
-                              ),
-                            );
-                          }).toList(),
+                                        // Bottom 50% - Pick/Select area
+                                        Expanded(
+                                          flex: (SampleBrowserSizing.pickAreaRatio * 100).round(),
+                                          child: GestureDetector(
+                                            onTap: () => sequencerState.selectSampleItem(item),
+                                            child: Container(
+                                              width: double.infinity,
+                                              padding: EdgeInsets.all(tilePadding),
+                                              decoration: const BoxDecoration(
+                                                color: SequencerPhoneBookColors.accent,
+                                                borderRadius: BorderRadius.only(
+                                                  bottomLeft: Radius.circular(4),
+                                                  bottomRight: Radius.circular(4),
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  // File name
+                                                  Expanded(
+                                                    child: Text(
+                                                      item.name,
+                                                      style: GoogleFonts.sourceSans3(
+                                                        color: SequencerPhoneBookColors.pageBackground,
+                                                        fontSize: (fontSize * 0.8).clamp(6.0, 12.0),
+                                                        fontWeight: FontWeight.w600,
+                                                      ),
+                                                      maxLines: 2,
+                                                      overflow: TextOverflow.ellipsis,
+                                                    ),
+                                                  ),
+                                                  // File type and tap hint
+                                                  Text(
+                                                    item.name.toLowerCase().endsWith('.wav') ? 'WAV' :
+                                                    item.name.toLowerCase().endsWith('.mp3') ? 'MP3' :
+                                                    item.name.toLowerCase().endsWith('.m4a') ? 'M4A' : 'AUDIO',
+                                                    style: GoogleFonts.sourceSans3(
+                                                      color: SequencerPhoneBookColors.pageBackground.withOpacity(0.8),
+                                                      fontSize: (fontSize * 0.6).clamp(5.0, 10.0),
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                  Text(
+                                                    'TAP TO SELECT',
+                                                    style: GoogleFonts.sourceSans3(
+                                                      color: SequencerPhoneBookColors.pageBackground.withOpacity(0.9),
+                                                      fontSize: (fontSize * 0.5).clamp(4.0, 8.0),
+                                                      fontWeight: FontWeight.w700,
+                                                      letterSpacing: 0.5,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                            },
+                          ),
                         ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    );
+                  },
+                ),
           ),
         ],
       ),

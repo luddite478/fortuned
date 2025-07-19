@@ -251,7 +251,7 @@ class SequencerState extends ChangeNotifier {
   int? _selectedSampleSlot; // Track which sample is selected for placement
   
   // Layout settings
-  SequencerLayoutVersion _selectedLayout = SequencerLayoutVersion.v1;
+  SequencerLayoutVersion _selectedLayout = SequencerLayoutVersion.v2;
   
   // Grid configuration
   int _gridColumns = 4;
@@ -329,6 +329,10 @@ class SequencerState extends ChangeNotifier {
   int? _sampleSelectionSlot;
   List<String> _currentSamplePath = [];
   List<SampleBrowserItem> _currentSampleItems = [];
+  
+  // Body element sample browser state (separate from multitask panel)
+  bool _isBodyElementSampleBrowserOpen = false;
+  int? _bodyElementSampleBrowserSlot;
 
   // Share widget state
   List<String> _localRecordings = []; // List of local recording file paths
@@ -917,6 +921,10 @@ class SequencerState extends ChangeNotifier {
   int? get sampleSelectionSlot => _sampleSelectionSlot;
   List<String> get currentSamplePath => List.unmodifiable(_currentSamplePath);
   List<SampleBrowserItem> get currentSampleItems => List.unmodifiable(_currentSampleItems);
+  
+  // Body element sample browser getters
+  bool get isBodyElementSampleBrowserOpen => _isBodyElementSampleBrowserOpen;
+  int? get bodyElementSampleBrowserSlot => _bodyElementSampleBrowserSlot;
   int get currentSoundGridIndex => _currentSoundGridIndex;
   List<int> get soundGridOrder => List.unmodifiable(_soundGridOrder);
   int get columnsPerGrid => _gridColumns;
@@ -1033,6 +1041,64 @@ class SequencerState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Initialize sample browser for body element usage (independent of multitask panel)
+  Future<void> initializeSampleBrowserForBodyElement() async {
+    _currentSamplePath.clear();
+    await _loadSamples();
+    notifyListeners();
+  }
+  
+  /// Copy asset to temp for body element usage (wrapper method)
+  Future<String> copyAssetToTempForBodyElement(String assetPath, String fileName) async {
+    return await _copyAssetToTemp(assetPath, fileName);
+  }
+  
+  /// Load sample to slot from body element (bypasses multitask panel system)
+  Future<void> loadSampleToSlotFromBodyElement(int slot, String filePath, String fileName) async {
+    // Flush any pending debounced actions before sample loading
+    _flushPendingUndoAction();
+    
+    // Capture state before loading sample
+    final beforeState = _captureCurrentState();
+    
+    _filePaths[slot] = filePath;
+    _fileNames[slot] = fileName;
+    _slotLoaded[slot] = false;
+    
+    // Always load sample to memory immediately
+    loadSlot(slot);
+    
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.sampleLoad,
+      description: 'Load Sample ${String.fromCharCode(65 + slot)}: $fileName',
+      beforeState: beforeState,
+    );
+    
+    notifyListeners();
+  }
+  
+  /// Open body element sample browser for slot (instead of multitask panel)
+  Future<void> openBodyElementSampleBrowserForSlot(int slot) async {
+    _bodyElementSampleBrowserSlot = slot;
+    _currentSamplePath.clear();
+    await _loadSamples();
+    
+    // Open body element browser (NOT multitask panel)
+    _isBodyElementSampleBrowserOpen = true;
+    
+    notifyListeners();
+  }
+  
+  /// Close body element sample browser
+  void closeBodyElementSampleBrowser() {
+    _isBodyElementSampleBrowserOpen = false;
+    _bodyElementSampleBrowserSlot = null;
+    _currentSamplePath.clear();
+    _currentSampleItems.clear();
+    notifyListeners();
+  }
+
   Future<void> selectSampleItem(SampleBrowserItem item) async {
     if (item.isFolder) {
       _currentSamplePath.add(item.name);
@@ -1053,7 +1119,11 @@ class SequencerState extends ChangeNotifier {
   }
 
   Future<void> _selectSampleFile(String path, String name) async {
-    if (_sampleSelectionSlot == null) return;
+    // Check which browser is active
+    final isBodyBrowser = _isBodyElementSampleBrowserOpen;
+    final slot = isBodyBrowser ? _bodyElementSampleBrowserSlot : _sampleSelectionSlot;
+    
+    if (slot == null) return;
     
     try {
       // Flush any pending debounced actions before sample loading
@@ -1061,7 +1131,6 @@ class SequencerState extends ChangeNotifier {
       
       // Capture state before loading sample
       final beforeState = _captureCurrentState();
-      final slot = _sampleSelectionSlot!;
       
       String finalPath = path;
       
@@ -1086,8 +1155,12 @@ class SequencerState extends ChangeNotifier {
         beforeState: beforeState,
       );
       
-      // Close sample selection
-      cancelSampleSelection();
+      // Close appropriate sample selection
+      if (isBodyBrowser) {
+        closeBodyElementSampleBrowser();
+      } else {
+        cancelSampleSelection();
+      }
       
     } catch (e) {
       print('❌ Error loading sample: $e');
@@ -1265,8 +1338,14 @@ class SequencerState extends ChangeNotifier {
     
     // Always open appropriate menu based on slot content
     if (!hasFile) {
-      // Empty slot - open sample browser
-      pickFileForSlot(bankIndex, context);
+      // Empty slot - open body element sample browser (V2+ layout) or multitask panel (V1)
+      if (_selectedLayout == SequencerLayoutVersion.v2 || _selectedLayout == SequencerLayoutVersion.v3) {
+        // Use body element approach for V2+ layouts
+        openBodyElementSampleBrowserForSlot(bankIndex);
+      } else {
+        // Use original multitask panel approach for V1 layout
+        pickFileForSlot(bankIndex, context);
+      }
     } else {
       // Loaded slot - always open sample settings
       _activeBank = bankIndex;

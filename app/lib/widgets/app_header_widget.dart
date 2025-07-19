@@ -199,9 +199,14 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       // Percentage-based spacing
       SizedBox(width: spacingWidth),
       
-      // Checkpoints menu button
+      // Checkpoints menu button (conditionally shown)
       Consumer2<SequencerState, ThreadsState>(
         builder: (context, sequencer, threadsState, child) {
+          // Hide in V2 layout
+          if (sequencer.selectedLayout == SequencerLayoutVersion.v2) {
+            return const SizedBox.shrink();
+          }
+          
           return IconButton(
             icon: Icon(
               Icons.format_list_bulleted,
@@ -215,12 +220,25 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
         },
       ),
       
-      // Percentage-based spacing
-      SizedBox(width: spacingWidth),
+      // Percentage-based spacing (conditionally shown)
+      Consumer<SequencerState>(
+        builder: (context, sequencer, child) {
+          // Hide spacing in V2 layout
+          if (sequencer.selectedLayout == SequencerLayoutVersion.v2) {
+            return const SizedBox.shrink();
+          }
+          return SizedBox(width: spacingWidth);
+        },
+      ),
       
-      // Save/Send button
+      // Save/Send button (conditionally shown)
       Consumer2<SequencerState, ThreadsState>(
         builder: (context, sequencer, threadsState, child) {
+          // Hide in V2 layout
+          if (sequencer.selectedLayout == SequencerLayoutVersion.v2) {
+            return const SizedBox.shrink();
+          }
+          
           return IconButton(
             icon: Icon(
               Icons.save,
@@ -281,41 +299,68 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Recording status dot when recording
+              // Recording button and timer display
               if (sequencer.isRecording) ...[
+                // Recording timer display
                 Container(
-                  width: 8,
-                  height: 8,
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: SequencerPhoneBookColors.accent,
-                    shape: BoxShape.circle,
+                    color: SequencerPhoneBookColors.accent.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: SequencerPhoneBookColors.accent.withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Pulsing red recording indicator
+                      _RecordingIndicatorDot(),
+                      SizedBox(width: spacingWidth * 0.2),
+                      Text(
+                        sequencer.formattedRecordingDuration,
+                        style: TextStyle(
+                          color: SequencerPhoneBookColors.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(width: spacingWidth * 0.3), // Smaller spacing within controls
+                SizedBox(width: spacingWidth * 0.3),
+                
+                // Stop recording button
+                IconButton(
+                  icon: Icon(
+                    Icons.stop,
+                    color: Colors.red,
+                  ),
+                  onPressed: () => sequencer.stopRecording(),
+                  iconSize: 16,
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
+              ] else ...[
+                // Start recording button
+                IconButton(
+                  icon: Icon(
+                    Icons.fiber_manual_record,
+                    color: SequencerPhoneBookColors.accent,
+                  ),
+                  onPressed: () => sequencer.startRecording(),
+                  iconSize: 16,
+                  padding: const EdgeInsets.all(2),
+                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                ),
               ],
               
-              // Recording button
-              IconButton(
-                icon: Icon(
-                  sequencer.isRecording ? Icons.stop : Icons.fiber_manual_record,
-                  color: SequencerPhoneBookColors.accent,
-                ),
-                onPressed: () {
-                  if (sequencer.isRecording) {
-                    sequencer.stopRecording();
-                  } else {
-                    sequencer.startRecording();
-                  }
-                },
-                iconSize: 16,
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              ),
+              // Spacing between recording and sequencer controls
+              SizedBox(width: spacingWidth * 0.5),
               
-              // Smaller spacing between recording controls
-              SizedBox(width: spacingWidth * 0.3),
-              
-              // Play/Stop button
+              // Sequencer play/stop button
               IconButton(
                 icon: Icon(
                   sequencer.isSequencerPlaying ? Icons.stop : Icons.play_arrow,
@@ -514,5 +559,59 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
         );
       }
     }
+  }
+}
+
+// Helper widget for pulsing recording indicator
+class _RecordingIndicatorDot extends StatefulWidget {
+  @override
+  _RecordingIndicatorDotState createState() => _RecordingIndicatorDotState();
+}
+
+class _RecordingIndicatorDotState extends State<_RecordingIndicatorDot>
+    with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _animation = Tween<double>(
+      begin: 0.3,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+    
+    // Start repeating animation
+    _animationController.repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: Colors.red.withOpacity(_animation.value),
+            shape: BoxShape.circle,
+          ),
+        );
+      },
+    );
   }
 } 

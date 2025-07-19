@@ -23,6 +23,15 @@ class SequencerPhoneBookColors {
 class SampleGridWidget extends StatefulWidget {
   const SampleGridWidget({super.key});
 
+  // 🎯 SPACING CONFIGURATION - Percentage-based and easily controllable
+  // All values are percentages of the container height for responsive scaling
+  static const double topSpacingPercent = 6.0; // Space above labels (4% of height)
+  static const double tabHeightPercent = 3.5; // Height allocated for tab labels (3.5% of height)
+  static const double tabSpacingPercent = 5.0; // Gap between labels and sound grid (1% of height)
+  
+  // 🎯 TOTAL SPACING = topSpacingPercent + tabHeightPercent + tabSpacingPercent
+  // Example: 4% + 3.5% + 1% = 8.5% of container height used for spacing
+  
   @override
   State<SampleGridWidget> createState() => _SampleGridWidgetState();
 }
@@ -179,8 +188,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           ),
           child: StackedCardsWidget(
             numCards: numSoundGrids,
-            cardWidthFactor: 0.9,
-            cardHeightFactor: 0.9,
+            cardWidthFactor: 1.0, // Use full width (was 0.9)
+            cardHeightFactor: 1.0, // Use full height (was 0.9)
             offsetPerDepth: const Offset(0, -8),
             scaleFactorPerDepth: 0.02,
             borderRadius: 2.0, // Sharp corners
@@ -213,16 +222,18 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             // The front card is the one that matches the current sound grid index
             final isFrontCard = actualSoundGridId == sequencer.currentSoundGridIndex;
             
-            // Wrap everything in a container with minimal extra space for the label tab
+            // Wrap everything in a container with configurable top spacing
             return SizedBox(
               width: width,
-              height: height + 22, // Reduced extra space for tab
+              height: height + 22, // Extra space for tab
               child: Stack(
                 clipBehavior: Clip.none, // Allow tabs to be positioned outside bounds if needed
                 children: [
-                  // Main card positioned to leave minimal space for tab at top
+                  // Main card positioned with percentage-based spacing
                   Positioned(
-                    top: 18, // Reduced space for tab
+                    top: (height * SampleGridWidget.topSpacingPercent / 100) + 
+                          (height * SampleGridWidget.tabHeightPercent / 100) + 
+                          (height * SampleGridWidget.tabSpacingPercent / 100),
                     left: 0,
                     child: _buildMainCard(
                       width: width,
@@ -235,10 +246,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                       sequencer: sequencer,
                     ),
                   ),
-                  // Clickable tab label positioned above the card
+                  // Clickable tab label positioned with percentage-based spacing
                   // Use actualSoundGridId for positioning to maintain fixed horizontal positions
                   Positioned(
-                    top: 0, // At the very top
+                    top: height * SampleGridWidget.topSpacingPercent / 100, // Top spacing only
                     left: _calculateTabPosition(actualSoundGridId, width, numSoundGrids),
                     child: _buildClickableTabLabel(
                       gridIndex: actualSoundGridId,
@@ -546,7 +557,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           ],
         ),
         child: Container(
-          margin: const EdgeInsets.all(16),
+          margin: const EdgeInsets.all(4), // Reduced margin from 16 to 4
           decoration: BoxDecoration(
             color: SequencerPhoneBookColors.surfacePressed.withOpacity(0.1),
             borderRadius: BorderRadius.circular(2), // Sharp corners
@@ -617,12 +628,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12), // Reduced padding
+        padding: EdgeInsets.zero, // Removed padding to take full available space
         child: Column(
           children: [
-            // Minimal space for tab label above
-            const SizedBox(height: 4),
-            // Sound grid
+            // Sound grid (no internal spacing needed - whole structure moves together)
             Expanded(
               child: _buildGridContent(sequencer),
             ),

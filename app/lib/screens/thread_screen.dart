@@ -5,10 +5,10 @@ import '../state/sequencer_state.dart';
 import '../widgets/sequencer_widget.dart';
 import '../widgets/checkpoint_message_widget.dart';
 import '../widgets/app_header_widget.dart';
-import '../widgets/sequencer/top_multitask_panel_widget.dart';
-import '../widgets/sequencer/sample_banks_widget.dart'; // Legacy - commented out
-import '../widgets/sequencer/sound_grid_widget.dart';
-import '../widgets/sequencer/edit_buttons_widget.dart';
+import '../widgets/sequencer/v1/top_multitask_panel_widget.dart';
+import '../widgets/sequencer/v1/sample_banks_widget.dart'; // Legacy - commented out
+import '../widgets/sequencer/v1/sound_grid_widget.dart';
+import '../widgets/sequencer/v1/edit_buttons_widget.dart';
 
 class ThreadScreen extends StatefulWidget {
   final String threadId;
