@@ -61,14 +61,23 @@ server {
 }
 
 server {
-    listen ${WEBSOCKET_PORT};
-    listen [::]:${WEBSOCKET_PORT};
+    listen ${WEBSOCKET_PORT} ssl http2;
+    listen [::]:${WEBSOCKET_PORT} ssl http2;
 
     access_log /var/log/nginx/access.log upstream_log;
     
     server_name ${SERVER_HOST};
     server_tokens off;
     tcp_nodelay on;
+
+    ssl_certificate /etc/letsencrypt/live/${SERVER_HOST}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${SERVER_HOST}/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES128-SHA256;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
 
     location / {
         proxy_pass http://websocket_backend;
