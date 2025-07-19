@@ -3,11 +3,10 @@ name: Deploy new version
 on:
   push:
     branches:
-      - main
       - master
     paths-ignore:
       - 'README.md'
-      - 'docs/**'
+      - 'app/**'
 
   workflow_dispatch:
     inputs:
