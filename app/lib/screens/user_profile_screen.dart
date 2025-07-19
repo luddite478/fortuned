@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/user_profile_service.dart';
+import '../services/users_service.dart';
 import '../services/threads_service.dart';
 import '../services/auth_service.dart';
 import '../state/threads_state.dart';
@@ -51,7 +51,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       });
 
       // Load user profile first (required)
-      final profile = await UserProfileService.getUserProfile(widget.userId);
+      final profile = await UsersService.getUserProfile(widget.userId);
       
       // Load threads separately (optional - don't fail if this fails)
       List<Thread> threads = [];

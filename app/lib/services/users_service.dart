@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../state/threads_state.dart';
 import 'http_client.dart';
+import 'ws_client.dart';
 
 class UserProfile {
   final String id;
@@ -239,7 +241,7 @@ class AuthResponse {
   }
 }
 
-class UserProfileService {
+class UsersService {
   static String get _baseUrl {
     final serverIp = dotenv.env['SERVER_HOST'] ?? '';
     final apiPort = dotenv.env['HTTPS_API_PORT'] ?? '443';
@@ -254,6 +256,49 @@ class UserProfileService {
     print('All env vars: ${dotenv.env.keys.toList()}');
     
     return token;
+  }
+
+  // WebSocket client for real-time online users functionality
+  final WebSocketClient _wsClient;
+  
+  // Stream controller for online users
+  final _onlineUsersController = StreamController<List<String>>.broadcast();
+  
+  // Getter for online users stream
+  Stream<List<String>> get onlineUsersStream => _onlineUsersController.stream;
+  Stream<bool> get connectionStream => _wsClient.connectionStream;
+  Stream<String> get errorStream => _wsClient.errorStream;
+  bool get isConnected => _wsClient.isConnected;
+  String? get clientId => _wsClient.clientId;
+
+  UsersService({required WebSocketClient wsClient}) : _wsClient = wsClient {
+    // Register handler for online users messages
+    _wsClient.registerMessageHandler('online_users', _handleOnlineUsers);
+  }
+
+  void _handleOnlineUsers(Map<String, dynamic> message) {
+    if (!_onlineUsersController.isClosed) {
+      final users = List<String>.from(message['users'] ?? []);
+      _onlineUsersController.add(users);
+    }
+  }
+
+  // Request list of online users
+  Future<bool> requestOnlineUsers() async {
+    final request = {
+      'type': 'list_users',
+    };
+    return await _wsClient.sendMessage(request);
+  }
+
+  // Dispose method to clean up resources
+  void dispose() {
+    // Unregister message handlers
+    _wsClient.unregisterAllHandlers('online_users');
+    
+    if (!_onlineUsersController.isClosed) {
+      _onlineUsersController.close();
+    }
   }
 
   static Future<AuthResponse> login(String email, String password) async {
@@ -328,7 +373,7 @@ class UserProfileService {
       
       print('Fetching users from: /users/list');
 
-      final response = await ApiHttpClient.getWithAuth('/users/list', queryParams: queryParams);
+      final response = await ApiHttpClient.get('/users/list', queryParams: queryParams);
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');
@@ -355,7 +400,7 @@ class UserProfileService {
 
       print('Fetching user from: /users/user');
 
-      final response = await ApiHttpClient.getWithAuth('/users/user', queryParams: queryParams);
+      final response = await ApiHttpClient.get('/users/user', queryParams: queryParams);
 
       print('Response status: ${response.statusCode}');
       print('Response body: ${response.body}');

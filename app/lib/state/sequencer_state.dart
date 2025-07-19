@@ -3055,7 +3055,7 @@ Made with Demo Sequencer 🚀
       debugPrint('📝 Making thread public: $isPublic');
       debugPrint('🆔 Thread ID: $threadId');
       
-      final response = await ApiHttpClient.putWithAuth('/threads/$threadId', body: updateData);
+      final response = await ApiHttpClient.put('/threads/$threadId', body: updateData);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         debugPrint('✅ Successfully updated thread to public (status: ${response.statusCode})');
@@ -3148,7 +3148,7 @@ Made with Demo Sequencer 🚀
       // Send thread creation request
       debugPrint('🌐 Creating thread at URL: /threads');
       
-      final threadResponse = await ApiHttpClient.postWithAuth('/threads', body: threadData);
+      final threadResponse = await ApiHttpClient.post('/threads', body: threadData);
 
       if (threadResponse.statusCode != 200 && threadResponse.statusCode != 201) {
         debugPrint('❌ Failed to create thread: ${threadResponse.statusCode} - ${threadResponse.body}');
@@ -3222,7 +3222,7 @@ Made with Demo Sequencer 🚀
         'checkpoint': checkpoint,
       };
       
-      final checkpointResponse = await ApiHttpClient.postWithAuth('/threads/$newThreadId/checkpoints', body: checkpointData);
+      final checkpointResponse = await ApiHttpClient.post('/threads/$newThreadId/checkpoints', body: checkpointData);
 
       if (checkpointResponse.statusCode != 200 && checkpointResponse.statusCode != 201) {
         debugPrint('❌ Failed to add checkpoint: ${checkpointResponse.statusCode} - ${checkpointResponse.body}');
@@ -3527,7 +3527,7 @@ Made with Demo Sequencer 🚀
     required String comment,
     String? currentUserId,
     String? currentUserName,
-    dynamic chatClient, // Add ChatClient parameter
+    dynamic threadsService, // Add ThreadsService parameter
   }) async {
     if (!_isCollaborating || _sourceThread == null) {
       debugPrint('❌ Not in collaboration mode');
@@ -3650,9 +3650,9 @@ Made with Demo Sequencer 🚀
           
           // Send thread message to original author via WebSocket
           try {
-            if (chatClient != null) {
-              debugPrint('📡 Sending WebSocket notification to ${originalAuthor.name} (${originalAuthor.id})');
-              final success = await chatClient.sendThreadMessage(
+                      if (threadsService != null) {
+            debugPrint('📡 Sending WebSocket notification to ${originalAuthor.name} (${originalAuthor.id})');
+            final success = await threadsService.sendThreadMessage(
                 originalAuthor.id,
                 forkThreadId,
                 forkTitle,
@@ -3664,7 +3664,7 @@ Made with Demo Sequencer 🚀
                 debugPrint('📡 ⚠️ Fork was created successfully, but notification failed');
               }
             } else {
-              debugPrint('📡 ⚠️ No ChatClient provided - cannot send notification');
+              debugPrint('📡 ⚠️ No ThreadsService provided - cannot send notification');
               debugPrint('📡 ℹ️ Fork was created successfully without notification');
             }
           } catch (e) {

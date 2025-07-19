@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'user_profile_service.dart';
+import 'users_service.dart';
 
 class AuthService extends ChangeNotifier {
   static const String _tokenKey = 'auth_token';
@@ -20,10 +20,12 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   AuthService() {
+    print('🐛 [AUTH] AuthService constructor called');
     _loadAuthState();
   }
 
   Future<void> _loadAuthState() async {
+    print('🐛 [AUTH] Starting _loadAuthState()');
     _isLoading = true;
     notifyListeners();
 
@@ -32,26 +34,41 @@ class AuthService extends ChangeNotifier {
       _token = prefs.getString(_tokenKey);
       final userJson = prefs.getString(_userKey);
       final loginTime = prefs.getInt(_loginTimeKey);
+      
+      print('🐛 [AUTH] Loaded from storage:');
+      print('🐛   - token: ${_token != null ? 'EXISTS' : 'null'}');
+      print('🐛   - userJson: ${userJson != null ? 'EXISTS' : 'null'}');
+      print('🐛   - loginTime: $loginTime');
 
       if (_token != null && userJson != null && loginTime != null) {
         // Check if login is still valid (7 days)
         final loginDate = DateTime.fromMillisecondsSinceEpoch(loginTime);
         final daysSinceLogin = DateTime.now().difference(loginDate).inDays;
         
+        print('🐛 [AUTH] Login age: $daysSinceLogin days');
+        
         if (daysSinceLogin < 7) {
           _currentUser = UserProfile.fromJson(json.decode(userJson));
           _isAuthenticated = true;
+          print('🐛 [AUTH] ✅ User authenticated from storage: ${_currentUser?.id}');
         } else {
           // Login expired, clear stored data
+          print('🐛 [AUTH] ❌ Login expired, clearing stored data');
           await clearAuthState();
         }
+      } else {
+        print('🐛 [AUTH] ❌ No valid stored auth data found');
       }
     } catch (e) {
-      print('Error loading auth state: $e');
+      print('🐛 [AUTH] ❌ Error loading auth state: $e');
       await clearAuthState();
     }
 
     _isLoading = false;
+    print('🐛 [AUTH] _loadAuthState() completed:');
+    print('🐛   - _isLoading: $_isLoading');
+    print('🐛   - _isAuthenticated: $_isAuthenticated');
+    print('🐛   - _currentUser: ${_currentUser?.id ?? 'null'}');
     notifyListeners();
   }
 
@@ -60,7 +77,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await UserProfileService.login(email, password);
+      final response = await UsersService.login(email, password);
       
       if (response.success && response.userId != null) {
         // Create UserProfile from AuthResponse data
@@ -105,7 +122,7 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final response = await UserProfileService.register(username, name, email, password);
+      final response = await UsersService.register(username, name, email, password);
       
       if (response.success && response.userId != null) {
         // Create UserProfile from AuthResponse data

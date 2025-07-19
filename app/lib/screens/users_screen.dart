@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/chat_client.dart';
-import '../services/user_profile_service.dart';
+import '../services/threads_service.dart';
+import '../services/users_service.dart';
 import '../services/auth_service.dart';
 import '../services/threads_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -36,7 +36,8 @@ class UsersScreen extends StatefulWidget {
 }
 
 class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin {
-  late ChatClient _chatClient;
+  late ThreadsService _threadsService;
+  late UsersService _usersService;
   List<String> _onlineUserIds = [];
   List<UserProfile> _userProfiles = [];
   bool _isLoading = true;
@@ -49,8 +50,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
-    // Use the global ChatClient from Provider instead of creating a new one
-    _chatClient = Provider.of<ChatClient>(context, listen: false);
+          // Use the global ThreadsService and UsersService from Provider instead of creating new ones
+    _threadsService = Provider.of<ThreadsService>(context, listen: false);
+    _usersService = Provider.of<UsersService>(context, listen: false);
     
     // Initialize lamp animation (5-second cycle)
     _lampAnimation = AnimationController(
@@ -58,18 +60,18 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       vsync: this,
     )..repeat();
     
-    _setupChatClientListeners();
+    _setupThreadsServiceListeners();
   }
 
-  void _setupChatClientListeners() async {
-    // Setup listeners for online users
-    _chatClient.onlineUsersStream.listen((users) {
+  void _setupThreadsServiceListeners() async {
+    // Setup listeners for online users from UsersService
+    _usersService.onlineUsersStream.listen((users) {
       setState(() {
         _onlineUserIds = users;
       });
     });
 
-    _chatClient.errorStream.listen((error) {
+    _usersService.errorStream.listen((error) {
       // Only show WebSocket error if we haven't successfully loaded user profiles from API
       if (_userProfiles.isEmpty) {
         setState(() {
@@ -79,14 +81,14 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       }
     });
 
-    _chatClient.connectionStream.listen((connected) {
+    _usersService.connectionStream.listen((connected) {
       if (connected) {
-        _chatClient.requestOnlineUsers();
+        _usersService.requestOnlineUsers();
       }
     });
 
     // No need to connect here - it's already connected globally
-    debugPrint('📡 Using global ChatClient connection in users screen');
+    debugPrint('📡 Using global ThreadsService connection in users screen');
 
     // Load user profiles from API
     await _loadUserProfiles();
@@ -94,7 +96,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
 
   Future<void> _loadUserProfiles() async {
     try {
-      final response = await UserProfileService.getUserProfiles(limit: 50);
+      final response = await UsersService.getUserProfiles(limit: 50);
       setState(() {
         _userProfiles = response.profiles;
         _isLoading = false;
@@ -111,7 +113,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   void dispose() {
     _lampAnimation.dispose();
-    // Don't dispose the global ChatClient - it's managed at app level
+    // Don't dispose the global ThreadsService - it's managed at app level
     super.dispose();
   }
 

@@ -32,75 +32,139 @@ class ApiHttpClient {
     };
   }
 
-  /// GET request
+  /// GET request with authentication token in query params
   static Future<http.Response> get(String path, {Map<String, String>? queryParams}) async {
     final url = Uri.parse('$_baseUrl$path');
-    final finalUrl = queryParams != null ? url.replace(queryParameters: queryParams) : url;
+    final finalQueryParams = queryParams ?? <String, String>{};
+    finalQueryParams['token'] = _apiToken;
+    final finalUrl = url.replace(queryParameters: finalQueryParams);
     
-    return await http.get(finalUrl, headers: _defaultHeaders);
+    print('🌐 GET: $finalUrl');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      print('📝 Query params: $queryParams');
+    }
+    
+    try {
+      final response = await http.get(finalUrl, headers: _defaultHeaders);
+      
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+      
+      if (response.statusCode >= 400) {
+        print('❌ HTTP Error ${response.statusCode} for GET $path');
+      } else {
+        print('✅ GET $path completed successfully');
+      }
+      
+      return response;
+    } catch (e) {
+      print('❌ Network error for GET $path: $e');
+      rethrow;
+    }
   }
 
-  /// POST request
+  /// POST request with authentication token in body
   static Future<http.Response> post(String path, {Map<String, dynamic>? body, Map<String, String>? queryParams}) async {
     final url = Uri.parse('$_baseUrl$path');
     final finalUrl = queryParams != null ? url.replace(queryParameters: queryParams) : url;
+    final bodyWithAuth = body ?? <String, dynamic>{};
+    bodyWithAuth['token'] = _apiToken;
+    final jsonBody = json.encode(bodyWithAuth);
     
-    return await http.post(
-      finalUrl,
-      headers: _defaultHeaders,
-      body: body != null ? json.encode(body) : null,
-    );
+    print('🌐 POST: $finalUrl');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      print('📝 Query params: $queryParams');
+    }
+    print('📝 Request body: $jsonBody');
+    
+    try {
+      final response = await http.post(
+        finalUrl,
+        headers: _defaultHeaders,
+        body: jsonBody,
+      );
+      
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+      
+      if (response.statusCode >= 400) {
+        print('❌ HTTP Error ${response.statusCode} for POST $path');
+      } else {
+        print('✅ POST $path completed successfully');
+      }
+      
+      return response;
+    } catch (e) {
+      print('❌ Network error for POST $path: $e');
+      rethrow;
+    }
   }
 
-  /// PUT request
+  /// PUT request with authentication token in body
   static Future<http.Response> put(String path, {Map<String, dynamic>? body, Map<String, String>? queryParams}) async {
     final url = Uri.parse('$_baseUrl$path');
     final finalUrl = queryParams != null ? url.replace(queryParameters: queryParams) : url;
-    
-    return await http.put(
-      finalUrl,
-      headers: _defaultHeaders,
-      body: body != null ? json.encode(body) : null,
-    );
-  }
-
-  /// DELETE request
-  static Future<http.Response> delete(String path, {Map<String, String>? queryParams}) async {
-    final url = Uri.parse('$_baseUrl$path');
-    final finalUrl = queryParams != null ? url.replace(queryParameters: queryParams) : url;
-    
-    return await http.delete(finalUrl, headers: _defaultHeaders);
-  }
-
-  /// POST request with authentication token
-  static Future<http.Response> postWithAuth(String path, {Map<String, dynamic>? body, Map<String, String>? queryParams}) async {
     final bodyWithAuth = body ?? <String, dynamic>{};
     bodyWithAuth['token'] = _apiToken;
+    final jsonBody = json.encode(bodyWithAuth);
     
-    return await post(path, body: bodyWithAuth, queryParams: queryParams);
-  }
-
-  /// PUT request with authentication token
-  static Future<http.Response> putWithAuth(String path, {Map<String, dynamic>? body, Map<String, String>? queryParams}) async {
-    final bodyWithAuth = body ?? <String, dynamic>{};
-    bodyWithAuth['token'] = _apiToken;
+    print('🌐 PUT: $finalUrl');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      print('📝 Query params: $queryParams');
+    }
+    print('📝 Request body: $jsonBody');
     
-    return await put(path, body: bodyWithAuth, queryParams: queryParams);
-  }
-
-  /// GET request with authentication token in query params
-  static Future<http.Response> getWithAuth(String path, {Map<String, String>? queryParams}) async {
-    final finalQueryParams = queryParams ?? <String, String>{};
-    finalQueryParams['token'] = _apiToken;
-    
-    return await get(path, queryParams: finalQueryParams);
+    try {
+      final response = await http.put(
+        finalUrl,
+        headers: _defaultHeaders,
+        body: jsonBody,
+      );
+      
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+      
+      if (response.statusCode >= 400) {
+        print('❌ HTTP Error ${response.statusCode} for PUT $path');
+      } else {
+        print('✅ PUT $path completed successfully');
+      }
+      
+      return response;
+    } catch (e) {
+      print('❌ Network error for PUT $path: $e');
+      rethrow;
+    }
   }
 
   /// DELETE request with authentication token in query params
-  static Future<http.Response> deleteWithAuth(String path, {Map<String, String>? queryParams}) async {
+  static Future<http.Response> delete(String path, {Map<String, String>? queryParams}) async {
+    final url = Uri.parse('$_baseUrl$path');
     final finalQueryParams = queryParams ?? <String, String>{};
     finalQueryParams['token'] = _apiToken;
+    final finalUrl = url.replace(queryParameters: finalQueryParams);
     
-    return await delete(path, queryParams: finalQueryParams);
+    print('🌐 DELETE: $finalUrl');
+    if (queryParams != null && queryParams.isNotEmpty) {
+      print('📝 Query params: $queryParams');
+    }
+    
+    try {
+      final response = await http.delete(finalUrl, headers: _defaultHeaders);
+      
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+      
+      if (response.statusCode >= 400) {
+        print('❌ HTTP Error ${response.statusCode} for DELETE $path');
+      } else {
+        print('✅ DELETE $path completed successfully');
+      }
+      
+      return response;
+    } catch (e) {
+      print('❌ Network error for DELETE $path: $e');
+      rethrow;
+    }
   }
 } 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../services/chat_client.dart';
-import '../services/user_profile_service.dart';
+import '../services/threads_service.dart';
+import '../services/users_service.dart';
 import '../services/auth_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -19,7 +19,8 @@ class ContactsScreen extends StatefulWidget {
 }
 
 class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStateMixin {
-  late ChatClient _chatClient;
+  late ThreadsService _threadsService;
+  late UsersService _usersService;
   List<String> _onlineUserIds = [];
   List<UserProfile> _userProfiles = [];
   bool _isLoading = true;
@@ -45,8 +46,9 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   void initState() {
     super.initState();
     
-    // Use the global ChatClient from Provider instead of creating a new one
-    _chatClient = Provider.of<ChatClient>(context, listen: false);
+          // Use the global ThreadsService and UsersService from Provider instead of creating new ones
+    _threadsService = Provider.of<ThreadsService>(context, listen: false);
+    _usersService = Provider.of<UsersService>(context, listen: false);
     
     // Initialize lamp animation (5-second cycle)
     _lampAnimation = AnimationController(
@@ -54,12 +56,12 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       vsync: this,
     )..repeat();
     
-    _setupChatClientListeners();
+    _setupThreadsServiceListeners();
   }
 
-  void _setupChatClientListeners() async {
-    // Setup listeners
-    _chatClient.onlineUsersStream.listen((users) {
+  void _setupThreadsServiceListeners() async {
+    // Setup listeners for online users from UsersService
+    _usersService.onlineUsersStream.listen((users) {
       setState(() {
         _onlineUserIds = users;
         _isLoading = false;
@@ -67,22 +69,22 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       });
     });
 
-    _chatClient.errorStream.listen((error) {
+    _usersService.errorStream.listen((error) {
       setState(() {
         _error = error;
         _isLoading = false;
       });
     });
 
-    _chatClient.connectionStream.listen((connected) {
+    _usersService.connectionStream.listen((connected) {
       if (connected) {
         // Request online users when connected
-        _chatClient.requestOnlineUsers();
+        _usersService.requestOnlineUsers();
       }
     });
 
     // Listen for thread messages (collaboration notifications)
-    _chatClient.threadMessageStream.listen((threadMessage) {
+    _threadsService.threadNotificationStream.listen((threadMessage) {
       setState(() {
         _usersWithNotifications.add(threadMessage.from);
       });
@@ -100,7 +102,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
     });
 
     // No need to connect here - it's already connected globally
-    debugPrint('📡 Using global ChatClient connection in contacts screen');
+    debugPrint('📡 Using global ThreadsService connection in contacts screen');
     
     // Load user profiles from API
     await _loadUserProfiles();
@@ -108,7 +110,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
 
   Future<void> _loadUserProfiles() async {
     try {
-      final response = await UserProfileService.getUserProfiles(limit: 50);
+      final response = await UsersService.getUserProfiles(limit: 50);
       setState(() {
         _userProfiles = response.profiles;
         _isLoading = false;
@@ -125,7 +127,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   @override
   void dispose() {
     _lampAnimation.dispose();
-    // Don't dispose the global ChatClient - it's managed at app level
+    // Don't dispose the global ThreadsService - it's managed at app level
     super.dispose();
   }
 
@@ -189,7 +191,7 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                                     _isLoading = true;
                                     _error = null;
                                   });
-                                  _setupChatClientListeners();
+                                  _setupThreadsServiceListeners();
                                 },
                                 child: const Text('RETRY'),
                               ),

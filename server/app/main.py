@@ -13,19 +13,14 @@ sys.path.insert(0, current_dir)
 from http_api.router import router as api_router
 from http_api.rate_limiter import RateLimitMiddleware
 from ws.router import start_websocket_server
-
-# Import database initialization
 from db.init_collections import init_mongodb
 
 from dotenv import load_dotenv
-# Load .env from the server directory (parent of app directory)
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Debug: Print loaded API_TOKEN
 api_token = os.getenv("API_TOKEN")
 logger.info(f"🔑 Server loaded API_TOKEN: {api_token}")
 
@@ -46,21 +41,17 @@ def init_database():
     try:
         logger.info("🗄️  Initializing database...")
         
-        # For testing, always reinitialize database
         logger.info("🔄 Reinitializing database (drop existing collections)")
         init_mongodb(drop_existing=True, insert_samples=True)
             
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
-        # Don't crash the server, just log the error
         logger.warning("⚠️  Server starting without database initialization")
 
 @app.on_event("startup")
 def startup_event():
-    # Initialize database first
     init_database()
     
-    # Then start websocket server
     ws_thread = threading.Thread(target=run_ws_server, daemon=True)
     ws_thread.start()
     

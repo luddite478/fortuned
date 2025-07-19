@@ -7,7 +7,7 @@ import '../widgets/sequencer/edit_buttons_widget.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
-import '../services/chat_client.dart';
+import '../services/threads_service.dart';
 
 import 'checkpoints_screen.dart';
 
@@ -32,16 +32,16 @@ class PatternScreen extends StatefulWidget {
 }
 
 class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserver {
-  late ChatClient _chatClient;
+  late ThreadsService _threadsService;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    // Use the global ChatClient from Provider instead of creating a new one
-    _chatClient = Provider.of<ChatClient>(context, listen: false);
-    _setupChatClientListeners();
+          // Use the global ThreadsService from Provider instead of creating a new one
+    _threadsService = Provider.of<ThreadsService>(context, listen: false);
+          _setupThreadsServiceListeners();
     
     // Ensure there's an active thread for saving work
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -49,10 +49,10 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
     });
   }
 
-  void _setupChatClientListeners() async {
+  void _setupThreadsServiceListeners() async {
     // Setup connection status listener
-    _chatClient.connectionStream.listen((connected) {
-      debugPrint('📡 ChatClient connection status changed: $connected');
+    _threadsService.connectionStream.listen((connected) {
+      debugPrint('📡 ThreadsService connection status changed: $connected');
       if (connected) {
         debugPrint('📡 ✅ WebSocket connected and ready for notifications');
       } else {
@@ -61,12 +61,12 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
     });
     
     // Setup error listener
-    _chatClient.errorStream.listen((error) {
-      debugPrint('📡 ❌ ChatClient error: $error');
+    _threadsService.errorStream.listen((error) {
+      debugPrint('📡 ❌ ThreadsService error: $error');
     });
     
     // No need to connect here - it's already connected globally
-    debugPrint('📡 Using global ChatClient connection in sequencer');
+    debugPrint('📡 Using global ThreadsService connection in sequencer');
   }
 
   void _ensureActiveThread() async {
@@ -146,7 +146,7 @@ class _PatternScreenState extends State<PatternScreen> with WidgetsBindingObserv
       appBar: AppHeaderWidget(
         mode: HeaderMode.sequencer,
         onBack: () => Navigator.of(context).pop(),
-        chatClient: _chatClient,
+        threadsService: _threadsService,
       ),
       body: const SafeArea(
         child: SequencerBody(),

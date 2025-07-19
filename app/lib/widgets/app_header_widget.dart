@@ -55,10 +55,10 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     this.onSave,
     this.onInfo,
     this.showProjectInfo = false,
-    this.chatClient, // Add optional ChatClient parameter
+    this.threadsService, // Add optional ThreadsService parameter
   });
 
-  final dynamic chatClient;
+  final dynamic threadsService;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -409,7 +409,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
         
         final success = await sequencer.createProjectFork(
           comment: 'Modified version',
-          chatClient: chatClient,
+          threadsService: threadsService,
         );
         
         if (success) {
