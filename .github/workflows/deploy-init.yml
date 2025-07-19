@@ -16,6 +16,7 @@ on:
         required: true
         type: choice
         options:
+          - stage
           - prod
 
 jobs:

@@ -9,14 +9,9 @@ import os
 from http_api.rate_limiter import check_rate_limit
 from pymongo import MongoClient
 from pydantic import BaseModel
+from db.connection import get_database
 
-MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
-DATABASE_NAME = "admin"
 API_TOKEN = os.getenv("API_TOKEN")
-
-# Connect to MongoDB
-client = MongoClient(MONGO_URL)
-db = client[DATABASE_NAME]
 
 # Pydantic models for request/response
 class LoginRequest(BaseModel):
@@ -38,7 +33,7 @@ class LoginResponse(BaseModel):
     message: Optional[str] = None
 
 def get_db():
-    return db
+    return get_database()
 
 def verify_token(token: str):
     if token != API_TOKEN:

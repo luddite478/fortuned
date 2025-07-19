@@ -10,14 +10,11 @@ from pymongo import MongoClient, ASCENDING, DESCENDING
 from datetime import datetime, timezone
 import logging
 from typing import Dict, List, Any
+from .connection import get_database
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# MongoDB connection with authentication
-MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
-DATABASE_NAME = "admin"
 
 # =============================================================================
 # DATA STRUCTURE CONFIGURATION
@@ -297,11 +294,9 @@ def init_mongodb(drop_existing: bool = False, insert_samples: bool = True):
         insert_samples: Whether to insert sample data
     """
     try:
-        client = MongoClient(MONGO_URL)
-        db = client[DATABASE_NAME]
+        db = get_database()
         
-        logger.info(f"Connected to MongoDB: {MONGO_URL}")
-        logger.info(f"Database: {DATABASE_NAME}")
+        logger.info("🗄️  Initializing MongoDB collections...")
         
         # Drop existing collections if requested
         if drop_existing:
@@ -322,8 +317,6 @@ def init_mongodb(drop_existing: bool = False, insert_samples: bool = True):
     except Exception as e:
         logger.error(f"❌ Error initializing MongoDB: {e}")
         raise
-    finally:
-        client.close()
 
 def create_collections_and_indexes(db):
     """Create collections and their indexes based on configuration"""

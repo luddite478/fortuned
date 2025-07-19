@@ -5,14 +5,12 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import uuid
 import os
+from db.connection import get_database
 
-MONGO_URL = "mongodb://admin:test@mongodb:27017/admin?authSource=admin"
-DATABASE_NAME = "admin"
 API_TOKEN = os.getenv("API_TOKEN")
 
 def get_db():
-    client = MongoClient(MONGO_URL)
-    return client[DATABASE_NAME]
+    return get_database()
 
 def verify_token(token: str):
     if token != API_TOKEN:
