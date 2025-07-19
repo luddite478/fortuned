@@ -68,3 +68,4 @@ jobs:
             fi
           done
           echo "${{ inputs.environment }} server is up." 
+          
