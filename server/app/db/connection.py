@@ -18,7 +18,7 @@ def get_mongodb_client() -> MongoClient:
     """Get MongoDB client instance (singleton pattern)"""
     global _client
     if _client is None:
-        logger.info(f"Connecting to MongoDB: {MONGO_URL.split('@')[1] if '@' in MONGO_URL else MONGO_URL}")
+        logger.info(f"Connecting to MongoDB: {MONGO_URL}")
         _client = MongoClient(MONGO_URL)
         
         # Test the connection
