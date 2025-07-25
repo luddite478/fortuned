@@ -260,9 +260,9 @@ class _RevolverSelectorWidgetState extends State<RevolverSelectorWidget> {
 
 // Helper functions to create common revolver configurations
 
-/// Creates step jump selector (1-16, starting from center)
-List<RevolverItem> createStepJumpItems() {
-  return List.generate(16, (index) => RevolverItem(
+/// Creates step jump selector (1-maxSequencerSteps, starting from center)
+List<RevolverItem> createStepJumpItems(int maxSteps) {
+  return List.generate(maxSteps, (index) => RevolverItem(
     displayText: '${index + 1}',
     value: index + 1,
   ));

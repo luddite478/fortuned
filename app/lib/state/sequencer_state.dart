@@ -71,6 +71,7 @@ enum UndoRedoActionType {
   gridAdd,
   gridRemove,
   gridReorder,
+  gridResize, // For grid row/column dimension changes
   multipleCellChange, // For batch operations like copy/paste/delete
 }
 
@@ -225,6 +226,9 @@ class SequencerState extends ChangeNotifier {
   
   late final SequencerLibrary _sequencerLibrary;
   late final int _slotCount;
+  
+  // Max sequencer steps from environment variable (read once during initialization)
+  late final int _maxSequencerSteps;
 
   // 🎯 PERFORMANCE: ValueNotifiers for high-frequency updates
   final Map<int, ValueNotifier<double>> _sampleVolumeNotifiers = {};
@@ -255,7 +259,7 @@ class SequencerState extends ChangeNotifier {
   
   // Grid configuration
   int _gridColumns = 4;
-  int _gridRows = 16;
+  int _gridRows = 16; // Will be validated against _maxSequencerSteps in init
   
   // Grid state - tracks which sample slot is assigned to each grid cell for each sound grid
   late List<List<int?>> _soundGridSamples; // Each sound grid has its own grid samples
@@ -270,7 +274,7 @@ class SequencerState extends ChangeNotifier {
   
   // Sequencer state
   int _bpm = 120;
-  int _currentStep = -1; // -1 means not playing, 0-15 for current step
+  int _currentStep = -1; // -1 means not playing, 0-(maxGridRows-1) for current step
   bool _isSequencerPlaying = false;
   Timer? _sequencerTimer;
   
@@ -342,7 +346,7 @@ class SequencerState extends ChangeNotifier {
   
   // Step insert feature state
   bool _isStepInsertMode = false; // Toggle for step insert mode
-  int _stepInsertSize = 2; // Number of steps to jump (1-16)
+  int _stepInsertSize = 2; // Number of steps to jump (1-maxGridRows)
   
   // Volume control state
   late List<double> _sampleVolumes; // Global sample volumes (affects all instances)
@@ -666,6 +670,16 @@ class SequencerState extends ChangeNotifier {
   // Initialize sequencer
   SequencerState() {
     _sequencerLibrary = SequencerLibrary.instance;
+    
+    // Initialize max sequencer steps from environment variable
+    final envValue = dotenv.env['SEQUENCER_MAX_STEPS'];
+    _maxSequencerSteps = int.parse(envValue!); // Fail if not set or invalid
+    
+    // Validate grid rows against max steps
+    if (_gridRows > _maxSequencerSteps) {
+      _gridRows = _maxSequencerSteps;
+    }
+    
     _initializeAudio();
 
     _slotCount = _sequencerLibrary.slotCount;
@@ -781,7 +795,7 @@ class SequencerState extends ChangeNotifier {
     final audio = ProjectAudio(
       format: 'mp3',
       duration: 0.0, // Could calculate based on BPM and pattern length
-      sampleRate: 44100,
+      sampleRate: 48000,
       channels: 2,
       url: '', // Empty URL since this is a live snapshot
       renders: [], // No renders yet
@@ -2603,6 +2617,149 @@ Made with Demo Sequencer 🚀
   }
 
   // =============================================================================
+  // GRID ROW MANAGEMENT FUNCTIONALITY
+  // =============================================================================
+  
+  static const int minGridRows = 4;
+  int get maxGridRows => _maxSequencerSteps;
+  
+  /// Increase the number of grid rows by 1
+  void increaseGridRows() {
+    if (_gridRows >= maxGridRows) return;
+    
+    // Flush any pending debounced actions before grid changes
+    _flushPendingUndoAction();
+    
+    // Capture state before making changes
+    final beforeState = _captureCurrentState();
+    
+    final oldRows = _gridRows;
+    _gridRows++;
+    
+    // Resize all sound grids to accommodate new rows
+    _resizeAllSoundGrids(oldRows, _gridRows);
+    
+    // Reconfigure native sequencer columns (dimensions may have changed)
+    final nativeTableColumns = numSoundGrids * _gridColumns;
+    _sequencerLibrary.configureColumns(nativeTableColumns);
+    
+    // Sync all grids to native sequencer
+    _syncGridToSequencer();
+    
+    // 🎯 REAL-TIME UPDATE: If sequencer is playing, update step count seamlessly  
+    if (_isSequencerPlaying) {
+      _sequencerLibrary.setSequencerSteps(_gridRows);
+      debugPrint('🔄 Updated playing sequencer steps: ${oldRows} → $_gridRows (seamless)');
+    }
+    
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.gridResize,
+      description: 'Increase grid rows: $oldRows → $_gridRows',
+      beforeState: beforeState,
+    );
+    
+    debugPrint('➕ Increased grid rows: $oldRows → $_gridRows');
+    notifyListeners();
+  }
+  
+  /// Decrease the number of grid rows by 1
+  void decreaseGridRows() {
+    if (_gridRows <= minGridRows) return;
+    
+    // Flush any pending debounced actions before grid changes
+    _flushPendingUndoAction();
+    
+    // Capture state before making changes
+    final beforeState = _captureCurrentState();
+    
+    final oldRows = _gridRows;
+    _gridRows--;
+    
+    // Resize all sound grids to accommodate fewer rows (may lose data in bottom rows)
+    _resizeAllSoundGrids(oldRows, _gridRows);
+    
+    // Clear any selections that are now out of bounds
+    _clearOutOfBoundsSelections();
+    
+    // Reconfigure native sequencer columns (dimensions may have changed)
+    final nativeTableColumns = numSoundGrids * _gridColumns;
+    _sequencerLibrary.configureColumns(nativeTableColumns);
+    
+    // Sync all grids to native sequencer
+    _syncGridToSequencer();
+    
+    // Record undo action
+    _recordUndoAction(
+      type: UndoRedoActionType.gridResize,
+      description: 'Decrease grid rows: $oldRows → $_gridRows',
+      beforeState: beforeState,
+    );
+    
+    debugPrint('➖ Decreased grid rows: $oldRows → $_gridRows');
+    notifyListeners();
+  }
+  
+  /// Resize all sound grids when the number of rows changes
+  /// Grows/shrinks from the BOTTOM so existing content stays in same visual position
+  void _resizeAllSoundGrids(int oldRows, int newRows) {
+    final oldSize = oldRows * _gridColumns;
+    final newSize = newRows * _gridColumns;
+    final rowDifference = newRows - oldRows;
+    final cellDifference = rowDifference * _gridColumns;
+    
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      final oldGrid = _soundGridSamples[gridIndex];
+      final newGrid = <int?>[];
+      
+      if (newSize > oldSize) {
+        // Increasing size - ADD NEW EMPTY ROWS AT THE BOTTOM
+        // First add all existing data (which stays at the top)
+        newGrid.addAll(oldGrid);
+        // Then add empty cells at the end for new rows
+        newGrid.addAll(List.filled(cellDifference, null));
+        
+        debugPrint('➕ Grid $gridIndex: Added ${rowDifference} empty rows at bottom');
+      } else {
+        // Decreasing size - REMOVE ROWS FROM THE BOTTOM
+        final cellsToKeep = newSize; // Only keep the first N cells
+        
+        // Take only the top rows that fit in the new size
+        final dataToKeep = oldGrid.take(cellsToKeep).toList();
+        newGrid.addAll(dataToKeep);
+        
+        // Log any lost samples from removed bottom rows
+        final lostCells = oldGrid.skip(cellsToKeep).where((sample) => sample != null).length;
+        if (lostCells > 0) {
+          debugPrint('⚠️ Grid $gridIndex: Lost $lostCells samples in bottom rows');
+        } else {
+          debugPrint('➖ Grid $gridIndex: Removed ${-rowDifference} empty rows from bottom');
+        }
+      }
+      
+      _soundGridSamples[gridIndex] = newGrid;
+    }
+  }
+  
+  /// Clear any selections that are now out of bounds after grid resize
+  void _clearOutOfBoundsSelections() {
+    final maxValidIndex = _gridRows * _gridColumns - 1;
+    final originalSelectionSize = _selectedGridCells.length;
+    
+    _selectedGridCells.removeWhere((cellIndex) => cellIndex > maxValidIndex);
+    
+    if (_selectedGridCells.length != originalSelectionSize) {
+      debugPrint('🧹 Cleared ${originalSelectionSize - _selectedGridCells.length} out-of-bounds selections');
+    }
+    
+    // Reset selection tracking if selections were cleared
+    if (_selectedGridCells.isEmpty) {
+      _selectionStartCell = null;
+      _currentSelectionCell = null;
+    }
+  }
+
+  // =============================================================================
   // AUTOSAVE FUNCTIONALITY
   // =============================================================================
 
@@ -2702,7 +2859,7 @@ Made with Demo Sequencer 🚀
       // Apply simple properties
       _bpm = state['bpm'] ?? 120;
       _gridColumns = state['gridColumns'] ?? 4;
-      _gridRows = state['gridRows'] ?? 16;
+      _gridRows = (state['gridRows'] ?? 16).clamp(minGridRows, maxGridRows);
       _currentSoundGridIndex = state['currentSoundGridIndex'] ?? 0;
       _activeBank = state['activeBank'] ?? 0;
       
@@ -3864,7 +4021,7 @@ Made with Demo Sequencer 🚀
     notifyListeners();
   }
   
-  /// Set step insert size (1-16)
+  /// Set step insert size (1-maxGridRows)
   void setStepInsertSize(int size) {
     if (size >= 1 && size <= _gridRows) {
       _stepInsertSize = size;

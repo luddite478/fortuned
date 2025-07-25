@@ -385,8 +385,15 @@ class SequencerLibrary {
     _bindings.set_bpm(bpm);
   }
   
+  /// Set sequencer step count (updates loop length instantly)
+  void setSequencerSteps(int steps) {
+    // Note: This requires the native set_steps function to be implemented
+    // _bindings.set_steps(steps);
+    print('🎵 Would set sequencer steps to $steps (native function needed)');
+  }
+  
   /// Set a grid cell to play a specific sample slot
-  /// step: 0-31, column: 0-7, sampleSlot: 0-1023 (or -1 to clear)
+  /// step: 0-(maxSteps-1), column: 0-7, sampleSlot: 0-1023 (or -1 to clear)
   void setGridCell(int step, int column, int sampleSlot) {
     _bindings.set_cell(step, column, sampleSlot);
   }

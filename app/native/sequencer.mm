@@ -324,7 +324,7 @@ static uint64_t g_recording_start_time = 0;
 static uint64_t g_total_frames_written = 0;
 
 // Sequencer state
-#define MAX_SEQUENCER_STEPS 32
+#define MAX_SEQUENCER_STEPS 128
 #define MAX_TOTAL_COLUMNS 64
 #define MAX_ACTIVE_CELL_NODES 512  // Maximum number of simultaneously active cell nodes
 

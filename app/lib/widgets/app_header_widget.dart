@@ -5,6 +5,7 @@ import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
 import '../screens/checkpoints_screen.dart';
 import '../screens/sequencer_settings_screen.dart';
+import '../screens/test_screen.dart';
 
 // Telephone book color scheme - same as other screens
 class PhoneBookColors {
@@ -184,6 +185,21 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     final spacingWidth = screenWidth * (spacingPercentage / 100);
     
     return [
+      // Test button - for testing scrollable elements
+      IconButton(
+        icon: Icon(
+          Icons.science,
+          color: SequencerPhoneBookColors.accent,
+        ),
+        onPressed: () => _navigateToTestScreen(context),
+        iconSize: 14,
+        padding: const EdgeInsets.all(2),
+        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+      ),
+      
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
       // Settings gear button - access to all other functions
       IconButton(
         icon: Icon(
@@ -432,6 +448,15 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       context,
       MaterialPageRoute(
         builder: (context) => const SequencerSettingsScreen(),
+      ),
+    );
+  }
+
+  void _navigateToTestScreen(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const TestScreen(),
       ),
     );
   }

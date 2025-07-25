@@ -74,11 +74,11 @@ class StackedCardsWidget extends StatelessWidget {
                   width: scaledWidth,
                   height: scaledHeight,
                   decoration: BoxDecoration(
-                    color: cardColors[i % cardColors.length].withOpacity(1.0 - 0.1 * depth),
+                    color: cardColors[i % cardColors.length],
                     borderRadius: BorderRadius.circular(borderRadius),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(shadowOpacity),
+                        color: Colors.black,
                         blurRadius: shadowBlurRadius,
                         offset: shadowOffset,
                       ),

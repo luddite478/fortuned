@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../widgets/sequencer/v1/sample_banks_widget.dart' as v1;
-import '../widgets/sequencer/v1/edit_buttons_widget.dart' as v1;
-import '../widgets/sequencer/v1/top_multitask_panel_widget.dart' as v1;
+import '../widgets/sequencer/v2/sample_banks_widget.dart' as v1;
+import '../widgets/sequencer/v2/edit_buttons_widget.dart' as v1;
+import '../widgets/sequencer/v2/top_multitask_panel_widget.dart' as v1;
 import '../widgets/sequencer/v2/message_bar_widget.dart';
-import '../widgets/sequencer/v2/sequencer_body_element.dart';
+import '../widgets/sequencer/v2/sequencer_body.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
@@ -90,8 +90,8 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
             metadata: {
               'project_type': 'solo',
               'is_public': false, // Unpublished initially
-              'created_from': 'sequencer_v2',
-              'layout_version': 'v2',
+              // 'created_from': 'sequencer_v2',
+              // 'layout_version': 'v2',
             },
             createInitialCheckpoint: false, // Don't create checkpoint until user makes changes
           );
@@ -170,7 +170,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
             // 🎯 PERFORMANCE: Body element with switching capability between sound grid and sample browser
             Expanded(
               flex: 50, // Reduced from 60 to make space for message bar
-              child: const SequencerBodyElement(),
+              child: const SequencerBody(),
             ),
 
             // 🎯 PERFORMANCE: Edit buttons only rebuild when selection or mode changes

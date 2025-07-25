@@ -109,8 +109,8 @@ class StepInsertSettingsWidget extends StatelessWidget {
                             child: Slider(
                               value: sequencer.stepInsertSize.toDouble(),
                               min: 1,
-                              max: 16,
-                              divisions: 15,
+                              max: sequencer.maxGridRows.toDouble(),
+                              divisions: sequencer.maxGridRows - 1,
                               onChanged: (value) {
                                 sequencer.setStepInsertSize(value.round());
                               },

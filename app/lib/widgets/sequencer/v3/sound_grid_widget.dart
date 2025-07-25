@@ -10,13 +10,13 @@ class SequencerPhoneBookColors {
   static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
   static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
   static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
+  static const Color surfacePressed = Color.fromARGB(255, 212, 212, 62); // Pressed/active surface
   static const Color text = Color(0xFFE8E6E0); // Light text for contrast
   static const Color lightText = Color(0xFFB8B6B0); // Muted light text
   static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF4A4A47); // Dark shadows for depth
-  static const Color cellEmpty = Color(0xFF3E3E3B); // Empty grid cells
+  static const Color border = Color.fromARGB(255, 132, 132, 132); // Subtle borders
+  static const Color shadow = Color.fromARGB(255, 77, 77, 75); // Dark shadows for depth
+  static const Color cellEmpty = Color.fromARGB(255, 103, 103, 97); // Empty grid cells
   static const Color cellFilled = Color(0xFF5C5A55); // Filled grid cells
 }
 
@@ -162,10 +162,11 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         }
         
         return Container(
+          margin: const EdgeInsets.only(top: 0, bottom: 0), // Move entire sound grid structure
           decoration: BoxDecoration(
             border: Border.all(
               color: SequencerPhoneBookColors.border,
-              width: 1,
+              width: 0,
             ),
             borderRadius: BorderRadius.circular(2), // Sharp corners
             boxShadow: [
@@ -179,8 +180,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           ),
           child: StackedCardsWidget(
             numCards: numSoundGrids,
-            cardWidthFactor: 0.9,
-            cardHeightFactor: 0.9,
+            cardWidthFactor: 0.98,
+            cardHeightFactor: 0.98,
             offsetPerDepth: const Offset(0, -8),
             scaleFactorPerDepth: 0.02,
             borderRadius: 2.0, // Sharp corners
@@ -216,13 +217,13 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             // Wrap everything in a container with minimal extra space for the label tab
             return SizedBox(
               width: width,
-              height: height + 22, // Reduced extra space for tab
+              height: height + 100, // More space for tabs positioned lower
               child: Stack(
                 clipBehavior: Clip.none, // Allow tabs to be positioned outside bounds if needed
                 children: [
-                  // Main card positioned to leave minimal space for tab at top
+                  // Main card positioned to leave space for tab at top
                   Positioned(
-                    top: 18, // Reduced space for tab
+                    top: 37, // More space for tab positioned lower
                     left: 0,
                     child: _buildMainCard(
                       width: width,
@@ -238,7 +239,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                   // Clickable tab label positioned above the card
                   // Use actualSoundGridId for positioning to maintain fixed horizontal positions
                   Positioned(
-                    top: 0, // At the very top
+                    top: 15, // Positioned lower to stay within container bounds
                     left: _calculateTabPosition(actualSoundGridId, width, numSoundGrids),
                     child: _buildClickableTabLabel(
                       gridIndex: actualSoundGridId,
@@ -531,15 +532,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: SequencerPhoneBookColors.surfaceBase.withOpacity(0.4 - 0.1 * depth), // Muted background
+          color: SequencerPhoneBookColors.surfaceBase, // Full opacity background
           borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
-            color: SequencerPhoneBookColors.border.withOpacity(0.6),
+            color: SequencerPhoneBookColors.border,
             width: 0.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: SequencerPhoneBookColors.shadow.withOpacity(0.3),
+              color: SequencerPhoneBookColors.shadow,
               blurRadius: 2,
               offset: const Offset(0, 1),
             ),
@@ -548,10 +549,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         child: Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.surfacePressed.withOpacity(0.1),
+            color: SequencerPhoneBookColors.surfacePressed,
             borderRadius: BorderRadius.circular(2), // Sharp corners
             border: Border.all(
-              color: SequencerPhoneBookColors.border.withOpacity(0.3),
+              color: SequencerPhoneBookColors.border,
               width: 0.5,
             ),
           ),
@@ -561,14 +562,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               children: [
                 Icon(
                   Icons.music_note,
-                  color: SequencerPhoneBookColors.lightText.withOpacity(0.3),
+                  color: SequencerPhoneBookColors.lightText,
                   size: 40,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   sequencer.getGridLabel(actualSoundGridId),
                   style: GoogleFonts.sourceSans3(
-                    color: SequencerPhoneBookColors.lightText.withOpacity(0.4),
+                    color: SequencerPhoneBookColors.lightText,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -617,11 +618,11 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12), // Reduced padding
+        padding: const EdgeInsets.all(2), // Reduced padding
         child: Column(
           children: [
             // Minimal space for tab label above
-            const SizedBox(height: 4),
+            const SizedBox(height: 8),
             // Sound grid
             Expanded(
               child: _buildGridContent(sequencer),

@@ -53,36 +53,6 @@ class EditButtonsWidget extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Undo button
-                  _buildEditButton(
-                    size: buttonSize,
-                    iconSize: iconSize,
-                    icon: Icons.undo,
-                    color: sequencer.canUndo
-                        ? SequencerPhoneBookColors.accent
-                        : SequencerPhoneBookColors.lightText,
-                    onPressed: sequencer.canUndo
-                        ? () => sequencer.undo()
-                        : null,
-                    tooltip: sequencer.canUndo 
-                        ? 'Undo: ${sequencer.currentUndoDescription}'
-                        : 'Nothing to Undo',
-                  ),
-                  // Redo button
-                  _buildEditButton(
-                    size: buttonSize,
-                    iconSize: iconSize,
-                    icon: Icons.redo,
-                    color: sequencer.canRedo
-                        ? SequencerPhoneBookColors.accent
-                        : SequencerPhoneBookColors.lightText,
-                    onPressed: sequencer.canRedo
-                        ? () => sequencer.redo()
-                        : null,
-                    tooltip: sequencer.canRedo 
-                        ? 'Redo'
-                        : 'Nothing to Redo',
-                  ),
                   // Selection Mode Toggle button
                   _buildEditButton(
                     size: buttonSize,
