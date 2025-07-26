@@ -3,8 +3,21 @@
 - smoothing - done
 - pitch (fix artifacts) - done 
 - master settings - done
+- bpm - done
 
-- bpm
+- grid cell appearance 
+    - color on the right side 
+    - show key,vol,effects
+- slide to next slide (scene?)
+- 2 A/B ma nodes per column
+- paste + jump 
+- smooth volume and pitch change ui
+- recording fix and ui change
+- mute/solo
+    - layer
+    - selection ?
+- pattern chain (song)
+    - send message bar icon pattern
 - contacts and all users search
 - comment(reply)-menu for chekpoints
 - pitch (optimize speed)
