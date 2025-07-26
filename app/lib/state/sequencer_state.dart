@@ -224,6 +224,11 @@ enum SequencerChangeType {
 class SequencerState extends ChangeNotifier {
   static const int maxSlots = 16;
   
+  // BPM range constants
+  static const int minBpm = 1;
+  static const int maxBpm = 320;
+  static const int defaultBpm = 120;
+  
   late final SequencerLibrary _sequencerLibrary;
   late final int _slotCount;
   
@@ -237,6 +242,7 @@ class SequencerState extends ChangeNotifier {
   final Map<int, ValueNotifier<double>> _cellPitchNotifiers = {};
   final ValueNotifier<int> _currentStepNotifier = ValueNotifier(-1);
   final ValueNotifier<bool> _isSequencerPlayingNotifier = ValueNotifier(false);
+  final ValueNotifier<int> _bpmNotifier = ValueNotifier(defaultBpm);
   
   // 🎯 PERFORMANCE: Batched notification system
   Timer? _notificationBatchTimer;
@@ -273,7 +279,7 @@ class SequencerState extends ChangeNotifier {
   int? _currentSelectionCell;
   
   // Sequencer state
-  int _bpm = 120;
+  int _bpm = defaultBpm;
   int _currentStep = -1; // -1 means not playing, 0-(maxGridRows-1) for current step
   bool _isSequencerPlaying = false;
   Timer? _sequencerTimer;
@@ -354,6 +360,14 @@ class SequencerState extends ChangeNotifier {
   late List<double> _samplePitches; // Global sample pitches (affects all instances)
   late Map<int, double> _cellPitches; // Individual cell pitch overrides
 
+  // Slider interaction tracking for overlay display
+  bool _isSliderInteracting = false;
+  String _currentSliderSetting = '';
+  String _currentSliderValue = '';
+  final ValueNotifier<bool> _sliderInteractionNotifier = ValueNotifier(false);
+  final ValueNotifier<String> _sliderSettingNotifier = ValueNotifier('');
+  final ValueNotifier<String> _sliderValueNotifier = ValueNotifier('');
+
   // Grid labeling system
   List<String> _soundGridLabels = [];
 
@@ -367,6 +381,38 @@ class SequencerState extends ChangeNotifier {
   // Collaboration getters
   bool get isCollaborating => _isCollaborating;
   Thread? get sourceThread => _sourceThread;
+
+  // Slider interaction getters
+  bool get isSliderInteracting => _isSliderInteracting;
+  String get currentSliderSetting => _currentSliderSetting;
+  String get currentSliderValue => _currentSliderValue;
+  ValueNotifier<bool> get sliderInteractionNotifier => _sliderInteractionNotifier;
+  ValueNotifier<String> get sliderSettingNotifier => _sliderSettingNotifier;
+  ValueNotifier<String> get sliderValueNotifier => _sliderValueNotifier;
+
+  // Slider interaction methods
+  void startSliderInteraction(String setting, String value) {
+    _isSliderInteracting = true;
+    _currentSliderSetting = setting;
+    _currentSliderValue = value;
+    _sliderInteractionNotifier.value = true;
+    _sliderSettingNotifier.value = setting;
+    _sliderValueNotifier.value = value;
+  }
+
+  void updateSliderValue(String value) {
+    _currentSliderValue = value;
+    _sliderValueNotifier.value = value;
+  }
+
+  void stopSliderInteraction() {
+    _isSliderInteracting = false;
+    _currentSliderSetting = '';
+    _currentSliderValue = '';
+    _sliderInteractionNotifier.value = false;
+    _sliderSettingNotifier.value = '';
+    _sliderValueNotifier.value = '';
+  }
 
   // Undo-Redo getters
   bool get canUndo => _undoRedoManager.canUndo;
@@ -635,6 +681,7 @@ class SequencerState extends ChangeNotifier {
   
   ValueNotifier<int> get currentStepNotifier => _currentStepNotifier;
   ValueNotifier<bool> get isSequencerPlayingNotifier => _isSequencerPlayingNotifier;
+  ValueNotifier<int> get bpmNotifier => _bpmNotifier;
 
   // 🎯 PERFORMANCE: Selector-friendly getters (prevent unnecessary rebuilds)
   List<int?> get currentGridSamplesForSelector => 
@@ -2308,9 +2355,12 @@ Made with Demo Sequencer 🚀
   
   // Update BPM and sync with native sequencer
   void setBpm(int newBpm) {
-    if (newBpm < 60 || newBpm > 300) return;
+    if (newBpm < minBpm || newBpm > maxBpm) return;
     
     _bpm = newBpm;
+    
+    // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+    _bpmNotifier.value = newBpm;
     
     // Update sequencer BPM if it's running
     if (_sequencerLibrary.isSequencerPlaying) {
@@ -2857,7 +2907,8 @@ Made with Demo Sequencer 🚀
       final state = jsonDecode(stateJson) as Map<String, dynamic>;
       
       // Apply simple properties
-      _bpm = state['bpm'] ?? 120;
+      _bpm = state['bpm'] ?? defaultBpm;
+      _bpmNotifier.value = _bpm; // Sync ValueNotifier with restored BPM
       _gridColumns = state['gridColumns'] ?? 4;
       _gridRows = (state['gridRows'] ?? 16).clamp(minGridRows, maxGridRows);
       _currentSoundGridIndex = state['currentSoundGridIndex'] ?? 0;
@@ -2961,7 +3012,7 @@ Made with Demo Sequencer 🚀
     clearAllCells();
     
     // Reset to defaults
-    _bpm = 120;
+    _bpm = defaultBpm;
     _currentStep = -1;
     _isSequencerPlaying = false;
     _activeBank = 0;

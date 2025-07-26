@@ -139,6 +139,7 @@ using namespace soundtouch;
 #define MAX_MEMORY_SLOTS 128                          // Up to 128 fully memory-loaded sounds
 #define MAX_MEMORY_FILE_SIZE (50 * 1024 * 1024)      // 50MB per individual file
 #define MAX_TOTAL_MEMORY_USAGE (500 * 1024 * 1024)   // 500MB total memory usage limit
+#define MAX_SEQUENCER_BPM 320
 
 // Unified pitch data source wrapper supporting all three implementations
 typedef struct {
@@ -3187,7 +3188,7 @@ int start(int bpm, int steps) {
         return -1;
     }
     
-    if (bpm <= 0 || bpm > 300) {
+    if (bpm <= 0 || bpm > MAX_SEQUENCER_BPM) {
         prnt_err("🔴 [SEQUENCER] Invalid BPM: %d", bpm);
         return -1;
     }

@@ -104,7 +104,7 @@ class SoundSettingsWidget extends StatefulWidget {
     return SoundSettingsWidget(
       type: SettingsType.cell,
       title: 'Cell Settings',
-      headerButtons: ['VOL', 'KEY', 'EQ', 'RVB', 'DLY'],
+      headerButtons: ['VOL', 'KEY'],
       infoTextBuilder: (sequencer) {
         final selectedCell = sequencer.selectedCellForSettings;
         final hasCellSelected = selectedCell != null;
@@ -154,7 +154,7 @@ class SoundSettingsWidget extends StatefulWidget {
     return SoundSettingsWidget(
       type: SettingsType.sample,
       title: 'Sample Settings',
-      headerButtons: ['VOL', 'KEY', 'EQ', 'RVB', 'DLY'],
+      headerButtons: ['VOL', 'KEY'],
       infoTextBuilder: (sequencer) {
         final currentSample = sequencer.activeBank;
         final sampleName = sequencer.fileNames[currentSample];
@@ -187,7 +187,7 @@ class SoundSettingsWidget extends StatefulWidget {
     return SoundSettingsWidget(
       type: SettingsType.master,
       title: 'Master Settings',
-      headerButtons: ['BPM', 'MASTER', 'COMP', 'EQ', 'RVB', 'DLY', 'FILTER', 'DIST'],
+      headerButtons: ['BPM', 'MASTER'],
       infoTextBuilder: (sequencer) => 'Master Controls', // Always available
       hasDataChecker: (sequencer) => true, // Always has data for master
       indexProvider: (sequencer) => 0, // Default index for master
@@ -409,12 +409,12 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           return _buildVolumeControl(sequencer, index, height, padding, fontSize);
         case 'KEY':
           return _buildPitchControl(sequencer, index, height, padding, fontSize);
-        case 'EQ':
-          return _buildPlaceholderControl('EQ', 'Equalizer settings', height, padding, fontSize);
-        case 'RVB':
-          return _buildPlaceholderControl('RVB', 'Reverb settings', height, padding, fontSize);
-        case 'DLY':
-          return _buildPlaceholderControl('DLY', 'Delay settings', height, padding, fontSize);
+        // case 'EQ':
+        //   return _buildPlaceholderControl('EQ', 'Equalizer settings', height, padding, fontSize);
+        // case 'RVB':
+        //   return _buildPlaceholderControl('RVB', 'Reverb settings', height, padding, fontSize);
+        // case 'DLY':
+        //   return _buildPlaceholderControl('DLY', 'Delay settings', height, padding, fontSize);
         default:
           return _buildVolumeControl(sequencer, index, height, padding, fontSize);
       }
@@ -427,18 +427,18 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         return _buildBPMControl(sequencer, height, padding, fontSize);
       case 'MASTER':
         return _buildPlaceholderControl('MASTER', 'Master volume and effects', height, padding, fontSize);
-      case 'COMP':
-        return _buildPlaceholderControl('COMP', 'Compression settings', height, padding, fontSize);
-      case 'EQ':
-        return _buildPlaceholderControl('EQ', 'Equalizer settings', height, padding, fontSize);
-      case 'RVB':
-        return _buildPlaceholderControl('RVB', 'Reverb settings', height, padding, fontSize);
-      case 'DLY':
-        return _buildPlaceholderControl('DLY', 'Delay settings', height, padding, fontSize);
-      case 'FILTER':
-        return _buildPlaceholderControl('FILTER', 'Filter settings', height, padding, fontSize);
-      case 'DIST':
-        return _buildPlaceholderControl('DIST', 'Distortion settings', height, padding, fontSize);
+      // case 'COMP':
+      //   return _buildPlaceholderControl('COMP', 'Compression settings', height, padding, fontSize);
+      // case 'EQ':
+      //   return _buildPlaceholderControl('EQ', 'Equalizer settings', height, padding, fontSize);
+      // case 'RVB':
+      //   return _buildPlaceholderControl('RVB', 'Reverb settings', height, padding, fontSize);
+      // case 'DLY':
+      //   return _buildPlaceholderControl('DLY', 'Delay settings', height, padding, fontSize);
+      // case 'FILTER':
+      //   return _buildPlaceholderControl('FILTER', 'Filter settings', height, padding, fontSize);
+      // case 'DIST':
+      //   return _buildPlaceholderControl('DIST', 'Distortion settings', height, padding, fontSize);
       default:
         return _buildBPMControl(sequencer, height, padding, fontSize);
     }
@@ -474,27 +474,45 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           ),
         ],
       ),
-      child: Center(
-        child: SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: SequencerPhoneBookColors.accent,
-            inactiveTrackColor: SequencerPhoneBookColors.border,
-            thumbColor: SequencerPhoneBookColors.accent,
-            trackHeight: (height * 0.04).clamp(2.0, 8.0), // Scales with full height
-            thumbShape: RoundSliderThumbShape(
-              enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0), // Scales with full height
-            ),
-          ),
-          child: Slider(
-            value: 120.0, // Default BPM
-            onChanged: (value) {
-              // TODO: Implement BPM change
-            },
-            min: 60.0,
-            max: 200.0,
-            divisions: 140, // 1 BPM increments
-          ),
-        ),
+      child: ValueListenableBuilder<int>(
+        valueListenable: sequencer.bpmNotifier,
+        builder: (context, bpm, child) {
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '$bpm BPM',
+                style: TextStyle(
+                  fontSize: fontSize * 0.8,
+                  fontWeight: FontWeight.bold,
+                  color: SequencerPhoneBookColors.lightText,
+                ),
+              ),
+              SizedBox(height: height * 0.02),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: SequencerPhoneBookColors.accent,
+                  inactiveTrackColor: SequencerPhoneBookColors.border,
+                  thumbColor: SequencerPhoneBookColors.accent,
+                  trackHeight: (height * 0.04).clamp(2.0, 8.0), // Scales with full height
+                  thumbShape: RoundSliderThumbShape(
+                    enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0), // Scales with full height
+                  ),
+                ),
+                child: Slider(
+                  value: bpm.toDouble(),
+                  onChanged: (value) {
+                    sequencer.setBpm(value.round());
+                  },
+                  min: SequencerState.minBpm.toDouble(),
+                  max: SequencerState.maxBpm.toDouble(),
+                  divisions: SequencerState.maxBpm - SequencerState.minBpm, // 1 BPM increments
+                  label: '${bpm} BPM',
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
