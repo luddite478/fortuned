@@ -23,9 +23,9 @@ int load_sound(const char* file_path);
 __attribute__((visibility("default"))) __attribute__((used))
 int play_loaded_sound(void);
 
-// Stop all currently playing sounds
+// Stop all currently playing sounds  
 __attribute__((visibility("default"))) __attribute__((used))
-void stop_all_sounds(void);
+void stop_all_slots(void);
 
 // Check if engine is initialized
 __attribute__((visibility("default"))) __attribute__((used))
@@ -45,11 +45,11 @@ void cleanup(void);
 
 // Sequencer functions (sample-accurate timing)
 __attribute__((visibility("default"))) __attribute__((used))
-int start(int bpm, int steps);
+int start_sequencer(int bpm, int steps);
 __attribute__((visibility("default"))) __attribute__((used))
-void stop(void);
+void stop_sequencer(void);
 __attribute__((visibility("default"))) __attribute__((used))
-int is_playing(void);
+int is_sequencer_playing(void);
 __attribute__((visibility("default"))) __attribute__((used))
 int get_current_step(void);
 __attribute__((visibility("default"))) __attribute__((used))
@@ -59,7 +59,7 @@ void set_cell(int step, int column, int sample_slot);
 __attribute__((visibility("default"))) __attribute__((used))
 void clear_cell(int step, int column);
 __attribute__((visibility("default"))) __attribute__((used))
-void clear_all_cells(void);
+void clear_grid_completely(void);
 
 // Multi-grid sequencer support
 __attribute__((visibility("default"))) __attribute__((used))
@@ -139,9 +139,9 @@ float get_cell_pitch(int step, int column);
 
 // Output recording/rendering functions (captures mixed grid output to WAV file)
 __attribute__((visibility("default"))) __attribute__((used))
-int start_recording(const char* output_file_path);
+int start_output_recording(const char* output_file_path);
 __attribute__((visibility("default"))) __attribute__((used))
-int stop_recording(void);
+int stop_output_recording(void);
 __attribute__((visibility("default"))) __attribute__((used))
 int is_recording(void);
 __attribute__((visibility("default"))) __attribute__((used))

@@ -2170,11 +2170,14 @@ static void play_samples_for_step(int step) {
                     // Check if this is the same node as currently playing
                     bool is_same_node = (currently_playing_nodes_per_col[column] == target_node);
                     
-                                        if (!is_same_node) {
+                    if (!is_same_node) {
                         // Fade out previous node, fade in new node
                         if (currently_playing_nodes_per_col[column]) {
                             set_target_volume(currently_playing_nodes_per_col[column], 0.0f);
                         }
+                        
+                        // Ensure target node is in started state for processing
+                        ma_node_set_state(&target_node->node, ma_node_state_started);
                         
                         // Seek to beginning based on data source type
                         if (target_node->uses_audio_buffer && target_node->audio_buffer_initialized) {
@@ -2194,6 +2197,9 @@ static void play_samples_for_step(int step) {
                              step, column, sample_to_play, resolved_volume, target_node->id);
                     } else {
                         // Same node - restart from beginning
+                        // Ensure node is in started state (may have been stopped)
+                        ma_node_set_state(&target_node->node, ma_node_state_started);
+                        
                         if (target_node->uses_audio_buffer && target_node->audio_buffer_initialized) {
                             ma_data_source_seek_to_pcm_frame(&target_node->audio_buffer, 0);
                         } else {
@@ -2839,13 +2845,13 @@ void unload_slot(int slot) {
     prnt("🗑️ [MINIAUDIO] Slot %d unloaded", slot);
 }
 
-void stop_all_sounds(void) {
+void stop_all_slots(void) {
     if (!g_is_initialized) {
         prnt_err("🔴 [MINIAUDIO] Device not initialized");
         return;
     }
     
-    prnt("⏹️ [MINIAUDIO] Stopping all sounds (sample bank + sequencer + previews + cell nodes)");
+    prnt("⏹️ [MINIAUDIO] Stopping all slots (sample bank + sequencer + previews + cell nodes)");
     
     // Stop and cleanup all active cell nodes
     for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
@@ -3107,7 +3113,7 @@ void log_route(void) {
 }
 
 // Output recording functions (following simple_capture example pattern)
-int start_recording(const char* output_file_path) {
+int start_output_recording(const char* output_file_path) {
     if (!g_is_initialized) {
         prnt_err("🔴 [RECORDING] Device not initialized");
         return -1;
@@ -3137,7 +3143,7 @@ int start_recording(const char* output_file_path) {
     return 0;
 }
 
-int stop_recording(void) {
+int stop_output_recording(void) {
     if (!g_is_output_recording) {
         prnt_err("🔴 [RECORDING] Not currently recording");
         return -1;
@@ -3182,7 +3188,7 @@ int get_max_cell_node_count(void) {
 }
 
 // Sequencer functions (sample-accurate timing)
-int start(int bpm, int steps) {
+int start_sequencer(int bpm, int steps) {
     if (!g_is_initialized) {
         prnt_err("🔴 [SEQUENCER] Device not initialized");
         return -1;
@@ -3211,26 +3217,27 @@ int start(int bpm, int steps) {
     return 0;
 }
 
-void stop(void) {
+void stop_sequencer(void) {
     g_sequencer_playing = 0;
     g_current_step = 0;
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     
-    // Stop and cleanup all active cell nodes to prevent background processing
+    // NEW: Use miniaudio node state control instead of destroying nodes
+    // This is much more efficient and preserves all settings
     for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        if (g_cell_nodes[i].active) {
-            cleanup_cell_node(&g_cell_nodes[i]);
+        if (g_cell_nodes[i].active && g_cell_nodes[i].node_initialized) {
+            ma_node_set_state(&g_cell_nodes[i].node, ma_node_state_stopped);
         }
     }
     
     // Clear column tracking since nothing is currently playing
     memset(currently_playing_nodes_per_col, 0, sizeof(currently_playing_nodes_per_col));
     
-    prnt("⏹️ [SEQUENCER] Stopped");
+    prnt("⏹️ [SEQUENCER] Stopped (nodes preserved with ma_node_state_stopped)");
 }
 
-int is_playing(void) {
+int is_sequencer_playing(void) {
     return g_sequencer_playing;
 }
 
@@ -3352,7 +3359,7 @@ void clear_cell(int step, int column) {
     prnt("🗑️ [SEQUENCER] Cleared cell [%d,%d]", step, column);
 }
 
-void clear_all_cells(void) {
+void clear_grid_completely(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
             g_sequencer_grid[step][col] = -1;
@@ -3360,8 +3367,10 @@ void clear_all_cells(void) {
     g_sequencer_grid_pitches[step][col] = DEFAULT_CELL_PITCH; // Reset to use sample bank pitch
         }
     }
-    prnt("🗑️ [SEQUENCER] Cleared all grid cells (entire %dx%d table)", MAX_SEQUENCER_STEPS, MAX_TOTAL_COLUMNS);
+    prnt("🗑️ [SEQUENCER] Cleared grid completely (samples + volume/pitch reset)");
 }
+
+
 
 // Multi-grid sequencer support
 void set_columns(int columns) {
@@ -3598,11 +3607,11 @@ void cleanup(void) {
     prnt("🧹 [MINIAUDIO] Starting cleanup...");
     
     // Stop sequencer
-    stop();
+    stop_sequencer();
     
     // Stop recording if active
     if (g_is_output_recording) {
-        stop_recording();
+        stop_output_recording();
     }
     
     // Stop device first

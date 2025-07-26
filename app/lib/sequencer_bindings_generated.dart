@@ -79,14 +79,13 @@ class SequencerBindings {
       _play_loaded_soundPtr.asFunction<int Function()>();
 
   /// Stop all currently playing sounds
-  void stop_all_sounds() {
-    return _stop_all_sounds();
+  void stop_all_slots() {
+    return _stop_all_slots();
   }
 
-  late final _stop_all_soundsPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('stop_all_sounds');
-  late final _stop_all_sounds =
-      _stop_all_soundsPtr.asFunction<void Function()>();
+  late final _stop_all_slotsPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('stop_all_slots');
+  late final _stop_all_slots = _stop_all_slotsPtr.asFunction<void Function()>();
 
   /// Check if engine is initialized
   int is_initialized() {
@@ -127,35 +126,38 @@ class SequencerBindings {
   late final _cleanup = _cleanupPtr.asFunction<void Function()>();
 
   /// Sequencer functions (sample-accurate timing)
-  int start(
+  int start_sequencer(
     int bpm,
     int steps,
   ) {
-    return _start(
+    return _start_sequencer(
       bpm,
       steps,
     );
   }
 
-  late final _startPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>('start');
-  late final _start = _startPtr.asFunction<int Function(int, int)>();
+  late final _start_sequencerPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
+          'start_sequencer');
+  late final _start_sequencer =
+      _start_sequencerPtr.asFunction<int Function(int, int)>();
 
-  void stop() {
-    return _stop();
+  void stop_sequencer() {
+    return _stop_sequencer();
   }
 
-  late final _stopPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('stop');
-  late final _stop = _stopPtr.asFunction<void Function()>();
+  late final _stop_sequencerPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('stop_sequencer');
+  late final _stop_sequencer = _stop_sequencerPtr.asFunction<void Function()>();
 
-  int is_playing() {
-    return _is_playing();
+  int is_sequencer_playing() {
+    return _is_sequencer_playing();
   }
 
-  late final _is_playingPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('is_playing');
-  late final _is_playing = _is_playingPtr.asFunction<int Function()>();
+  late final _is_sequencer_playingPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('is_sequencer_playing');
+  late final _is_sequencer_playing =
+      _is_sequencer_playingPtr.asFunction<int Function()>();
 
   int get_current_step() {
     return _get_current_step();
@@ -211,14 +213,14 @@ class SequencerBindings {
           'clear_cell');
   late final _clear_cell = _clear_cellPtr.asFunction<void Function(int, int)>();
 
-  void clear_all_cells() {
-    return _clear_all_cells();
+  void clear_grid_completely() {
+    return _clear_grid_completely();
   }
 
-  late final _clear_all_cellsPtr =
-      _lookup<ffi.NativeFunction<ffi.Void Function()>>('clear_all_cells');
-  late final _clear_all_cells =
-      _clear_all_cellsPtr.asFunction<void Function()>();
+  late final _clear_grid_completelyPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('clear_grid_completely');
+  late final _clear_grid_completely =
+      _clear_grid_completelyPtr.asFunction<void Function()>();
 
   /// Multi-grid sequencer support
   void set_columns(
@@ -555,27 +557,28 @@ class SequencerBindings {
       _get_cell_pitchPtr.asFunction<double Function(int, int)>();
 
   /// Output recording/rendering functions (captures mixed grid output to WAV file)
-  int start_recording(
+  int start_output_recording(
     ffi.Pointer<ffi.Char> output_file_path,
   ) {
-    return _start_recording(
+    return _start_output_recording(
       output_file_path,
     );
   }
 
-  late final _start_recordingPtr =
+  late final _start_output_recordingPtr =
       _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Pointer<ffi.Char>)>>(
-          'start_recording');
-  late final _start_recording =
-      _start_recordingPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+          'start_output_recording');
+  late final _start_output_recording = _start_output_recordingPtr
+      .asFunction<int Function(ffi.Pointer<ffi.Char>)>();
 
-  int stop_recording() {
-    return _stop_recording();
+  int stop_output_recording() {
+    return _stop_output_recording();
   }
 
-  late final _stop_recordingPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function()>>('stop_recording');
-  late final _stop_recording = _stop_recordingPtr.asFunction<int Function()>();
+  late final _stop_output_recordingPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('stop_output_recording');
+  late final _stop_output_recording =
+      _stop_output_recordingPtr.asFunction<int Function()>();
 
   int is_recording() {
     return _is_recording();
@@ -615,6 +618,21 @@ class SequencerBindings {
           'get_max_cell_node_count');
   late final _get_max_cell_node_count =
       _get_max_cell_node_countPtr.asFunction<int Function()>();
+
+  /// Performance testing mode for diagnosing bottlenecks
+  void set_perf_test_mode(
+    int mode,
+  ) {
+    return _set_perf_test_mode(
+      mode,
+    );
+  }
+
+  late final _set_perf_test_modePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+          'set_perf_test_mode');
+  late final _set_perf_test_mode =
+      _set_perf_test_modePtr.asFunction<void Function(int)>();
 }
 
 /// mbstate_t is an opaque object to keep conversion state, during multibyte

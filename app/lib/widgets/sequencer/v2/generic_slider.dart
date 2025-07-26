@@ -3,7 +3,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../state/sequencer_state.dart';
 import '../../../utils/musical_notes.dart';
 
-// Simple musical notes helper (copied from sound_settings.dart)
 class MusicalNotes {
   static const List<String> _noteNames = [
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'

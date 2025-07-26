@@ -186,7 +186,7 @@ class SequencerLibrary {
   }
 
   void stopAllSounds() {
-    _bindings.stop_all_sounds();
+    _bindings.stop_all_slots();
   }
 
   bool isInitialized() {
@@ -294,7 +294,7 @@ class SequencerLibrary {
       }
       cString[utf8Bytes.length] = 0;
       
-      int result = _bindings.start_recording(cString.cast());
+      int result = _bindings.start_output_recording(cString.cast());
       bool success = result == 0;
       
       if (success) {
@@ -313,7 +313,7 @@ class SequencerLibrary {
   bool stopOutputRecording() {
     print('⏹️ Stopping output recording...');
     
-    int result = _bindings.stop_recording();
+    int result = _bindings.stop_output_recording();
     bool success = result == 0;
     
     if (success) {
@@ -354,7 +354,7 @@ class SequencerLibrary {
       return false;
     }
     
-    int result = _bindings.start(bpm, steps);
+    int result = _bindings.start_sequencer(bpm, steps);
     bool success = result == 0;
     if (success) {
       print('🎵 Sequencer started: $bpm BPM, $steps steps');
@@ -366,13 +366,13 @@ class SequencerLibrary {
   
   /// Stop the sequencer
   void stopSequencer() {
-    _bindings.stop();
+    _bindings.stop_sequencer();
     print('⏹️ Sequencer stopped');
   }
   
   /// Check if sequencer is playing
   bool get isSequencerPlaying {
-    return _bindings.is_playing() == 1;
+    return _bindings.is_sequencer_playing() == 1;
   }
   
   /// Get current sequencer step (0-based)
@@ -405,7 +405,7 @@ class SequencerLibrary {
   
   /// Clear all grid cells
   void clearAllGridCells() {
-    _bindings.clear_all_cells();
+    _bindings.clear_grid_completely();
     print('🗑️ All grid cells cleared');
   }
   

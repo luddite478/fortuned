@@ -545,7 +545,7 @@ class SequencerState extends ChangeNotifier {
     }
 
     // Sync changes to native sequencer
-    _syncGridToSequencer();
+    syncFlutterSequencerGridToNativeSequencerGrid();
 
     debugPrint('🔄 Applied ${isUndo ? 'undo' : 'redo'} state successfully');
   }
@@ -1783,8 +1783,8 @@ class SequencerState extends ChangeNotifier {
   void startSequencer() {
     if (_sequencerLibrary.isSequencerPlaying) return;
     
-    // First, transfer current grid to sequencer
-    _syncGridToSequencer();
+    // Note: Grid sync is now called explicitly when needed
+    // For simple stop/start, nodes are preserved via ma_node_set_state
     
     // Start sequencer with current BPM and grid size
     bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows);
@@ -1823,10 +1823,16 @@ class SequencerState extends ChangeNotifier {
     _notifyImmediately(SequencerChangeType.playback);
   }
   
-  void _syncGridToSequencer() {
-    // Clear sequencer grid first
+  /// Transfer Flutter grid state to native sequencer
+  /// Call this when:
+  /// - App startup after loading saved state
+  /// - Loading new saved state  
+  /// - Switching sound grids
+  /// - Major grid changes
+  void syncFlutterSequencerGridToNativeSequencerGrid() {
+    // Clear everything and rebuild (simpler and more reliable)
     _sequencerLibrary.clearAllGridCells();
-    print('🔄 [SYNC] Cleared all native sequencer cells');
+    print('🔄 [SYNC] Cleared native sequencer completely');
     
     // Transfer ALL sound grids to sequencer as one horizontally concatenated table
     int totalCellsSet = 0;
@@ -2694,7 +2700,7 @@ Made with Demo Sequencer 🚀
     _sequencerLibrary.configureColumns(nativeTableColumns);
     
     // Sync all grids to native sequencer
-    _syncGridToSequencer();
+    syncFlutterSequencerGridToNativeSequencerGrid();
     
     // 🎯 REAL-TIME UPDATE: If sequencer is playing, update step count seamlessly  
     if (_isSequencerPlaying) {
@@ -2737,7 +2743,7 @@ Made with Demo Sequencer 🚀
     _sequencerLibrary.configureColumns(nativeTableColumns);
     
     // Sync all grids to native sequencer
-    _syncGridToSequencer();
+    syncFlutterSequencerGridToNativeSequencerGrid();
     
     // Record undo action
     _recordUndoAction(

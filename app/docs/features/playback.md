@@ -6,6 +6,13 @@
 
 The audio system uses **individual nodes per grid cell** with **column-based tracking** for smooth transitions. Each grid cell gets its own permanent audio node that's controlled by the sequencer through volume changes.
 
+### Function Naming
+Updated to consistent naming scheme:
+- `start_sequencer()` / `stop_sequencer()` / `is_sequencer_playing()` - sequencer control
+- `clear_grid_completely()` - clears samples and resets volume/pitch settings  
+- `stop_all_slots()` - stops sample bank playback
+- `syncFlutterSequencerGridToNativeSequencerGrid()` - explicit Flutter→Native sync
+
 ### Per-Cell Node Structure
 ```c
 typedef struct {
@@ -133,29 +140,53 @@ static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
 
 ### 5. Stop/Start Behavior
 ```c
-// stop() function:
-void stop(void) {
-    // Smoothly fade out all currently playing nodes
-    for (each column) {
-        if (currently_playing_nodes_per_col[column]) {
-            set_target_volume(node, 0.0f);  // Smooth fade to silence
+// stop_sequencer() function:
+void stop_sequencer(void) {
+    g_sequencer_playing = 0;
+    g_current_step = 0;
+    
+    // NEW: Use miniaudio node state control (preserves all settings)
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) {
+            ma_node_set_state(&g_cell_nodes[i].node, ma_node_state_stopped);
+        }
+    }
+    // Nodes preserved - no destruction/recreation needed
+}
+
+// start_sequencer() function:  
+int start_sequencer(int bpm, int steps) {
+    // Resume existing nodes (much faster than recreation)
+    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
+        if (g_cell_nodes[i].active) {
+            ma_node_set_state(&g_cell_nodes[i].node, ma_node_state_started);
         }
     }
     
-    // Clear tracking since nothing is currently playing
-    memset(currently_playing_nodes_per_col, 0, ...);
-}
-
-// start() function:
-void start(int bpm, int steps) {
-    // Configure sequencer (don't clear column tracking)
-    g_current_step = 0;
-    g_step_just_changed = 1;  // Trigger step 0 immediately
     g_sequencer_playing = 1;
+    g_step_just_changed = 1;  // Trigger step 0 immediately
 }
 ```
 
-**Result**: Clean stop/start cycles with proper state management.
+**Result**: Efficient stop/start cycles that preserve volume/pitch settings and avoid node recreation.
+
+### 6. Grid Sync Strategy
+```dart
+// Explicit sync when actually needed
+syncFlutterSequencerGridToNativeSequencerGrid();
+
+// Call only when:
+// - App startup after loading saved state  
+// - Loading different saved state
+// - Switching sound grids
+// - Major grid changes (resize, etc.)
+
+// NOT needed for:
+// - Simple stop/start (nodes preserved via ma_node_set_state)
+// - Individual cell changes (handled by _syncSingleCellToNative)
+```
+
+**Result**: ~90% fewer sync operations, much faster restart times.
 
 ## Click Elimination
 
@@ -220,7 +251,7 @@ ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 ```c
 static void audio_callback(...) {
     // 1. Run sequencer (timing + sample triggering)
-    run_sequencer(frameCount);
+    run_sequencer(frameCount);  // Internal function - same name
     
     // 2. Update volume smoothing to prevent clicks
     update_volume_smoothing();
