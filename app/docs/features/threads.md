@@ -325,3 +325,33 @@ POST /api/v1/threads/thread123/users
 
 This threads system provides a robust foundation for both solo project versioning and collaborative music creation, maintaining complete project history while enabling seamless collaboration between multiple users.
 
+## ✅ Tree-Like Folder Structure Implemented!
+
+### 🎯 Key Features:
+
+1. **📁 Tree Connector Line**: Vertical line connecting user tile to folder
+2. **🗂️ Folder Container**: Proper folder-like box with borders
+3. **💬 Mail Icons**: Blue mail icons for new invitations
+4. **🏷️ NEW Badges**: Prominent "NEW" badges for pending invites
+5. **🔄 Auto-Expand**: Tree automatically unfolds when new invitation arrives
+
+### 🚀 Behavior:
+
+- **When invitation arrives**: 
+  - 🔵 Blue dot appears on user tile
+  - 📧 Mail icon shows with "NEW" badge
+  - 📱 Snackbar notification appears
+
+- **Manual expansion**: 
+  - Click chevron to expand/collapse
+  - Shows all shared threads in folder structure
+
+### 🎨 Styling:
+
+- **Telephone book aesthetic** maintained
+- **Proper hierarchy** with connecting lines
+- **Clear visual separation** between user and threads
+- **Consistent spacing** and typography
+
+The tree structure now properly mimics your image with the folder-like appearance and automatic expansion when new invitations arrive! 🌳✨
+

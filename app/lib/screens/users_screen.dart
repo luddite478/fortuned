@@ -41,6 +41,15 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   List<UserProfile> _userProfiles = [];
   bool _isLoading = true;
   String? _error;
+  
+  // Track users with unread thread messages
+  Set<String> _usersWithNotifications = {};
+  
+  // Track users with pending invitations
+  Set<String> _usersWithPendingInvites = {};
+
+  // Track expanded contact tiles
+  Set<String> _expandedContacts = {};
 
   // Animation controllers
   late AnimationController _lampAnimation;
@@ -86,11 +95,58 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       }
     });
 
+    // Listen for thread messages (collaboration notifications)
+    _threadsService.threadNotificationStream.listen((threadMessage) {
+      setState(() {
+        _usersWithNotifications.add(threadMessage.from);
+      });
+      
+      // Show snackbar notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${threadMessage.from} shared a project: ${threadMessage.threadTitle}'),
+            backgroundColor: const Color(0xFF7C3AED),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+
+    // Listen for thread invitations
+    _threadsService.threadInvitationStream.listen((invitation) {
+      setState(() {
+        _usersWithPendingInvites.add(invitation.fromUserId);
+      });
+      
+      // Show snackbar notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${invitation.fromUserName} invited you to collaborate on "${invitation.threadTitle}"'),
+            backgroundColor: const Color(0xFF3B82F6), // Blue color for invitations
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'VIEW',
+              textColor: Colors.white,
+              onPressed: () {
+                // TODO: Navigate to invitations screen or thread
+                debugPrint('Navigate to invitation for thread: ${invitation.threadId}');
+              },
+            ),
+          ),
+        );
+      }
+    });
+
     // No need to connect here - it's already connected globally
     debugPrint('📡 Using global ThreadsService connection in users screen');
 
     // Load user profiles from API
     await _loadUserProfiles();
+    
+    // Load threads to check for pending invitations
+    await _loadThreadsAndCheckInvitations();
   }
 
   Future<void> _loadUserProfiles() async {
@@ -107,6 +163,44 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _loadThreadsAndCheckInvitations() async {
+    try {
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      
+      // Load threads from server to get latest invitation data
+      await threadsState.loadThreads();
+      
+      // Check for pending invitations
+      _checkPendingInvitations();
+    } catch (e) {
+      debugPrint('Failed to load threads: $e');
+      // Still check local state for invitations
+      _checkPendingInvitations();
+    }
+  }
+
+  void _checkPendingInvitations() {
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    if (currentUserId == null) return;
+    
+    // Check all threads for pending invitations to current user
+    final usersWithInvites = <String>{};
+    for (final thread in threadsState.threads) {
+      for (final invite in thread.invites) {
+        if (invite.userId == currentUserId && invite.status == InviteStatus.pending) {
+          usersWithInvites.add(invite.invitedBy);
+        }
+      }
+    }
+    
+    setState(() {
+      _usersWithPendingInvites = usersWithInvites;
+    });
   }
 
   @override
@@ -207,7 +301,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                           padding: const EdgeInsets.symmetric(horizontal: 12),
                           itemCount: _users.length,
                           itemBuilder: (context, index) {
-                            return _buildUserBar(_users[index]);
+                            return _buildExpandableUserCard(_users[index]);
                           },
                         ),
             ),
@@ -351,7 +445,20 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildUserBar(User user) {
+  Widget _buildExpandableUserCard(User user) {
+    final isExpanded = _expandedContacts.contains(user.id);
+    final commonThreads = _getCommonThreadsWithUserSync(user.id);
+    
+    return Column(
+      children: [
+        _buildUserBar(user, isExpanded, commonThreads.isNotEmpty),
+        if (isExpanded && commonThreads.isNotEmpty)
+          _buildThreadsList(user, commonThreads),
+      ],
+    );
+  }
+
+  Widget _buildUserBar(User user, bool isExpanded, bool hasThreads) {
     return Container(
       height: 48, // Compact like phone book entries
       margin: const EdgeInsets.only(bottom: 2), // Tight spacing like phone book
@@ -392,6 +499,63 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                     ),
                     
                     const SizedBox(width: 12),
+                    
+                    // Notification indicators
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Blue dot for pending invitations
+                        if (_usersWithPendingInvites.contains(user.id))
+                          Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            width: 6,
+                            height: 6,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFF3B82F6), // Blue color for invitations
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        
+                        // Red dot for unread thread messages
+                        if (_usersWithNotifications.contains(user.id))
+                          Container(
+                            margin: const EdgeInsets.only(right: 4),
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFEF4444), // Red color for notifications
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        
+                        // Add spacing if there are notifications
+                        if (_usersWithNotifications.contains(user.id) || _usersWithPendingInvites.contains(user.id))
+                          const SizedBox(width: 4),
+                      ],
+                    ),
+                    
+                    // Expand/collapse button (only show if user has threads)
+                    if (hasThreads)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isExpanded) {
+                              _expandedContacts.remove(user.id);
+                            } else {
+                              _expandedContacts.add(user.id);
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          margin: const EdgeInsets.only(right: 4),
+                          child: Icon(
+                            isExpanded ? Icons.expand_less : Icons.expand_more,
+                            color: PhoneBookColors.text,
+                            size: 16,
+                          ),
+                        ),
+                      ),
                     
                     // Online indicator - small dot like phone book annotations
                     Container(
@@ -486,7 +650,173 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
+  List<Thread> _getCommonThreadsWithUserSync(String userId) {
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    if (currentUserId == null) return [];
+    
+    // Find threads where both current user and the target user are participants
+    return threadsState.threads.where((thread) {
+      final userIds = thread.users.map((u) => u.id).toList();
+      return userIds.contains(currentUserId) && userIds.contains(userId);
+    }).toList();
+  }
+
+  Widget _buildThreadsList(User user, List<Thread> threads) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    return Container(
+      margin: const EdgeInsets.only(left: 16, right: 8, bottom: 2),
+      decoration: BoxDecoration(
+        color: PhoneBookColors.pageBackground.withOpacity(0.7),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: PhoneBookColors.border, width: 0.5),
+      ),
+      child: Column(
+        children: threads.map((thread) {
+          // Check if user has pending invitation to this thread
+          final hasPendingInvite = currentUserId != null && 
+              thread.hasPendingInvite(currentUserId);
+          
+          return Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: thread == threads.last 
+                      ? Colors.transparent 
+                      : PhoneBookColors.border,
+                  width: 0.5,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                // Thread icon - smaller, phone book style
+                Container(
+                  width: 16,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: hasPendingInvite 
+                        ? const Color(0xFF3B82F6) 
+                        : PhoneBookColors.lightText,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                  child: Icon(
+                    hasPendingInvite ? Icons.mail : Icons.folder,
+                    color: Colors.white,
+                    size: 10,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                
+                // Thread info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              thread.title,
+                              style: GoogleFonts.sourceSans3(
+                                color: PhoneBookColors.text,
+                                fontSize: 12,
+                                fontWeight: hasPendingInvite 
+                                    ? FontWeight.w600 
+                                    : FontWeight.w500,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                          if (hasPendingInvite)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF3B82F6),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                'NEW',
+                                style: GoogleFonts.sourceSans3(
+                                  color: Colors.white,
+                                  fontSize: 8,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      if (hasPendingInvite)
+                        Text(
+                          'Invitation to collaborate',
+                          style: GoogleFonts.sourceSans3(
+                            color: PhoneBookColors.lightText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        )
+                      else
+                        Text(
+                          '${thread.checkpoints.length} checkpoints',
+                          style: GoogleFonts.sourceSans3(
+                            color: PhoneBookColors.lightText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                
+                // Timestamp - phone book style
+                Text(
+                  _formatThreadTimestamp(thread.updatedAt),
+                  style: GoogleFonts.sourceSans3(
+                    color: PhoneBookColors.lightText,
+                    fontSize: 9,
+                    fontWeight: FontWeight.w400,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  String _formatThreadTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+    
+    if (difference.inDays > 0) {
+      if (difference.inDays == 1) {
+        return 'Yesterday';
+      } else {
+        return '${difference.inDays}d ago';
+      }
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}m ago';
+    } else {
+      return 'Now';
+    }
+  }
+
   void _startChat(User user) async {
+    // Clear notifications for this user
+    setState(() {
+      _usersWithNotifications.remove(user.id);
+      _usersWithPendingInvites.remove(user.id);
+    });
+    
     // Check for common threads with this user
     final commonThreads = await _getCommonThreadsWithUser(user.id);
     
@@ -527,7 +857,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
           userName: user.name,
           ),
         ),
-      );
+      ).then((_) {
+        // Refresh pending invitations when returning from user profile
+        _checkPendingInvitations();
+      });
     }
   }
 
