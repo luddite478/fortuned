@@ -3,8 +3,8 @@ import 'package:provider/provider.dart';
 import '../v2/sound_grid_widget.dart' as v1;
 import 'sample_selection_widget.dart';
 import 'sound_grid_side_control_widget.dart';
+import 'value_control_overlay.dart';
 import '../../../state/sequencer_state.dart';
-import 'package:flutter/material.dart';
 
 // Body element modes for switching between different content
 enum SequencerBodyMode {
@@ -30,37 +30,45 @@ class SequencerBody extends StatelessWidget {
       builder: (context, isBodyBrowserOpen, child) {
         return isBodyBrowserOpen
             ? const SampleSelectionWidget()
-            : RepaintBoundary(
-                child: Selector<SequencerState, ({List<int?> currentGridSamples, Set<int> selectedCells})>(
-                  selector: (context, state) => (
-                    currentGridSamples: state.currentGridSamplesForSelector,
-                    selectedCells: state.selectedGridCellsForSelector,
+            : Stack(
+                children: [
+                  // Main sequencer body content
+                  RepaintBoundary(
+                    child: Selector<SequencerState, ({List<int?> currentGridSamples, Set<int> selectedCells})>(
+                      selector: (context, state) => (
+                        currentGridSamples: state.currentGridSamplesForSelector,
+                        selectedCells: state.selectedGridCellsForSelector,
+                      ),
+                      builder: (context, data, child) {
+                        // Use Row to place left side control, sound grid, and right side control
+                        return Row(
+                          children: [
+                            // Left side control widget - small width
+                            Expanded(
+                              flex: sideControlFlex, // 6% of total width
+                              child: const SoundGridSideControlWidget(side: SideControlSide.left),
+                            ),
+                            
+                            // Sound grid - maintains nearly original size
+                            Expanded(
+                              flex: soundGridFlex, // 88% of total width (nearly original)
+                              child: const v1.SampleGridWidget(),
+                            ),
+                            
+                            // Right side control widget - small width  
+                            Expanded(
+                              flex: sideControlFlex, // 6% of total width
+                              child: const SoundGridSideControlWidget(side: SideControlSide.right),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
                   ),
-                  builder: (context, data, child) {
-                    // Use Row to place left side control, sound grid, and right side control
-                    return Row(
-                      children: [
-                        // Left side control widget - small width
-                        Expanded(
-                          flex: sideControlFlex, // 6% of total width
-                          child: const SoundGridSideControlWidget(side: SideControlSide.left),
-                        ),
-                        
-                        // Sound grid - maintains nearly original size
-                        Expanded(
-                          flex: soundGridFlex, // 88% of total width (nearly original)
-                          child: const v1.SampleGridWidget(),
-                        ),
-                        
-                        // Right side control widget - small width  
-                        Expanded(
-                          flex: sideControlFlex, // 6% of total width
-                          child: const SoundGridSideControlWidget(side: SideControlSide.right),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                  
+                  // Value control overlay (appears on top when slider is being used)
+                  const ValueControlOverlay(),
+                ],
               );
       },
     );

@@ -4,25 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../state/sequencer_state.dart';
 import '../../../utils/musical_notes.dart';
+import 'generic_slider.dart';
 
-// Simple musical notes helper
-class MusicalNotes {
-  static const List<String> _noteNames = [
-    'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
-  ];
-  
-  static Map<String, String> getNoteInfo(int semitones) {
-    // Convert semitones (-12 to +12) to note name
-    final normalizedSemitones = semitones % 12;
-    final noteIndex = normalizedSemitones < 0 ? normalizedSemitones + 12 : normalizedSemitones;
-    final noteName = _noteNames[noteIndex];
-    
-    return {
-      'note': noteName,
-      'semitones': semitones.toString(),
-    };
-  }
-}
+
 
 // Pitch conversion utilities
 class PitchConversion {
@@ -477,40 +461,17 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
       child: ValueListenableBuilder<int>(
         valueListenable: sequencer.bpmNotifier,
         builder: (context, bpm, child) {
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                '$bpm BPM',
-                style: TextStyle(
-                  fontSize: fontSize * 0.8,
-                  fontWeight: FontWeight.bold,
-                  color: SequencerPhoneBookColors.lightText,
-                ),
-              ),
-              SizedBox(height: height * 0.02),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: SequencerPhoneBookColors.accent,
-                  inactiveTrackColor: SequencerPhoneBookColors.border,
-                  thumbColor: SequencerPhoneBookColors.accent,
-                  trackHeight: (height * 0.04).clamp(2.0, 8.0), // Scales with full height
-                  thumbShape: RoundSliderThumbShape(
-                    enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0), // Scales with full height
-                  ),
-                ),
-                child: Slider(
-                  value: bpm.toDouble(),
-                  onChanged: (value) {
-                    sequencer.setBpm(value.round());
-                  },
-                  min: SequencerState.minBpm.toDouble(),
-                  max: SequencerState.maxBpm.toDouble(),
-                  divisions: SequencerState.maxBpm - SequencerState.minBpm, // 1 BPM increments
-                  label: '${bpm} BPM',
-                ),
-              ),
-            ],
+                    return Center(
+            child: GenericSlider(
+              value: bpm.toDouble(),
+              min: SequencerState.minBpm.toDouble(),
+              max: SequencerState.maxBpm.toDouble(),
+              divisions: SequencerState.maxBpm - SequencerState.minBpm,
+              type: SliderType.bpm,
+              onChanged: (value) => sequencer.setBpm(value.round()),
+              height: height,
+              sequencer: sequencer,
+            ),
           );
         },
       ),
@@ -568,23 +529,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         ],
       ),
       child: Center(
-        child: SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: SequencerPhoneBookColors.accent,
-            inactiveTrackColor: SequencerPhoneBookColors.border,
-            thumbColor: SequencerPhoneBookColors.accent,
-            trackHeight: (height * 0.04).clamp(2.0, 8.0),
-            thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0)),
-          ),
-          child: Slider(
-            value: widget.volumeGetter(sequencer, index),
-            onChanged: (value) {
-              widget.volumeSetter(sequencer, index, value);
-            },
-            min: 0.0,
-            max: 1.0,
-            divisions: 100,
-          ),
+        child: GenericSlider(
+          value: widget.volumeGetter(sequencer, index),
+          min: 0.0,
+          max: 1.0,
+          divisions: 100,
+          type: SliderType.volume,
+          onChanged: (value) => widget.volumeSetter(sequencer, index, value),
+          height: height,
+          sequencer: sequencer,
         ),
       ),
     );
@@ -619,23 +572,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         ],
       ),
       child: Center(
-        child: SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: SequencerPhoneBookColors.accent,
-            inactiveTrackColor: SequencerPhoneBookColors.border,
-            thumbColor: SequencerPhoneBookColors.accent,
-            trackHeight: (height * 0.04).clamp(2.0, 8.0),
-            thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0)),
-          ),
-          child: Slider(
-            value: currentPitch,
-            onChanged: (value) {
-              widget.pitchSetter(sequencer, index, value);
-            },
-            min: 0.0,
-            max: 1.0,
-            divisions: 24, // 24 semitones
-          ),
+        child: GenericSlider(
+          value: currentPitch,
+          min: 0.0,
+          max: 1.0,
+          divisions: 24,
+          type: SliderType.pitch,
+          onChanged: (value) => widget.pitchSetter(sequencer, index, value),
+          height: height,
+          sequencer: sequencer,
         ),
       ),
     );

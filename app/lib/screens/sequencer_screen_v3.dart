@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../widgets/sequencer/v3/sample_banks_widget.dart' as v3;
-import '../widgets/sequencer/v3/sound_grid_widget.dart' as v3;
-import '../widgets/sequencer/v3/edit_buttons_widget.dart' as v3;
-import '../widgets/sequencer/v3/top_multitask_panel_widget.dart' as v3;
+import '../widgets/sequencer/v2/sample_banks_widget.dart' as v1;
+import '../widgets/sequencer/v2/edit_buttons_widget.dart' as v1;
+import '../widgets/sequencer/v2/top_multitask_panel_widget.dart' as v1;
+import '../widgets/sequencer/v2/message_bar_widget.dart';
+import '../widgets/sequencer/v2/sequencer_body.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
@@ -89,8 +90,8 @@ class _SequencerScreenV3State extends State<SequencerScreenV3> with WidgetsBindi
             metadata: {
               'project_type': 'solo',
               'is_public': false, // Unpublished initially
-              'created_from': 'sequencer_v3',
-              'layout_version': 'v3',
+              // 'created_from': 'sequencer_v3',
+              // 'layout_version': 'v3',
             },
             createInitialCheckpoint: false, // Don't create checkpoint until user makes changes
           );
@@ -151,7 +152,6 @@ class _SequencerScreenV3State extends State<SequencerScreenV3> with WidgetsBindi
       body: SafeArea(
         child: Column(
           children: [
-            // 🎯 PERFORMANCE: Sample banks only rebuild when file names or loading state changes
             Expanded(
               flex: 7,
               child: RepaintBoundary(
@@ -162,27 +162,15 @@ class _SequencerScreenV3State extends State<SequencerScreenV3> with WidgetsBindi
                     activeBank: state.activeBank,
                   ),
                   builder: (context, data, child) {
-                    return const v3.SampleBanksWidget();
+                    return const v1.SampleBanksWidget();
                   },
                 ),
               ),
             ),
-
-            // 🎯 PERFORMANCE: Sample grid with cell-level step highlighting
+            // 🎯 PERFORMANCE: Body element with switching capability between sound grid and sample browser
             Expanded(
-              flex: 60,
-              child: RepaintBoundary(
-                child: Selector<SequencerState, ({List<int?> currentGridSamples, Set<int> selectedCells})>(
-                  selector: (context, state) => (
-                    currentGridSamples: state.currentGridSamplesForSelector,
-                    selectedCells: state.selectedGridCellsForSelector,
-                    // Note: currentStep tracking moved to individual cells via ValueListenableBuilder
-                  ),
-                  builder: (context, data, child) {
-                    return const v3.SampleGridWidget();
-                  },
-                ),
-              ),
+              flex: 50, // Reduced from 60 to make space for message bar
+              child: const SequencerBody(),
             ),
 
             // 🎯 PERFORMANCE: Edit buttons only rebuild when selection or mode changes
@@ -197,23 +185,32 @@ class _SequencerScreenV3State extends State<SequencerScreenV3> with WidgetsBindi
                     canRedo: state.canRedo,
                   ),
                   builder: (context, data, child) {
-                    return const v3.EditButtonsWidget();
+                    return const v1.EditButtonsWidget();
                   },
                 ),
               ),
             ),
 
+            // 🎯 PERFORMANCE: Sample banks only rebuild when file names or loading state changes
+
+
             // 🎯 PERFORMANCE: Multitask panel only rebuilds when panel mode changes
             Expanded(
-              flex: 18,
+              flex: 15, // Reduced from 18 to make space for message bar
               child: RepaintBoundary(
                 child: Selector<SequencerState, MultitaskPanelMode>(
                   selector: (context, state) => state.currentPanelModeForSelector,
                   builder: (context, panelMode, child) {
-                    return const v3.MultitaskPanelWidget();
+                    return const v1.MultitaskPanelWidget();
                   },
                 ),
               ),
+            ),
+
+            // V3 Specific: Message bar at the bottom
+            const SizedBox(
+              height: 44, // Smaller height for message bar
+              child: MessageBarWidget(),
             ),
           ],
         ),

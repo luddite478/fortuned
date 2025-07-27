@@ -186,16 +186,16 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     
     return [
       // Test button - for testing scrollable elements
-      IconButton(
-        icon: Icon(
-          Icons.science,
-          color: SequencerPhoneBookColors.accent,
-        ),
-        onPressed: () => _navigateToTestScreen(context),
-        iconSize: 14,
-        padding: const EdgeInsets.all(2),
-        constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-      ),
+      // IconButton(
+      //   icon: Icon(
+      //     Icons.science,
+      //     color: SequencerPhoneBookColors.accent,
+      //   ),
+      //   onPressed: () => _navigateToTestScreen(context),
+      //   iconSize: 14,
+      //   padding: const EdgeInsets.all(2),
+      //   constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+      // ),
       
       // Percentage-based spacing
       SizedBox(width: spacingWidth),
@@ -272,20 +272,20 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       SizedBox(width: spacingWidth),
       
       // Share button
-      Consumer<SequencerState>(
-        builder: (context, sequencer, child) {
-          return IconButton(
-            icon: Icon(
-              Icons.share,
-              color: SequencerPhoneBookColors.accent,
-            ),
-            onPressed: () => sequencer.setShowShareWidget(!sequencer.isShowingShareWidget),
-            iconSize: 14,
-            padding: const EdgeInsets.all(2),
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          );
-        },
-      ),
+      // Consumer<SequencerState>(
+      //   builder: (context, sequencer, child) {
+      //     return IconButton(
+      //       icon: Icon(
+      //         Icons.share,
+      //         color: SequencerPhoneBookColors.accent,
+      //       ),
+      //       onPressed: () => sequencer.setShowShareWidget(!sequencer.isShowingShareWidget),
+      //       iconSize: 14,
+      //       padding: const EdgeInsets.all(2),
+      //       constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+      //     );
+      //   },
+      // ),
       
       // Percentage-based spacing
       SizedBox(width: spacingWidth),

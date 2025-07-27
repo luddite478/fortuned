@@ -5,12 +5,50 @@ import 'dart:async';
 import '../../../state/sequencer_state.dart';
 import '../../stacked_cards_widget.dart';
 
+// Custom ScrollPhysics to retain position when content changes
+class PositionRetainedScrollPhysics extends ScrollPhysics {
+  final bool shouldRetain;
+  const PositionRetainedScrollPhysics({super.parent, this.shouldRetain = true});
+
+  @override
+  PositionRetainedScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return PositionRetainedScrollPhysics(
+      parent: buildParent(ancestor),
+      shouldRetain: shouldRetain,
+    );
+  }
+
+  @override
+  double adjustPositionForNewDimensions({
+    required ScrollMetrics oldPosition,
+    required ScrollMetrics newPosition,
+    required bool isScrolling,
+    required double velocity,
+  }) {
+    final position = super.adjustPositionForNewDimensions(
+      oldPosition: oldPosition,
+      newPosition: newPosition,
+      isScrolling: isScrolling,
+      velocity: velocity,
+    );
+
+    final diff = newPosition.maxScrollExtent - oldPosition.maxScrollExtent;
+
+    // Always retain position when content is added (diff > 0), regardless of scroll position
+    if (diff > 0 && shouldRetain) {
+      return position + diff;
+    } else {
+      return position;
+    }
+  }
+}
+
 // Darker Gray-Beige Telephone Book Color Scheme for Sequencer
 class SequencerPhoneBookColors {
   static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
   static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
   static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color.fromARGB(255, 212, 212, 62); // Pressed/active surface
+  static const Color surfacePressed = Color.fromARGB(255, 192, 192, 188); // Pressed/active surface
   static const Color text = Color(0xFFE8E6E0); // Light text for contrast
   static const Color lightText = Color(0xFFB8B6B0); // Muted light text
   static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
@@ -45,6 +83,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   void dispose() {
     _autoScrollTimer?.cancel();
     _scrollController.dispose();
+    _stopAllActions(); // Clean up button press timer
     super.dispose();
   }
 
@@ -407,6 +446,52 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     return _buildEnhancedGridCell(context, sequencer, index);
   }
 
+  Widget _buildGridRow(BuildContext context, SequencerState sequencer, int rowIndex) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
+      child: Row(
+        children: [
+          // Row number indicator on the left
+          Container(
+            width: 32, // Fixed width for row numbers
+            margin: const EdgeInsets.only(right: 8, left: 4),
+            child: Container(
+              decoration: BoxDecoration(
+                color: SequencerPhoneBookColors.surfaceBase,
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(
+                  color: SequencerPhoneBookColors.border.withOpacity(0.3),
+                  width: 0.5,
+                ),
+              ),
+              child: Center(
+                child: Text(
+                  '${rowIndex + 1}',
+                  style: GoogleFonts.sourceSans3(
+                    color: SequencerPhoneBookColors.lightText,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          // Grid cells
+          ...List.generate(sequencer.gridColumns, (colIndex) {
+            final cellIndex = rowIndex * sequencer.gridColumns + colIndex;
+            return Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 2),
+                child: _buildGridCell(context, sequencer, cellIndex),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildClickableTabLabel({
     required int gridIndex,
@@ -660,20 +745,25 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           sequencer.handlePanEnd();
         }
       },
-      child: GridView.builder(
+      child: ListView.builder(
         controller: _scrollController,
         physics: (sequencer.isInSelectionMode || _gestureMode == GestureMode.selecting)
             ? const NeverScrollableScrollPhysics()
-            : const AlwaysScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: sequencer.gridColumns,
-          crossAxisSpacing: 4,
-          mainAxisSpacing: 4,
-          childAspectRatio: 2.5,
-        ),
-        itemCount: sequencer.gridSamples.length,
+            : const PositionRetainedScrollPhysics(), // Prevents jumping when rows are added/removed
+        itemCount: sequencer.gridRows + 1, // +1 for the control buttons at the bottom
         itemBuilder: (context, index) {
-          return _buildGridCell(context, sequencer, index);
+          if (index < sequencer.gridRows) {
+            // Build a row of grid cells
+            return _buildGridRow(context, sequencer, index);
+          } else {
+            // Control buttons at the bottom
+            return RepaintBoundary(
+              child: Container(
+                margin: const EdgeInsets.only(left: 16, right: 16, bottom: 60, top: 4),
+                child: _buildGridRowControls(sequencer),
+              ),
+            );
+          }
         },
       ),
     );
@@ -716,5 +806,225 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     final scaleFactor = 1.0 / numSoundGrids; // Reduce spacing as tabs increase
     
     return (baseSpacing * scaleFactor).clamp(2.0, 12.0); // Min 2px, Max 12px
+  }
+
+  // Grid row control buttons - styled like test page buttons
+  Timer? _buttonPressTimer;
+  bool _isLongPressing = false;
+  bool _isDecreasePressed = false;
+  bool _isIncreasePressed = false;
+  
+  Widget _buildGridRowControls(SequencerState sequencer) {
+    return Container(
+      height: 30, // Reduced height from 40 to 30
+      margin: const EdgeInsets.symmetric(horizontal: 16), // Full width like grid rows
+      child: Row(
+        children: [
+          // Remove rows button - left half
+          Expanded(
+            child: _buildControlButton(
+              isEnabled: sequencer.gridRows > 4,
+              onAction: () => _handleDecreaseRows(sequencer),
+              icon: Icons.remove,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(6),
+                bottomLeft: Radius.circular(6),
+              ),
+              isPressed: _isDecreasePressed,
+              buttonType: 'decrease',
+            ),
+          ),
+          
+          // Add rows button - right half
+          Expanded(
+            child: _buildControlButton(
+              isEnabled: sequencer.gridRows < sequencer.maxGridRows,
+              onAction: () => _handleIncreaseRows(sequencer),
+              icon: Icons.add,
+              borderRadius: const BorderRadius.only(
+                topRight: Radius.circular(6),
+                bottomRight: Radius.circular(6),
+              ),
+              isPressed: _isIncreasePressed,
+              buttonType: 'increase',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildControlButton({
+    required bool isEnabled,
+    required VoidCallback onAction,
+    required IconData icon,
+    required BorderRadius borderRadius,
+    required bool isPressed,
+    required String buttonType,
+  }) {
+    return Listener(
+      onPointerDown: isEnabled ? (event) {
+        // Update pressed state
+        setState(() {
+          if (buttonType == 'decrease') {
+            _isDecreasePressed = true;
+          } else {
+            _isIncreasePressed = true;
+          }
+        });
+        
+        // Start single action immediately
+        onAction();
+        
+        // Start long press timer for continuous action
+        _buttonPressTimer?.cancel();
+        _buttonPressTimer = Timer(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _isLongPressing = true;
+            _startContinuousAction(onAction);
+          }
+        });
+      } : null,
+      onPointerUp: (event) {
+        _stopAllActions();
+        
+        // Reset pressed state
+        setState(() {
+          _isDecreasePressed = false;
+          _isIncreasePressed = false;
+        });
+      },
+      onPointerCancel: (event) {
+        _stopAllActions();
+        
+        // Reset pressed state
+        setState(() {
+          _isDecreasePressed = false;
+          _isIncreasePressed = false;
+        });
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: _getButtonColor(isEnabled, isPressed),
+          borderRadius: borderRadius,
+          border: Border.all(
+            color: isPressed 
+                ? SequencerPhoneBookColors.accent 
+                : SequencerPhoneBookColors.border,
+            width: isPressed ? 1.5 : 1,
+          ),
+          boxShadow: isPressed 
+              ? [
+                  // Pressed (inset) shadow effect
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.shadow,
+                    blurRadius: 2,
+                    offset: const Offset(0, -1),
+                  ),
+                ]
+              : [
+                  // Normal (protruding) shadow effect
+                  BoxShadow(
+                    color: SequencerPhoneBookColors.shadow,
+                    blurRadius: 1,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+        ),
+        child: Center(
+          child: Icon(
+            icon,
+            color: isEnabled 
+                ? (isPressed ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.text)
+                : SequencerPhoneBookColors.lightText.withOpacity(0.5),
+            size: 18, // Slightly smaller icon for reduced button height
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getButtonColor(bool isEnabled, bool isPressed) {
+    if (!isEnabled) {
+      return SequencerPhoneBookColors.cellEmpty.withOpacity(0.3);
+    }
+    
+    if (isPressed) {
+      return SequencerPhoneBookColors.surfacePressed; // Darker when pressed
+    }
+    
+    return SequencerPhoneBookColors.cellEmpty; // Normal state
+  }
+  
+
+  
+  void _handleIncreaseRows(SequencerState sequencer) {
+    // Check limits - if at limit, stop continuous action
+    if (sequencer.gridRows >= sequencer.maxGridRows) {
+      _isLongPressing = false;
+      _stopContinuousAction();
+      return;
+    }
+    sequencer.increaseGridRows();
+    
+    // Check if we just reached the limit and stop
+    if (sequencer.gridRows >= sequencer.maxGridRows) {
+      _isLongPressing = false;
+      _stopContinuousAction();
+    }
+  }
+  
+  void _handleDecreaseRows(SequencerState sequencer) {
+    // Check limits - if at limit, stop continuous action
+    if (sequencer.gridRows <= 4) {
+      _isLongPressing = false;
+      _stopContinuousAction();
+      return;
+    }
+    sequencer.decreaseGridRows();
+    
+    // Check if we just reached the limit and stop
+    if (sequencer.gridRows <= 4) {
+      _isLongPressing = false;
+      _stopContinuousAction();
+    }
+  }
+  
+  void _startContinuousAction(VoidCallback action) {
+    _buttonPressTimer?.cancel();
+    _buttonPressTimer = null;
+    
+    _buttonPressTimer = Timer.periodic(const Duration(milliseconds: 75), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        _buttonPressTimer = null;
+        _isLongPressing = false;
+        return;
+      }
+      
+      if (_isLongPressing) {
+        action();
+      } else {
+        timer.cancel();
+        _buttonPressTimer = null;
+      }
+    });
+  }
+  
+  void _stopContinuousAction() {
+    _isLongPressing = false;
+    if (_buttonPressTimer != null) {
+      _buttonPressTimer!.cancel();
+      _buttonPressTimer = null;
+    }
+  }
+
+  void _stopAllActions() {
+    _isLongPressing = false;
+    
+    if (_buttonPressTimer != null) {
+      _buttonPressTimer!.cancel();
+      _buttonPressTimer = null;
+    }
   }
 } 

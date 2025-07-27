@@ -238,46 +238,39 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
             );
           }
 
-          return Column(
-            children: [
-              Expanded(
-                child: ListView.builder(
-                  controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  itemCount: thread.checkpoints.length,
-                  itemBuilder: (context, index) {
-                    final checkpoint = thread.checkpoints[index];
-                    final isCurrentUser = checkpoint.userId == threadsState.currentUserId;
-                    final isNewest = index == thread.checkpoints.length - 1;
-                    final shouldHighlight = widget.highlightNewest && isNewest && _colorAnimation != null;
-                    
-                    // Apply color animation to newest checkpoint if highlighting enabled
-                    return shouldHighlight
-                        ? AnimatedBuilder(
-                            animation: _colorAnimation!,
-                            builder: (context, child) {
-                              return _buildCheckpointMessage(
-                                context,
-                                checkpoint,
-                                isCurrentUser,
-                                sequencerState,
-                                threadsState,
-                                highlightColor: _colorAnimation!.value,
-                              );
-                            },
-                          )
-                        : _buildCheckpointMessage(
-                            context,
-                            checkpoint,
-                            isCurrentUser,
-                            sequencerState,
-                            threadsState,
-                          );
-                  },
-                ),
-              ),
-              _buildNewCheckpointButton(context, threadsState, sequencerState),
-            ],
+          return ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+            itemCount: thread.checkpoints.length,
+            itemBuilder: (context, index) {
+              final checkpoint = thread.checkpoints[index];
+              final isCurrentUser = checkpoint.userId == threadsState.currentUserId;
+              final isNewest = index == thread.checkpoints.length - 1;
+              final shouldHighlight = widget.highlightNewest && isNewest && _colorAnimation != null;
+              
+              // Apply color animation to newest checkpoint if highlighting enabled
+              return shouldHighlight
+                  ? AnimatedBuilder(
+                      animation: _colorAnimation!,
+                      builder: (context, child) {
+                        return _buildCheckpointMessage(
+                          context,
+                          checkpoint,
+                          isCurrentUser,
+                          sequencerState,
+                          threadsState,
+                          highlightColor: _colorAnimation!.value,
+                        );
+                      },
+                    )
+                  : _buildCheckpointMessage(
+                      context,
+                      checkpoint,
+                      isCurrentUser,
+                      sequencerState,
+                      threadsState,
+                    );
+            },
           );
         },
       ),
@@ -524,52 +517,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
     );
   }
 
-  Widget _buildNewCheckpointButton(
-    BuildContext context,
-    ThreadsState threadsState,
-    SequencerState sequencerState,
-  ) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: PhoneBookColors.entryBackground,
-        border: Border(
-          top: BorderSide(
-            color: PhoneBookColors.border,
-            width: 1,
-          ),
-        ),
-      ),
-      child: SizedBox(
-        width: double.infinity,
-        child: ElevatedButton.icon(
-          onPressed: () => _createNewCheckpoint(context, threadsState, sequencerState),
-          icon: Icon(Icons.save, color: PhoneBookColors.text, size: 18),
-          label: Text(
-            'Save Checkpoint',
-            style: GoogleFonts.sourceSans3(
-              color: PhoneBookColors.text,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-              fontSize: 16,
-            ),
-          ),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: PhoneBookColors.buttonBackground,
-            foregroundColor: PhoneBookColors.text,
-            padding: const EdgeInsets.symmetric(vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(2),
-            ),
-            side: BorderSide(
-              color: PhoneBookColors.buttonBorder,
-              width: 1,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+
 
   Color _getLayerColor(int layerIndex) {
     final colors = [
@@ -666,127 +614,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
     );
   }
 
-  void _createNewCheckpoint(
-    BuildContext context,
-    ThreadsState threadsState,
-    SequencerState sequencerState,
-  ) {
-    final commentController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: PhoneBookColors.entryBackground,
-        title: Text(
-          'Save Checkpoint',
-          style: GoogleFonts.sourceSans3(
-            color: PhoneBookColors.text,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'Add a comment to describe your changes:',
-              style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.lightText,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: commentController,
-              style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.text,
-                fontWeight: FontWeight.w400,
-              ),
-              decoration: InputDecoration(
-                hintText: 'e.g., Added bassline and drums',
-                hintStyle: GoogleFonts.sourceSans3(
-                  color: PhoneBookColors.lightText,
-                  fontWeight: FontWeight.w400,
-                ),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: PhoneBookColors.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: PhoneBookColors.onlineIndicator),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: PhoneBookColors.border),
-                ),
-              ),
-              maxLines: 3,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.lightText,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final comment = commentController.text.trim();
-              if (comment.isEmpty) return;
-              
-              try {
-                await threadsState.addCheckpointFromSequencer(
-                  widget.threadId,
-                  comment,
-                  sequencerState,
-                );
-                
-                Navigator.of(context).pop();
-                
-                // Scroll to bottom to show new checkpoint
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  _scrollToBottom();
-                });
-                
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Checkpoint saved successfully!',
-                      style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
-                    ),
-                    backgroundColor: PhoneBookColors.onlineIndicator,
-                  ),
-                );
-              } catch (e) {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      'Failed to save checkpoint: $e',
-                      style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
-                    ),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: PhoneBookColors.buttonBackground,
-              foregroundColor: PhoneBookColors.text,
-              side: BorderSide(color: PhoneBookColors.buttonBorder),
-            ),
-            child: Text(
-              'Save',
-              style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w600),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+
 
   PreferredSizeWidget _buildCustomHeader(BuildContext context) {
     return AppBar(

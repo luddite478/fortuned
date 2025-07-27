@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
+import 'dart:math' as math;
 import '../../../state/sequencer_state.dart';
 import '../../stacked_cards_widget.dart';
 
@@ -54,7 +55,8 @@ class SequencerPhoneBookColors {
   static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
   static const Color border = Color.fromARGB(255, 132, 132, 132); // Subtle borders
   static const Color shadow = Color.fromARGB(255, 77, 77, 75); // Dark shadows for depth
-  static const Color cellEmpty = Color.fromARGB(255, 103, 103, 97); // Empty grid cells
+  static const Color cellEmpty = Color.fromARGB(255, 62, 62, 58); // Empty grid cells (darker)
+  static const Color cellEmptyAlternate = Color.fromARGB(255, 62, 62, 58); // Lighter empty cells for every 4th row
   static const Color cellFilled = Color(0xFF5C5A55); // Filled grid cells
 }
 
@@ -78,6 +80,41 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   Offset? _currentPanPosition;
   GestureMode _gestureMode = GestureMode.undetermined;
   static const double _gestureThreshold = 15.0;
+
+  // CONFIGURABLE GRID DIMENSIONS - Easy to control cell sizing
+  static const double cellWidthPercent = 92.0; // Cell width as % of available column space (reduced to make room for row numbers)
+  static const double cellHeightPercent = 60.0; // Cell height as % of available row space  
+  static const double cellSpacingPercent = 0.0; // Spacing between cells as % of available space
+  static const double rowSpacingPercent = 5.0; // Spacing between rows as % of available space
+  static const double rowNumberColumnWidthPercent = 6.0; // Row number column width as % of total width
+  static const Color rowNumberColumnColor = Color.fromARGB(121, 40, 46, 39); // Color for row number column
+  
+  // CONFIGURABLE CONTENT SIZING - Control text and element sizes
+  static const double sampleLetterFontSize = 14.0; // Font size for sample letters (A, B, C, etc.)
+  static const double effectsFontSize = 8.0; // Font size for effects text (V45, K-4, etc.)
+  static const double cellPaddingPercent = 5.0; // Internal padding as % of cell size
+  
+  // CONFIGURATION EXAMPLES - Uncomment and modify as needed:
+  // 
+  // COMPACT GRID (smaller cells, more spacing):
+  // static const double cellWidthPercent = 85.0;
+  // static const double cellHeightPercent = 30.0;
+  // static const double cellSpacingPercent = 15.0;
+  // static const double rowSpacingPercent = 10.0;
+  // static const double sampleLetterFontSize = 12.0;
+  // static const double effectsFontSize = 7.0;
+  //
+  // LARGE GRID (bigger cells, less spacing):
+  // static const double cellWidthPercent = 98.0;
+  // static const double cellHeightPercent = 60.0;
+  // static const double cellSpacingPercent = 2.0;
+  // static const double rowSpacingPercent = 2.0;
+  // static const double sampleLetterFontSize = 16.0;
+  // static const double effectsFontSize = 9.0;
+  //
+  // RECTANGULAR CELLS (wider than tall):
+  // static const double cellAspectRatio = 1.5; // 1.5:1 ratio (wider cells)
+  // static const double cellAspectRatio = 0.75; // 3:4 ratio (taller cells)
 
   @override
   void dispose() {
@@ -324,7 +361,11 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
          } else if (hasPlacedSample) {
            cellColor = _getSampleColorForGrid(placedSample, sequencer);
         } else {
-          cellColor = SequencerPhoneBookColors.cellEmpty;
+          // Alternate cell color for every 4th row (1, 5, 9, etc. in 1-indexed terms)
+          final isAlternateRow = row % 4 == 0;
+          cellColor = isAlternateRow 
+              ? SequencerPhoneBookColors.cellEmptyAlternate 
+              : SequencerPhoneBookColors.cellEmpty;
         }
         
         return DragTarget<int>(
@@ -338,8 +379,9 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               onTap: () {
                 sequencer.handlePadPress(index);
               },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 100),
+              child: Container(
+                width: double.infinity, // Fill available width
+                height: double.infinity, // Fill available height
                 decoration: BoxDecoration(
                   color: isDragHovering 
                       ? SequencerPhoneBookColors.accent.withOpacity(0.8)
@@ -386,52 +428,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                               ),
                             ],
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                                             Text(
-                         hasPlacedSample 
-                             ? String.fromCharCode(65 + placedSample)
-                             : '${row + 1}',
-                        style: GoogleFonts.sourceSans3(
-                          color: (isActivePad || isDragHovering) 
-                              ? SequencerPhoneBookColors.pageBackground 
-                              : isCurrentStep
-                                  ? Colors.white // Bright white text for current step
-                                  : SequencerPhoneBookColors.text,
-                          fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.w600,
-                          fontSize: 12,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      if (isSelected) ...[
-                        Container(
-                          width: 6,
-                          height: 6,
-                          decoration: BoxDecoration(
-                            color: SequencerPhoneBookColors.accent,
-                            borderRadius: BorderRadius.circular(1),
-                          ),
-                        ),
-                      ] else ...[
-                        Text(
-                          'C-4',
-                          style: GoogleFonts.sourceSans3(
-                            color: (isActivePad || isDragHovering)
-                                ? SequencerPhoneBookColors.pageBackground
-                                : isCurrentStep
-                                    ? Colors.white.withOpacity(0.8) // Bright text for current step
-                                    : SequencerPhoneBookColors.lightText.withOpacity(0.6),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.3,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final actualPadding = math.min(constraints.maxWidth, constraints.maxHeight) * (cellPaddingPercent / 100.0);
+                    return Padding(
+                      padding: EdgeInsets.all(actualPadding), // Use percentage-based padding relative to cell size
+                      child: hasPlacedSample ? _buildSampleCellContent(sequencer, index, placedSample!, isActivePad, isCurrentStep, isDragHovering) : _buildEmptyCellContent(),
+                    );
+                  },
                 ),
               ),
             );
@@ -441,25 +445,180 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
+  Widget _buildSampleCellContent(SequencerState sequencer, int index, int sampleSlot, bool isActivePad, bool isCurrentStep, bool isDragHovering) {
+    // Get volume and pitch values
+    final cellVolume = sequencer.getCellVolume(index);
+    final sampleVolume = sequencer.getSampleVolume(sampleSlot);
+    final cellPitch = sequencer.getCellPitch(index);
+    final samplePitch = sequencer.getSamplePitch(sampleSlot);
+    
+    // Check if values are non-default (cell overrides)
+    final hasVolumeOverride = (cellVolume - sampleVolume).abs() > 0.001;
+    final hasPitchOverride = (cellPitch - samplePitch).abs() > 0.001;
+    
+    // Only show table if there are non-default values
+    final showEffectsTable = hasVolumeOverride || hasPitchOverride;
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        // Sample letter (always shown on the left)
+        Text(
+          String.fromCharCode(65 + sampleSlot),
+          style: GoogleFonts.sourceSans3(
+            color: (isActivePad || isDragHovering) 
+                ? SequencerPhoneBookColors.pageBackground 
+                : isCurrentStep
+                    ? Colors.white // Bright white text for current step
+                    : SequencerPhoneBookColors.text,
+            fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.w600,
+            fontSize: sampleLetterFontSize,
+            letterSpacing: 0.5,
+          ),
+        ),
+        
+        // Effects table (only shown if there are non-default values, positioned on the right)
+        if (showEffectsTable) ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 1),
+            decoration: BoxDecoration(
+              color: SequencerPhoneBookColors.pageBackground.withOpacity(0.3),
+              borderRadius: BorderRadius.circular(1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                if (hasVolumeOverride) ...[
+                  Text(
+                    'V${(cellVolume * 100).round()}',
+                    style: GoogleFonts.sourceSans3(
+                      color: (isActivePad || isDragHovering)
+                          ? SequencerPhoneBookColors.pageBackground
+                          : isCurrentStep
+                              ? Colors.white.withOpacity(0.9)
+                              : SequencerPhoneBookColors.lightText,
+                      fontSize: effectsFontSize,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+                if (hasPitchOverride) ...[
+                  Text(
+                    _formatPitchDisplay(cellPitch),
+                    style: GoogleFonts.sourceSans3(
+                      color: (isActivePad || isDragHovering)
+                          ? SequencerPhoneBookColors.pageBackground
+                          : isCurrentStep
+                              ? Colors.white.withOpacity(0.9)
+                              : SequencerPhoneBookColors.lightText,
+                      fontSize: effectsFontSize,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildEmptyCellContent() {
+    // Return a simple container to maintain consistent cell size
+    return const SizedBox.shrink();
+  }
+
+  String _formatPitchDisplay(double pitchRatio) {
+    // Convert pitch ratio to semitones from center (1.0 = 0 semitones)
+    final semitones = 12.0 * (math.log(pitchRatio) / math.ln2);
+    final semitonesRounded = semitones.round();
+    
+    if (semitonesRounded == 0) {
+      return 'K0';
+    } else if (semitonesRounded > 0) {
+      return 'K+$semitonesRounded';
+    } else {
+      return 'K$semitonesRounded'; // Negative sign is included in the number
+    }
+  }
+
   Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index) {
     // 🎯 PERFORMANCE: Use enhanced cell that listens to currentStepNotifier
     return _buildEnhancedGridCell(context, sequencer, index);
   }
 
   Widget _buildGridRow(BuildContext context, SequencerState sequencer, int rowIndex) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      child: Row(
-        children: List.generate(sequencer.gridColumns, (colIndex) {
-          final cellIndex = rowIndex * sequencer.gridColumns + colIndex;
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 2),
-              child: _buildGridCell(context, sequencer, cellIndex),
-            ),
-          );
-        }),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Calculate dimensions based on percentages
+        final availableWidth = constraints.maxWidth;
+        final baseRowHeight = 50.0; // Base height for percentage calculation
+        final actualRowHeight = baseRowHeight * (cellHeightPercent / 100.0);
+        final actualCellSpacing = availableWidth * (cellSpacingPercent / 100.0);
+        final actualRowSpacing = baseRowHeight * (rowSpacingPercent / 100.0);
+        
+        // Calculate row number column width and grid area
+        final actualRowNumberColumnWidth = availableWidth * (rowNumberColumnWidthPercent / 100.0);
+        final availableWidthForGrid = availableWidth - actualRowNumberColumnWidth;
+        final totalHorizontalSpacing = actualCellSpacing * (sequencer.gridColumns - 1);
+        final availableWidthForCells = availableWidthForGrid - totalHorizontalSpacing;
+        final fullCellWidth = availableWidthForCells / sequencer.gridColumns;
+        final actualCellWidth = fullCellWidth * (cellWidthPercent / 100.0);
+        
+        return Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: 0, 
+            vertical: actualRowSpacing / 2, // Use calculated row spacing
+          ),
+          child: Row(
+            children: [
+              // Row number column on the left
+              Container(
+                width: actualRowNumberColumnWidth,
+                height: actualRowHeight,
+                decoration: BoxDecoration(
+                  color: rowNumberColumnColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: Center(
+                  child: Text(
+                    '${rowIndex + 1}',
+                    style: GoogleFonts.sourceSans3(
+                      color: SequencerPhoneBookColors.text,
+                      fontSize: 9,
+                      // fontWeight: FontWeight.bold,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                ),
+              ),
+              // Grid cells
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: List.generate(sequencer.gridColumns, (colIndex) {
+                    final cellIndex = rowIndex * sequencer.gridColumns + colIndex;
+                    return Container(
+                      width: actualCellWidth,
+                      height: actualRowHeight,
+                      margin: EdgeInsets.symmetric(
+                        horizontal: actualCellSpacing / 2, // Use calculated cell spacing
+                      ),
+                      child: _buildGridCell(context, sequencer, cellIndex),
+                    );
+                  }),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
