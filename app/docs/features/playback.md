@@ -1,10 +1,10 @@
 # 🎵 Audio Playback Implementation
 
-**Per-cell node architecture with column tracking and smooth volume transitions**
+**A/B column node architecture with smooth transitions and efficient resource usage**
 
 ## Core Architecture
 
-The audio system uses **individual nodes per grid cell** with **column-based tracking** for smooth transitions. Each grid cell gets its own permanent audio node that's controlled by the sequencer through volume changes.
+The audio system uses **2 nodes per column (A/B switching)** for efficient resource management and smooth transitions. Instead of creating nodes for each grid cell, we maintain exactly 2 nodes per column and switch between them as needed.
 
 ### Function Naming
 Updated to consistent naming scheme:
@@ -13,15 +13,16 @@ Updated to consistent naming scheme:
 - `stop_all_slots()` - stops sample bank playback
 - `syncFlutterSequencerGridToNativeSequencerGrid()` - explicit Flutter→Native sync
 
-### Per-Cell Node Structure
+### A/B Column Node Structure
 ```c
+// Single column node (A or B)
 typedef struct {
-    int active;                    // Node status
-    int step, column, sample_slot; // Grid position and sample reference
+    int node_initialized;          // 1 when miniaudio node is created
+    int sample_slot;               // Which sample this node plays (-1 = none)
     ma_decoder decoder;            // Independent audio decoder
     ma_pitch_data_source pitch_ds; // Pitch shifting layer
     ma_data_source_node node;      // Individual node in graph
-    float volume, pitch;           // Cell-specific controls
+    float volume, pitch;           // Current settings
     
     // Volume smoothing (see docs/smoothing.md)
     float current_volume;          // Current smoothed volume
@@ -31,7 +32,15 @@ typedef struct {
     int is_volume_smoothing;       // Whether smoothing is active
     
     uint64_t id;                   // Unique identifier
-} cell_node_t;
+} column_node_t;
+
+// Column nodes container (A/B pair per column)
+typedef struct {
+    column_node_t nodes[2];        // A and B nodes for this column
+    int active_node;               // 0 = A active, 1 = B active, -1 = none
+    int next_node;                 // Which node (0 or 1) to use for next sample
+    int column;                    // Column index
+} column_nodes_t;
 ```
 
 ### Audio Flow Architecture
@@ -89,27 +98,27 @@ int reset_cell_pitch(int step, int column);
 
 ## Playback Flow
 
-### 1. Node Creation (Grid Management)
-**Nodes are created when cells are set, not during playback:**
+### 1. A/B Node Management
+**Nodes are created on-demand during playback, not when cells are set:**
 ```c
-// When user sets a cell:
-set_cell(step, column, sample_slot) → create_cell_node(...) → starts at volume 0.0
+// When sequencer triggers a sample:
+play_samples_for_step(step) → setup_column_node(...) → A/B switching
 ```
-- **Timing**: Happens during grid editing, not sequencer playback
-- **State**: Nodes start silent (`volume = 0.0`)
-- **Lifecycle**: Nodes persist until cell is cleared or changed
-- **Volume/Pitch**: Uses resolved values from hierarchy system
+- **Timing**: Nodes created during first playback of a sample in a column
+- **State**: New nodes start in `ma_node_state_stopped`, activated when triggered
+- **Lifecycle**: Nodes persist and are reused for different samples
+- **A/B Logic**: Always switch to unused node for smooth transitions
 
-### 2. Sequencer Playback (Volume Control)
-**Sequencer controls volume of existing nodes:**
+### 2. A/B Switching Logic
+**Sequencer manages A/B switching for smooth transitions:**
 ```c
 // During playback:
-play_samples_for_step(step) → find_node_for_cell(...) → set_target_volume(...)
+play_samples_for_step(step) → get_column_node_for_cell(...) → A/B switch + fade
 ```
-- **No node creation**: Sequencer only controls volume of pre-existing nodes
-- **Column tracking**: `currently_playing_nodes_per_col[]` tracks what's audible per column
-- **Smooth transitions**: Volume changes use exponential smoothing (see `docs/smoothing.md`)
-- **Real-time resolution**: Volume/pitch resolved on every trigger
+- **Smart switching**: Different sample = switch A/B, same sample = restart current
+- **Column tracking**: `currently_playing_nodes_per_col[]` tracks active A or B node
+- **Smooth transitions**: Crossfade between A/B nodes (see `docs/smoothing.md`)
+- **Resource efficiency**: Fixed memory usage (16 columns × 2 = 32 nodes total)
 
 ### 3. Real-time Control Updates
 ```c
@@ -127,16 +136,18 @@ static void update_existing_nodes_for_cell(int step, int column, int sample_slot
 }
 ```
 
-### 4. Column Tracking System
+### 4. A/B Column System
 ```c
-static cell_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];
+static column_nodes_t g_column_nodes[MAX_TOTAL_COLUMNS];  // A/B pairs for each column
+static column_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];  // Track active node
 ```
-**Purpose**: Track which node is currently audible in each column for smooth transitions.
+**Purpose**: Provide exactly 2 reusable nodes per column for efficient resource management.
 
-**Behavior**:
-- **New sample in column**: Fade out old node, fade in new node
-- **Same sample triggered**: Restart from beginning with smooth volume transition
+**A/B Switching Behavior**:
+- **New sample in column**: Fade out current node, setup & fade in alternate node (A→B or B→A)
+- **Same sample triggered**: Restart current node from beginning with smooth transition  
 - **Empty cell**: Keep previous node playing (intended sequencer behavior)
+- **Resource limit**: Always exactly 32 nodes total (16 columns × 2)
 
 ### 5. Stop/Start Behavior
 ```c
@@ -221,10 +232,10 @@ ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 ## Performance Characteristics
 
 ### Resource Management
-- **512 simultaneous nodes**: `MAX_ACTIVE_CELL_NODES = 512`
-- **Node pooling**: Pre-allocated `g_cell_nodes[]` array
-- **Memory efficiency**: Multiple nodes can reference same sample data
-- **Automatic cleanup**: Finished nodes automatically return to pool
+- **32 total nodes**: Always exactly 16 columns × 2 A/B nodes = 32 nodes
+- **Fixed allocation**: Node structures pre-allocated, miniaudio nodes created on-demand
+- **Memory efficiency**: ~75% fewer nodes than old per-cell system
+- **No cleanup needed**: Nodes are persistent and reused for different samples
 
 ### Real-time Performance
 - **Volume-only control**: Sequencer just changes volume, no node creation/destruction
@@ -264,25 +275,26 @@ static void audio_callback(...) {
 }
 ```
 
-### Sample Switching Logic
+### A/B Switching Logic
 ```c
 // In play_samples_for_step():
-cell_node_t* target_node = find_node_for_cell(step, column, sample_to_play);
-if (target_node) {
-    bool is_same_node = (currently_playing_nodes_per_col[column] == target_node);
+column_nodes_t* col_nodes = &g_column_nodes[column];
+if (different_sample || no_active_sample) {
+    // A/B switch: fade out current, setup & fade in alternate
+    target_node_idx = col_nodes->next_node;  // Get A or B
+    setup_column_node(column, target_node_idx, sample, volume, pitch);
     
-    if (!is_same_node) {
-        // Fade out previous node, fade in new node
-        if (currently_playing_nodes_per_col[column]) {
-            set_target_volume(currently_playing_nodes_per_col[column], 0.0f);
-        }
-        set_target_volume(target_node, target_node->volume);
-        currently_playing_nodes_per_col[column] = target_node;
-    } else {
-        // Same node - restart from beginning
-        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
-        set_target_volume(target_node, target_node->volume);
+    if (col_nodes->active_node >= 0) {
+        set_target_volume(&col_nodes->nodes[col_nodes->active_node], 0.0f);  // Fade out
     }
+    set_target_volume(&col_nodes->nodes[target_node_idx], volume);  // Fade in
+    
+    col_nodes->active_node = target_node_idx;
+    col_nodes->next_node = (target_node_idx + 1) % 2;  // Alternate for next time
+} else {
+    // Same sample - restart current node
+    ma_decoder_seek_to_pcm_frame(&current_node->decoder, 0);
+    set_target_volume(current_node, volume);
 }
 ```
 
