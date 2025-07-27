@@ -27,6 +27,9 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   
   // Track users with unread thread messages
   Set<String> _usersWithNotifications = {};
+  
+  // Track users with pending invitations
+  Set<String> _usersWithPendingInvites = {};
 
   // Animation controllers
   late AnimationController _lampAnimation;
@@ -100,11 +103,40 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
       }
     });
 
+    // Listen for thread invitations
+    _threadsService.threadInvitationStream.listen((invitation) {
+      setState(() {
+        _usersWithPendingInvites.add(invitation.fromUserId);
+      });
+      
+      // Show snackbar notification
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${invitation.fromUserName} invited you to collaborate on "${invitation.threadTitle}"'),
+            backgroundColor: const Color(0xFF3B82F6), // Blue color for invitations
+            duration: const Duration(seconds: 4),
+            action: SnackBarAction(
+              label: 'VIEW',
+              textColor: Colors.white,
+              onPressed: () {
+                // TODO: Navigate to invitations screen or thread
+                debugPrint('Navigate to invitation for thread: ${invitation.threadId}');
+              },
+            ),
+          ),
+        );
+      }
+    });
+
     // No need to connect here - it's already connected globally
     debugPrint('📡 Using global ThreadsService connection in contacts screen');
     
     // Load user profiles from API
     await _loadUserProfiles();
+    
+    // Check for existing pending invitations
+    _checkPendingInvitations();
   }
 
   Future<void> _loadUserProfiles() async {
@@ -121,6 +153,28 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
         _isLoading = false;
       });
     }
+  }
+
+  void _checkPendingInvitations() {
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    if (currentUserId == null) return;
+    
+    // Check all threads for pending invitations to current user
+    final usersWithInvites = <String>{};
+    for (final thread in threadsState.threads) {
+      for (final invite in thread.invites) {
+        if (invite.userId == currentUserId && invite.status == InviteStatus.pending) {
+          usersWithInvites.add(invite.invitedBy);
+        }
+      }
+    }
+    
+    setState(() {
+      _usersWithPendingInvites = usersWithInvites;
+    });
   }
 
   @override
@@ -363,27 +417,49 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
                         ),
                       ),
                       
-                      // Notification indicator - red dot for unread thread messages
-                      if (_usersWithNotifications.contains(user.id))
-                        Container(
-                          margin: const EdgeInsets.only(right: 8),
-                          width: 12,
-                          height: 12,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFEF4444), // Red color for notifications
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Center(
-                            child: Text(
-                              '!',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 8,
-                                fontWeight: FontWeight.bold,
+                      // Notification indicators
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Blue dot for pending invitations
+                          if (_usersWithPendingInvites.contains(user.id))
+                            Container(
+                              margin: const EdgeInsets.only(right: 4),
+                              width: 8,
+                              height: 8,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFF3B82F6), // Blue color for invitations
+                                shape: BoxShape.circle,
                               ),
                             ),
-                          ),
-                        ),
+                          
+                          // Red dot for unread thread messages
+                          if (_usersWithNotifications.contains(user.id))
+                            Container(
+                              margin: const EdgeInsets.only(right: 4),
+                              width: 12,
+                              height: 12,
+                              decoration: const BoxDecoration(
+                                color: Color(0xFFEF4444), // Red color for notifications
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Center(
+                                child: Text(
+                                  '!',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          
+                          // Add spacing if there are notifications
+                          if (_usersWithNotifications.contains(user.id) || _usersWithPendingInvites.contains(user.id))
+                            const SizedBox(width: 4),
+                        ],
+                      ),
                       
                       // Online indicator - small purple circle
                       if (user.isOnline)
@@ -479,9 +555,10 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
   }
 
   void _startChat(ContactUser user) {
-    // Clear notification for this user
+    // Clear notifications for this user
     setState(() {
       _usersWithNotifications.remove(user.id);
+      _usersWithPendingInvites.remove(user.id);
     });
     
     // Navigate to user profile instead of chat
@@ -493,7 +570,10 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
           userName: user.name,
         ),
       ),
-    );
+    ).then((_) {
+      // Refresh pending invitations when returning from user profile
+      _checkPendingInvitations();
+    });
   }
 }
 

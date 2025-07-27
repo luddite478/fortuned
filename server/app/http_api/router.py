@@ -14,7 +14,9 @@ from http_api.threads import (
     join_thread_handler, 
     get_threads_handler, 
     get_thread_handler, 
-    update_thread_handler
+    update_thread_handler,
+    send_invitation_handler,
+    manage_invitation_handler
 )
 from typing import Dict, Any
 import json
@@ -97,3 +99,13 @@ async def join_thread(request: Request, thread_id: str, user_data: Dict[str, Any
 @router.put("/threads/{thread_id}")
 async def update_thread(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
     return await update_thread_handler(request, thread_id, update_data)
+
+@router.post("/threads/{thread_id}/invites")
+async def send_invitation(request: Request, thread_id: str, invitation_data: Dict[str, Any] = Body(...)):
+    """Send invitation to user for a thread"""
+    return await send_invitation_handler(request, thread_id, invitation_data)
+
+@router.put("/threads/{thread_id}/invites/{user_id}")
+async def manage_invitation(request: Request, thread_id: str, user_id: str, action_data: Dict[str, Any] = Body(...)):
+    """Accept or decline thread invitation"""
+    return await manage_invitation_handler(request, thread_id, user_id, action_data)

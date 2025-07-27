@@ -1386,19 +1386,88 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
     );
   }
 
-  void _inviteSelectedContacts() {
+  void _inviteSelectedContacts() async {
     Navigator.of(context).pop();
     
-    // Show placeholder message - backend logic not implemented yet
+    if (_selectedContacts.isEmpty) return;
+    
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final currentThread = threadsState.currentThread;
+    final currentUserId = threadsState.currentUserId;
+    
+    if (currentThread == null || currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to send invitations at this time'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    // Show loading message
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
-          'Invite functionality coming soon! Selected ${_selectedContacts.length} users.',
+          'Sending ${_selectedContacts.length} invitation(s)...',
           style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
         ),
-        backgroundColor: Colors.orangeAccent,
+        backgroundColor: Colors.blue,
         duration: const Duration(seconds: 2),
       ),
     );
+    
+    int successCount = 0;
+    int failureCount = 0;
+    
+    // Send invitations to all selected users
+    for (final contactId in _selectedContacts) {
+      try {
+        // Find the user profile to get the name
+        final userProfile = _userProfiles.where((profile) => profile.id == contactId).firstOrNull;
+        final userName = userProfile?.username ?? 'Unknown User';
+        
+        await threadsState.sendInvitation(
+          threadId: currentThread.id,
+          userId: contactId,
+          userName: userName,
+          invitedBy: currentUserId,
+        );
+        
+        successCount++;
+      } catch (e) {
+        failureCount++;
+        debugPrint('Failed to invite user $contactId: $e');
+      }
+    }
+    
+    // Show result message
+    if (mounted) {
+      String message;
+      Color backgroundColor;
+      
+      if (failureCount == 0) {
+        message = 'Successfully invited $successCount user(s)!';
+        backgroundColor = Colors.green;
+      } else if (successCount == 0) {
+        message = 'Failed to send all invitations';
+        backgroundColor = Colors.red;
+      } else {
+        message = 'Invited $successCount user(s), $failureCount failed';
+        backgroundColor = Colors.orange;
+      }
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            message,
+            style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
+          ),
+          backgroundColor: backgroundColor,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 } 
