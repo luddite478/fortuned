@@ -431,7 +431,7 @@ class UsersService {
   }
 }
 
-// Data models - Note: Thread, ThreadCheckpoint, etc. are imported from threads_state.dart
+// Data models - Note: Thread, ProjectCheckpoint, etc. are imported from threads_state.dart
 // Legacy data models below are kept for backward compatibility with existing UI components
 
 class SoundTrack {

@@ -369,7 +369,7 @@ class SampleInfo {
 }
 
 // A checkpoint represents a project state at a specific point in time
-class ThreadCheckpoint {
+class ProjectCheckpoint {
   final String id;
   final String userId; // User who created this checkpoint
   final String userName;
@@ -377,7 +377,7 @@ class ThreadCheckpoint {
   final String comment; // Optional description of changes
   final SequencerSnapshot snapshot; // Complete project state
 
-  const ThreadCheckpoint({
+  const ProjectCheckpoint({
     required this.id,
     required this.userId,
     required this.userName,
@@ -395,8 +395,8 @@ class ThreadCheckpoint {
     'snapshot': snapshot.toJson(),
   };
 
-  factory ThreadCheckpoint.fromJson(Map<String, dynamic> json) {
-    return ThreadCheckpoint(
+  factory ProjectCheckpoint.fromJson(Map<String, dynamic> json) {
+    return ProjectCheckpoint(
       id: json['id'] ?? '',
       userId: json['user_id'] ?? '',
       userName: json['user_name'] ?? '',
@@ -412,7 +412,7 @@ class Thread {
   final String id;
   final String title;
   final List<ThreadUser> users; // First user is always the initial author
-  final List<ThreadCheckpoint> checkpoints;
+  final List<ProjectCheckpoint> checkpoints;
   final ThreadStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -432,8 +432,8 @@ class Thread {
   // Get the initial author (first user)
   ThreadUser get author => users.first;
   
-  // Get the latest checkpoint
-  ThreadCheckpoint? get latestCheckpoint => 
+    // Get the latest checkpoint
+  ProjectCheckpoint? get latestCheckpoint =>
       checkpoints.isNotEmpty ? checkpoints.last : null;
   
   // Check if user is part of this thread
@@ -462,7 +462,7 @@ class Thread {
           .map((user) => ThreadUser.fromJson(user))
           .toList(),
       checkpoints: (json['checkpoints'] as List<dynamic>? ?? [])
-          .map((checkpoint) => ThreadCheckpoint.fromJson(checkpoint))
+          .map((checkpoint) => ProjectCheckpoint.fromJson(checkpoint))
           .toList(),
       status: ThreadStatus.values.firstWhere(
         (s) => s.name == (json['status'] ?? 'active'),
@@ -478,7 +478,7 @@ class Thread {
     String? id,
     String? title,
     List<ThreadUser>? users,
-    List<ThreadCheckpoint>? checkpoints,
+    List<ProjectCheckpoint>? checkpoints,
     ThreadStatus? status,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -586,9 +586,9 @@ class ThreadsState extends ChangeNotifier {
       }
 
       // Create initial checkpoint only if requested
-      ThreadCheckpoint? initialCheckpoint;
+      ProjectCheckpoint? initialCheckpoint;
       if (createInitialCheckpoint && initialSnapshot != null) {
-        initialCheckpoint = ThreadCheckpoint(
+        initialCheckpoint = ProjectCheckpoint(
           id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
           userId: authorId,
           userName: authorName,
@@ -645,7 +645,7 @@ class ThreadsState extends ChangeNotifier {
       setLoading(true);
       setError(null);
 
-      final checkpoint = ThreadCheckpoint(
+      final checkpoint = ProjectCheckpoint(
         id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
         userId: userId,
         userName: userName,

@@ -277,7 +277,7 @@ class ThreadsService {
   static Future<String> createThread({
     required String title,
     required List<ThreadUser> users,
-    ThreadCheckpoint? initialCheckpoint,
+    ProjectCheckpoint? initialCheckpoint,
     Map<String, dynamic> metadata = const {},
   }) async {
     try {
@@ -305,7 +305,7 @@ class ThreadsService {
   }
 
   // Add a checkpoint to an existing thread
-  static Future<void> addCheckpoint(String threadId, ThreadCheckpoint checkpoint) async {
+  static Future<void> addCheckpoint(String threadId, ProjectCheckpoint checkpoint) async {
     try {
       final body = <String, dynamic>{
         'checkpoint': checkpoint.toJson(),

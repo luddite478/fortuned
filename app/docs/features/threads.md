@@ -12,7 +12,7 @@ The Threads system provides a collaborative framework for music production where
 
 **Multi-User Collaboration**: Threads support multiple users, with the first user being the original author. Users can join existing threads to collaborate or create solo threads for personal project versioning.
 
-**Complete Snapshots**: Each checkpoint contains a complete project state snapshot rather than incremental changes, ensuring any checkpoint can be independently applied to recreate the exact project state.
+**Complete Snapshots**: Each project checkpoint contains a complete project state snapshot rather than incremental changes, ensuring any checkpoint can be independently applied to recreate the exact project state.
 
 ## Data Models
 
@@ -25,7 +25,7 @@ class Thread {
   final String id;
   final String title;
   final List<ThreadUser> users;        // Multiple users, first is author
-  final List<ThreadCheckpoint> checkpoints;  // Project snapshots over time
+  final List<ProjectCheckpoint> checkpoints;  // Project snapshots over time
   final ThreadStatus status;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -51,12 +51,12 @@ class ThreadUser {
 }
 ```
 
-### ThreadCheckpoint
+### ProjectCheckpoint
 
 A complete project snapshot at a specific point in time:
 
 ```dart
-class ThreadCheckpoint {
+class ProjectCheckpoint {
   final String id;
   final String userId;          // User who created this checkpoint
   final String userName;
@@ -201,7 +201,7 @@ void applySnapshot(SequencerSnapshot snapshot)
 | GET | `/api/v1/threads/{id}` | Get specific thread |
 | PUT | `/api/v1/threads/{id}` | Update thread metadata |
 | DELETE | `/api/v1/threads/{id}` | Archive thread |
-| POST | `/api/v1/threads/{id}/checkpoints` | Add checkpoint to thread |
+| POST | `/api/v1/threads/{id}/checkpoints` | Add project checkpoint to thread |
 | POST | `/api/v1/threads/{id}/users` | Join user to thread |
 | GET | `/api/v1/threads/search` | Search threads |
 | GET | `/api/v1/threads/stats` | Thread statistics |
@@ -252,22 +252,22 @@ The thread checkpoint snapshots are fully compatible with the existing database 
 
 ### 1. Solo Producer Workflow
 - Creates thread for new track
-- Works on beat, saves checkpoint: "Initial drum pattern"
-- Adds bassline, saves checkpoint: "Added bass"
-- Experiments with melody, saves checkpoint: "Melody experiment v1"
-- Can revert to any previous checkpoint if needed
+- Works on beat, saves project checkpoint: "Initial drum pattern"
+- Adds bassline, saves project checkpoint: "Added bass"
+- Experiments with melody, saves project checkpoint: "Melody experiment v1"
+- Can revert to any previous project checkpoint if needed
 
 ### 2. Collaborative Beat Making
 - Producer A creates thread with initial idea
-- Producer B joins, adds elements, saves checkpoint
-- Producer A refines B's additions, saves new checkpoint
+- Producer B joins, adds elements, saves project checkpoint
+- Producer A refines B's additions, saves new project checkpoint
 - Both can see full evolution and contribute iteratively
 
 ### 3. Remix/Improvement Workflow
 - User discovers interesting project from another user
 - Clicks "Improve" to create new collaborative thread
-- Original project becomes first checkpoint
-- User makes improvements and saves new checkpoint
+- Original project becomes first project checkpoint
+- User makes improvements and saves new project checkpoint
 - Original creator can join to see improvements and collaborate
 
 ## Future Enhancements
@@ -275,9 +275,9 @@ The thread checkpoint snapshots are fully compatible with the existing database 
 1. **Real-time Collaboration**: WebSocket integration for live editing
 2. **Branching**: Allow threads to branch into multiple parallel timelines
 3. **Merge Capabilities**: Combine different thread branches
-4. **Audio Rendering**: Automatic audio rendering for each checkpoint
-5. **Version Tagging**: Tag specific checkpoints as releases or milestones
-6. **Export Options**: Export thread history or specific checkpoints
+4. **Audio Rendering**: Automatic audio rendering for each project checkpoint
+5. **Version Tagging**: Tag specific project checkpoints as releases or milestones
+6. **Export Options**: Export thread history or specific project checkpoints
 
 ## API Usage Examples
 
@@ -301,7 +301,7 @@ POST /api/v1/threads
 }
 ```
 
-### Adding a Checkpoint
+### Adding a Project Checkpoint
 ```javascript
 POST /api/v1/threads/thread123/checkpoints
 {

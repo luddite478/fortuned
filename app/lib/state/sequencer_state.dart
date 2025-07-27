@@ -267,6 +267,9 @@ class SequencerState extends ChangeNotifier {
   int _gridColumns = 4;
   int _gridRows = 16; // Will be validated against _maxSequencerSteps in init
   
+  // Scene chain configuration
+  int _numScenes = 1; // Number of scenes in the chain
+  
   // Grid state - tracks which sample slot is assigned to each grid cell for each sound grid
   late List<List<int?>> _soundGridSamples; // Each sound grid has its own grid samples
   
@@ -943,6 +946,7 @@ class SequencerState extends ChangeNotifier {
   int? get selectedSampleSlot => _selectedSampleSlot;
   int get gridColumns => _gridColumns;
   int get gridRows => _gridRows;
+  int get numScenes => _numScenes;
   List<int?> get gridSamples => _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length 
       ? List.unmodifiable(_soundGridSamples[_currentSoundGridIndex]) 
       : List.filled(_gridColumns * _gridRows, null);
@@ -2379,6 +2383,18 @@ Made with Demo Sequencer 🚀
     notifyListeners();
   }
 
+  // Update number of scenes in the chain
+  void setNumScenes(int newNumScenes) {
+    if (newNumScenes < 1 || newNumScenes > 10) return; // Limit to reasonable range
+    
+    _numScenes = newNumScenes;
+    
+    // Trigger autosave when scene count changes
+    _triggerAutosave();
+    
+    notifyListeners();
+  }
+
   // New method: Toggle selection mode on/off
   void toggleSelectionMode() {
     _isInSelectionMode = !_isInSelectionMode;
@@ -3347,51 +3363,14 @@ Made with Demo Sequencer 🚀
       debugPrint('📸 Created snapshot: ${snapshot.id}');
       
       // Create new checkpoint for the existing thread
-      final checkpoint = {
-        'id': 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
-        'user_id': _threadsState?.currentUserId ?? 'unknown_user',
-        'user_name': _threadsState?.currentUserName ?? 'Unknown User',
-        'timestamp': DateTime.now().toIso8601String(),
-        'comment': description ?? 'Published from mobile app',
-        'renders': [],
-        'snapshot': {
-          'id': snapshot.id,
-          'name': snapshot.name,
-          'createdAt': snapshot.createdAt.toIso8601String(),
-          'version': snapshot.version,
-          'audio': {
-            'sources': snapshot.audio.sources.map((source) => {
-              'scenes': source.scenes.map((scene) => {
-                'layers': scene.layers.map((layer) => {
-                  'id': layer.id,
-                  'index': layer.index,
-                  'rows': layer.rows.map((row) => {
-                    'cells': row.cells.map((cell) => {
-                      'sample': cell.sample?.hasSample == true ? {
-                        'sample_id': cell.sample!.sampleId,
-                        'sample_name': cell.sample!.sampleName,
-                      } : null,
-                    }).toList(),
-                  }).toList(),
-                }).toList(),
-                'metadata': {
-                  'user': scene.metadata.user,
-                  'bpm': scene.metadata.bpm,
-                  'key': scene.metadata.key,
-                  'time_signature': scene.metadata.timeSignature,
-                  'created_at': scene.metadata.createdAt.toIso8601String(),
-                },
-              }).toList(),
-              'samples': source.samples.map((sample) => {
-                'id': sample.id,
-                'name': sample.name,
-                'url': sample.url,
-                'is_public': sample.isPublic,
-              }).toList(),
-            }).toList(),
-          },
-        },
-      };
+      final checkpoint = ProjectCheckpoint(
+        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+        userId: _threadsState?.currentUserId ?? 'unknown_user',
+        userName: _threadsState?.currentUserName ?? 'Unknown User',
+        timestamp: DateTime.now(),
+        comment: description ?? 'Published from mobile app',
+        snapshot: snapshot,
+      );
       
       // Prepare update data
       final updateData = <String, dynamic>{
@@ -3401,7 +3380,7 @@ Made with Demo Sequencer 🚀
           'description': description ?? '',
           'updated_at': DateTime.now().toIso8601String(),
         },
-        'checkpoint': checkpoint,
+        'checkpoint': checkpoint.toJson(),
       };
 
       // Send update to server
@@ -3421,9 +3400,9 @@ Made with Demo Sequencer 🚀
             // Add the checkpoint to the local thread state
             await _threadsState!.addCheckpoint(
               threadId: threadId,
-              userId: checkpoint['user_id'] as String,
-              userName: checkpoint['user_name'] as String,
-              comment: checkpoint['comment'] as String,
+              userId: checkpoint.userId,
+              userName: checkpoint.userName,
+              comment: checkpoint.comment,
               snapshot: snapshot,
             );
             
@@ -3523,67 +3502,26 @@ Made with Demo Sequencer 🚀
       // Step 2: Create checkpoint using the proper checkpoint API
       final snapshot = createSnapshot(name: projectTitle, comment: description);
       
-      final checkpoint = {
-        'id': 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
-        'user_id': currentUserId,
-        'user_name': currentUserName ?? 'Unknown User',
-        'timestamp': DateTime.now().toIso8601String(),
-        'comment': description ?? 'Published from mobile app',
-        'renders': [], // Will be populated after audio rendering
-        'snapshot': {
-          'id': snapshot.id,
-          'name': snapshot.name,
-          'createdAt': snapshot.createdAt.toIso8601String(),
-          'version': snapshot.version,
-          'audio': {
-            'sources': snapshot.audio.sources.map((source) => {
-              'scenes': source.scenes.map((scene) => {
-                'layers': scene.layers.map((layer) => {
-                  'id': layer.id,
-                  'index': layer.index,
-                  'rows': layer.rows.map((row) => {
-                    'cells': row.cells.map((cell) => {
-                      'sample': cell.sample?.hasSample == true ? {
-                        'sample_id': cell.sample!.sampleId,
-                        'sample_name': cell.sample!.sampleName,
-                      } : null,
-                    }).toList(),
-                  }).toList(),
-                }).toList(),
-                'metadata': {
-                  'user': scene.metadata.user,
-                  'bpm': scene.metadata.bpm,
-                  'key': scene.metadata.key,
-                  'time_signature': scene.metadata.timeSignature,
-                  'created_at': scene.metadata.createdAt.toIso8601String(),
-                },
-              }).toList(),
-              'samples': source.samples.map((sample) => {
-                'id': sample.id,
-                'name': sample.name,
-                'url': sample.url,
-                'is_public': sample.isPublic,
-              }).toList(),
-            }).toList(),
-          },
-        },
-      };
+      // Create a proper ProjectCheckpoint object
+      final checkpoint = ProjectCheckpoint(
+        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
+        userId: currentUserId,
+        userName: currentUserName ?? 'Unknown User',
+        timestamp: DateTime.now(),
+        comment: description ?? 'Published from mobile app',
+        snapshot: snapshot,
+      );
       
-      // Add checkpoint to the thread
+      // Add checkpoint to the thread using ThreadsService
       debugPrint('🌐 Adding checkpoint at URL: /threads/$newThreadId/checkpoints');
       
-      final checkpointData = {
-        'checkpoint': checkpoint,
-      };
-      
-      final checkpointResponse = await ApiHttpClient.post('/threads/$newThreadId/checkpoints', body: checkpointData);
-
-      if (checkpointResponse.statusCode != 200 && checkpointResponse.statusCode != 201) {
-        debugPrint('❌ Failed to add checkpoint: ${checkpointResponse.statusCode} - ${checkpointResponse.body}');
+      try {
+        await ThreadsService.addCheckpoint(newThreadId, checkpoint);
+        debugPrint('✅ Successfully added checkpoint to thread');
+      } catch (e) {
+        debugPrint('❌ Failed to add checkpoint: $e');
         // Thread was created but checkpoint failed - still consider it a partial success
         // The user can add checkpoints later
-      } else {
-        debugPrint('✅ Successfully added checkpoint to thread');
       }
       
       // Step 3: Update local ThreadsState with the new thread from server
@@ -3642,7 +3580,7 @@ Made with Demo Sequencer 🚀
       
       // For sourcing projects, we want to load the "published" checkpoint, not the latest one
       // The published checkpoint is the one created by the original author when they published
-      ThreadCheckpoint? checkpointToLoad;
+      ProjectCheckpoint? checkpointToLoad;
       
       if (thread.checkpoints.isEmpty) {
         debugPrint('❌ No checkpoints found in thread');
@@ -3708,7 +3646,7 @@ Made with Demo Sequencer 🚀
       
       // For sourcing projects, we want to load the "published" checkpoint, not the latest one
       // The published checkpoint is the one created by the original author when they published
-      ThreadCheckpoint? checkpointToLoad;
+      ProjectCheckpoint? checkpointToLoad;
       
       if (thread.checkpoints.isEmpty) {
         debugPrint('❌ No checkpoints found in thread');
@@ -3902,7 +3840,7 @@ Made with Demo Sequencer 🚀
       if (_threadsState != null) {
         try {
           // Find the original checkpoint that we forked from
-          ThreadCheckpoint? originalCheckpoint;
+          ProjectCheckpoint? originalCheckpoint;
           if (_sourceThread!.checkpoints.isNotEmpty) {
             // Look for the published checkpoint (created by original author with publish comment)
             for (final checkpoint in _sourceThread!.checkpoints) {

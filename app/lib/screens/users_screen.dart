@@ -6,7 +6,6 @@ import '../services/users_service.dart';
 import '../services/auth_service.dart';
 import '../services/threads_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'thread_screen.dart';
 import 'user_profile_screen.dart';
 import 'sequencer_screen.dart';
 import 'checkpoints_screen.dart';

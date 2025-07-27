@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
-import '../widgets/app_header_widget.dart';
+
 import '../services/threads_service.dart';
+import '../services/users_service.dart';
 import 'user_profile_screen.dart';
 
 // Telephone book color scheme - same as users screen
@@ -117,7 +118,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
 
 
 
-  void _playCheckpointRender(ThreadCheckpoint checkpoint) {
+  void _playCheckpointRender(ProjectCheckpoint checkpoint) {
     // Check if there are any renders available
     if (checkpoint.snapshot.audio.renders.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -184,10 +185,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppHeaderWidget(
-        mode: HeaderMode.checkpoints,
-        title: 'Project Checkpoints',
-      ),
+      appBar: _buildCustomHeader(context),
       backgroundColor: PhoneBookColors.pageBackground,
       body: Consumer2<ThreadsState, SequencerState>(
         builder: (context, threadsState, sequencerState, child) {
@@ -288,7 +286,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
 
   Widget _buildCheckpointMessage(
     BuildContext context,
-    ThreadCheckpoint checkpoint,
+    ProjectCheckpoint checkpoint,
     bool isCurrentUser,
     SequencerState sequencerState,
     ThreadsState threadsState,
@@ -606,7 +604,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
 
   void _applyCheckpoint(
     BuildContext context,
-    ThreadCheckpoint checkpoint,
+    ProjectCheckpoint checkpoint,
     SequencerState sequencerState,
   ) {
     showDialog(
@@ -786,6 +784,78 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  PreferredSizeWidget _buildCustomHeader(BuildContext context) {
+    return AppBar(
+      backgroundColor: PhoneBookColors.entryBackground,
+      foregroundColor: PhoneBookColors.text,
+      elevation: 0,
+      leading: IconButton(
+        icon: Icon(Icons.arrow_back, color: PhoneBookColors.text),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      actions: [
+        // Invite Collaborators button (User + plus icon)
+        IconButton(
+          icon: Icon(Icons.person_add, color: PhoneBookColors.text),
+          onPressed: () => _showInviteCollaboratorsModal(context),
+        ),
+        // Publish button
+        Container(
+          margin: const EdgeInsets.only(right: 4),
+          child: ElevatedButton(
+            onPressed: () => _showPublishModal(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: PhoneBookColors.buttonBackground,
+              foregroundColor: PhoneBookColors.text,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(6),
+              ),
+              side: BorderSide(
+                color: PhoneBookColors.buttonBorder,
+                width: 1,
+              ),
+              elevation: 1,
+            ),
+            child: Text(
+              'Publish',
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.text,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+      ],
+    );
+  }
+
+  void _showPublishModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: const _PublishModalBottomSheet(),
+      ),
+    );
+  }
+
+  void _showInviteCollaboratorsModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => SizedBox(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: const _InviteCollaboratorsModalBottomSheet(),
       ),
     );
   }
@@ -1007,6 +1077,499 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
             ),
           ),
         ],
+      ),
+    );
+  }
+} 
+
+// Modal bottom sheet for publish options
+class _PublishModalBottomSheet extends StatefulWidget {
+  const _PublishModalBottomSheet();
+
+  @override
+  State<_PublishModalBottomSheet> createState() => _PublishModalBottomSheetState();
+}
+
+class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
+  bool _isPublishing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: PhoneBookColors.entryBackground,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      child: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 32,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: PhoneBookColors.border,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Help message
+              Text(
+                'Publish this thread to show others what you\'re working on or to share the composing history. It will be visible on your profile to selected groups.',
+                style: GoogleFonts.sourceSans3(
+                  color: PhoneBookColors.lightText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+              const SizedBox(height: 24),
+              
+              // Option 1: For everyone (working)
+              _buildPublishOption(
+                context,
+                'For everyone',
+                'Anyone can discover and view this thread',
+                true,
+                () => _publishForEveryone(context),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Option 2: For followers (disabled)
+              _buildPublishOption(
+                context,
+                'For followers',
+                'Only users who follow you can see this',
+                false,
+                null,
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // Option 3: For users... (disabled)
+              _buildPublishOption(
+                context,
+                'For users...',
+                'Share with specific users or groups',
+                false,
+                null,
+              ),
+              
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPublishOption(
+    BuildContext context,
+    String title,
+    String description,
+    bool enabled,
+    VoidCallback? onTap,
+  ) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: enabled ? PhoneBookColors.buttonBackground : PhoneBookColors.border.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: enabled ? PhoneBookColors.buttonBorder : PhoneBookColors.border,
+            width: 1,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              title,
+              style: GoogleFonts.sourceSans3(
+                color: enabled ? PhoneBookColors.text : PhoneBookColors.lightText,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              description,
+              style: GoogleFonts.sourceSans3(
+                color: PhoneBookColors.lightText,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _publishForEveryone(BuildContext context) async {
+    if (_isPublishing) return;
+    
+    setState(() {
+      _isPublishing = true;
+    });
+
+    try {
+      final sequencerState = Provider.of<SequencerState>(context, listen: false);
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      
+      // Close modal
+      Navigator.of(context).pop();
+      
+      // Show loading indicator
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Publishing thread...'),
+          backgroundColor: Colors.orangeAccent,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      // Use the same publish logic as in share widget
+      final success = await sequencerState.publishToDatabase(
+        description: 'Published from mobile app',
+        isPublic: true,
+      );
+      
+      if (success) {
+        // Refresh threads to make sure we have the latest data
+        await threadsState.loadThreads();
+        
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Thread published successfully!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to publish thread'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isPublishing = false;
+        });
+      }
+    }
+  }
+}
+
+// Modal bottom sheet for inviting collaborators
+class _InviteCollaboratorsModalBottomSheet extends StatefulWidget {
+  const _InviteCollaboratorsModalBottomSheet();
+
+  @override
+  State<_InviteCollaboratorsModalBottomSheet> createState() => _InviteCollaboratorsModalBottomSheetState();
+}
+
+class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaboratorsModalBottomSheet> {
+  final Set<String> _selectedContacts = {};
+  List<UserProfile> _userProfiles = [];
+  bool _isLoading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserProfiles();
+  }
+
+  Future<void> _loadUserProfiles() async {
+    try {
+      final response = await UsersService.getUserProfiles(limit: 50);
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      final currentUserId = threadsState.currentUserId;
+      
+      setState(() {
+        // Filter out current user from the list
+        _userProfiles = response.profiles
+            .where((user) => user.id != currentUserId)
+            .toList();
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Failed to load users: $e';
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: PhoneBookColors.entryBackground,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(16),
+          topRight: Radius.circular(16),
+        ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                children: [
+                  // Handle bar
+                  Container(
+                    width: 32,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: PhoneBookColors.border,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  Text(
+                    'Invite Collaborators',
+                    style: GoogleFonts.sourceSans3(
+                      color: PhoneBookColors.text,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Select users to invite to this thread',
+                    style: GoogleFonts.sourceSans3(
+                      color: PhoneBookColors.lightText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            
+            // Contacts list
+            Expanded(
+              child: _isLoading
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const CircularProgressIndicator(),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Loading users...',
+                            style: GoogleFonts.sourceSans3(
+                              color: PhoneBookColors.lightText,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    )
+                  : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.error_outline,
+                                color: PhoneBookColors.lightText,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                _error!,
+                                style: GoogleFonts.sourceSans3(
+                                  color: PhoneBookColors.lightText,
+                                  fontSize: 14,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadUserProfiles,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: PhoneBookColors.buttonBackground,
+                                  side: BorderSide(color: PhoneBookColors.buttonBorder),
+                                ),
+                                child: Text(
+                                  'Retry',
+                                  style: GoogleFonts.sourceSans3(
+                                    color: PhoneBookColors.text,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          itemCount: _userProfiles.length,
+                          itemBuilder: (context, index) {
+                            final user = _userProfiles[index];
+                            final isSelected = _selectedContacts.contains(user.id);
+                            final isOnline = user.isOnline;
+                  
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                                                    setState(() {
+                              if (isSelected) {
+                                _selectedContacts.remove(user.id);
+                              } else {
+                                _selectedContacts.add(user.id);
+                              }
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: isSelected ? PhoneBookColors.currentUserCheckpoint : PhoneBookColors.checkpointBackground,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: isSelected ? PhoneBookColors.onlineIndicator : PhoneBookColors.border,
+                                width: isSelected ? 2 : 1,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                // Online indicator
+                                Container(
+                                  width: 12,
+                                  height: 12,
+                                  decoration: BoxDecoration(
+                                    color: isOnline ? PhoneBookColors.onlineIndicator : PhoneBookColors.lightText,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                
+                                // Username only
+                                Expanded(
+                                  child: Text(
+                                    user.username,
+                                    style: GoogleFonts.sourceSans3(
+                                      color: PhoneBookColors.text,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ),
+                            
+                            // Checkbox
+                            Icon(
+                              isSelected ? Icons.check_circle : Icons.circle_outlined,
+                              color: isSelected ? PhoneBookColors.onlineIndicator : PhoneBookColors.lightText,
+                              size: 20,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            
+            // Bottom actions
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Row(
+                children: [
+                  Text(
+                    '${_selectedContacts.length} selected',
+                    style: GoogleFonts.sourceSans3(
+                      color: PhoneBookColors.lightText,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.sourceSans3(
+                        color: PhoneBookColors.lightText,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  ElevatedButton(
+                    onPressed: _selectedContacts.isNotEmpty ? () => _inviteSelectedContacts() : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: PhoneBookColors.buttonBackground,
+                      foregroundColor: PhoneBookColors.text,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      side: BorderSide(color: PhoneBookColors.buttonBorder),
+                    ),
+                    child: Text(
+                      'Invite',
+                      style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _inviteSelectedContacts() {
+    Navigator.of(context).pop();
+    
+    // Show placeholder message - backend logic not implemented yet
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Invite functionality coming soon! Selected ${_selectedContacts.length} users.',
+          style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
+        ),
+        backgroundColor: Colors.orangeAccent,
+        duration: const Duration(seconds: 2),
       ),
     );
   }

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../state/threads_state.dart';
 
 class CheckpointMessageWidget extends StatefulWidget {
-  final ThreadCheckpoint checkpoint;
+  final ProjectCheckpoint checkpoint;
   final bool isCurrentUser;
   final bool isExpanded;
   final VoidCallback? onTap;
