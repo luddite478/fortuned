@@ -4,6 +4,45 @@ import 'sequencer_state.dart';
 
 enum ThreadStatus { active, paused, completed, archived }
 
+enum InviteStatus { pending, accepted, declined, cancelled }
+
+class ThreadInvite {
+  final String userId;
+  final String userName;
+  final InviteStatus status;
+  final String invitedBy;
+  final DateTime invitedAt;
+  
+  const ThreadInvite({
+    required this.userId,
+    required this.userName,
+    required this.status,
+    required this.invitedBy,
+    required this.invitedAt,
+  });
+  
+  Map<String, dynamic> toJson() => {
+    'user_id': userId,
+    'user_name': userName,
+    'status': status.name,
+    'invited_by': invitedBy,
+    'invited_at': invitedAt.toIso8601String(),
+  };
+  
+  factory ThreadInvite.fromJson(Map<String, dynamic> json) {
+    return ThreadInvite(
+      userId: json['user_id'] ?? '',
+      userName: json['user_name'] ?? '',
+      status: InviteStatus.values.firstWhere(
+        (s) => s.name == (json['status'] ?? 'pending'),
+        orElse: () => InviteStatus.pending,
+      ),
+      invitedBy: json['invited_by'] ?? '',
+      invitedAt: DateTime.parse(json['invited_at'] ?? DateTime.now().toIso8601String()),
+    );
+  }
+}
+
 class ThreadUser {
   final String id;
   final String name;
@@ -412,6 +451,7 @@ class Thread {
   final String id;
   final String title;
   final List<ThreadUser> users; // First user is always the initial author
+  final List<ThreadInvite> invites; // Pending/historical invitations
   final List<ProjectCheckpoint> checkpoints;
   final ThreadStatus status;
   final DateTime createdAt;
@@ -422,6 +462,7 @@ class Thread {
     required this.id,
     required this.title,
     required this.users,
+    this.invites = const [],
     required this.checkpoints,
     required this.status,
     required this.createdAt,
@@ -432,7 +473,7 @@ class Thread {
   // Get the initial author (first user)
   ThreadUser get author => users.first;
   
-    // Get the latest checkpoint
+  // Get the latest checkpoint
   ProjectCheckpoint? get latestCheckpoint =>
       checkpoints.isNotEmpty ? checkpoints.last : null;
   
@@ -443,10 +484,26 @@ class Thread {
   ThreadUser? getUser(String userId) => 
       users.where((user) => user.id == userId).firstOrNull;
 
+  // Check if user has been invited to this thread
+  bool isUserInvited(String userId) => invites.any((invite) => invite.userId == userId);
+  
+  // Check if user has a pending invitation
+  bool hasPendingInvite(String userId) => 
+      invites.any((invite) => invite.userId == userId && invite.status == InviteStatus.pending);
+  
+  // Get invite by user ID
+  ThreadInvite? getInvite(String userId) => 
+      invites.where((invite) => invite.userId == userId).firstOrNull;
+  
+  // Get all pending invites
+  List<ThreadInvite> get pendingInvites => 
+      invites.where((invite) => invite.status == InviteStatus.pending).toList();
+
   Map<String, dynamic> toJson() => {
     'id': id,
     'title': title,
     'users': users.map((u) => u.toJson()).toList(),
+    'invites': invites.map((i) => i.toJson()).toList(),
     'checkpoints': checkpoints.map((c) => c.toJson()).toList(),
     'status': status.name,
     'created_at': createdAt.toIso8601String(),
@@ -460,6 +517,9 @@ class Thread {
       title: json['title'] ?? '',
       users: (json['users'] as List<dynamic>? ?? [])
           .map((user) => ThreadUser.fromJson(user))
+          .toList(),
+      invites: (json['invites'] as List<dynamic>? ?? [])
+          .map((invite) => ThreadInvite.fromJson(invite))
           .toList(),
       checkpoints: (json['checkpoints'] as List<dynamic>? ?? [])
           .map((checkpoint) => ProjectCheckpoint.fromJson(checkpoint))
@@ -478,6 +538,7 @@ class Thread {
     String? id,
     String? title,
     List<ThreadUser>? users,
+    List<ThreadInvite>? invites,
     List<ProjectCheckpoint>? checkpoints,
     ThreadStatus? status,
     DateTime? createdAt,
@@ -488,6 +549,7 @@ class Thread {
       id: id ?? this.id,
       title: title ?? this.title,
       users: users ?? this.users,
+      invites: invites ?? this.invites,
       checkpoints: checkpoints ?? this.checkpoints,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
@@ -771,5 +833,160 @@ class ThreadsState extends ChangeNotifier {
   void clearError() {
     _error = null;
     notifyListeners();
+  }
+
+  // Send invitation to user for a thread
+  Future<void> sendInvitation({
+    required String threadId,
+    required String userId,
+    required String userName,
+    required String invitedBy,
+  }) async {
+    try {
+      setLoading(true);
+      setError(null);
+
+      // Check if user is already part of thread or already invited
+      final thread = _threads.firstWhere((t) => t.id == threadId);
+      
+      if (thread.hasUser(userId)) {
+        throw Exception('User is already a member of this thread');
+      }
+      
+      if (thread.hasPendingInvite(userId)) {
+        throw Exception('User already has a pending invitation');
+      }
+
+      await ThreadsService.sendInvitation(threadId, userId, userName, invitedBy);
+
+      // Update local state - add the invite to the thread
+      final invite = ThreadInvite(
+        userId: userId,
+        userName: userName,
+        status: InviteStatus.pending,
+        invitedBy: invitedBy,
+        invitedAt: DateTime.now(),
+      );
+
+      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+      if (threadIndex != -1) {
+        final updatedInvites = [..._threads[threadIndex].invites, invite];
+        _threads[threadIndex] = _threads[threadIndex].copyWith(
+          invites: updatedInvites,
+          updatedAt: DateTime.now(),
+        );
+
+        if (_activeThread?.id == threadId) {
+          setActiveThread(_threads[threadIndex]);
+        }
+      }
+    } catch (e) {
+      setError('Failed to send invitation: $e');
+      rethrow;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Accept an invitation
+  Future<void> acceptInvitation({
+    required String threadId,
+    required String userId,
+    required String userName,
+  }) async {
+    try {
+      setLoading(true);
+      setError(null);
+
+      await ThreadsService.acceptInvitation(threadId, userId);
+
+      // Update local state - add user to thread and remove invite
+      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+      if (threadIndex != -1) {
+        final thread = _threads[threadIndex];
+        
+        // Add user to users list
+        final newUser = ThreadUser(
+          id: userId,
+          name: userName,
+          joinedAt: DateTime.now(),
+        );
+        final updatedUsers = [...thread.users, newUser];
+        
+        // Remove invite from invites list
+        final updatedInvites = thread.invites
+            .where((invite) => invite.userId != userId)
+            .toList();
+
+        _threads[threadIndex] = thread.copyWith(
+          users: updatedUsers,
+          invites: updatedInvites,
+          updatedAt: DateTime.now(),
+        );
+
+        if (_activeThread?.id == threadId) {
+          setActiveThread(_threads[threadIndex]);
+        }
+      }
+    } catch (e) {
+      setError('Failed to accept invitation: $e');
+      rethrow;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Decline an invitation
+  Future<void> declineInvitation({
+    required String threadId,
+    required String userId,
+  }) async {
+    try {
+      setLoading(true);
+      setError(null);
+
+      await ThreadsService.declineInvitation(threadId, userId);
+
+      // Update local state - remove invite
+      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+      if (threadIndex != -1) {
+        final thread = _threads[threadIndex];
+        
+        // Remove invite from invites list
+        final updatedInvites = thread.invites
+            .where((invite) => invite.userId != userId)
+            .toList();
+
+        _threads[threadIndex] = thread.copyWith(
+          invites: updatedInvites,
+          updatedAt: DateTime.now(),
+        );
+
+        if (_activeThread?.id == threadId) {
+          setActiveThread(_threads[threadIndex]);
+        }
+      }
+    } catch (e) {
+      setError('Failed to decline invitation: $e');
+      rethrow;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Get all threads where user has pending invitations
+  List<Thread> getThreadsWithPendingInvites(String userId) {
+    return _threads.where((thread) => thread.hasPendingInvite(userId)).toList();
+  }
+
+  // Get count of pending invitations for a user
+  int getPendingInvitesCount(String userId) {
+    int count = 0;
+    for (final thread in _threads) {
+      if (thread.hasPendingInvite(userId)) {
+        count++;
+      }
+    }
+    return count;
   }
 } 

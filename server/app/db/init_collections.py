@@ -74,6 +74,15 @@ COLLECTIONS_CONFIG = {
                     "joined_at": "datetime"
                 }
             ],
+            "invites": [
+                {
+                    "user_id": "string (UUID)",
+                    "user_name": "string", 
+                    "status": "string",  # pending, accepted, declined, cancelled
+                    "invited_by": "string (UUID)",
+                    "invited_at": "datetime"
+                }
+            ],
             "checkpoints": [
                 {
                     "id": "string (UUID)",

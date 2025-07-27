@@ -80,6 +80,23 @@ class ThreadNotification {
   });
 }
 
+// Data model for thread invitation notification
+class ThreadInvitationNotification {
+  final String fromUserId;
+  final String fromUserName;
+  final String threadId;
+  final String threadTitle;
+  final DateTime timestamp;
+  
+  ThreadInvitationNotification({
+    required this.fromUserId,
+    required this.fromUserName,
+    required this.threadId,
+    required this.threadTitle,
+    required this.timestamp,
+  });
+}
+
 class ThreadsService {
   static String get _baseUrl {
     final serverIp = dotenv.env['SERVER_HOST'] ?? '';
@@ -102,12 +119,14 @@ class ThreadsService {
   final _threadHistoryController = StreamController<ThreadHistoryResponse>.broadcast();
   final _deliveryController = StreamController<DeliveryConfirmation>.broadcast();
   final _threadNotificationController = StreamController<ThreadNotification>.broadcast();
+  final _threadInvitationController = StreamController<ThreadInvitationNotification>.broadcast();
   
   // Getters for streams (for listening in UI)
   Stream<ThreadMessage> get messageStream => _messageController.stream;
   Stream<ThreadHistoryResponse> get threadHistoryStream => _threadHistoryController.stream;
   Stream<DeliveryConfirmation> get deliveryStream => _deliveryController.stream;
   Stream<ThreadNotification> get threadNotificationStream => _threadNotificationController.stream;
+  Stream<ThreadInvitationNotification> get threadInvitationStream => _threadInvitationController.stream;
   Stream<bool> get connectionStream => _wsClient.connectionStream;
   Stream<String> get errorStream => _wsClient.errorStream;
   bool get isConnected => _wsClient.isConnected;
@@ -124,6 +143,7 @@ class ThreadsService {
     _wsClient.registerMessageHandler('delivered', _handleDeliveryConfirmation);
     _wsClient.registerMessageHandler('thread_history', _handleThreadHistory);
     _wsClient.registerMessageHandler('thread_message', _handleThreadNotification);
+    _wsClient.registerMessageHandler('thread_invitation', _handleThreadInvitation);
   }
 
   void _handleDirectMessage(Map<String, dynamic> message) {
@@ -186,6 +206,21 @@ class ThreadsService {
         ),
       );
       _threadNotificationController.add(threadNotification);
+    }
+  }
+
+  void _handleThreadInvitation(Map<String, dynamic> message) {
+    if (!_threadInvitationController.isClosed) {
+      final threadInvitation = ThreadInvitationNotification(
+        fromUserId: message['from_user_id'],
+        fromUserName: message['from_user_name'],
+        threadId: message['thread_id'],
+        threadTitle: message['thread_title'],
+        timestamp: DateTime.fromMillisecondsSinceEpoch(
+          message['timestamp'] * 1000,
+        ),
+      );
+      _threadInvitationController.add(threadInvitation);
     }
   }
 
@@ -257,6 +292,7 @@ class ThreadsService {
     _wsClient.unregisterAllHandlers('delivered');
     _wsClient.unregisterAllHandlers('thread_history');
     _wsClient.unregisterAllHandlers('thread_message');
+    _wsClient.unregisterAllHandlers('thread_invitation');
     
     _wsClient.dispose();
     if (!_messageController.isClosed) {
@@ -270,6 +306,9 @@ class ThreadsService {
     }
     if (!_threadNotificationController.isClosed) {
       _threadNotificationController.close();
+    }
+    if (!_threadInvitationController.isClosed) {
+      _threadInvitationController.close();
     }
   }
 
@@ -476,6 +515,59 @@ class ThreadsService {
       }
     } catch (e) {
       throw Exception('Network error searching threads: $e');
+    }
+  }
+
+  // Send invitation to user for a thread
+  static Future<void> sendInvitation(String threadId, String userId, String userName, String invitedBy) async {
+    try {
+      final body = {
+        'user_id': userId,
+        'user_name': userName,
+        'invited_by': invitedBy,
+      };
+
+      final response = await ApiHttpClient.post('/threads/$threadId/invites', body: body);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Failed to send invitation: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error sending invitation: $e');
+    }
+  }
+
+  // Accept an invitation
+  static Future<void> acceptInvitation(String threadId, String userId) async {
+    try {
+      final body = {
+        'action': 'accept',
+      };
+
+      final response = await ApiHttpClient.put('/threads/$threadId/invites/$userId', body: body);
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to accept invitation: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error accepting invitation: $e');
+    }
+  }
+
+  // Decline an invitation
+  static Future<void> declineInvitation(String threadId, String userId) async {
+    try {
+      final body = {
+        'action': 'decline',
+      };
+
+      final response = await ApiHttpClient.put('/threads/$threadId/invites/$userId', body: body);
+
+      if (response.statusCode != 200) {
+        throw Exception('Failed to decline invitation: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error declining invitation: $e');
     }
   }
 } 

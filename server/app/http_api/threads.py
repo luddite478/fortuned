@@ -182,4 +182,120 @@ async def update_thread_handler(request: Request, thread_id: str, update_data: D
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+async def send_invitation_handler(request: Request, thread_id: str, invitation_data: Dict[str, Any] = Body(...)):
+    verify_token(invitation_data.get("token", ""))
+    try:
+        db = get_db()
+        
+        # Check if thread exists
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
+        
+        user_id = invitation_data.get("user_id")
+        user_name = invitation_data.get("user_name")
+        invited_by = invitation_data.get("invited_by")
+        
+        if not user_id or not user_name or not invited_by:
+            raise HTTPException(status_code=400, detail="user_id, user_name, and invited_by are required")
+        
+        # Check if user is already a member
+        existing_users = [u["id"] for u in thread.get("users", [])]
+        if user_id in existing_users:
+            raise HTTPException(status_code=400, detail="User is already a member of this thread")
+        
+        # Check if user already has a pending invitation
+        existing_invites = thread.get("invites", [])
+        for invite in existing_invites:
+            if invite.get("user_id") == user_id and invite.get("status") == "pending":
+                raise HTTPException(status_code=400, detail="User already has a pending invitation")
+        
+        # Create new invitation
+        invitation = {
+            "user_id": user_id,
+            "user_name": user_name,
+            "status": "pending",
+            "invited_by": invited_by,
+            "invited_at": datetime.utcnow().isoformat() + "Z"
+        }
+        
+        # Initialize invites array if it doesn't exist, then add invitation
+        db.threads.update_one(
+            {"id": thread_id},
+            {
+                "$push": {"invites": invitation},
+                "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
+            }
+        )
+        
+        # TODO: Send WebSocket notification to invited user
+        # This would be handled by the WebSocket router
+        
+        return {"status": "invitation_sent"}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+async def manage_invitation_handler(request: Request, thread_id: str, user_id: str, action_data: Dict[str, Any] = Body(...)):
+    verify_token(action_data.get("token", ""))
+    try:
+        db = get_db()
+        
+        # Check if thread exists
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
+        
+        action = action_data.get("action")
+        if action not in ["accept", "decline"]:
+            raise HTTPException(status_code=400, detail="Action must be 'accept' or 'decline'")
+        
+        # Find the invitation
+        invites = thread.get("invites", [])
+        invitation = None
+        invite_index = None
+        
+        for i, invite in enumerate(invites):
+            if invite.get("user_id") == user_id and invite.get("status") == "pending":
+                invitation = invite
+                invite_index = i
+                break
+        
+        if not invitation:
+            raise HTTPException(status_code=404, detail="No pending invitation found for this user")
+        
+        if action == "accept":
+            # Add user to thread members
+            new_user = {
+                "id": user_id,
+                "name": invitation["user_name"],
+                "joined_at": datetime.utcnow().isoformat() + "Z"
+            }
+            
+            # Remove invitation and add user in one atomic operation
+            db.threads.update_one(
+                {"id": thread_id},
+                {
+                    "$push": {"users": new_user},
+                    "$pull": {"invites": {"user_id": user_id}},
+                    "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
+                }
+            )
+            return {"status": "invitation_accepted", "user_added": True}
+        
+        elif action == "decline":
+            # Remove invitation
+            db.threads.update_one(
+                {"id": thread_id},
+                {
+                    "$pull": {"invites": {"user_id": user_id}},
+                    "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
+                }
+            )
+            return {"status": "invitation_declined"}
+    
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 
