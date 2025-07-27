@@ -202,6 +202,43 @@ async def handle_special_command(websocket, client_id, message_obj):
             "messages": history
         })
         return True
+    elif msg_type == "thread_invitation":
+        # Handle thread invitation notification
+        target_user = sanitize_input(message_obj.get("target_user", ""))
+        thread_id = sanitize_input(message_obj.get("thread_id", ""))
+        thread_title = sanitize_input(message_obj.get("thread_title", ""))
+        from_user_name = sanitize_input(message_obj.get("from_user_name", ""))
+        
+        if not target_user or not thread_id:
+            await send_error(websocket, "Missing required fields for thread invitation")
+            return True
+            
+        # Send real-time notification to target user if online
+        target_ws = clients.get(target_user)
+        if target_ws:
+            try:
+                await send_json(target_ws, {
+                    "type": "thread_invitation",
+                    "from_user_id": client_id,
+                    "from_user_name": from_user_name,
+                    "thread_id": thread_id,
+                    "thread_title": thread_title,
+                    "timestamp": int(time.time())
+                })
+                logger.info(f"Sent thread invitation notification from {client_id} to {target_user}")
+            except Exception as e:
+                logger.error(f"Failed to send thread invitation to {target_user}: {e}")
+        else:
+            logger.info(f"User {target_user} not online, invitation stored in database")
+        
+        # Confirm to sender
+        await send_json(websocket, {
+            "type": "invitation_sent",
+            "to": target_user,
+            "thread_id": thread_id,
+            "message": "Invitation sent successfully"
+        })
+        return True
     elif msg_type == "thread_message":
         # Handle thread sharing notification
         target_user = sanitize_input(message_obj.get("target_user", ""))
@@ -297,6 +334,38 @@ async def handler(websocket):
     finally:
         if client_id:
             unregister_client(client_id)
+
+# --- API Integration Functions ---
+
+async def send_thread_invitation_notification(target_user_id, from_user_id, from_user_name, thread_id, thread_title):
+    """Send thread invitation notification to user if they're online"""
+    target_ws = clients.get(target_user_id)
+    if target_ws:
+        try:
+            await send_json(target_ws, {
+                "type": "thread_invitation",
+                "from_user_id": from_user_id,
+                "from_user_name": from_user_name,
+                "thread_id": thread_id,
+                "thread_title": thread_title,
+                "timestamp": int(time.time())
+            })
+            logger.info(f"Sent thread invitation notification from {from_user_id} to {target_user_id}")
+            return True
+        except Exception as e:
+            logger.error(f"Failed to send thread invitation to {target_user_id}: {e}")
+            return False
+    else:
+        logger.info(f"User {target_user_id} not online, invitation notification not sent")
+        return False
+
+def get_online_clients():
+    """Get list of online client IDs"""
+    return list(clients.keys())
+
+def is_user_online(user_id):
+    """Check if a user is currently online"""
+    return user_id in clients
 
 # --- Entry Point ---
 

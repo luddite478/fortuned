@@ -1,10 +1,12 @@
 import uuid
 import json
+import asyncio
 from datetime import datetime, timezone
 from fastapi import Request, Query, HTTPException, Body
 from typing import Optional, Dict, Any, List
 import os
 from db.connection import get_database
+from ws.router import send_thread_invitation_notification
 
 # Initialize database connection
 db = get_database()
@@ -228,8 +230,23 @@ async def send_invitation_handler(request: Request, thread_id: str, invitation_d
             }
         )
         
-        # TODO: Send WebSocket notification to invited user
-        # This would be handled by the WebSocket router
+        # Send WebSocket notification to invited user
+        try:
+            # Get the name of the person who invited (for the notification)
+            inviter = db.users.find_one({"id": invited_by}, {"name": 1, "username": 1})
+            inviter_name = inviter.get("name", inviter.get("username", "Unknown")) if inviter else "Unknown"
+            
+            # Send real-time notification
+            await send_thread_invitation_notification(
+                target_user_id=user_id,
+                from_user_id=invited_by,
+                from_user_name=inviter_name,
+                thread_id=thread_id,
+                thread_title=thread.get("title", "Untitled Thread")
+            )
+        except Exception as e:
+            # Don't fail the request if WebSocket notification fails
+            print(f"⚠️  Failed to send WebSocket notification: {e}")
         
         return {"status": "invitation_sent"}
     except Exception as e:
