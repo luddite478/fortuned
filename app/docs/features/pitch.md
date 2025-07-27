@@ -1,6 +1,6 @@
 # 🎵 Pitch Shifting Implementation
 
-**Real-time pitch shifting using miniaudio's resampler, integrated with per-cell node architecture**
+**Real-time pitch shifting using miniaudio's resampler, integrated with A/B column node architecture**
 
 ## Overview
 
@@ -11,7 +11,7 @@ The pitch system provides real-time pitch shifting for all audio playback throug
 - ✅ **Sample bank pitch** - Global pitch per sample slot  
 - ✅ **Real-time processing** - No latency, applied during playback
 - ✅ **10-octave range** - C0 to C10 (pitch ratios 0.03125 to 32.0)
-- ✅ **Node-graph integration** - Seamless with per-cell node architecture
+- ✅ **Node-graph integration** - Seamless with A/B column node architecture
 - ✅ **UI/Native conversion** - Automatic conversion between UI sliders and pitch ratios
 - ✅ **Reset to defaults** - Ability to reset cell overrides to sample bank settings
 
@@ -25,7 +25,7 @@ Sample File → Decoder → Pitch Data Source → Data Source Node → Node Grap
                     Pitch Shifting
 ```
 
-### Per-Cell Node Architecture
+### A/B Column Node Architecture
 ```c
 typedef struct {
     ma_decoder decoder;            // Audio decoder
@@ -33,7 +33,7 @@ typedef struct {
     ma_data_source_node node;      // Node graph connection
     float pitch;                   // Current pitch value (as ratio)
     int pitch_ds_initialized;      // Initialization flag
-} cell_node_t;
+} column_node_t;  // A or B node in a column pair
 ```
 
 ## Pitch Data Source Implementation
@@ -159,40 +159,46 @@ pitchSetter: (sequencer, index, uiValue) => sequencer.setCellPitch(index, PitchC
 
 ## Integration with Playback Systems
 
-### 1. Per-Cell Nodes (Sequencer)
+### 1. A/B Column Nodes (Sequencer)
 ```c
-// Cell node creation with pitch:
-cell_node_t* create_cell_node(int step, int column, int sample_slot, float volume, float pitch) {
+// Column node setup with pitch:
+int setup_column_node(int column, int node_index, int sample_slot, float volume, float pitch) {
     // 1. Initialize decoder
-    ma_decoder_init_memory/file(&cell->decoder, ...);
+    ma_decoder_init_memory/file(&node->decoder, ...);
     
     // 2. Wrap decoder with pitch data source
-    ma_pitch_data_source_init(&cell->pitch_ds, &cell->decoder, pitch, channels, sample_rate);
+    ma_pitch_data_source_init(&node->pitch_ds, &node->decoder, pitch, channels, sample_rate);
     
     // 3. Create node from pitch data source
-    ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &cell->node);
+    ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, &node->node);
     
     // 4. Connect to node graph
-    ma_node_attach_output_bus(&cell->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+    ma_node_attach_output_bus(&node->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
 }
 ```
 
 ### 2. Real-time Pitch Updates
 ```c
-// Update pitch for existing nodes when settings change
-static void update_existing_nodes_for_cell(int step, int column, int sample_slot) {
-    cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
-    if (existing_node) {
-        float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
-        update_cell_pitch(existing_node, resolved_pitch);
+// Update pitch for existing column nodes when settings change
+static void update_existing_column_nodes_for_cell(int step, int column, int sample_slot) {
+    if (column < 0 || column >= g_columns) return;
+    column_nodes_t* col_nodes = &g_column_nodes[column];
+    
+    // Update active node if it's playing this sample
+    if (col_nodes->active_node >= 0) {
+        column_node_t* active_node = &col_nodes->nodes[col_nodes->active_node];
+        if (active_node->sample_slot == sample_slot) {
+            float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
+            update_column_node_pitch(active_node, resolved_pitch);
+        }
     }
 }
 
-// Real-time pitch change
-static void update_cell_pitch(cell_node_t* cell, float new_pitch) {
-    if (!cell || !cell->pitch_ds_initialized) return;
-    cell->pitch = new_pitch;
-    ma_pitch_data_source_set_pitch(&cell->pitch_ds, new_pitch);
+// Real-time pitch change for column node
+static void update_column_node_pitch(column_node_t* node, float new_pitch) {
+    if (!node || !node->pitch_ds_initialized) return;
+    node->pitch = new_pitch;
+    ma_pitch_data_source_set_pitch(&node->pitch_ds, new_pitch);
 }
 ```
 

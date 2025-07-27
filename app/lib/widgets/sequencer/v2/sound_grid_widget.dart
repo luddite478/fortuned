@@ -82,17 +82,17 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   static const double _gestureThreshold = 15.0;
 
   // CONFIGURABLE GRID DIMENSIONS - Easy to control cell sizing
-  static const double cellWidthPercent = 92.0; // Cell width as % of available column space (reduced to make room for row numbers)
+  static const double cellWidthPercent = 98.0; // Cell width as % of available column space (reduced to make room for row numbers)
   static const double cellHeightPercent = 60.0; // Cell height as % of available row space  
   static const double cellSpacingPercent = 0.0; // Spacing between cells as % of available space
-  static const double rowSpacingPercent = 5.0; // Spacing between rows as % of available space
+  static const double rowSpacingPercent = 0.0; // Spacing between rows as % of available space
   static const double rowNumberColumnWidthPercent = 6.0; // Row number column width as % of total width
   static const Color rowNumberColumnColor = Color.fromARGB(121, 40, 46, 39); // Color for row number column
   
   // CONFIGURABLE CONTENT SIZING - Control text and element sizes
   static const double sampleLetterFontSize = 14.0; // Font size for sample letters (A, B, C, etc.)
   static const double effectsFontSize = 8.0; // Font size for effects text (V45, K-4, etc.)
-  static const double cellPaddingPercent = 5.0; // Internal padding as % of cell size
+  static const double cellPaddingPercent = 0.0; // Internal padding as % of cell size
   
   // CONFIGURATION EXAMPLES - Uncomment and modify as needed:
   // 

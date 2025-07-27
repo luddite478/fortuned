@@ -123,22 +123,22 @@ Result: **Smooth exponential curve** from 0.0 to 1.0 over ~6ms
 
 ---
 
-## 🎵 **Sample Switching Flow**
+## 🎵 **A/B Node Switching Flow**
 
-When switching from Sample A to Sample B in the same column:
+When switching from Sample A to Sample B in the same column using A/B nodes:
 
-1. **Old Sample (A)**: `set_target_volume(nodeA, 0.0)`
+1. **Current Node (A)**: `set_target_volume(current_node, 0.0)`
    - Starts fading out with 12ms fall time
    - Uses fall coefficient (slower decay)
 
-2. **New Sample (B)**: `set_target_volume(nodeB, 1.0)` 
-   - Starts fading in with 6ms rise time
+2. **Alternate Node (B)**: `set_target_volume(alternate_node, 1.0)` 
+   - Loads new sample and starts fading in with 6ms rise time
    - Uses rise coefficient (faster attack)
 
-3. **Both samples** play simultaneously during transition
-   - Old sample gets quieter exponentially
-   - New sample gets louder exponentially
-   - **Total result**: Smooth crossfade with no clicks
+3. **Both A/B nodes** play simultaneously during transition
+   - Current node gets quieter exponentially
+   - Alternate node gets louder exponentially
+   - **Total result**: Smooth crossfade with no clicks, then roles switch
 
 ---
 
@@ -177,8 +177,8 @@ When switching from Sample A to Sample B in the same column:
 - **Functions**: `update_volume_smoothing()`, `set_target_volume()`, `calculate_smoothing_alpha()`
 
 ### Usage Points
-1. **Sample start**: Fade from 0.0 to target volume
-2. **Sample switch**: Crossfade between old and new
+1. **Sample start**: Fade from 0.0 to target volume on A or B node
+2. **A/B switch**: Crossfade between current and alternate column nodes
 3. **Sample stop**: Fade from current to 0.0
 
 ---
