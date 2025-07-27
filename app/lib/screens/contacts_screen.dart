@@ -135,8 +135,8 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
     // Load user profiles from API
     await _loadUserProfiles();
     
-    // Check for existing pending invitations
-    _checkPendingInvitations();
+    // Load threads to check for pending invitations
+    await _loadThreadsAndCheckInvitations();
   }
 
   Future<void> _loadUserProfiles() async {
@@ -152,6 +152,22 @@ class _ContactsScreenState extends State<ContactsScreen> with TickerProviderStat
         _error = 'Failed to load user profiles: $e';
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadThreadsAndCheckInvitations() async {
+    try {
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      
+      // Load threads from server to get latest invitation data
+      await threadsState.loadThreads();
+      
+      // Check for pending invitations
+      _checkPendingInvitations();
+    } catch (e) {
+      debugPrint('Failed to load threads: $e');
+      // Still check local state for invitations
+      _checkPendingInvitations();
     }
   }
 
