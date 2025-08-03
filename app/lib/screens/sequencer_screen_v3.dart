@@ -10,19 +10,7 @@ import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
 import '../services/threads_service.dart';
 import 'checkpoints_screen.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
-}
+import '../utils/app_colors.dart';
 
 class SequencerScreenV3 extends StatefulWidget {
   const SequencerScreenV3({super.key});
@@ -84,7 +72,7 @@ class _SequencerScreenV3State extends State<SequencerScreenV3> with WidgetsBindi
         if (currentUserId != null) {
           // Create an unpublished thread for this new project
           final threadId = await threadsState.createThread(
-            title: 'Untitled Project ${DateTime.now().toString().substring(5, 16)}', // e.g. "Untitled Project 12-25 14:30"
+            title: 'Untitled ${DateTime.now().toString().substring(5, 16)}', // e.g. "Untitled Project 12-25 14:30"
             authorId: currentUserId,
             authorName: currentUserName ?? 'User',
             metadata: {
@@ -143,7 +131,7 @@ class _SequencerScreenV3State extends State<SequencerScreenV3> with WidgetsBindi
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SequencerPhoneBookColors.pageBackground,
+      backgroundColor: AppColors.sequencerPageBackground,
       appBar: AppHeaderWidget(
         mode: HeaderMode.sequencer,
         onBack: () => Navigator.of(context).pop(),

@@ -1,20 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../state/sequencer_state.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
-}
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';
 
 class StepInsertSettingsWidget extends StatelessWidget {
   const StepInsertSettingsWidget({super.key});
@@ -25,21 +13,21 @@ class StepInsertSettingsWidget extends StatelessWidget {
       builder: (context, sequencer, child) {
         return Container(
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.surfaceBase,
+            color: AppColors.sequencerSurfaceBase,
             borderRadius: BorderRadius.circular(2), // Sharp corners
             border: Border.all(
-              color: SequencerPhoneBookColors.border,
+              color: AppColors.sequencerBorder,
               width: 0.5,
             ),
             boxShadow: [
               // Protruding effect
               BoxShadow(
-                color: SequencerPhoneBookColors.shadow,
+                color: AppColors.sequencerShadow,
                 blurRadius: 3,
                 offset: const Offset(0, 2),
               ),
               BoxShadow(
-                color: SequencerPhoneBookColors.surfaceRaised,
+                color: AppColors.sequencerSurfaceRaised,
                 blurRadius: 1,
                 offset: const Offset(0, -1),
               ),
@@ -63,7 +51,7 @@ class StepInsertSettingsWidget extends StatelessWidget {
                           child: Text(
                             'Step Insert: ${sequencer.stepInsertSize} steps',
                             style: GoogleFonts.sourceSans3(
-                              color: SequencerPhoneBookColors.text,
+                              color: AppColors.sequencerText,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -75,7 +63,7 @@ class StepInsertSettingsWidget extends StatelessWidget {
                             padding: const EdgeInsets.all(4),
                             child: Icon(
                               Icons.close,
-                              color: SequencerPhoneBookColors.lightText,
+                              color: AppColors.sequencerLightText,
                               size: 16,
                             ),
                           ),
@@ -92,17 +80,17 @@ class StepInsertSettingsWidget extends StatelessWidget {
                         Text(
                           '1',
                           style: GoogleFonts.sourceSans3(
-                            color: SequencerPhoneBookColors.lightText,
+                            color: AppColors.sequencerLightText,
                             fontSize: 12,
                           ),
                         ),
                         Expanded(
                           child: SliderTheme(
                             data: SliderThemeData(
-                              activeTrackColor: SequencerPhoneBookColors.accent,
-                              inactiveTrackColor: SequencerPhoneBookColors.border,
-                              thumbColor: SequencerPhoneBookColors.accent,
-                              overlayColor: SequencerPhoneBookColors.accent.withOpacity(0.3),
+                              activeTrackColor: AppColors.sequencerAccent,
+                              inactiveTrackColor: AppColors.sequencerBorder,
+                              thumbColor: AppColors.sequencerAccent,
+                              overlayColor: AppColors.sequencerAccent.withOpacity(0.3),
                               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
                               trackHeight: 4,
                             ),
@@ -120,7 +108,7 @@ class StepInsertSettingsWidget extends StatelessWidget {
                         Text(
                           '16',
                           style: GoogleFonts.sourceSans3(
-                            color: SequencerPhoneBookColors.lightText,
+                            color: AppColors.sequencerLightText,
                             fontSize: 12,
                           ),
                         ),

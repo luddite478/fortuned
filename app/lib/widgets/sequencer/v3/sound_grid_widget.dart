@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
 import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';
 import '../../stacked_cards_widget.dart';
 
 // Custom ScrollPhysics to retain position when content changes
@@ -41,21 +42,6 @@ class PositionRetainedScrollPhysics extends ScrollPhysics {
       return position;
     }
   }
-}
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color.fromARGB(255, 192, 192, 188); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color.fromARGB(255, 132, 132, 132); // Subtle borders
-  static const Color shadow = Color.fromARGB(255, 77, 77, 75); // Dark shadows for depth
-  static const Color cellEmpty = Color.fromARGB(255, 103, 103, 97); // Empty grid cells
-  static const Color cellFilled = Color(0xFF5C5A55); // Filled grid cells
 }
 
 class SampleGridWidget extends StatefulWidget {
@@ -183,7 +169,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   Color _getSampleColorForGrid(int sampleSlot, SequencerState sequencer) {
     // Convert original bank colors to darker gray-beige variants for grid cells
     final originalColor = sequencer.bankColors[sampleSlot];
-    return Color.lerp(originalColor, SequencerPhoneBookColors.cellFilled, 0.6) ?? SequencerPhoneBookColors.cellFilled;
+    return Color.lerp(originalColor, AppColors.sequencerCellFilled, 0.6) ?? AppColors.sequencerCellFilled;
   }
 
   @override
@@ -204,14 +190,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           margin: const EdgeInsets.only(top: 0, bottom: 0), // Move entire sound grid structure
           decoration: BoxDecoration(
             border: Border.all(
-              color: SequencerPhoneBookColors.border,
+              color: AppColors.sequencerBorder,
               width: 0,
             ),
             borderRadius: BorderRadius.circular(2), // Sharp corners
             boxShadow: [
               // Protruding effect
               BoxShadow(
-                color: SequencerPhoneBookColors.shadow,
+                color: AppColors.sequencerShadow,
                 blurRadius: 2,
                 offset: const Offset(0, 1),
               ),
@@ -225,8 +211,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             scaleFactorPerDepth: 0.02,
             borderRadius: 2.0, // Sharp corners
             cardColors: [
-              SequencerPhoneBookColors.surfaceBase,
-              SequencerPhoneBookColors.surfaceRaised,
+              AppColors.sequencerSurfaceBase,
+              AppColors.sequencerSurfaceRaised,
             ],
             activeCardIndex: sequencer.currentSoundGridIndex,
           cardBuilder: (index, width, height, depth) {
@@ -315,7 +301,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         // 🎯 PERFORMANCE: Light bulb-bluish-white highlight for current step
         Color cellColor;
         if (isActivePad) {
-          cellColor = SequencerPhoneBookColors.accent.withOpacity(0.6);
+          cellColor = AppColors.sequencerAccent.withOpacity(0.6);
                  } else if (isCurrentStep) {
            // Light bulb-bluish-white highlight for current step
            cellColor = hasPlacedSample 
@@ -324,7 +310,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
          } else if (hasPlacedSample) {
            cellColor = _getSampleColorForGrid(placedSample, sequencer);
         } else {
-          cellColor = SequencerPhoneBookColors.cellEmpty;
+          cellColor = AppColors.sequencerCellEmpty;
         }
         
         return DragTarget<int>(
@@ -342,22 +328,22 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                 duration: const Duration(milliseconds: 100),
                 decoration: BoxDecoration(
                   color: isDragHovering 
-                      ? SequencerPhoneBookColors.accent.withOpacity(0.8)
+                      ? AppColors.sequencerAccent.withOpacity(0.8)
                       : cellColor,
                   borderRadius: BorderRadius.circular(2),
                   border: isSelected 
-                      ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
+                      ? Border.all(color: AppColors.sequencerAccent, width: 1.5)
                       : isCurrentStep 
                           ? Border.all(color: const Color(0xFF87CEEB), width: 1.5) // Light blue border for current step
                           : isDragHovering
-                              ? Border.all(color: SequencerPhoneBookColors.accent, width: 1.5)
+                              ? Border.all(color: AppColors.sequencerAccent, width: 1.5)
                               : hasPlacedSample && !isActivePad
-                                  ? Border.all(color: SequencerPhoneBookColors.border, width: 0.5)
-                                  : Border.all(color: SequencerPhoneBookColors.border.withOpacity(0.3), width: 0.5),
+                                  ? Border.all(color: AppColors.sequencerBorder, width: 0.5)
+                                  : Border.all(color: AppColors.sequencerBorder.withOpacity(0.3), width: 0.5),
                   boxShadow: isSelected 
                       ? [
                           BoxShadow(
-                            color: SequencerPhoneBookColors.accent.withOpacity(0.4),
+                            color: AppColors.sequencerAccent.withOpacity(0.4),
                             blurRadius: 3,
                             spreadRadius: 0,
                             offset: const Offset(0, 1),
@@ -373,14 +359,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                                 offset: const Offset(0, 0),
                               ),
                               BoxShadow(
-                                color: SequencerPhoneBookColors.shadow,
+                                color: AppColors.sequencerShadow,
                                 blurRadius: 1,
                                 offset: const Offset(0, 0.5),
                               ),
                             ]
                           : [
                               BoxShadow(
-                                color: SequencerPhoneBookColors.shadow,
+                                color: AppColors.sequencerShadow,
                                 blurRadius: 1,
                                 offset: const Offset(0, 0.5),
                               ),
@@ -397,10 +383,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                              : '${row + 1}',
                         style: GoogleFonts.sourceSans3(
                           color: (isActivePad || isDragHovering) 
-                              ? SequencerPhoneBookColors.pageBackground 
+                              ? AppColors.sequencerPageBackground 
                               : isCurrentStep
                                   ? Colors.white // Bright white text for current step
-                                  : SequencerPhoneBookColors.text,
+                                  : AppColors.sequencerText,
                           fontWeight: isCurrentStep ? FontWeight.bold : FontWeight.w600,
                           fontSize: 12,
                           letterSpacing: 0.5,
@@ -411,7 +397,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                           width: 6,
                           height: 6,
                           decoration: BoxDecoration(
-                            color: SequencerPhoneBookColors.accent,
+                            color: AppColors.sequencerAccent,
                             borderRadius: BorderRadius.circular(1),
                           ),
                         ),
@@ -420,10 +406,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                           'C-4',
                           style: GoogleFonts.sourceSans3(
                             color: (isActivePad || isDragHovering)
-                                ? SequencerPhoneBookColors.pageBackground
+                                ? AppColors.sequencerPageBackground
                                 : isCurrentStep
                                     ? Colors.white.withOpacity(0.8) // Bright text for current step
-                                    : SequencerPhoneBookColors.lightText.withOpacity(0.6),
+                                    : AppColors.sequencerLightText.withOpacity(0.6),
                             fontSize: 10,
                             fontWeight: FontWeight.w500,
                             letterSpacing: 0.3,
@@ -450,44 +436,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
       child: Row(
-        children: [
-          // Row number indicator on the left
-          Container(
-            width: 32, // Fixed width for row numbers
-            margin: const EdgeInsets.only(right: 8, left: 4),
+        children: List.generate(sequencer.gridColumns, (colIndex) {
+          final cellIndex = rowIndex * sequencer.gridColumns + colIndex;
+          return Expanded(
             child: Container(
-              decoration: BoxDecoration(
-                color: SequencerPhoneBookColors.surfaceBase,
-                borderRadius: BorderRadius.circular(2),
-                border: Border.all(
-                  color: SequencerPhoneBookColors.border.withOpacity(0.3),
-                  width: 0.5,
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  '${rowIndex + 1}',
-                  style: GoogleFonts.sourceSans3(
-                    color: SequencerPhoneBookColors.lightText,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
+              margin: const EdgeInsets.symmetric(horizontal: 2),
+              child: _buildGridCell(context, sequencer, cellIndex),
             ),
-          ),
-          // Grid cells
-          ...List.generate(sequencer.gridColumns, (colIndex) {
-            final cellIndex = rowIndex * sequencer.gridColumns + colIndex;
-            return Expanded(
-              child: Container(
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                child: _buildGridCell(context, sequencer, cellIndex),
-              ),
-            );
-          }),
-        ],
+          );
+        }),
       ),
     );
   }
@@ -511,32 +468,32 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         decoration: BoxDecoration(
           color: isFrontCard 
-              ? SequencerPhoneBookColors.surfaceRaised // Active tab protruding
-              : SequencerPhoneBookColors.surfaceBase, // Inactive tabs recessed
+              ? AppColors.sequencerSurfaceRaised // Active tab protruding
+              : AppColors.sequencerSurfaceBase, // Inactive tabs recessed
           borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
             color: isFrontCard 
-                ? SequencerPhoneBookColors.accent // Brown accent for active
-                : SequencerPhoneBookColors.border, // Subtle border for inactive
+                ? AppColors.sequencerAccent // Brown accent for active
+                : AppColors.sequencerBorder, // Subtle border for inactive
             width: isFrontCard ? 1.0 : 0.5,
           ),
           boxShadow: isFrontCard 
               ? [
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
                   // Extra highlight for protruding effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.surfaceRaised,
+                    color: AppColors.sequencerSurfaceRaised,
                     blurRadius: 1,
                     offset: const Offset(0, -0.5),
                   ),
                 ]
               : [
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 1,
                     offset: const Offset(0, 0.5),
                   ),
@@ -547,8 +504,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             'L${gridIndex + 1}',
             style: GoogleFonts.sourceSans3(
               color: isFrontCard 
-                  ? SequencerPhoneBookColors.text // Light text for active tab
-                  : SequencerPhoneBookColors.lightText, // Muted text for inactive tab
+                  ? AppColors.sequencerText // Light text for active tab
+                  : AppColors.sequencerLightText, // Muted text for inactive tab
               fontSize: 12,
               fontWeight: isFrontCard ? FontWeight.bold : FontWeight.w600,
               letterSpacing: 1,
@@ -617,15 +574,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         width: width,
         height: height,
         decoration: BoxDecoration(
-          color: SequencerPhoneBookColors.surfaceBase, // Full opacity background
+          color: AppColors.sequencerSurfaceBase, // Full opacity background
           borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
-            color: SequencerPhoneBookColors.border,
+            color: AppColors.sequencerBorder,
             width: 0.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: SequencerPhoneBookColors.shadow,
+              color: AppColors.sequencerShadow,
               blurRadius: 2,
               offset: const Offset(0, 1),
             ),
@@ -634,10 +591,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         child: Container(
           margin: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.surfacePressed,
+            color: AppColors.sequencerSurfacePressed,
             borderRadius: BorderRadius.circular(2), // Sharp corners
             border: Border.all(
-              color: SequencerPhoneBookColors.border,
+              color: AppColors.sequencerBorder,
               width: 0.5,
             ),
           ),
@@ -647,14 +604,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               children: [
                 Icon(
                   Icons.music_note,
-                  color: SequencerPhoneBookColors.lightText,
+                  color: AppColors.sequencerLightText,
                   size: 40,
                 ),
                 const SizedBox(height: 8),
                 Text(
                   sequencer.getGridLabel(actualSoundGridId),
                   style: GoogleFonts.sourceSans3(
-                    color: SequencerPhoneBookColors.lightText,
+                    color: AppColors.sequencerLightText,
                     fontSize: 14,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 0.5,
@@ -673,30 +630,30 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised, // Gray-beige surface
+        color: AppColors.sequencerSurfaceRaised, // Gray-beige surface
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
           color: sequencer.isInSelectionMode 
-              ? SequencerPhoneBookColors.accent 
-              : SequencerPhoneBookColors.border, // Brown accent or subtle border
+              ? AppColors.sequencerAccent 
+              : AppColors.sequencerBorder, // Brown accent or subtle border
           width: sequencer.isInSelectionMode ? 2 : 1, // Thicker border when in selection mode
         ),
         boxShadow: [
           // Strong protruding effect for front card
           BoxShadow(
-            color: SequencerPhoneBookColors.shadow,
+            color: AppColors.sequencerShadow,
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
           BoxShadow(
-            color: SequencerPhoneBookColors.surfaceRaised,
+            color: AppColors.sequencerSurfaceRaised,
             blurRadius: 2,
             offset: const Offset(0, -1),
           ),
           // Additional highlight for selection mode
           if (sequencer.isInSelectionMode)
             BoxShadow(
-              color: SequencerPhoneBookColors.accent.withOpacity(0.3),
+              color: AppColors.sequencerAccent.withOpacity(0.3),
               blurRadius: 6,
               offset: const Offset(0, 0),
             ),
@@ -909,15 +866,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           borderRadius: borderRadius,
           border: Border.all(
             color: isPressed 
-                ? SequencerPhoneBookColors.accent 
-                : SequencerPhoneBookColors.border,
+                ? AppColors.sequencerAccent 
+                : AppColors.sequencerBorder,
             width: isPressed ? 1.5 : 1,
           ),
           boxShadow: isPressed 
               ? [
                   // Pressed (inset) shadow effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 2,
                     offset: const Offset(0, -1),
                   ),
@@ -925,7 +882,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               : [
                   // Normal (protruding) shadow effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 1,
                     offset: const Offset(0, 1),
                   ),
@@ -935,8 +892,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           child: Icon(
             icon,
             color: isEnabled 
-                ? (isPressed ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.text)
-                : SequencerPhoneBookColors.lightText.withOpacity(0.5),
+                ? (isPressed ? AppColors.sequencerAccent : AppColors.sequencerText)
+                : AppColors.sequencerLightText.withOpacity(0.5),
             size: 18, // Slightly smaller icon for reduced button height
           ),
         ),
@@ -946,14 +903,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
 
   Color _getButtonColor(bool isEnabled, bool isPressed) {
     if (!isEnabled) {
-      return SequencerPhoneBookColors.cellEmpty.withOpacity(0.3);
+      return AppColors.sequencerCellEmpty.withOpacity(0.3);
     }
     
     if (isPressed) {
-      return SequencerPhoneBookColors.surfacePressed; // Darker when pressed
+      return AppColors.sequencerSurfacePressed; // Darker when pressed
     }
     
-    return SequencerPhoneBookColors.cellEmpty; // Normal state
+    return AppColors.sequencerCellEmpty; // Normal state
   }
   
 

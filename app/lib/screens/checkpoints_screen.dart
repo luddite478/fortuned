@@ -7,20 +7,7 @@ import '../state/sequencer_state.dart';
 import '../services/threads_service.dart';
 import '../services/users_service.dart';
 import 'user_profile_screen.dart';
-
-// Telephone book color scheme - same as users screen
-class PhoneBookColors {
-  static const Color pageBackground = Color.fromARGB(255, 250, 248, 236); // Aged paper yellow
-  static const Color entryBackground = Color.fromARGB(255, 251, 247, 231); // Slightly lighter
-  static const Color text = Color(0xFF2C2C2C); // Dark gray/black text
-  static const Color lightText = Color.fromARGB(255, 161, 161, 161); // Lighter text
-  static const Color border = Color(0xFFE8E0C7); // Aged border
-  static const Color onlineIndicator = Color(0xFF8B4513); // Brown instead of purple
-  static const Color buttonBackground = Color.fromARGB(255, 246, 244, 226); // Khaki for main button
-  static const Color buttonBorder = Color.fromARGB(255, 248, 246, 230); // Golden border
-  static const Color checkpointBackground = Color.fromARGB(255, 248, 245, 228); // Checkpoint cards
-  static const Color currentUserCheckpoint = Color.fromARGB(255, 240, 235, 210); // Current user checkpoints
-}
+import '../utils/app_colors.dart';
 
 class CheckpointsScreen extends StatefulWidget {
   final String threadId;
@@ -60,7 +47,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
       );
       
       // Define colors for the animation
-      final Color originalColor = PhoneBookColors.checkpointBackground;
+      final Color originalColor = AppColors.menuCheckpointBackground;
       final Color highlightColor = Colors.lightBlue.withOpacity(0.3);
       
       _colorAnimation = ColorTween(
@@ -186,7 +173,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: _buildCustomHeader(context),
-      backgroundColor: PhoneBookColors.pageBackground,
+      backgroundColor: AppColors.menuPageBackground,
       body: Consumer2<ThreadsState, SequencerState>(
         builder: (context, threadsState, sequencerState, child) {
           final thread = threadsState.currentThread;
@@ -196,7 +183,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
               child: Text(
                 'Project not found',
                 style: GoogleFonts.sourceSans3(
-                  color: PhoneBookColors.lightText,
+                  color: AppColors.menuLightText,
                   fontSize: 16,
                   fontWeight: FontWeight.w500,
                 ),
@@ -212,13 +199,13 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                   Icon(
                     Icons.history,
                     size: 64,
-                    color: PhoneBookColors.lightText,
+                    color: AppColors.menuLightText,
                   ),
                   const SizedBox(height: 16),
                   Text(
                     'No checkpoints yet',
                     style: GoogleFonts.sourceSans3(
-                      color: PhoneBookColors.text,
+                      color: AppColors.menuText,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -227,7 +214,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                   Text(
                     'Save your progress to create checkpoints',
                     style: GoogleFonts.sourceSans3(
-                      color: PhoneBookColors.lightText,
+                      color: AppColors.menuLightText,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                     ),
@@ -291,11 +278,11 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
         width: double.infinity,
         decoration: BoxDecoration(
           color: highlightColor ?? (isCurrentUser 
-              ? PhoneBookColors.currentUserCheckpoint 
-              : PhoneBookColors.checkpointBackground),
+              ? AppColors.menuCurrentUserCheckpoint 
+              : AppColors.menuCheckpointBackground),
           borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
-            color: PhoneBookColors.border,
+            color: AppColors.menuBorder,
             width: 0.5,
           ),
         ),
@@ -309,7 +296,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                 Text(
                   checkpoint.userName,
                   style: GoogleFonts.sourceSans3(
-                    color: PhoneBookColors.text,
+                    color: AppColors.menuText,
                     fontSize: 14, // Regular size
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.3,
@@ -319,7 +306,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                 Text(
                   _formatTimestamp(checkpoint.timestamp),
                   style: GoogleFonts.sourceSans3(
-                    color: PhoneBookColors.lightText,
+                    color: AppColors.menuLightText,
                     fontSize: 11,
                     fontWeight: FontWeight.w400,
                   ),
@@ -344,10 +331,10 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                   Container(
                     padding: const EdgeInsets.all(8), // Regular padding
                     decoration: BoxDecoration(
-                      color: PhoneBookColors.buttonBackground,
+                      color: AppColors.menuButtonBackground,
                       borderRadius: BorderRadius.circular(2), // Sharp corners
                       border: Border.all(
-                        color: PhoneBookColors.border,
+                        color: AppColors.menuBorder,
                         width: 0.5,
                       ),
                     ),
@@ -360,7 +347,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                             width: 28, // Regular size
                             height: 28,
                             decoration: BoxDecoration(
-                              color: PhoneBookColors.onlineIndicator,
+                              color: AppColors.menuOnlineIndicator,
                               borderRadius: BorderRadius.circular(2), // Sharp corners
                             ),
                             child: const Icon(
@@ -376,13 +363,13 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                         Icon(
                           Icons.schedule,
                           size: 14,
-                          color: PhoneBookColors.lightText,
+                          color: AppColors.menuLightText,
                         ),
                         const SizedBox(width: 4),
                         Text(
                           _formatDuration(checkpoint.snapshot.audio.duration),
                           style: GoogleFonts.sourceSans3(
-                            color: PhoneBookColors.lightText,
+                            color: AppColors.menuLightText,
                             fontSize: 12,
                             fontWeight: FontWeight.w400,
                           ),
@@ -395,13 +382,13 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                           Icon(
                             Icons.audiotrack,
                             size: 14,
-                            color: PhoneBookColors.lightText,
+                            color: AppColors.menuLightText,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '${checkpoint.snapshot.audio.renders.length}',
                             style: GoogleFonts.sourceSans3(
-                              color: PhoneBookColors.lightText,
+                              color: AppColors.menuLightText,
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                             ),
@@ -426,10 +413,10 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
       return Container(
         height: 80, // Regular messenger size
         decoration: BoxDecoration(
-          color: PhoneBookColors.border.withOpacity(0.3),
+          color: AppColors.menuBorder.withOpacity(0.3),
           borderRadius: BorderRadius.circular(2), // Sharp corners
           border: Border.all(
-            color: PhoneBookColors.border,
+            color: AppColors.menuBorder,
             width: 0.5,
           ),
         ),
@@ -437,7 +424,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
           child: Text(
             'Empty Project',
             style: GoogleFonts.sourceSans3(
-              color: PhoneBookColors.lightText,
+              color: AppColors.menuLightText,
               fontSize: 12, // Regular text size
               fontWeight: FontWeight.w400,
             ),
@@ -452,10 +439,10 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
     return Container(
       height: 80, // Regular messenger size
       decoration: BoxDecoration(
-        color: PhoneBookColors.border.withOpacity(0.3),
+        color: AppColors.menuBorder.withOpacity(0.3),
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: PhoneBookColors.border,
+          color: AppColors.menuBorder,
           width: 0.5,
         ),
       ),
@@ -466,7 +453,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
             Text(
               'Sound Grid Preview',
               style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.lightText,
+                color: AppColors.menuLightText,
                 fontSize: 10, // Small header text
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,
@@ -558,18 +545,18 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: PhoneBookColors.entryBackground,
+        backgroundColor: AppColors.menuEntryBackground,
         title: Text(
           'Apply Checkpoint',
           style: GoogleFonts.sourceSans3(
-            color: PhoneBookColors.text,
+            color: AppColors.menuText,
             fontWeight: FontWeight.w600,
           ),
         ),
         content: Text(
           'This will replace your current project with this checkpoint.\n\nYour current work will be lost unless saved.',
           style: GoogleFonts.sourceSans3(
-            color: PhoneBookColors.lightText,
+            color: AppColors.menuLightText,
             fontWeight: FontWeight.w400,
           ),
         ),
@@ -579,7 +566,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
             child: Text(
               'Cancel',
               style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.lightText,
+                color: AppColors.menuLightText,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -595,14 +582,14 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
                     'Applied checkpoint successfully',
                     style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500),
                   ),
-                  backgroundColor: PhoneBookColors.onlineIndicator,
+                  backgroundColor: AppColors.menuOnlineIndicator,
                 ),
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: PhoneBookColors.buttonBackground,
-              foregroundColor: PhoneBookColors.text,
-              side: BorderSide(color: PhoneBookColors.buttonBorder),
+              backgroundColor: AppColors.menuButtonBackground,
+              foregroundColor: AppColors.menuText,
+              side: BorderSide(color: AppColors.menuButtonBorder),
             ),
             child: Text(
               'Apply',
@@ -618,17 +605,17 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
 
   PreferredSizeWidget _buildCustomHeader(BuildContext context) {
     return AppBar(
-      backgroundColor: PhoneBookColors.entryBackground,
-      foregroundColor: PhoneBookColors.text,
+      backgroundColor: AppColors.menuEntryBackground,
+      foregroundColor: AppColors.menuText,
       elevation: 0,
       leading: IconButton(
-        icon: Icon(Icons.arrow_back, color: PhoneBookColors.text),
+        icon: Icon(Icons.arrow_back, color: AppColors.menuText),
         onPressed: () => Navigator.of(context).pop(),
       ),
       actions: [
         // Invite Collaborators button (User + plus icon)
         IconButton(
-          icon: Icon(Icons.person_add, color: PhoneBookColors.text),
+          icon: Icon(Icons.person_add, color: AppColors.menuText),
           onPressed: () => _showInviteCollaboratorsModal(context),
         ),
         // Publish button
@@ -637,14 +624,14 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
           child: ElevatedButton(
             onPressed: () => _showPublishModal(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: PhoneBookColors.buttonBackground,
-              foregroundColor: PhoneBookColors.text,
+              backgroundColor: AppColors.menuButtonBackground,
+              foregroundColor: AppColors.menuText,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(6),
               ),
               side: BorderSide(
-                color: PhoneBookColors.buttonBorder,
+                color: AppColors.menuButtonBorder,
                 width: 1,
               ),
               elevation: 1,
@@ -652,7 +639,7 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
             child: Text(
               'Publish',
               style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.text,
+                color: AppColors.menuText,
                 fontWeight: FontWeight.w600,
                 fontSize: 14,
               ),
@@ -719,7 +706,7 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: PhoneBookColors.pageBackground,
+      backgroundColor: AppColors.menuPageBackground,
       body: Column(
         children: [
           // User header with threads button
@@ -742,16 +729,16 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 50, 16, 12),
       decoration: BoxDecoration(
-        color: PhoneBookColors.entryBackground,
+        color: AppColors.menuEntryBackground,
         border: Border(
-          bottom: BorderSide(color: PhoneBookColors.border, width: 1),
+          bottom: BorderSide(color: AppColors.menuBorder, width: 1),
         ),
       ),
       child: Row(
         children: [
           // Back button
           IconButton(
-            icon: Icon(Icons.arrow_back, color: PhoneBookColors.text),
+            icon: Icon(Icons.arrow_back, color: AppColors.menuText),
             onPressed: () => Navigator.pop(context),
           ),
           
@@ -762,7 +749,7 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
                 Text(
                   widget.targetUserName,
                   style: GoogleFonts.sourceSans3(
-                    color: PhoneBookColors.text,
+                    color: AppColors.menuText,
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     letterSpacing: 0.5,
@@ -774,7 +761,7 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
                   width: 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: PhoneBookColors.onlineIndicator,
+                    color: AppColors.menuOnlineIndicator,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -796,14 +783,14 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
               );
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: PhoneBookColors.buttonBackground,
-              foregroundColor: PhoneBookColors.text,
+              backgroundColor: AppColors.menuButtonBackground,
+              foregroundColor: AppColors.menuText,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               minimumSize: const Size(0, 36),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
-              side: BorderSide(color: PhoneBookColors.buttonBorder),
+              side: BorderSide(color: AppColors.menuButtonBorder),
             ),
             child: Text(
               'Profile',
@@ -830,9 +817,9 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: PhoneBookColors.checkpointBackground,
+        color: AppColors.menuCheckpointBackground,
         border: Border(
-          bottom: BorderSide(color: PhoneBookColors.border, width: 1),
+          bottom: BorderSide(color: AppColors.menuBorder, width: 1),
         ),
       ),
       child: Column(
@@ -841,7 +828,7 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
           Text(
             '📌 Other Common Threads',
             style: GoogleFonts.sourceSans3(
-              color: PhoneBookColors.text,
+              color: AppColors.menuText,
               fontSize: 14,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,
@@ -859,19 +846,19 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: PhoneBookColors.entryBackground,
+        color: AppColors.menuEntryBackground,
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: PhoneBookColors.border),
+        border: Border.all(color: AppColors.menuBorder),
       ),
       child: Row(
         children: [
-          Icon(Icons.push_pin, color: PhoneBookColors.lightText, size: 16),
+          Icon(Icons.push_pin, color: AppColors.menuLightText, size: 16),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               thread.title,
               style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.text,
+                color: AppColors.menuText,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -898,7 +885,7 @@ class _CheckpointsScreenWithUserContextState extends State<CheckpointsScreenWith
             child: Text(
               'Switch',
               style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.onlineIndicator,
+                color: AppColors.menuOnlineIndicator,
                 fontWeight: FontWeight.w600,
                 fontSize: 12,
               ),
@@ -925,7 +912,7 @@ class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: PhoneBookColors.entryBackground,
+        color: AppColors.menuEntryBackground,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(16),
           topRight: Radius.circular(16),
@@ -944,7 +931,7 @@ class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
                   width: 32,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: PhoneBookColors.border,
+                    color: AppColors.menuBorder,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -955,7 +942,7 @@ class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
               Text(
                 'Publish this thread to show others what you\'re working on or to share the composing history. It will be visible on your profile to selected groups.',
                 style: GoogleFonts.sourceSans3(
-                  color: PhoneBookColors.lightText,
+                  color: AppColors.menuLightText,
                   fontSize: 12,
                   fontWeight: FontWeight.w400,
                 ),
@@ -1013,10 +1000,10 @@ class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: enabled ? PhoneBookColors.buttonBackground : PhoneBookColors.border.withOpacity(0.3),
+          color: enabled ? AppColors.menuButtonBackground : AppColors.menuBorder.withOpacity(0.3),
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: enabled ? PhoneBookColors.buttonBorder : PhoneBookColors.border,
+            color: enabled ? AppColors.menuButtonBorder : AppColors.menuBorder,
             width: 1,
           ),
         ),
@@ -1026,7 +1013,7 @@ class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
             Text(
               title,
               style: GoogleFonts.sourceSans3(
-                color: enabled ? PhoneBookColors.text : PhoneBookColors.lightText,
+                color: enabled ? AppColors.menuText : AppColors.menuLightText,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -1035,7 +1022,7 @@ class _PublishModalBottomSheetState extends State<_PublishModalBottomSheet> {
             Text(
               description,
               style: GoogleFonts.sourceSans3(
-                color: PhoneBookColors.lightText,
+                color: AppColors.menuLightText,
                 fontSize: 12,
                 fontWeight: FontWeight.w400,
               ),
@@ -1165,7 +1152,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: PhoneBookColors.entryBackground,
+        color: AppColors.menuEntryBackground,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(16),
           topRight: Radius.circular(16),
@@ -1184,7 +1171,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                     width: 32,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: PhoneBookColors.border,
+                      color: AppColors.menuBorder,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -1193,7 +1180,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                   Text(
                     'Invite Collaborators',
                     style: GoogleFonts.sourceSans3(
-                      color: PhoneBookColors.text,
+                      color: AppColors.menuText,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1202,7 +1189,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                   Text(
                     'Select users to invite to this thread',
                     style: GoogleFonts.sourceSans3(
-                      color: PhoneBookColors.lightText,
+                      color: AppColors.menuLightText,
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                     ),
@@ -1223,7 +1210,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                           Text(
                             'Loading users...',
                             style: GoogleFonts.sourceSans3(
-                              color: PhoneBookColors.lightText,
+                              color: AppColors.menuLightText,
                               fontSize: 14,
                             ),
                           ),
@@ -1237,14 +1224,14 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                             children: [
                               Icon(
                                 Icons.error_outline,
-                                color: PhoneBookColors.lightText,
+                                color: AppColors.menuLightText,
                                 size: 48,
                               ),
                               const SizedBox(height: 16),
                               Text(
                                 _error!,
                                 style: GoogleFonts.sourceSans3(
-                                  color: PhoneBookColors.lightText,
+                                  color: AppColors.menuLightText,
                                   fontSize: 14,
                                 ),
                                 textAlign: TextAlign.center,
@@ -1253,13 +1240,13 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                               ElevatedButton(
                                 onPressed: _loadUserProfiles,
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: PhoneBookColors.buttonBackground,
-                                  side: BorderSide(color: PhoneBookColors.buttonBorder),
+                                  backgroundColor: AppColors.menuButtonBackground,
+                                  side: BorderSide(color: AppColors.menuButtonBorder),
                                 ),
                                 child: Text(
                                   'Retry',
                                   style: GoogleFonts.sourceSans3(
-                                    color: PhoneBookColors.text,
+                                    color: AppColors.menuText,
                                     fontWeight: FontWeight.w500,
                                   ),
                                 ),
@@ -1290,10 +1277,10 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: isSelected ? PhoneBookColors.currentUserCheckpoint : PhoneBookColors.checkpointBackground,
+                              color: isSelected ? AppColors.menuCurrentUserCheckpoint : AppColors.menuCheckpointBackground,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: isSelected ? PhoneBookColors.onlineIndicator : PhoneBookColors.border,
+                                color: isSelected ? AppColors.menuOnlineIndicator : AppColors.menuBorder,
                                 width: isSelected ? 2 : 1,
                               ),
                             ),
@@ -1304,7 +1291,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                                   width: 12,
                                   height: 12,
                                   decoration: BoxDecoration(
-                                    color: isOnline ? PhoneBookColors.onlineIndicator : PhoneBookColors.lightText,
+                                    color: isOnline ? AppColors.menuOnlineIndicator : AppColors.menuLightText,
                                     shape: BoxShape.circle,
                                   ),
                                 ),
@@ -1315,7 +1302,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                                   child: Text(
                                     user.username,
                                     style: GoogleFonts.sourceSans3(
-                                      color: PhoneBookColors.text,
+                                      color: AppColors.menuText,
                                       fontSize: 16,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -1325,7 +1312,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                             // Checkbox
                             Icon(
                               isSelected ? Icons.check_circle : Icons.circle_outlined,
-                              color: isSelected ? PhoneBookColors.onlineIndicator : PhoneBookColors.lightText,
+                              color: isSelected ? AppColors.menuOnlineIndicator : AppColors.menuLightText,
                               size: 20,
                             ),
                           ],
@@ -1345,7 +1332,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                   Text(
                     '${_selectedContacts.length} selected',
                     style: GoogleFonts.sourceSans3(
-                      color: PhoneBookColors.lightText,
+                      color: AppColors.menuLightText,
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                     ),
@@ -1356,7 +1343,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                     child: Text(
                       'Cancel',
                       style: GoogleFonts.sourceSans3(
-                        color: PhoneBookColors.lightText,
+                        color: AppColors.menuLightText,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -1365,12 +1352,12 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                   ElevatedButton(
                     onPressed: _selectedContacts.isNotEmpty ? () => _inviteSelectedContacts() : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: PhoneBookColors.buttonBackground,
-                      foregroundColor: PhoneBookColors.text,
+                      backgroundColor: AppColors.menuButtonBackground,
+                      foregroundColor: AppColors.menuText,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      side: BorderSide(color: PhoneBookColors.buttonBorder),
+                      side: BorderSide(color: AppColors.menuButtonBorder),
                     ),
                     child: Text(
                       'Invite',

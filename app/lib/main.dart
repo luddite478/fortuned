@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
-import 'screens/users_screen.dart';
+import 'screens/main_navigation_screen.dart';
 import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/threads_service.dart';
@@ -179,8 +179,8 @@ class _MainPageState extends State<MainPage> {
           return const LoginScreen();
         }
 
-        print('🐛 [DEBUG] User authenticated, showing UsersScreen');
-        return const UsersScreen();
+        print('🐛 [DEBUG] User authenticated, showing MainNavigationScreen');
+        return const MainNavigationScreen();
       },
     );
   }

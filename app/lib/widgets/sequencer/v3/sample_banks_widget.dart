@@ -1,20 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../state/sequencer_state.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
-}
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';
 
 class SampleBanksWidget extends StatelessWidget {
   const SampleBanksWidget({super.key});
@@ -40,16 +28,16 @@ class SampleBanksWidget extends StatelessWidget {
             return Container(
               padding: EdgeInsets.symmetric(horizontal: padding),
               decoration: BoxDecoration(
-                color: SequencerPhoneBookColors.surfaceBase,
+                color: AppColors.sequencerSurfaceBase,
                 borderRadius: BorderRadius.circular(2), // Sharp corners
                 border: Border.all(
-                  color: SequencerPhoneBookColors.border,
+                  color: AppColors.sequencerBorder,
                   width: 0.5,
                 ),
                 boxShadow: [
                   // Protruding effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
@@ -106,7 +94,7 @@ class SampleBanksWidget extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: _getButtonColorForBank(bank, sequencer).withOpacity(0.9),
                                 borderRadius: BorderRadius.circular(borderRadius),
-                                border: Border.all(color: SequencerPhoneBookColors.accent, width: 2),
+                                border: Border.all(color: AppColors.sequencerAccent, width: 2),
                               ),
                               child: Center(
                                 child: Column(
@@ -116,7 +104,7 @@ class SampleBanksWidget extends StatelessWidget {
                                     Text(
                                       String.fromCharCode(65 + bank),
                                       style: GoogleFonts.sourceSans3(
-                                        color: SequencerPhoneBookColors.text,
+                                        color: AppColors.sequencerText,
                                         fontWeight: FontWeight.w600,
                                         fontSize: letterSize,
                                         letterSpacing: 0.5,
@@ -131,10 +119,10 @@ class SampleBanksWidget extends StatelessWidget {
                               width: buttonWidth,
                               margin: EdgeInsets.symmetric(horizontal: padding * 0.3),
                               decoration: BoxDecoration(
-                                color: SequencerPhoneBookColors.surfacePressed,
+                                color: AppColors.sequencerSurfacePressed,
                                 borderRadius: BorderRadius.circular(borderRadius),
                                 border: Border.all(
-                                  color: SequencerPhoneBookColors.border,
+                                  color: AppColors.sequencerBorder,
                                   width: 1,
                                 ),
                               ),
@@ -146,7 +134,7 @@ class SampleBanksWidget extends StatelessWidget {
                                     Text(
                                       String.fromCharCode(65 + bank),
                                       style: GoogleFonts.sourceSans3(
-                                        color: SequencerPhoneBookColors.lightText,
+                                        color: AppColors.sequencerLightText,
                                         fontWeight: FontWeight.w600,
                                         fontSize: letterSize,
                                         letterSpacing: 0.5,
@@ -181,7 +169,7 @@ class SampleBanksWidget extends StatelessWidget {
     if (hasFile) {
       return _getButtonColorForBank(bank, sequencer); // Sample loaded - use bank color
     } else {
-      return SequencerPhoneBookColors.surfacePressed; // Empty slot
+      return AppColors.sequencerSurfacePressed; // Empty slot
     }
   }
 
@@ -189,16 +177,16 @@ class SampleBanksWidget extends StatelessWidget {
     // Convert original bank colors to darker gray-beige variants
     final originalColor = sequencer.bankColors[bank];
     // Create a muted variant that fits the telephone book theme
-    return Color.lerp(originalColor, SequencerPhoneBookColors.surfaceRaised, 0.7) ?? SequencerPhoneBookColors.surfaceRaised;
+    return Color.lerp(originalColor, AppColors.sequencerSurfaceRaised, 0.7) ?? AppColors.sequencerSurfaceRaised;
   }
 
   Color _getBorderColor(bool isSelected, bool isActive, bool isPlaying) {
     if (isSelected) {
-      return SequencerPhoneBookColors.accent; // Selected - brown accent
+      return AppColors.sequencerAccent; // Selected - brown accent
     } else if (isPlaying) {
-      return SequencerPhoneBookColors.accent.withOpacity(0.8); // Playing - muted accent
+      return AppColors.sequencerAccent.withOpacity(0.8); // Playing - muted accent
     } else {
-      return SequencerPhoneBookColors.border; // Default - subtle border
+      return AppColors.sequencerBorder; // Default - subtle border
     }
   }
 
@@ -214,7 +202,7 @@ class SampleBanksWidget extends StatelessWidget {
     if (isSelected) {
       return [
         BoxShadow(
-          color: SequencerPhoneBookColors.accent.withOpacity(0.4),
+          color: AppColors.sequencerAccent.withOpacity(0.4),
           blurRadius: 3,
           spreadRadius: 0,
           offset: const Offset(0, 1),
@@ -224,12 +212,12 @@ class SampleBanksWidget extends StatelessWidget {
       // All buttons get protruding effect
       return [
         BoxShadow(
-          color: SequencerPhoneBookColors.shadow,
+          color: AppColors.sequencerShadow,
           blurRadius: 2,
           offset: const Offset(0, 1),
         ),
         BoxShadow(
-          color: SequencerPhoneBookColors.surfaceRaised,
+          color: AppColors.sequencerSurfaceRaised,
           blurRadius: 1,
           offset: const Offset(0, -0.5),
         ),
@@ -238,6 +226,6 @@ class SampleBanksWidget extends StatelessWidget {
   }
 
   Color _getTextColor(bool isSelected, bool isActive, bool hasFile) {
-    return SequencerPhoneBookColors.text; // Light text for contrast
+    return AppColors.sequencerText; // Light text for contrast
   }
 } 
