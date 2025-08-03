@@ -656,8 +656,16 @@ class SequencerState extends ChangeNotifier {
   
   // Preview timer to automatically stop preview after user stops adjusting
   Timer? _previewTimer;
+  
+  // Debounced native calls for performance (prevent rapid native calls)
+  Timer? _nativePitchDebounceTimer;
+  Timer? _nativeVolumeDebounceTimer;
+  Map<String, double> _pendingNativePitchCalls = {}; // key: "cell_$index" or "sample_$index"
+  Map<String, double> _pendingNativeVolumeCalls = {}; // key: "cell_$index" or "sample_$index"
+  
   static const Duration _undoDebounceDelay = Duration(milliseconds: 800); // 800ms delay
   static const Duration _previewAutoStopDelay = Duration(milliseconds: 1500); // 1.5s preview auto-stop
+  static const Duration _nativeCallDebounceDelay = Duration(milliseconds: 50); // 50ms delay for native calls
 
   // 🎯 PERFORMANCE: ValueNotifier getters for high-frequency updates
   ValueNotifier<double> getSampleVolumeNotifier(int sampleIndex) {
@@ -3109,14 +3117,16 @@ Made with Demo Sequencer 🚀
         
         _sampleVolumes[sampleIndex] = clampedVolume;
         
-        // Apply volume to native audio engine immediately (no UI delay)
-        _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
-        
-        // Preview the sample with new volume for immediate feedback
-        _previewSampleWithNewVolume(sampleIndex, clampedVolume);
-        
         // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
         _sampleVolumeNotifiers[sampleIndex]?.value = clampedVolume;
+        
+        // Apply volume to native audio engine with debouncing for performance
+        _debouncedNativeVolumeCall('sample_$sampleIndex', clampedVolume, () {
+          _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
+          
+          // Preview the sample with new volume for immediate feedback
+          _previewSampleWithNewVolume(sampleIndex, clampedVolume);
+        });
         
         // Record debounced undo action (will only record after user stops adjusting)
         _recordDebouncedUndoAction(
@@ -3163,20 +3173,22 @@ Made with Demo Sequencer 🚀
       // Store cell volume override
       _cellVolumes[cellIndex] = clampedVolume;
       
+      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+      _cellVolumeNotifiers[cellIndex]?.value = clampedVolume;
+      
       // Convert cellIndex to step and column for native call
       final row = cellIndex ~/ _gridColumns;
       final col = cellIndex % _gridColumns;
       final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
       
-      // Store volume in native grid - will be applied when cell is triggered
-      _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
-      
-      // Preview the cell with new volume for immediate feedback
-      final cellPitch = getCellPitch(cellIndex);
-      _previewCellWithAutoStop(row, absoluteColumn, cellPitch, clampedVolume);
-      
-      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
-      _cellVolumeNotifiers[cellIndex]?.value = clampedVolume;
+      // Store volume in native grid with debouncing for performance
+      _debouncedNativeVolumeCall('cell_$cellIndex', clampedVolume, () {
+        _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
+        
+        // Preview the cell with new volume for immediate feedback
+        final cellPitch = getCellPitch(cellIndex);
+        _previewCellWithAutoStop(row, absoluteColumn, cellPitch, clampedVolume);
+      });
       
       // Record debounced undo action (will only record after user stops adjusting)
       final cellPosition = _getCellPositionString(cellIndex);
@@ -3211,14 +3223,16 @@ Made with Demo Sequencer 🚀
         
         _samplePitches[sampleIndex] = clampedPitch;
         
-        // Apply pitch to native audio engine immediately (no UI delay)
-        _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
-        
-        // Preview the sample with new pitch for immediate feedback
-        _previewSampleWithNewPitch(sampleIndex, clampedPitch);
-        
         // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
         _samplePitchNotifiers[sampleIndex]?.value = clampedPitch;
+        
+        // Apply pitch to native audio engine with debouncing for performance
+        _debouncedNativePitchCall('sample_$sampleIndex', clampedPitch, () {
+          _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
+          
+          // Preview the sample with new pitch for immediate feedback
+          _previewSampleWithNewPitch(sampleIndex, clampedPitch);
+        });
         
         // Record debounced undo action (will only record after user stops adjusting)
         _recordDebouncedUndoAction(
@@ -3230,6 +3244,69 @@ Made with Demo Sequencer 🚀
         // 🎯 PERFORMANCE: Use batched notification for non-critical UI updates
         _scheduleNotification(SequencerChangeType.pitch);
       }
+    }
+  }
+
+  /// Debounced native pitch calls for performance
+  void _debouncedNativePitchCall(String key, double pitch, VoidCallback actualCall) {
+    // Store the pending value
+    _pendingNativePitchCalls[key] = pitch;
+    
+    // Cancel existing timer
+    _nativePitchDebounceTimer?.cancel();
+    
+    // Set new timer
+    _nativePitchDebounceTimer = Timer(_nativeCallDebounceDelay, () {
+      // Execute all pending pitch calls
+      final pendingCalls = Map<String, double>.from(_pendingNativePitchCalls);
+      _pendingNativePitchCalls.clear();
+      
+      for (final entry in pendingCalls.entries) {
+        if (entry.key == key) {
+          actualCall(); // Call the actual native function
+          break;
+        }
+      }
+    });
+  }
+  
+  /// Debounced native volume calls for performance
+  void _debouncedNativeVolumeCall(String key, double volume, VoidCallback actualCall) {
+    // Store the pending value
+    _pendingNativeVolumeCalls[key] = volume;
+    
+    // Cancel existing timer
+    _nativeVolumeDebounceTimer?.cancel();
+    
+    // Set new timer
+    _nativeVolumeDebounceTimer = Timer(_nativeCallDebounceDelay, () {
+      // Execute all pending volume calls
+      final pendingCalls = Map<String, double>.from(_pendingNativeVolumeCalls);
+      _pendingNativeVolumeCalls.clear();
+      
+      for (final entry in pendingCalls.entries) {
+        if (entry.key == key) {
+          actualCall(); // Call the actual native function
+          break;
+        }
+      }
+    });
+  }
+  
+  /// Force flush all pending native calls immediately (for critical updates)
+  void _flushPendingNativeCalls() {
+    _nativePitchDebounceTimer?.cancel();
+    _nativeVolumeDebounceTimer?.cancel();
+    
+    // Execute any pending calls immediately
+    if (_pendingNativePitchCalls.isNotEmpty) {
+      print('🚀 [PERFORMANCE] Flushing ${_pendingNativePitchCalls.length} pending pitch calls');
+      _pendingNativePitchCalls.clear();
+    }
+    
+    if (_pendingNativeVolumeCalls.isNotEmpty) {
+      print('🚀 [PERFORMANCE] Flushing ${_pendingNativeVolumeCalls.length} pending volume calls');
+      _pendingNativeVolumeCalls.clear();
     }
   }
 
@@ -3344,20 +3421,22 @@ Made with Demo Sequencer 🚀
       // Store cell pitch override
       _cellPitches[cellIndex] = clampedPitch;
       
+      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
+      _cellPitchNotifiers[cellIndex]?.value = clampedPitch;
+      
       // Convert cellIndex to step and column for native call
       final row = cellIndex ~/ _gridColumns;
       final col = cellIndex % _gridColumns;
       final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
       
-      // Store pitch in native grid - will be applied when cell is triggered
-      _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
-      
-      // Preview the cell with new pitch for immediate feedback
-      final cellVolume = getCellVolume(cellIndex);
-      _previewCellWithAutoStop(row, absoluteColumn, clampedPitch, cellVolume);
-      
-      // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
-      _cellPitchNotifiers[cellIndex]?.value = clampedPitch;
+      // Store pitch in native grid with debouncing for performance
+      _debouncedNativePitchCall('cell_$cellIndex', clampedPitch, () {
+        _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
+        
+        // Preview the cell with new pitch for immediate feedback
+        final cellVolume = getCellVolume(cellIndex);
+        _previewCellWithAutoStop(row, absoluteColumn, clampedPitch, cellVolume);
+      });
       
       // Record debounced undo action (will only record after user stops adjusting)
       final cellPosition = _getCellPositionString(cellIndex);
@@ -4218,6 +4297,8 @@ Made with Demo Sequencer 🚀
     _notificationBatchTimer?.cancel(); // 🎯 PERFORMANCE: Cancel batch timer
     _previewTimer?.cancel();
     _undoDebounceTimer?.cancel();
+    _nativePitchDebounceTimer?.cancel();
+    _nativeVolumeDebounceTimer?.cancel();
     
     if (_isRecording) {
       stopRecording();

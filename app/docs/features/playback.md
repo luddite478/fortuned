@@ -283,8 +283,14 @@ ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 3. **Tap Preview**: When the sequencer is NOT playing, tapping any cell with a sample will preview it with current pitch/volume settings
 4. **Auto-stop**: All previews automatically stop after 1.5 seconds to avoid audio clutter
 5. **Smart Preview Management**: New previews automatically cancel previous ones to avoid overlapping sounds
+6. **Debounced Native Calls**: Rapid UI changes (fast slider movements) are debounced with 50ms delay to prevent performance issues from excessive native calls
 
-This gives instant audio feedback regardless of sequencer state, grid content, or current step position.
+**Performance Optimizations**:
+- **UI Responsiveness**: UI updates immediately via ValueNotifiers for instant visual feedback
+- **Native Call Throttling**: Heavy native operations are debounced to prevent lag during rapid adjustments
+- **Async Preprocessing**: SoundTouch processing runs in background threads to avoid UI blocking
+
+This gives instant audio feedback with optimal performance regardless of sequencer state, grid content, or interaction speed.
 
 ## Technical Implementation
 

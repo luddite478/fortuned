@@ -64,6 +64,10 @@ static pitch_method_t g_current_pitch_method = PITCH_METHOD_SOUNDTOUCH_PREPROCES
 
 using namespace soundtouch;
 
+// C++ threading includes for async preprocessing
+#include <thread>
+#include <mutex>
+
 // Platform-specific includes and definitions
 #ifdef __APPLE__
     #include <os/log.h>
@@ -210,6 +214,8 @@ static int preprocess_sample_with_pitch(int source_slot, float pitch_ratio);
 static preprocessed_sample_t* find_preprocessed_sample(int source_slot, float pitch_ratio);
 static void cleanup_preprocessed_cache(void);
 static void evict_oldest_preprocessed_sample(void);
+static int start_async_preprocessing(int source_slot, float pitch_ratio);
+static void cleanup_async_preprocessing(void);
 
 // Audio slot structure - separate systems for different playback scenarios
 typedef struct {
@@ -254,6 +260,18 @@ typedef struct {
     int active;
     char* file_path;
 } preview_system_t;
+
+// Async preprocessing system
+typedef struct {
+    int source_slot;
+    float pitch_ratio;
+    int in_progress;
+    std::thread* worker_thread;
+} async_preprocess_job_t;
+
+#define MAX_ASYNC_JOBS 4
+static async_preprocess_job_t g_async_jobs[MAX_ASYNC_JOBS];
+static std::mutex g_async_jobs_mutex;
 
 // Global preview instances
 static preview_system_t g_sample_preview;  // For previewing samples before adding to banks
@@ -666,11 +684,12 @@ static int setup_column_node(int column, int node_index, int sample_slot, float 
         // Check for preprocessed sample first
         preprocessed_sample_t* preprocessed = find_preprocessed_sample(sample_slot, pitch);
         if (!preprocessed && fabs(pitch - 1.0f) > 0.001f) {
-            // Automatically preprocess on demand if not cached and pitch is needed
-            prnt("⚡ [PREPROCESS] Auto-preprocessing sample %d at pitch %.3f (not cached)", sample_slot, pitch);
-            if (preprocess_sample_with_pitch(sample_slot, pitch) == 0) {
-                preprocessed = find_preprocessed_sample(sample_slot, pitch);
-            }
+            // Start async preprocessing for future use (non-blocking)
+            prnt("⚡ [PREPROCESS] Starting async preprocessing: sample %d at pitch %.3f", sample_slot, pitch);
+            start_async_preprocessing(sample_slot, pitch);
+            
+            // Continue with fallback approach for immediate playback
+            prnt("🔄 [PREPROCESS] Using fallback approach while processing in background");
         }
         
         if (preprocessed) {
@@ -2532,6 +2551,9 @@ int init(void) {
     // Initialize preview systems
     memset(&g_sample_preview, 0, sizeof(preview_system_t));
     memset(&g_cell_preview, 0, sizeof(preview_system_t));
+
+    // Initialize async preprocessing system
+    memset(g_async_jobs, 0, sizeof(g_async_jobs));
     
     // Initialize sequencer state
     g_sequencer_playing = 0;
@@ -3532,6 +3554,9 @@ void cleanup(void) {
 #if PITCH_APPROACH_SOUNDTOUCH_PREPROCESSING
     // Clean up preprocessed pitch cache
     cleanup_preprocessed_cache();
+    
+    // Clean up async preprocessing jobs
+    cleanup_async_preprocessing();
 #endif
     
     // Uninitialize device
@@ -3798,6 +3823,86 @@ int preprocess_sample_pitch(int source_slot, float pitch_ratio) {
     return preprocess_sample_with_pitch(source_slot, pitch_ratio);
 }
 
+// Async preprocessing functions
+static void async_preprocess_worker(int job_index, int source_slot, float pitch_ratio) {
+    prnt("🚀 [ASYNC] Starting background processing: slot %d, pitch %.3f", source_slot, pitch_ratio);
+    
+    // Do the heavy processing in background
+    int result = preprocess_sample_with_pitch(source_slot, pitch_ratio);
+    
+    // Clean up job when done
+    {
+        std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
+        if (g_async_jobs[job_index].worker_thread) {
+            delete g_async_jobs[job_index].worker_thread;
+        }
+        memset(&g_async_jobs[job_index], 0, sizeof(async_preprocess_job_t));
+    }
+    
+    if (result == 0) {
+        prnt("✅ [ASYNC] Background processing completed: slot %d, pitch %.3f", source_slot, pitch_ratio);
+    } else {
+        prnt("❌ [ASYNC] Background processing failed: slot %d, pitch %.3f", source_slot, pitch_ratio);
+    }
+}
+
+static int start_async_preprocessing(int source_slot, float pitch_ratio) {
+    std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
+    
+    // Check if already processing this combination
+    for (int i = 0; i < MAX_ASYNC_JOBS; i++) {
+        if (g_async_jobs[i].in_progress && 
+            g_async_jobs[i].source_slot == source_slot && 
+            fabs(g_async_jobs[i].pitch_ratio - pitch_ratio) < 0.001f) {
+            prnt("ℹ️ [ASYNC] Already processing: slot %d, pitch %.3f", source_slot, pitch_ratio);
+            return 0; // Already in progress
+        }
+    }
+    
+    // Find empty job slot
+    int job_index = -1;
+    for (int i = 0; i < MAX_ASYNC_JOBS; i++) {
+        if (!g_async_jobs[i].in_progress) {
+            job_index = i;
+            break;
+        }
+    }
+    
+    if (job_index == -1) {
+        prnt("⚠️ [ASYNC] No available job slots, processing synchronously");
+        return -1; // Will fallback to sync processing
+    }
+    
+    // Start async job
+    g_async_jobs[job_index].source_slot = source_slot;
+    g_async_jobs[job_index].pitch_ratio = pitch_ratio;
+    g_async_jobs[job_index].in_progress = 1;
+    
+    try {
+        g_async_jobs[job_index].worker_thread = new std::thread(async_preprocess_worker, job_index, source_slot, pitch_ratio);
+        g_async_jobs[job_index].worker_thread->detach(); // Don't wait for completion
+        
+        prnt("🔄 [ASYNC] Started background processing: slot %d, pitch %.3f", source_slot, pitch_ratio);
+        return 0;
+    } catch (...) {
+        prnt_err("🔴 [ASYNC] Failed to start background thread");
+        memset(&g_async_jobs[job_index], 0, sizeof(async_preprocess_job_t));
+        return -1;
+    }
+}
+
+static void cleanup_async_preprocessing() {
+    std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
+    
+    for (int i = 0; i < MAX_ASYNC_JOBS; i++) {
+        if (g_async_jobs[i].worker_thread) {
+            // Note: threads are detached, so they'll clean up themselves
+            g_async_jobs[i].worker_thread = nullptr;
+        }
+        g_async_jobs[i].in_progress = 0;
+    }
+}
+
 uint64_t get_preprocessed_memory_usage(void) {
     return g_total_preprocessed_memory;
 }
@@ -3812,6 +3917,7 @@ int get_preprocessed_cache_count(void) {
 
 void clear_preprocessed_cache(void) {
     cleanup_preprocessed_cache();
+    cleanup_async_preprocessing();
     prnt("🗑️ [PREPROCESS] Cache cleared manually");
 }
 

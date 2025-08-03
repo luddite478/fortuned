@@ -287,6 +287,46 @@ void resetCellPitch(int cellIndex) {
 }
 ```
 
+## Performance Optimizations
+
+### Async Preprocessing (Background Threading)
+```cpp
+// SoundTouch preprocessing runs in background threads to prevent UI blocking
+static void async_preprocess_worker(int job_index, int source_slot, float pitch_ratio) {
+    // Heavy SoundTouch processing happens off main thread
+    int result = preprocess_sample_with_pitch(source_slot, pitch_ratio);
+    // Clean up job when complete
+}
+
+// Non-blocking pitch processing
+if (!preprocessed && fabs(pitch - 1.0f) > 0.001f) {
+    start_async_preprocessing(sample_slot, pitch);  // ← Background thread
+    // Continue with fallback approach for immediate playback
+}
+```
+
+**Benefits:**
+- **UI Responsiveness**: No more blocking during SoundTouch preprocessing
+- **Immediate Playback**: Uses fallback resampler while background processes
+- **Future Performance**: Next use gets cached high-quality version
+
+### Native Call Debouncing (Dart Layer)
+```dart
+// 50ms debouncing prevents performance issues from rapid UI changes
+_debouncedNativePitchCall('sample_$sampleIndex', pitch, () {
+  _sequencerLibrary.setSampleBankPitch(sampleIndex, pitch);
+  _previewSampleWithNewPitch(sampleIndex, pitch);
+});
+
+// UI updates immediately, native calls are throttled
+_samplePitchNotifiers[sampleIndex]?.value = pitch; // ← Instant UI feedback
+```
+
+**Benefits:**
+- **Smooth Sliders**: UI responds instantly without lag
+- **Reduced Native Load**: Max 1 call per 50ms instead of dozens
+- **Smart Batching**: Only latest value sent to native code
+
 ## Performance Characteristics
 
 - **Algorithm**: Linear interpolation resampling via `ma_resampler`
@@ -295,5 +335,7 @@ void resetCellPitch(int cellIndex) {
 - **Latency**: No additional latency beyond normal audio buffering
 - **Concurrent**: Each cell node processes pitch independently
 - **Real-time updates**: Existing nodes update immediately when settings change
+- **Threading**: Heavy preprocessing runs in background (4 max concurrent jobs)
+- **Debouncing**: Native calls throttled to prevent rapid-change performance issues
 
-This implementation provides seamless pitch shifting integrated with the per-cell node architecture, enabling independent pitch control for every playing audio instance with proper UI/native value conversion and reset capabilities. 
+This implementation provides seamless pitch shifting integrated with the per-cell node architecture, enabling independent pitch control for every playing audio instance with optimal performance and UI responsiveness. 
