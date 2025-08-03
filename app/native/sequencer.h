@@ -157,6 +157,16 @@ int get_max_cell_node_count(void);
 __attribute__((visibility("default"))) __attribute__((used))
 void set_perf_test_mode(int mode);
 
+// Preview system functions (for immediate feedback when changing settings)
+__attribute__((visibility("default"))) __attribute__((used))
+int preview_sample(const char* file_path, float pitch, float volume);
+__attribute__((visibility("default"))) __attribute__((used))
+int preview_cell(int step, int column, float pitch, float volume);
+__attribute__((visibility("default"))) __attribute__((used))
+void stop_sample_preview(void);
+__attribute__((visibility("default"))) __attribute__((used))
+void stop_cell_preview(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -784,15 +784,12 @@ static void update_existing_column_nodes_for_cell(int step, int column, int samp
     if (col_nodes->active_node >= 0) {
         column_node_t* active_node = &col_nodes->nodes[col_nodes->active_node];
         if (active_node->sample_slot == sample_slot) {
-            // Update volume immediately (pitch handling depends on method)
+            // Update volume immediately
             active_node->volume = resolved_volume;
             
             if (g_current_pitch_method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING) {
-                // For preprocessing: if pitch changed significantly, need to reload sample
-                if (fabs(active_node->pitch - resolved_pitch) > 0.001f) {
-                    prnt("🔄 [UPDATE] Pitch changed for column %d, reloading sample %d (%.3f → %.3f)", 
-                         column, sample_slot, active_node->pitch, resolved_pitch);
-                    
+                // For preprocessing: rebuild node when pitch changes
+                if (active_node->pitch != resolved_pitch) {
                     if (setup_column_node(column, col_nodes->active_node, sample_slot, resolved_volume, resolved_pitch) == 0) {
                         // Restart playback after reload
                         ma_node_set_state(&active_node->node, ma_node_state_started);
@@ -803,9 +800,6 @@ static void update_existing_column_nodes_for_cell(int step, int column, int samp
                 // For real-time pitch: update directly
                 update_column_node_pitch(active_node, resolved_pitch);
             }
-            
-            prnt("🔄 [UPDATE] Updated column %d node (vol: %.2f, pitch: %.3f)", 
-                 column, resolved_volume, resolved_pitch);
         }
     }
 }
@@ -2117,31 +2111,42 @@ static void play_samples_for_step(int step) {
                         ma_node_set_state(&target_node->node, ma_node_state_started);
                         set_target_volume(target_node, resolved_volume);  // Smooth fade in
                         
-                        prnt("▶️ [A/B SWITCH] Column %d: Activated node %c (sample %d, vol: %.2f, pitch: %.3f)", 
-                             column, target_node_idx == 0 ? 'A' : 'B', sample_to_play, resolved_volume, resolved_pitch);
+                        prnt("▶️ [PLAYBACK] Step %d Col %d: Activated node %c (sample %d, vol: %.2f, pitch: %.3f)", 
+                             step, column, target_node_idx == 0 ? 'A' : 'B', sample_to_play, resolved_volume, resolved_pitch);
                     } else {
                         prnt_err("🔴 [A/B SWITCH] Failed to setup node %c for column %d sample %d", 
                                 target_node_idx == 0 ? 'A' : 'B', column, sample_to_play);
                     }
                 } else {
                     // Same sample is already playing - restart from beginning
-                    prnt("🔄 [RESTART] Column %d: Restarting node %c (same sample %d)", 
-                         column, target_node_idx == 0 ? 'A' : 'B', sample_to_play);
-                    
-                    // Seek to beginning
-                    if (target_node->uses_audio_buffer && target_node->audio_buffer_initialized) {
-                        ma_data_source_seek_to_pcm_frame(&target_node->audio_buffer, 0);
-                    } else {
-                        ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
-                    }
-                    
-                    // Ensure node is started and update volume/pitch with current settings
-                    ma_node_set_state(&target_node->node, ma_node_state_started);
                     float resolved_volume = resolve_cell_volume(step, column, sample_to_play);
                     float resolved_pitch = resolve_cell_pitch(step, column, sample_to_play);
                     
-                    update_column_node_pitch(target_node, resolved_pitch);
-                    set_target_volume(target_node, resolved_volume);
+                    // For preprocessing method, rebuild node when pitch changes
+                    if (g_current_pitch_method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && 
+                        target_node->pitch != resolved_pitch) {
+                        
+                        // Rebuild the entire node with new pitch for preprocessing
+                        if (setup_column_node(column, target_node_idx, sample_to_play, resolved_volume, resolved_pitch) == 0) {
+                            col_nodes->active_node = target_node_idx;
+                            currently_playing_nodes_per_col[column] = target_node;
+                            ma_node_set_state(&target_node->node, ma_node_state_started);
+                            set_target_volume(target_node, resolved_volume);
+                        }
+                    } else {
+                        // Seek to beginning and update pitch for real-time methods
+                        if (target_node->uses_audio_buffer && target_node->audio_buffer_initialized) {
+                            ma_data_source_seek_to_pcm_frame(&target_node->audio_buffer, 0);
+                        } else {
+                            ma_decoder_seek_to_pcm_frame(&target_node->decoder, 0);
+                        }
+                        
+                        ma_node_set_state(&target_node->node, ma_node_state_started);
+                        target_node->volume = resolved_volume;
+                        target_node->pitch = resolved_pitch;
+                        update_column_node_pitch(target_node, resolved_pitch);
+                        set_target_volume(target_node, resolved_volume);
+                    }
                 }
             }
         }

@@ -181,7 +181,26 @@ int start_sequencer(int bpm, int steps) {
 
 **Result**: Efficient stop/start cycles that preserve volume/pitch settings and avoid node recreation.
 
-### 6. Grid Sync Strategy
+### 6. Pitch Change Handling During Restart
+
+**Issue Fixed**: With SoundTouch preprocessing, when the same sample plays from different steps with different pitches, the node must be completely rebuilt rather than just updating the pitch data source.
+
+```c
+// In play_samples_for_step() restart logic:
+if (g_current_pitch_method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && 
+    target_node->pitch != resolved_pitch) {
+    
+    // Rebuild the entire node with new pitch for preprocessing
+    setup_column_node(column, target_node_idx, sample_to_play, resolved_volume, resolved_pitch);
+} else {
+    // For real-time methods, just update the pitch data source
+    update_column_node_pitch(target_node, resolved_pitch);
+}
+```
+
+**Result**: Individual cell pitch overrides work correctly with preprocessing method.
+
+### 7. Grid Sync Strategy
 ```dart
 // Explicit sync when actually needed
 syncFlutterSequencerGridToNativeSequencerGrid();
@@ -253,8 +272,19 @@ ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
 
 ### Preview Systems
 - **Sample Preview**: For file browser (`g_sample_preview`)
-- **Cell Preview**: For grid cells (`g_cell_preview`)
+- **Cell Preview**: For grid cells (`g_cell_preview`) - **Now with immediate feedback!**
 - **Implementation**: Dedicated preview nodes independent of other playback
+- **Auto-stop**: Preview automatically stops after 1.5 seconds
+- **Integration**: Triggered when changing cell pitch/volume for immediate feedback
+
+**New Features**: 
+1. **Cell Settings Preview**: When you adjust a cell's pitch or volume, the system immediately previews the cell with the new settings
+2. **Sample Bank Settings Preview**: When you adjust a sample's default pitch or volume (sample bank level), the system immediately previews that sample with the new settings - **even if no cells use that sample on the grid**
+3. **Tap Preview**: When the sequencer is NOT playing, tapping any cell with a sample will preview it with current pitch/volume settings
+4. **Auto-stop**: All previews automatically stop after 1.5 seconds to avoid audio clutter
+5. **Smart Preview Management**: New previews automatically cancel previous ones to avoid overlapping sounds
+
+This gives instant audio feedback regardless of sequencer state, grid content, or current step position.
 
 ## Technical Implementation
 

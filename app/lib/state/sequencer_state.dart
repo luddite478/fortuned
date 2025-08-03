@@ -653,7 +653,11 @@ class SequencerState extends ChangeNotifier {
   Map<String, dynamic>? _pendingUndoBeforeState;
   String? _pendingUndoDescription;
   UndoRedoActionType? _pendingUndoType;
+  
+  // Preview timer to automatically stop preview after user stops adjusting
+  Timer? _previewTimer;
   static const Duration _undoDebounceDelay = Duration(milliseconds: 800); // 800ms delay
+  static const Duration _previewAutoStopDelay = Duration(milliseconds: 1500); // 1.5s preview auto-stop
 
   // 🎯 PERFORMANCE: ValueNotifier getters for high-frequency updates
   ValueNotifier<double> getSampleVolumeNotifier(int sampleIndex) {
@@ -1531,6 +1535,11 @@ class SequencerState extends ChangeNotifier {
         // Step 3: If cell has a sample, open cell settings menu
         if (cellHasSample) {
           setSelectedCellForSettings(padIndex);
+          
+          // Step 4: Preview the cell if sequencer is not playing
+          if (!_isSequencerPlaying) {
+            _previewCellFromPadPress(padIndex);
+          }
         }
       }
     } else {
@@ -1544,6 +1553,11 @@ class SequencerState extends ChangeNotifier {
         // If cell has a sample, open cell settings menu
         if (cellHasSample) {
           setSelectedCellForSettings(padIndex);
+          
+          // Preview the cell if sequencer is not playing
+          if (!_isSequencerPlaying) {
+            _previewCellFromPadPress(padIndex);
+          }
         }
       } else if (_selectedGridCells.contains(padIndex)) {
         // Tapping on an already selected cell - just remove the selection without adding new
@@ -1560,6 +1574,11 @@ class SequencerState extends ChangeNotifier {
         // If cell has a sample, open cell settings menu
         if (cellHasSample) {
           setSelectedCellForSettings(padIndex);
+          
+          // Preview the cell if sequencer is not playing
+          if (!_isSequencerPlaying) {
+            _previewCellFromPadPress(padIndex);
+          }
         }
       } else {
         // Multiple cells selected and tapping an unselected cell - clear all selections
@@ -3093,6 +3112,9 @@ Made with Demo Sequencer 🚀
         // Apply volume to native audio engine immediately (no UI delay)
         _sequencerLibrary.setSampleBankVolume(sampleIndex, clampedVolume);
         
+        // Preview the sample with new volume for immediate feedback
+        _previewSampleWithNewVolume(sampleIndex, clampedVolume);
+        
         // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
         _sampleVolumeNotifiers[sampleIndex]?.value = clampedVolume;
         
@@ -3149,6 +3171,10 @@ Made with Demo Sequencer 🚀
       // Store volume in native grid - will be applied when cell is triggered
       _sequencerLibrary.setCellVolume(row, absoluteColumn, clampedVolume);
       
+      // Preview the cell with new volume for immediate feedback
+      final cellPitch = getCellPitch(cellIndex);
+      _previewCellWithAutoStop(row, absoluteColumn, cellPitch, clampedVolume);
+      
       // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
       _cellVolumeNotifiers[cellIndex]?.value = clampedVolume;
       
@@ -3188,6 +3214,9 @@ Made with Demo Sequencer 🚀
         // Apply pitch to native audio engine immediately (no UI delay)
         _sequencerLibrary.setSampleBankPitch(sampleIndex, clampedPitch);
         
+        // Preview the sample with new pitch for immediate feedback
+        _previewSampleWithNewPitch(sampleIndex, clampedPitch);
+        
         // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
         _samplePitchNotifiers[sampleIndex]?.value = clampedPitch;
         
@@ -3200,6 +3229,85 @@ Made with Demo Sequencer 🚀
         
         // 🎯 PERFORMANCE: Use batched notification for non-critical UI updates
         _scheduleNotification(SequencerChangeType.pitch);
+      }
+    }
+  }
+
+  /// Preview a cell with auto-stop timer for immediate feedback
+  void _previewCellWithAutoStop(int step, int column, double pitch, double volume) {
+    // Cancel any existing preview timer and stop any active previews
+    _previewTimer?.cancel();
+    _sequencerLibrary.stopSamplePreview();
+    _sequencerLibrary.stopCellPreview();
+    
+    // Start preview
+    _sequencerLibrary.previewCell(step, column, pitch, volume);
+    
+    // Set timer to auto-stop preview
+    _previewTimer = Timer(_previewAutoStopDelay, () {
+      _sequencerLibrary.stopCellPreview();
+    });
+  }
+  
+  /// Preview a cell when tapped in the UI (when sequencer is not playing)
+  void _previewCellFromPadPress(int cellIndex) {
+    // Convert cellIndex to step and column for native call
+    final row = cellIndex ~/ _gridColumns;
+    final col = cellIndex % _gridColumns;
+    final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
+    
+    // Get current cell pitch and volume
+    final cellPitch = getCellPitch(cellIndex);
+    final cellVolume = getCellVolume(cellIndex);
+    
+    // Preview with auto-stop
+    _previewCellWithAutoStop(row, absoluteColumn, cellPitch, cellVolume);
+  }
+  
+  /// Preview a sample with new pitch when sample bank pitch is changed
+  void _previewSampleWithNewPitch(int sampleIndex, double pitch) {
+    // Check if sample is loaded and has a file path
+    if (sampleIndex >= 0 && sampleIndex < _filePaths.length && _filePaths[sampleIndex] != null) {
+      final filePath = _filePaths[sampleIndex]!;
+      final volume = getSampleVolume(sampleIndex);
+      
+      // Cancel any existing preview timer and stop any active previews
+      _previewTimer?.cancel();
+      _sequencerLibrary.stopSamplePreview();
+      _sequencerLibrary.stopCellPreview();
+      
+      // Start sample preview with new pitch
+      final success = _sequencerLibrary.previewSample(filePath, pitch, volume);
+      
+      if (success) {
+        // Set timer to auto-stop preview
+        _previewTimer = Timer(_previewAutoStopDelay, () {
+          _sequencerLibrary.stopSamplePreview();
+        });
+      }
+    }
+  }
+  
+  /// Preview a sample with new volume when sample bank volume is changed
+  void _previewSampleWithNewVolume(int sampleIndex, double volume) {
+    // Check if sample is loaded and has a file path
+    if (sampleIndex >= 0 && sampleIndex < _filePaths.length && _filePaths[sampleIndex] != null) {
+      final filePath = _filePaths[sampleIndex]!;
+      final pitch = getSamplePitch(sampleIndex);
+      
+      // Cancel any existing preview timer and stop any active previews
+      _previewTimer?.cancel();
+      _sequencerLibrary.stopSamplePreview();
+      _sequencerLibrary.stopCellPreview();
+      
+      // Start sample preview with new volume
+      final success = _sequencerLibrary.previewSample(filePath, pitch, volume);
+      
+      if (success) {
+        // Set timer to auto-stop preview
+        _previewTimer = Timer(_previewAutoStopDelay, () {
+          _sequencerLibrary.stopSamplePreview();
+        });
       }
     }
   }
@@ -3243,6 +3351,10 @@ Made with Demo Sequencer 🚀
       
       // Store pitch in native grid - will be applied when cell is triggered
       _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
+      
+      // Preview the cell with new pitch for immediate feedback
+      final cellVolume = getCellVolume(cellIndex);
+      _previewCellWithAutoStop(row, absoluteColumn, clampedPitch, cellVolume);
       
       // 🎯 PERFORMANCE: Update ValueNotifier for instant UI feedback
       _cellPitchNotifiers[cellIndex]?.value = clampedPitch;
@@ -4104,6 +4216,8 @@ Made with Demo Sequencer 🚀
     _debounceTimer?.cancel();
     _sequencerTimer?.cancel();
     _notificationBatchTimer?.cancel(); // 🎯 PERFORMANCE: Cancel batch timer
+    _previewTimer?.cancel();
+    _undoDebounceTimer?.cancel();
     
     if (_isRecording) {
       stopRecording();

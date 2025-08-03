@@ -633,6 +633,65 @@ class SequencerBindings {
           'set_perf_test_mode');
   late final _set_perf_test_mode =
       _set_perf_test_modePtr.asFunction<void Function(int)>();
+
+  /// Preview system functions (for immediate feedback when changing settings)
+  int preview_sample(
+    ffi.Pointer<ffi.Char> file_path,
+    double pitch,
+    double volume,
+  ) {
+    return _preview_sample(
+      file_path,
+      pitch,
+      volume,
+    );
+  }
+
+  late final _preview_samplePtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int Function(
+              ffi.Pointer<ffi.Char>, ffi.Float, ffi.Float)>>('preview_sample');
+  late final _preview_sample = _preview_samplePtr
+      .asFunction<int Function(ffi.Pointer<ffi.Char>, double, double)>();
+
+  int preview_cell(
+    int step,
+    int column,
+    double pitch,
+    double volume,
+  ) {
+    return _preview_cell(
+      step,
+      column,
+      pitch,
+      volume,
+    );
+  }
+
+  late final _preview_cellPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Int Function(
+              ffi.Int, ffi.Int, ffi.Float, ffi.Float)>>('preview_cell');
+  late final _preview_cell =
+      _preview_cellPtr.asFunction<int Function(int, int, double, double)>();
+
+  void stop_sample_preview() {
+    return _stop_sample_preview();
+  }
+
+  late final _stop_sample_previewPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('stop_sample_preview');
+  late final _stop_sample_preview =
+      _stop_sample_previewPtr.asFunction<void Function()>();
+
+  void stop_cell_preview() {
+    return _stop_cell_preview();
+  }
+
+  late final _stop_cell_previewPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function()>>('stop_cell_preview');
+  late final _stop_cell_preview =
+      _stop_cell_previewPtr.asFunction<void Function()>();
 }
 
 /// mbstate_t is an opaque object to keep conversion state, during multibyte

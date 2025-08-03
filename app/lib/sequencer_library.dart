@@ -575,4 +575,66 @@ class SequencerLibrary {
       print('❌ Error setting performance test mode: $e');
     }
   }
+
+  // -------------- PREVIEW SYSTEM FUNCTIONS --------------
+  
+  /// Preview a sample file with pitch and volume (for immediate feedback)
+  bool previewSample(String filePath, double pitch, double volume) {
+    if (pitch < 0.03125 || pitch > 32.0) {
+      print('❌ Invalid pitch: $pitch (must be 0.03125-32.0 for C0-C10)');
+      return false;
+    }
+    
+    if (volume < 0.0 || volume > 1.0) {
+      print('❌ Invalid volume: $volume (must be 0.0-1.0)');
+      return false;
+    }
+    
+    int result = _bindings.preview_sample(filePath.toNativeUtf8().cast(), pitch, volume);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🔍 Preview sample: $filePath (pitch: ${pitch.toStringAsFixed(2)}, volume: ${volume.toStringAsFixed(2)})');
+    } else {
+      print('❌ Failed to preview sample: $filePath');
+    }
+    
+    return success;
+  }
+  
+  /// Preview a specific cell with pitch and volume (for immediate feedback when changing settings)
+  bool previewCell(int step, int column, double pitch, double volume) {
+    if (pitch < 0.03125 || pitch > 32.0) {
+      print('❌ Invalid pitch: $pitch (must be 0.03125-32.0 for C0-C10)');
+      return false;
+    }
+    
+    if (volume < 0.0 || volume > 1.0) {
+      print('❌ Invalid volume: $volume (must be 0.0-1.0)');
+      return false;
+    }
+    
+    int result = _bindings.preview_cell(step, column, pitch, volume);
+    bool success = result == 0;
+    
+    if (success) {
+      print('🔍 Preview cell [$step,$column] (pitch: ${pitch.toStringAsFixed(2)}, volume: ${volume.toStringAsFixed(2)})');
+    } else {
+      print('❌ Failed to preview cell [$step,$column]');
+    }
+    
+    return success;
+  }
+  
+  /// Stop sample preview
+  void stopSamplePreview() {
+    _bindings.stop_sample_preview();
+    print('⏹️ Sample preview stopped');
+  }
+  
+  /// Stop cell preview
+  void stopCellPreview() {
+    _bindings.stop_cell_preview();
+    print('⏹️ Cell preview stopped');
+  }
 } 

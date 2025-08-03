@@ -214,6 +214,15 @@ static void update_column_node_pitch(column_node_t* node, float new_pitch) {
 
 ## Real-time Processing
 
+### SoundTouch Preprocessing Method
+With the SoundTouch preprocessing method, each unique pitch requires its own preprocessed audio data. When a node needs to change pitch during playback (e.g., when restarting for a different step with different pitch), the entire node must be rebuilt rather than just updating the pitch data source.
+
+**Key Fix:** In `play_samples_for_step()`, when the same sample is already playing but with a different pitch:
+- **For preprocessing method**: Rebuild the entire node with `setup_column_node()`
+- **For real-time methods**: Update the pitch data source directly
+
+This ensures proper pitch data source initialization for each pitch value.
+
 ### Pitch Data Source Read Callback
 ```c
 static ma_result ma_pitch_data_source_read(ma_data_source* pDataSource, void* pFramesOut, 
