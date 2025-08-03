@@ -4,32 +4,28 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/threads_service.dart';
 import '../services/users_service.dart';
 import '../services/auth_service.dart';
-import '../services/threads_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'user_profile_screen.dart';
-import 'sequencer_screen.dart';
-import 'checkpoints_screen.dart';
 import '../state/threads_state.dart';
-import '../state/sequencer_state.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
-import 'package:path/path.dart' as p;
 import '../utils/app_colors.dart';
+import '../widgets/common_header_widget.dart';
+import 'user_profile_screen.dart';
 
-class UsersScreen extends StatefulWidget {
-  const UsersScreen({Key? key}) : super(key: key);
+class NetworkScreen extends StatefulWidget {
+  const NetworkScreen({Key? key}) : super(key: key);
   
   @override
-  State<UsersScreen> createState() => _UsersScreenState();
+  State<NetworkScreen> createState() => _NetworkScreenState();
 }
 
-class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin {
+class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateMixin {
   late ThreadsService _threadsService;
   late UsersService _usersService;
   List<String> _onlineUserIds = [];
   List<UserProfile> _userProfiles = [];
+  List<UserProfile> _filteredUserProfiles = [];
   bool _isLoading = true;
   String? _error;
+  
+  final TextEditingController _searchController = TextEditingController();
   
   // Track users with unread thread messages
   Set<String> _usersWithNotifications = {};
@@ -40,6 +36,8 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   // Track expanded contact tiles
   Set<String> _expandedContacts = {};
 
+
+
   // Animation controllers
   late AnimationController _lampAnimation;
 
@@ -47,7 +45,6 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
-          // Use the global ThreadsService and UsersService from Provider instead of creating new ones
     _threadsService = Provider.of<ThreadsService>(context, listen: false);
     _usersService = Provider.of<UsersService>(context, listen: false);
     
@@ -58,7 +55,29 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     )..repeat();
     
     _setupThreadsServiceListeners();
+    _setupSearchListener();
   }
+
+  void _setupSearchListener() {
+    _searchController.addListener(() {
+      _filterUsers(_searchController.text);
+    });
+  }
+
+  void _filterUsers(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredUserProfiles = _userProfiles;
+      } else {
+        _filteredUserProfiles = _userProfiles.where((profile) {
+          return profile.name.toLowerCase().contains(query.toLowerCase()) ||
+                 (profile.info?.toLowerCase().contains(query.toLowerCase()) ?? false);
+        }).toList();
+      }
+    });
+  }
+
+
 
   void _setupThreadsServiceListeners() async {
     // Setup listeners for online users from UsersService
@@ -128,9 +147,6 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       }
     });
 
-    // No need to connect here - it's already connected globally
-    debugPrint('📡 Using global ThreadsService connection in users screen');
-
     // Load user profiles from API
     await _loadUserProfiles();
     
@@ -143,6 +159,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       final response = await UsersService.getUserProfiles(limit: 50);
       setState(() {
         _userProfiles = response.profiles;
+        _filteredUserProfiles = response.profiles;
         _isLoading = false;
         _error = null;
       });
@@ -195,7 +212,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   void dispose() {
     _lampAnimation.dispose();
-    // Don't dispose the global ThreadsService - it's managed at app level
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -205,7 +222,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     final currentUserId = authService.currentUser?.id;
     
     // Convert UserProfile from API to User for UI, excluding current user
-    for (final profile in _userProfiles) {
+    for (final profile in _filteredUserProfiles) {
       // Skip if this is the current user
       if (profile.id == currentUserId) continue;
       
@@ -218,10 +235,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
         name: profile.name,
         isOnline: isOnline,
         isWorking: isWorking,
-        project: profile.info, // Use info as project description
+        project: profile.info ?? '', // Use info as project description
       ));
     }
-    
     
     return users;
   }
@@ -229,36 +245,33 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.menupageBackground,
+      backgroundColor: AppColors.menuPageBackground,
       body: SafeArea(
         child: Column(
           children: [
-            // User indicator at the top
-            _buildUserIndicator(),
+            // Common header
+            const CommonHeaderWidget(),
             
-            Container(
-              width: double.infinity,
-              margin: const EdgeInsets.all(12),
-              child: _buildMySequencerButton(),
-            ),
+            // Search bar
+            _buildSearchBar(),
             
             // Users List
             Expanded(
               child: _isLoading
                   ? Center(
-                      child: CircularProgressIndicator(color: AppColors.menulightText),
+                      child: CircularProgressIndicator(color: AppColors.menuLightText),
                     )
                   : _error != null
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.error_outline, color: AppColors.menulightText, size: 48),
+                              Icon(Icons.error_outline, color: AppColors.menuLightText, size: 48),
                               const SizedBox(height: 12),
                               Text(
                                 _error!, 
                                 style: GoogleFonts.sourceSans3(
-                                  color: AppColors.menulightText,
+                                  color: AppColors.menuLightText,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -272,12 +285,12 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                                   _loadUserProfiles();
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.menubuttonBackground,
+                                  backgroundColor: AppColors.menuButtonBackground,
                                 ),
                                 child: Text(
                                   'RETRY',
                                   style: GoogleFonts.sourceSans3(
-                                    color: AppColors.menutext,
+                                    color: AppColors.menuText,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.0,
                                   ),
@@ -286,13 +299,30 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          itemCount: _users.length,
-                          itemBuilder: (context, index) {
-                            return _buildExpandableUserCard(_users[index]);
-                          },
-                        ),
+                      : _users.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.search_off, color: AppColors.menuLightText, size: 48),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    'No users found',
+                                    style: GoogleFonts.sourceSans3(
+                                      color: AppColors.menuLightText,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              itemCount: _users.length,
+                              itemBuilder: (context, index) {
+                                return _buildExpandableUserCard(_users[index]);
+                              },
+                            ),
             ),
           ],
         ),
@@ -300,135 +330,50 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     );
   }
 
-  Widget _buildUserIndicator() {
-    return Consumer<AuthService>(
-      builder: (context, authService, child) {
-        final currentUser = authService.currentUser;
-        if (currentUser == null) return const SizedBox();
-        
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.menuentryBackground,
-            border: Border(
-              bottom: BorderSide(
-                color: AppColors.menuborder,
-                width: 1,
-              ),
-            ),
-          ),
-          child: Row(
-            children: [
-              // User info - clickable to view own profile
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _viewMyProfile(currentUser),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        currentUser.name,
-                        style: GoogleFonts.sourceSans3(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.menutext,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              
-              // Logout button
-              GestureDetector(
-                onTap: () async {
-                  final authService = Provider.of<AuthService>(context, listen: false);
-                  await authService.logout();
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    Icons.logout,
-                    size: 16,
-                    color: AppColors.menutext,
-                  ),
-                ),
-              ),
-              
-              const SizedBox(width: 8),
-              
-              // Online indicator
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: AppColors.menuonlineIndicator,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMySequencerButton() {
+  Widget _buildSearchBar() {
     return Container(
-      height: 70, // Slightly taller to emphasize importance
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.menubuttonBackground,
-        borderRadius: BorderRadius.circular(4), // Sharp, boxy corners like old directories
-        border: Border.all(
-          color: AppColors.menubuttonBorder,
-          width: 2,
+        color: AppColors.menuEntryBackground,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.menuBorder,
+            width: 1,
+          ),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.15),
-            blurRadius: 4,
-            offset: const Offset(2, 2),
-          ),
-        ],
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            // Just navigate to sequencer - no need to create threads locally
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const PatternScreen(),
-              ),
-            );
-          },
-          borderRadius: BorderRadius.circular(4),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    'MY SEQUENCER',
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.menutext,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 2,
-                    ),
-                  ),
-                ),
-                Icon(
-                  Icons.arrow_forward,
-                  color: AppColors.menutext,
-                  size: 20,
-                ),
-              ],
-            ),
+      child: TextField(
+        controller: _searchController,
+        style: GoogleFonts.sourceSans3(
+          color: AppColors.menuText,
+          fontSize: 14,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Search users...',
+          hintStyle: GoogleFonts.sourceSans3(
+            color: AppColors.menuLightText,
+            fontSize: 14,
           ),
+          prefixIcon: Icon(
+            Icons.search,
+            color: AppColors.menuLightText,
+            size: 20,
+          ),
+          filled: true,
+          fillColor: AppColors.menuPageBackground,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: AppColors.menuBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: AppColors.menuBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(4),
+            borderSide: BorderSide(color: AppColors.menuText, width: 2),
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         ),
       ),
     );
@@ -452,10 +397,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       height: 48, // Compact like phone book entries
       margin: const EdgeInsets.only(bottom: 2), // Tight spacing like phone book
       decoration: BoxDecoration(
-        color: AppColors.menuentryBackground,
+        color: AppColors.menuEntryBackground,
         border: Border(
           bottom: BorderSide(
-            color: AppColors.menuborder,
+            color: AppColors.menuBorder,
             width: 0.5,
           ),
         ),
@@ -479,7 +424,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                       child: Text(
                         user.name,
                         style: GoogleFonts.sourceSans3(
-                          color: AppColors.menutext,
+                          color: AppColors.menuText,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 1.2,
@@ -540,7 +485,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                           margin: const EdgeInsets.only(right: 4),
                           child: Icon(
                             isExpanded ? Icons.expand_less : Icons.expand_more,
-                            color: AppColors.menutext,
+                            color: AppColors.menuText,
                             size: 16,
                           ),
                         ),
@@ -552,7 +497,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                       height: 6,
                       decoration: BoxDecoration(
                         color: user.isOnline 
-                            ? AppColors.menuonlineIndicator 
+                            ? AppColors.menuOnlineIndicator 
                             : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
@@ -632,7 +577,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       width: double.infinity,
       height: double.infinity,
       color: Color.lerp(
-        AppColors.menuentryBackground,
+        AppColors.menuEntryBackground,
         const Color(0xFFF5F0D0), // Slightly highlighted yellow when active
         intensity,
       ),
@@ -660,9 +605,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     return Container(
       margin: const EdgeInsets.only(left: 16, right: 8, bottom: 2),
       decoration: BoxDecoration(
-        color: AppColors.menupageBackground.withOpacity(0.7),
+        color: AppColors.menuPageBackground.withOpacity(0.7),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.menuborder, width: 0.5),
+        border: Border.all(color: AppColors.menuBorder, width: 0.5),
       ),
       child: Column(
         children: threads.map((thread) {
@@ -677,7 +622,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 bottom: BorderSide(
                   color: thread == threads.last 
                       ? Colors.transparent 
-                      : AppColors.menuborder,
+                      : AppColors.menuBorder,
                   width: 0.5,
                 ),
               ),
@@ -691,7 +636,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                   decoration: BoxDecoration(
                     color: hasPendingInvite 
                         ? const Color(0xFF3B82F6) 
-                        : AppColors.menulightText,
+                        : AppColors.menuLightText,
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Icon(
@@ -713,7 +658,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                             child: Text(
                               thread.title,
                               style: GoogleFonts.sourceSans3(
-                                color: AppColors.menutext,
+                                color: AppColors.menuText,
                                 fontSize: 12,
                                 fontWeight: hasPendingInvite 
                                     ? FontWeight.w600 
@@ -745,7 +690,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                         Text(
                           'Invitation to collaborate',
                           style: GoogleFonts.sourceSans3(
-                            color: AppColors.menulightText,
+                            color: AppColors.menuLightText,
                             fontSize: 10,
                             fontWeight: FontWeight.w400,
                           ),
@@ -754,7 +699,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                         Text(
                           '${thread.checkpoints.length} checkpoints',
                           style: GoogleFonts.sourceSans3(
-                            color: AppColors.menulightText,
+                            color: AppColors.menuLightText,
                             fontSize: 10,
                             fontWeight: FontWeight.w400,
                           ),
@@ -767,7 +712,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 Text(
                   _formatThreadTimestamp(thread.updatedAt),
                   style: GoogleFonts.sourceSans3(
-                    color: AppColors.menulightText,
+                    color: AppColors.menuLightText,
                     fontSize: 9,
                     fontWeight: FontWeight.w400,
                   ),
@@ -806,51 +751,20 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       _usersWithPendingInvites.remove(user.id);
     });
     
-    // Check for common threads with this user
-    final commonThreads = await _getCommonThreadsWithUser(user.id);
+    // Navigate to user profile screen
+    debugPrint('👤 Opening profile for ${user.name}');
+    final isUserOnline = _onlineUserIds.contains(user.id);
     
-    if (commonThreads.isNotEmpty) {
-      // We have collaborations - navigate directly to checkpoints screen
-      debugPrint('🤝 Found ${commonThreads.length} common threads with ${user.name}');
-      
-      // Sort by updated date to get the latest thread
-      commonThreads.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      final latestThread = commonThreads.first;
-      
-      debugPrint('📋 Opening checkpoints for latest thread: ${latestThread.title}');
-      
-      // Set the active thread in ThreadsState before navigating
-      final threadsState = Provider.of<ThreadsState>(context, listen: false);
-      threadsState.setActiveThread(latestThread);
-      
-      // Navigate to checkpoints screen (chat-like interface)
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CheckpointsScreenWithUserContext(
-            threadId: latestThread.id,
-            targetUserId: user.id,
-            targetUserName: user.name,
-            commonThreads: commonThreads,
-          ),
-        ),
-      );
-    } else {
-      // No collaborations - navigate to user profile
-      debugPrint('👤 No common threads with ${user.name}, opening profile');
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => UserProfileScreen(
           userId: user.id,
           userName: user.name,
-          ),
+          isOnline: isUserOnline,
         ),
-      ).then((_) {
-        // Refresh pending invitations when returning from user profile
-        _checkPendingInvitations();
-      });
-    }
+      ),
+    );
   }
 
   /// Get common threads between current user and target user
@@ -892,19 +806,6 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       return [];
     }
   }
-
-  void _viewMyProfile(UserProfile currentUser) {
-    // Navigate to own profile
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => UserProfileScreen(
-          userId: currentUser.id,
-          userName: currentUser.name,
-        ),
-      ),
-    );
-  }
 }
 
 // Data model for users
@@ -922,5 +823,4 @@ class User {
     required this.isWorking,
     required this.project,
   });
-}
-
+} 

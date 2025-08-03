@@ -1,27 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../../../state/sequencer_state.dart';
-import '../../../state/threads_state.dart';
-import '../../../screens/checkpoints_screen.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF4A4A47); // Dark shadows for depth
-  static const Color cellEmpty = Color(0xFF3E3E3B); // Empty grid cells
-  static const Color cellFilled = Color(0xFF5C5A55); // Filled grid cells
-  static const Color secondaryButton = Color(0xFF6A6A67); // Grayed out secondary buttons
-  static const Color secondaryButtonAlt = Color(0xFF5A5A57); // Alternative secondary button
-  static const Color primaryButton = Color(0xFF9B8365); // Lighter main action button
-}
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';import '../../../state/threads_state.dart';
+import '../../../utils/app_colors.dart';import '../../../screens/checkpoints_screen.dart';
+import '../../../utils/app_colors.dart';
 
 class MessageBarWidget extends StatelessWidget {
   // Configuration variables for easy control
@@ -51,8 +34,8 @@ class MessageBarWidget extends StatelessWidget {
   // static const Color centerContainerBackgroundColor = Color.fromARGB(255, 154, 14, 14);
   // static const Color rightContainerBackgroundColor = Color.fromARGB(255, 82, 11, 104);
 
-  static const Color leftContainerBackgroundColor = SequencerPhoneBookColors.cellEmpty;
-  static const Color centerContainerBackgroundColor = SequencerPhoneBookColors.cellEmpty;
+  static const Color leftContainerBackgroundColor = AppColors.sequencerCellEmpty;
+  static const Color centerContainerBackgroundColor = AppColors.sequencerCellEmpty;
   static const Color rightContainerBackgroundColor = Color.fromARGB(255, 67, 65, 65);
   
   // Parent container settings
@@ -68,10 +51,10 @@ class MessageBarWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 4), // Removed horizontal padding
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceBase,
+        color: AppColors.sequencerSurfaceBase,
         border: Border(
           top: BorderSide(
-            color: SequencerPhoneBookColors.border,
+            color: AppColors.sequencerBorder,
             width: 1,
           ),
         ),
@@ -143,7 +126,7 @@ class MessageBarWidget extends StatelessWidget {
                                     child: Center(
                                       child: Icon(
                                         Icons.format_list_bulleted,
-                                        color: SequencerPhoneBookColors.lightText,
+                                        color: AppColors.sequencerLightText,
                                         size: 18,
                                       ),
                                     ),
@@ -246,7 +229,7 @@ class MessageBarWidget extends StatelessWidget {
               color: const Color.fromARGB(255, 90, 111, 114),
               borderRadius: BorderRadius.circular(2),
               border: Border.all(
-                color: SequencerPhoneBookColors.border,
+                color: AppColors.sequencerBorder,
                 width: 1,
               ),
             ),
@@ -258,7 +241,7 @@ class MessageBarWidget extends StatelessWidget {
             height: 2,
             margin: const EdgeInsets.symmetric(horizontal: 1),
             decoration: BoxDecoration(
-              color: SequencerPhoneBookColors.lightText,
+              color: AppColors.sequencerLightText,
               borderRadius: BorderRadius.circular(1),
             ),
           );

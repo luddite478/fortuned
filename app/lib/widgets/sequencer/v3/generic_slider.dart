@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../state/sequencer_state.dart';
-import '../../../utils/musical_notes.dart';
-
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';import '../../../utils/musical_notes.dart';
+import '../../../utils/app_colors.dart';
 class MusicalNotes {
   static const List<String> _noteNames = [
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
@@ -60,14 +60,14 @@ class ValueDisplayThumbShape extends SliderComponentShape {
     
     // Draw the thumb background
     final Paint thumbPaint = Paint()
-      ..color = const Color(0xFF8B7355) // SequencerPhoneBookColors.accent
+      ..color = const Color(0xFF8B7355) // AppColors.sequencerAccent
       ..style = PaintingStyle.fill;
     
     canvas.drawCircle(center, thumbRadius, thumbPaint);
     
     // Draw border
     final Paint borderPaint = Paint()
-      ..color = const Color(0xFF5A5A57) // SequencerPhoneBookColors.border
+      ..color = const Color(0xFF5A5A57) // AppColors.sequencerBorder
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     
@@ -148,9 +148,9 @@ class GenericSlider extends StatelessWidget {
     
     return SliderTheme(
       data: SliderTheme.of(context).copyWith(
-        activeTrackColor: const Color(0xFF8B7355), // SequencerPhoneBookColors.accent
-        inactiveTrackColor: const Color(0xFF5A5A57), // SequencerPhoneBookColors.border
-        thumbColor: const Color(0xFF8B7355), // SequencerPhoneBookColors.accent
+        activeTrackColor: const Color(0xFF8B7355), // AppColors.sequencerAccent
+        inactiveTrackColor: const Color(0xFF5A5A57), // AppColors.sequencerBorder
+        thumbColor: const Color(0xFF8B7355), // AppColors.sequencerAccent
         trackHeight: (height * 0.04).clamp(2.0, 8.0),
         thumbShape: ValueDisplayThumbShape(
           value: currentValueText,

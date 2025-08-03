@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../state/sequencer_state.dart';
-import '../../../utils/musical_notes.dart';
-
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';import '../../../utils/musical_notes.dart';
+import '../../../utils/app_colors.dart';
 // Simple musical notes helper
 class MusicalNotes {
   static const List<String> _noteNames = [
@@ -46,18 +46,6 @@ class PitchConversion {
   }
 }
 
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
-}
 
 enum SettingsType { cell, sample, master }
 
@@ -261,21 +249,21 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
             return Container(
               padding: EdgeInsets.all(padding),
               decoration: BoxDecoration(
-                color: SequencerPhoneBookColors.surfaceBase,
+                color: AppColors.sequencerSurfaceBase,
                 borderRadius: BorderRadius.circular(2), // Sharp corners
                 border: Border.all(
-                  color: SequencerPhoneBookColors.border,
+                  color: AppColors.sequencerBorder,
                   width: 1,
                 ),
                 boxShadow: [
                   // Protruding effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 3,
                     offset: const Offset(0, 2),
                   ),
                   BoxShadow(
-                    color: SequencerPhoneBookColors.surfaceRaised,
+                    color: AppColors.sequencerSurfaceRaised,
                     blurRadius: 1,
                     offset: const Offset(0, -1),
                   ),
@@ -369,15 +357,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                 child: Container(
                   height: headerHeight * 0.7,
                   decoration: BoxDecoration(
-                    color: SequencerPhoneBookColors.surfacePressed,
+                    color: AppColors.sequencerSurfacePressed,
                     borderRadius: BorderRadius.circular(2),
                     border: Border.all(
-                      color: SequencerPhoneBookColors.border,
+                      color: AppColors.sequencerBorder,
                       width: 0.5,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: SequencerPhoneBookColors.shadow,
+                        color: AppColors.sequencerShadow,
                         blurRadius: 1,
                         offset: const Offset(0, 0.5),
                       ),
@@ -386,7 +374,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                   child: Center(
                     child: Icon(
                       Icons.close,
-                      color: SequencerPhoneBookColors.lightText,
+                      color: AppColors.sequencerLightText,
                       size: (headerHeight * 0.35).clamp(12.0, 18.0),
                     ),
                   ),
@@ -455,20 +443,20 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         vertical: padding * 0.3
       ),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised,
+        color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: SequencerPhoneBookColors.shadow,
+            color: AppColors.sequencerShadow,
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
           BoxShadow(
-            color: SequencerPhoneBookColors.surfaceRaised,
+            color: AppColors.sequencerSurfaceRaised,
             blurRadius: 1,
             offset: const Offset(0, -0.5),
           ),
@@ -485,15 +473,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                 style: TextStyle(
                   fontSize: fontSize * 0.8,
                   fontWeight: FontWeight.bold,
-                  color: SequencerPhoneBookColors.lightText,
+                  color: AppColors.sequencerLightText,
                 ),
               ),
               SizedBox(height: height * 0.02),
               SliderTheme(
                 data: SliderTheme.of(context).copyWith(
-                  activeTrackColor: SequencerPhoneBookColors.accent,
-                  inactiveTrackColor: SequencerPhoneBookColors.border,
-                  thumbColor: SequencerPhoneBookColors.accent,
+                  activeTrackColor: AppColors.sequencerAccent,
+                  inactiveTrackColor: AppColors.sequencerBorder,
+                  thumbColor: AppColors.sequencerAccent,
                   trackHeight: (height * 0.04).clamp(2.0, 8.0), // Scales with full height
                   thumbShape: RoundSliderThumbShape(
                     enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0), // Scales with full height
@@ -547,21 +535,21 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: padding * 0.3, vertical: padding * 0.05),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised,
+        color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
         boxShadow: [
           // Protruding effect
           BoxShadow(
-            color: SequencerPhoneBookColors.shadow,
+            color: AppColors.sequencerShadow,
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
           BoxShadow(
-            color: SequencerPhoneBookColors.surfaceRaised,
+            color: AppColors.sequencerSurfaceRaised,
             blurRadius: 1,
             offset: const Offset(0, -0.5),
           ),
@@ -570,9 +558,9 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
       child: Center(
         child: SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: SequencerPhoneBookColors.accent,
-            inactiveTrackColor: SequencerPhoneBookColors.border,
-            thumbColor: SequencerPhoneBookColors.accent,
+            activeTrackColor: AppColors.sequencerAccent,
+            inactiveTrackColor: AppColors.sequencerBorder,
+            thumbColor: AppColors.sequencerAccent,
             trackHeight: (height * 0.04).clamp(2.0, 8.0),
             thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0)),
           ),
@@ -599,20 +587,20 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return Container(
       padding: EdgeInsets.symmetric(horizontal: padding * 0.3, vertical: padding * 0.05),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised,
+        color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: SequencerPhoneBookColors.shadow,
+            color: AppColors.sequencerShadow,
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
           BoxShadow(
-            color: SequencerPhoneBookColors.surfaceRaised,
+            color: AppColors.sequencerSurfaceRaised,
             blurRadius: 1,
             offset: const Offset(0, -0.5),
           ),
@@ -621,9 +609,9 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
       child: Center(
         child: SliderTheme(
           data: SliderTheme.of(context).copyWith(
-            activeTrackColor: SequencerPhoneBookColors.accent,
-            inactiveTrackColor: SequencerPhoneBookColors.border,
-            thumbColor: SequencerPhoneBookColors.accent,
+            activeTrackColor: AppColors.sequencerAccent,
+            inactiveTrackColor: AppColors.sequencerBorder,
+            thumbColor: AppColors.sequencerAccent,
             trackHeight: (height * 0.04).clamp(2.0, 8.0),
             thumbShape: RoundSliderThumbShape(enabledThumbRadius: (height * 0.06).clamp(8.0, 20.0)),
           ),
@@ -648,15 +636,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         vertical: padding * 0.3
       ),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised,
+        color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: SequencerPhoneBookColors.shadow,
+            color: AppColors.sequencerShadow,
             blurRadius: 2,
             offset: const Offset(0, 1),
           ),
@@ -669,7 +657,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
             Text(
               title,
               style: GoogleFonts.sourceSans3(
-                color: SequencerPhoneBookColors.accent,
+                color: AppColors.sequencerAccent,
                 fontSize: fontSize * 1.8,
                 fontWeight: FontWeight.bold,
                 letterSpacing: 0.5,
@@ -680,7 +668,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
               description,
               textAlign: TextAlign.center,
               style: GoogleFonts.sourceSans3(
-                color: SequencerPhoneBookColors.lightText,
+                color: AppColors.sequencerLightText,
                 fontSize: fontSize * 1.1,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,
@@ -696,10 +684,10 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised,
+        color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
       ),
@@ -709,7 +697,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           children: [
             Icon(
               widget.noDataIcon,
-              color: SequencerPhoneBookColors.lightText,
+              color: AppColors.sequencerLightText,
               size: fontSize * 3,
             ),
             SizedBox(height: height * 0.05),
@@ -717,7 +705,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
               widget.noDataMessage,
               textAlign: TextAlign.center,
               style: GoogleFonts.sourceSans3(
-                color: SequencerPhoneBookColors.lightText,
+                color: AppColors.sequencerLightText,
                 fontSize: fontSize * 1.2,
                 fontWeight: FontWeight.w500,
                 letterSpacing: 0.3,
@@ -736,21 +724,21 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         height: height,
         decoration: BoxDecoration(
           color: isSelected 
-              ? SequencerPhoneBookColors.accent 
-              : SequencerPhoneBookColors.surfaceRaised,
+              ? AppColors.sequencerAccent 
+              : AppColors.sequencerSurfaceRaised,
           borderRadius: BorderRadius.circular(2),
           border: Border.all(
-            color: SequencerPhoneBookColors.border,
+            color: AppColors.sequencerBorder,
             width: 0.5,
           ),
           boxShadow: [
             BoxShadow(
-              color: SequencerPhoneBookColors.shadow,
+              color: AppColors.sequencerShadow,
               blurRadius: 1.5,
               offset: const Offset(0, 1),
             ),
             BoxShadow(
-              color: SequencerPhoneBookColors.surfaceRaised,
+              color: AppColors.sequencerSurfaceRaised,
               blurRadius: 0.5,
               offset: const Offset(0, -0.5),
             ),
@@ -761,8 +749,8 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
             label,
             style: GoogleFonts.sourceSans3(
               color: isSelected 
-                  ? SequencerPhoneBookColors.pageBackground 
-                  : SequencerPhoneBookColors.text,
+                  ? AppColors.sequencerPageBackground 
+                  : AppColors.sequencerText,
               fontSize: fontSize,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.5,

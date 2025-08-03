@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../widgets/app_header_widget.dart';
-import '../state/sequencer_state.dart';
-import '../state/threads_state.dart';
-import '../sequencer_library.dart';
-import 'checkpoints_screen.dart';
-
+import '../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../utils/app_colors.dart';import '../widgets/app_header_widget.dart';
+import '../utils/app_colors.dart';import '../state/sequencer_state.dart';
+import '../utils/app_colors.dart';import '../state/threads_state.dart';
+import '../utils/app_colors.dart';import '../sequencer_library.dart';
+import '../utils/app_colors.dart';import 'checkpoints_screen.dart';
+import '../utils/app_colors.dart';
 class SequencerSettingsScreen extends StatefulWidget {
   const SequencerSettingsScreen({super.key});
 
@@ -67,7 +67,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: SequencerPhoneBookColors.pageBackground,
+      backgroundColor: AppColors.sequencerPageBackground,
       appBar: AppHeaderWidget(
         mode: HeaderMode.sequencer,
         title: 'Sequencer Settings',
@@ -136,7 +136,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
       style: GoogleFonts.sourceSans3(
         fontSize: 18,
         fontWeight: FontWeight.bold,
-        color: SequencerPhoneBookColors.text,
+        color: AppColors.sequencerText,
       ),
     );
   }
@@ -145,17 +145,17 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceBase,
+        color: AppColors.sequencerSurfaceBase,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
       ),
       child: ListTile(
         leading: Icon(
           icon,
-          color: SequencerPhoneBookColors.accent,
+          color: AppColors.sequencerAccent,
           size: 20,
         ),
         title: Text(
@@ -163,19 +163,19 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
           style: GoogleFonts.sourceSans3(
             fontSize: 14,
             fontWeight: FontWeight.w600,
-            color: SequencerPhoneBookColors.text,
+            color: AppColors.sequencerText,
           ),
         ),
         subtitle: Text(
           subtitle,
           style: GoogleFonts.sourceSans3(
             fontSize: 12,
-            color: SequencerPhoneBookColors.lightText,
+            color: AppColors.sequencerLightText,
           ),
         ),
         trailing: Icon(
           Icons.chevron_right,
-          color: SequencerPhoneBookColors.lightText,
+          color: AppColors.sequencerLightText,
           size: 16,
         ),
         onTap: onTap,
@@ -189,10 +189,10 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
         return Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.surfaceBase,
+            color: AppColors.sequencerSurfaceBase,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: SequencerPhoneBookColors.border,
+              color: AppColors.sequencerBorder,
               width: 1,
             ),
           ),
@@ -203,7 +203,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
                 children: [
                   Icon(
                     Icons.dashboard,
-                    color: SequencerPhoneBookColors.accent,
+                    color: AppColors.sequencerAccent,
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -212,7 +212,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
                     style: GoogleFonts.sourceSans3(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
-                      color: SequencerPhoneBookColors.text,
+                      color: AppColors.sequencerText,
                     ),
                   ),
                 ],
@@ -245,10 +245,10 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
                       style: GoogleFonts.sourceSans3(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: SequencerPhoneBookColors.text,
+                        color: AppColors.sequencerText,
                       ),
                     ),
-                    activeColor: SequencerPhoneBookColors.accent,
+                    activeColor: AppColors.sequencerAccent,
                     dense: true,
                   ),
                 );
@@ -264,10 +264,10 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceBase,
+        color: AppColors.sequencerSurfaceBase,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
       ),
@@ -278,7 +278,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             children: [
               Icon(
                 Icons.science,
-                color: SequencerPhoneBookColors.accent,
+                color: AppColors.sequencerAccent,
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -287,7 +287,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
                 style: GoogleFonts.sourceSans3(
                   fontSize: 14,
                   fontWeight: FontWeight.w600,
-                  color: SequencerPhoneBookColors.text,
+                  color: AppColors.sequencerText,
                 ),
               ),
             ],
@@ -298,7 +298,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             'Use these modes to isolate audio performance bottlenecks:',
             style: GoogleFonts.sourceSans3(
               fontSize: 12,
-              color: SequencerPhoneBookColors.lightText,
+              color: AppColors.sequencerLightText,
             ),
           ),
           const SizedBox(height: 12),
@@ -337,17 +337,17 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             style: GoogleFonts.sourceSans3(
               fontSize: 13,
               fontWeight: FontWeight.w600,
-              color: SequencerPhoneBookColors.text,
+              color: AppColors.sequencerText,
             ),
           ),
           subtitle: Text(
             description,
             style: GoogleFonts.sourceSans3(
               fontSize: 11,
-              color: SequencerPhoneBookColors.lightText,
+              color: AppColors.sequencerLightText,
             ),
           ),
-          activeColor: SequencerPhoneBookColors.accent,
+          activeColor: AppColors.sequencerAccent,
           dense: true,
         ),
       );
@@ -358,10 +358,10 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceBase,
+        color: AppColors.sequencerSurfaceBase,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 1,
         ),
       ),
@@ -373,7 +373,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             style: GoogleFonts.sourceSans3(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: SequencerPhoneBookColors.text,
+              color: AppColors.sequencerText,
             ),
           ),
           const SizedBox(height: 12),
@@ -393,14 +393,14 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
         style: GoogleFonts.sourceSans3(
           fontSize: 13,
           fontWeight: FontWeight.w600,
-          color: SequencerPhoneBookColors.text,
+          color: AppColors.sequencerText,
         ),
       ),
       subtitle: Text(
         description,
         style: GoogleFonts.sourceSans3(
           fontSize: 11,
-          color: SequencerPhoneBookColors.lightText,
+          color: AppColors.sequencerLightText,
         ),
       ),
       value: value,
@@ -408,7 +408,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
         // TODO: Implement advanced options
         _showNotImplementedDialog(title);
       },
-      activeColor: SequencerPhoneBookColors.accent,
+      activeColor: AppColors.sequencerAccent,
       dense: true,
     );
   }
@@ -432,10 +432,10 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
           );
         },
         style: ElevatedButton.styleFrom(
-          backgroundColor: SequencerPhoneBookColors.surfaceRaised,
-          foregroundColor: SequencerPhoneBookColors.text,
+          backgroundColor: AppColors.sequencerSurfaceRaised,
+          foregroundColor: AppColors.sequencerText,
           side: BorderSide(
-            color: SequencerPhoneBookColors.border,
+            color: AppColors.sequencerBorder,
             width: 1,
           ),
           shape: RoundedRectangleBorder(
@@ -457,18 +457,18 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: SequencerPhoneBookColors.surfaceBase,
+        backgroundColor: AppColors.sequencerSurfaceBase,
         title: Text(
           'Coming Soon',
           style: GoogleFonts.sourceSans3(
-            color: SequencerPhoneBookColors.text,
+            color: AppColors.sequencerText,
             fontWeight: FontWeight.bold,
           ),
         ),
         content: Text(
           '$feature is not implemented yet.',
           style: GoogleFonts.sourceSans3(
-            color: SequencerPhoneBookColors.lightText,
+            color: AppColors.sequencerLightText,
           ),
         ),
         actions: [
@@ -477,7 +477,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             child: Text(
               'OK',
               style: GoogleFonts.sourceSans3(
-                color: SequencerPhoneBookColors.accent,
+                color: AppColors.sequencerAccent,
                 fontWeight: FontWeight.w600,
               ),
             ),

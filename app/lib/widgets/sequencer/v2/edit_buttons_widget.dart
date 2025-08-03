@@ -1,20 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:google_fonts/google_fonts.dart';
-import '../../../state/sequencer_state.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
-}
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';
 
 class EditButtonsWidget extends StatelessWidget {
   const EditButtonsWidget({super.key});
@@ -35,16 +23,16 @@ class EditButtonsWidget extends StatelessWidget {
             return Container(
               padding: EdgeInsets.symmetric(horizontal: panelHeight * 0.1), // Only horizontal padding
               decoration: BoxDecoration(
-                color: SequencerPhoneBookColors.surfaceBase,
+                color: AppColors.sequencerSurfaceBase,
                 borderRadius: BorderRadius.circular(2), // Sharp corners
                 border: Border.all(
-                  color: SequencerPhoneBookColors.border,
+                  color: AppColors.sequencerBorder,
                   width: 0.5,
                 ),
                 boxShadow: [
                   // Protruding effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
@@ -58,7 +46,7 @@ class EditButtonsWidget extends StatelessWidget {
                     size: buttonSize,
                     iconSize: iconSize,
                     icon: sequencer.isInSelectionMode ? Icons.check_box : Icons.check_box_outline_blank,
-                    color: sequencer.isInSelectionMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText,
+                    color: sequencer.isInSelectionMode ? AppColors.sequencerAccent : AppColors.sequencerLightText,
                     onPressed: () => sequencer.toggleSelectionMode(),
                     tooltip: sequencer.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
                   ),
@@ -74,8 +62,8 @@ class EditButtonsWidget extends StatelessWidget {
                     iconSize: iconSize,
                     icon: Icons.delete,
                     color: sequencer.selectedGridCells.isNotEmpty
-                        ? SequencerPhoneBookColors.accent.withOpacity(0.8)
-                        : SequencerPhoneBookColors.lightText,
+                        ? AppColors.sequencerAccent.withOpacity(0.8)
+                        : AppColors.sequencerLightText,
                     onPressed: sequencer.selectedGridCells.isNotEmpty
                         ? () => sequencer.deleteSelectedCells()
                         : null,
@@ -87,8 +75,8 @@ class EditButtonsWidget extends StatelessWidget {
                     iconSize: iconSize,
                     icon: Icons.copy,
                     color: sequencer.selectedGridCells.isNotEmpty
-                        ? SequencerPhoneBookColors.accent
-                        : SequencerPhoneBookColors.lightText,
+                        ? AppColors.sequencerAccent
+                        : AppColors.sequencerLightText,
                     onPressed: sequencer.selectedGridCells.isNotEmpty
                         ? () => sequencer.copySelectedCells()
                         : null,
@@ -100,8 +88,8 @@ class EditButtonsWidget extends StatelessWidget {
                     iconSize: iconSize,
                     icon: Icons.paste,
                     color: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
-                        ? SequencerPhoneBookColors.accent
-                        : SequencerPhoneBookColors.lightText,
+                        ? AppColors.sequencerAccent
+                        : AppColors.sequencerLightText,
                     onPressed: sequencer.hasClipboardData && sequencer.selectedGridCells.isNotEmpty
                         ? () => sequencer.pasteToSelectedCells()
                         : null,
@@ -131,23 +119,23 @@ class EditButtonsWidget extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         color: isEnabled 
-            ? SequencerPhoneBookColors.surfaceRaised 
-            : SequencerPhoneBookColors.surfacePressed,
+            ? AppColors.sequencerSurfaceRaised 
+            : AppColors.sequencerSurfacePressed,
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 0.5,
         ),
         boxShadow: isEnabled
             ? [
                 // Protruding effect for enabled buttons
                 BoxShadow(
-                  color: SequencerPhoneBookColors.shadow,
+                  color: AppColors.sequencerShadow,
                   blurRadius: 1.5,
                   offset: const Offset(0, 1),
                 ),
                 BoxShadow(
-                  color: SequencerPhoneBookColors.surfaceRaised,
+                  color: AppColors.sequencerSurfaceRaised,
                   blurRadius: 0.5,
                   offset: const Offset(0, -0.5),
                 ),
@@ -155,7 +143,7 @@ class EditButtonsWidget extends StatelessWidget {
             : [
                 // Recessed effect for disabled buttons
                 BoxShadow(
-                  color: SequencerPhoneBookColors.shadow,
+                  color: AppColors.sequencerShadow,
                   blurRadius: 1,
                   offset: const Offset(0, 0.5),
                 ),
@@ -188,21 +176,21 @@ class EditButtonsWidget extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceRaised,
+        color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: sequencer.isStepInsertMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.border,
+          color: sequencer.isStepInsertMode ? AppColors.sequencerAccent : AppColors.sequencerBorder,
           width: sequencer.isStepInsertMode ? 1.0 : 0.5,
         ),
         boxShadow: [
           // Protruding effect
           BoxShadow(
-            color: SequencerPhoneBookColors.shadow,
+            color: AppColors.sequencerShadow,
             blurRadius: 1.5,
             offset: const Offset(0, 1),
           ),
           BoxShadow(
-            color: SequencerPhoneBookColors.surfaceRaised,
+            color: AppColors.sequencerSurfaceRaised,
             blurRadius: 0.5,
             offset: const Offset(0, -0.5),
           ),
@@ -225,7 +213,7 @@ class EditButtonsWidget extends StatelessWidget {
                     child: Text(
                       '${sequencer.stepInsertSize}',
                       style: GoogleFonts.sourceSans3(
-                        color: sequencer.isStepInsertMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText,
+                        color: sequencer.isStepInsertMode ? AppColors.sequencerAccent : AppColors.sequencerLightText,
                         fontSize: iconSize * 0.8,
                         fontWeight: FontWeight.w600,
                         height: 0.7,
@@ -236,7 +224,7 @@ class EditButtonsWidget extends StatelessWidget {
                     offset: const Offset(0, -2), // Move arrow up by 2 pixels
                     child: Icon(
                       Icons.keyboard_double_arrow_down,
-                      color: sequencer.isStepInsertMode ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText,
+                      color: sequencer.isStepInsertMode ? AppColors.sequencerAccent : AppColors.sequencerLightText,
                       size: iconSize * 0.8,
                     ),
                   ),

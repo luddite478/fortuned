@@ -4,10 +4,10 @@
 - pitch (fix artifacts) - done 
 - master settings - done
 - bpm - done
-
 - grid cell appearance 
     - color on the right side 
-    - show key,vol,effects
+    - show key,vol,effects - done
+
 - slide to next slide (scene?)
 - 2 A/B ma nodes per column
 - paste + jump 
@@ -21,3 +21,4 @@
 - contacts and all users search
 - comment(reply)-menu for chekpoints
 - pitch (optimize speed)
+- local project storage

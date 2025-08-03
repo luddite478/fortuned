@@ -1,25 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
-import '../../../state/sequencer_state.dart';
-import '../../../state/threads_state.dart';
-import '../../../services/threads_service.dart';
-import '../../../screens/checkpoints_screen.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF4A4A47); // Dark shadows for depth
-  static const Color cellEmpty = Color(0xFF3E3E3B); // Empty grid cells
-  static const Color cellFilled = Color(0xFF5C5A55); // Filled grid cells
-}
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';import '../../../state/threads_state.dart';
+import '../../../utils/app_colors.dart';import '../../../services/threads_service.dart';
+import '../../../utils/app_colors.dart';import '../../../screens/checkpoints_screen.dart';
+import '../../../utils/app_colors.dart';
 
 class BottomBarWidget extends StatefulWidget {
   final VoidCallback? onToggleView;
@@ -174,7 +160,7 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.lightText,
+            color: AppColors.sequencerLightText,
             borderRadius: BorderRadius.circular(1),
           ),
         ),
@@ -183,7 +169,7 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.lightText,
+            color: AppColors.sequencerLightText,
             borderRadius: BorderRadius.circular(1),
           ),
         ),
@@ -192,7 +178,7 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.lightText,
+            color: AppColors.sequencerLightText,
             borderRadius: BorderRadius.circular(1),
           ),
         ),
@@ -201,7 +187,7 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
           width: 6,
           height: 6,
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.lightText,
+            color: AppColors.sequencerLightText,
             borderRadius: BorderRadius.circular(1),
           ),
         ),
@@ -214,10 +200,10 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: SequencerPhoneBookColors.surfaceBase,
+        color: AppColors.sequencerSurfaceBase,
         border: Border(
           top: BorderSide(
-            color: SequencerPhoneBookColors.border,
+            color: AppColors.sequencerBorder,
             width: 1,
           ),
         ),
@@ -231,10 +217,10 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
               child: Container(
                 height: 40,
                 decoration: BoxDecoration(
-                  color: SequencerPhoneBookColors.surfaceRaised,
+                  color: AppColors.sequencerSurfaceRaised,
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
-                    color: SequencerPhoneBookColors.border,
+                    color: AppColors.sequencerBorder,
                     width: 1,
                   ),
                 ),
@@ -256,7 +242,7 @@ class _BottomBarWidgetState extends State<BottomBarWidget> {
             // Send button
             Container(
               decoration: BoxDecoration(
-                color: SequencerPhoneBookColors.accent,
+                color: AppColors.sequencerAccent,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Material(

@@ -1,19 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../../state/sequencer_state.dart';
-
-// Darker Gray-Beige Telephone Book Color Scheme for Sequencer
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A); // Dark gray background
-  static const Color surfaceBase = Color(0xFF4A4A47); // Gray-beige base surface
-  static const Color surfaceRaised = Color(0xFF525250); // Protruding surface color
-  static const Color surfacePressed = Color(0xFF424240); // Pressed/active surface
-  static const Color text = Color(0xFFE8E6E0); // Light text for contrast
-  static const Color lightText = Color(0xFFB8B6B0); // Muted light text
-  static const Color accent = Color(0xFF8B7355); // Brown accent for highlights
-  static const Color border = Color(0xFF5A5A57); // Subtle borders
-  static const Color shadow = Color(0xFF2A2A2A); // Dark shadows for depth
-}
+import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import '../../../utils/app_colors.dart';
 
 enum SideControlSide { left, right }
 
@@ -51,16 +39,16 @@ class SoundGridSideControlWidget extends StatelessWidget {
               width: availableWidth,
               height: availableHeight,
               decoration: BoxDecoration(
-                color: SequencerPhoneBookColors.surfaceBase,
+                color: AppColors.sequencerSurfaceBase,
                 borderRadius: BorderRadius.circular(2), // Sharp corners
                 border: Border.all(
-                  color: SequencerPhoneBookColors.border,
+                  color: AppColors.sequencerBorder,
                   width: 0.5,
                 ),
                 boxShadow: [
                   // Protruding effect
                   BoxShadow(
-                    color: SequencerPhoneBookColors.shadow,
+                    color: AppColors.sequencerShadow,
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   ),
@@ -75,7 +63,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: Icons.circle_outlined, // Generic placeholder icon
-                    color: SequencerPhoneBookColors.lightText,
+                    color: AppColors.sequencerLightText,
                     onPressed: () {
                       // TODO: Add functionality
                     },
@@ -90,7 +78,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: side == SideControlSide.left ? Icons.chevron_left : Icons.chevron_right,
-                    color: SequencerPhoneBookColors.lightText,
+                    color: AppColors.sequencerLightText,
                     onPressed: () {
                       // TODO: Add functionality
                     },
@@ -106,8 +94,8 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     iconSize: iconSize,
                     icon: side == SideControlSide.left ? Icons.undo : Icons.redo,
                     color: side == SideControlSide.left 
-                        ? (sequencer.canUndo ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText)
-                        : (sequencer.canRedo ? SequencerPhoneBookColors.accent : SequencerPhoneBookColors.lightText),
+                        ? (sequencer.canUndo ? AppColors.sequencerAccent : AppColors.sequencerLightText)
+                        : (sequencer.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText),
                     onPressed: side == SideControlSide.left
                         ? (sequencer.canUndo ? () => sequencer.undo() : null)
                         : (sequencer.canRedo ? () => sequencer.redo() : null),
@@ -140,23 +128,23 @@ class SoundGridSideControlWidget extends StatelessWidget {
       height: height,
       decoration: BoxDecoration(
         color: isEnabled 
-            ? SequencerPhoneBookColors.surfaceRaised 
-            : SequencerPhoneBookColors.surfacePressed,
+            ? AppColors.sequencerSurfaceRaised 
+            : AppColors.sequencerSurfacePressed,
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: SequencerPhoneBookColors.border,
+          color: AppColors.sequencerBorder,
           width: 0.5,
         ),
         boxShadow: isEnabled
             ? [
                 // Protruding effect for enabled buttons
                 BoxShadow(
-                  color: SequencerPhoneBookColors.shadow,
+                  color: AppColors.sequencerShadow,
                   blurRadius: 1.5,
                   offset: const Offset(0, 1),
                 ),
                 BoxShadow(
-                  color: SequencerPhoneBookColors.surfaceRaised,
+                  color: AppColors.sequencerSurfaceRaised,
                   blurRadius: 0.5,
                   offset: const Offset(0, -0.5),
                 ),
@@ -164,7 +152,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
             : [
                 // Recessed effect for disabled buttons
                 BoxShadow(
-                  color: SequencerPhoneBookColors.shadow,
+                  color: AppColors.sequencerShadow,
                   blurRadius: 1,
                   offset: const Offset(0, 0.5),
                 ),

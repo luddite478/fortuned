@@ -1,18 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
-
+import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
+import '../../../utils/app_colors.dart';
 // Import colors from existing widget
-class SequencerPhoneBookColors {
-  static const Color pageBackground = Color(0xFF3A3A3A);
-  static const Color surfaceBase = Color(0xFF4A4A47);
-  static const Color surfaceRaised = Color(0xFF525250);
-  static const Color surfacePressed = Color(0xFF424240);
-  static const Color text = Color(0xFFE8E6E0);
-  static const Color lightText = Color(0xFFB8B6B0);
-  static const Color accent = Color(0xFF8B7355);
-  static const Color border = Color(0xFF5A5A57);
-  static const Color shadow = Color(0xFF2A2A2A);
-}
 
 enum RevolverAlignment {
   left,    // First item starts on the left
@@ -157,7 +146,7 @@ class _RevolverSelectorWidgetState extends State<RevolverSelectorWidget> {
           Text(
             widget.title!,
             style: GoogleFonts.sourceSans3(
-              color: SequencerPhoneBookColors.text,
+              color: AppColors.sequencerText,
               fontSize: 14,
               fontWeight: FontWeight.w600,
             ),
@@ -167,10 +156,10 @@ class _RevolverSelectorWidgetState extends State<RevolverSelectorWidget> {
         Container(
           height: widget.height,
           decoration: BoxDecoration(
-            color: SequencerPhoneBookColors.surfacePressed,
+            color: AppColors.sequencerSurfacePressed,
             borderRadius: BorderRadius.circular(2),
             border: Border.all(
-              color: SequencerPhoneBookColors.border,
+              color: AppColors.sequencerBorder,
               width: 0.5,
             ),
           ),
@@ -208,18 +197,18 @@ class _RevolverSelectorWidgetState extends State<RevolverSelectorWidget> {
                             height: widget.centerTileSize,
                             decoration: BoxDecoration(
                               color: isSelected 
-                                  ? SequencerPhoneBookColors.surfaceRaised
-                                  : SequencerPhoneBookColors.surfaceBase,
+                                  ? AppColors.sequencerSurfaceRaised
+                                  : AppColors.sequencerSurfaceBase,
                               borderRadius: BorderRadius.circular(2),
                               border: Border.all(
                                 color: isSelected 
-                                    ? SequencerPhoneBookColors.accent
-                                    : SequencerPhoneBookColors.border,
+                                    ? AppColors.sequencerAccent
+                                    : AppColors.sequencerBorder,
                                 width: isSelected ? 1.0 : 0.5,
                               ),
                               boxShadow: isSelected ? [
                                 BoxShadow(
-                                  color: SequencerPhoneBookColors.shadow,
+                                  color: AppColors.sequencerShadow,
                                   blurRadius: 2,
                                   offset: const Offset(0, 1),
                                 ),
@@ -230,8 +219,8 @@ class _RevolverSelectorWidgetState extends State<RevolverSelectorWidget> {
                                 item.displayText,
                                 style: GoogleFonts.sourceSans3(
                                   color: isSelected 
-                                      ? SequencerPhoneBookColors.accent
-                                      : SequencerPhoneBookColors.lightText,
+                                      ? AppColors.sequencerAccent
+                                      : AppColors.sequencerLightText,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
