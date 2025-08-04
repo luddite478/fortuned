@@ -797,7 +797,13 @@ class ThreadsState extends ChangeNotifier {
       setLoading(true);
       setError(null);
 
-      final threads = await ThreadsService.getThreads();
+      // Only load threads for the current user
+      if (_currentUserId == null) {
+        setError('User not authenticated');
+        return;
+      }
+      
+      final threads = await ThreadsService.getThreads(userId: _currentUserId);
       _threads = threads;
     } catch (e) {
       setError('Failed to load threads: $e');
