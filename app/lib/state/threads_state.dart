@@ -202,18 +202,18 @@ class AudioRender {
 }
 
 class AudioSource {
-  final List<SequencerScene> scenes;
+  final List<SequencerSection> sections;
   final List<SampleInfo> samples;
 
   const AudioSource({
-    required this.scenes,
+    required this.sections,
     required this.samples,
   });
 
   factory AudioSource.fromJson(Map<String, dynamic> json) {
     return AudioSource(
-      scenes: (json['scenes'] as List<dynamic>? ?? [])
-          .map((scene) => SequencerScene.fromJson(scene))
+      sections: (json['sections'] as List<dynamic>? ?? [])
+          .map((section) => SequencerSection.fromJson(section))
           .toList(),
       samples: (json['samples'] as List<dynamic>? ?? [])
           .map((sample) => SampleInfo.fromJson(sample))
@@ -222,26 +222,26 @@ class AudioSource {
   }
 
   Map<String, dynamic> toJson() => {
-    'scenes': scenes.map((s) => s.toJson()).toList(),
+    'sections': sections.map((s) => s.toJson()).toList(),
     'samples': samples.map((s) => s.toJson()).toList(),
   };
 }
 
-class SequencerScene {
+class SequencerSection {
   final List<SequencerLayer> layers;
-  final SceneMetadata metadata;
+  final SectionMetadata metadata;
 
-  const SequencerScene({
+  const SequencerSection({
     required this.layers,
     required this.metadata,
   });
 
-  factory SequencerScene.fromJson(Map<String, dynamic> json) {
-    return SequencerScene(
+  factory SequencerSection.fromJson(Map<String, dynamic> json) {
+    return SequencerSection(
       layers: (json['layers'] as List<dynamic>? ?? [])
           .map((layer) => SequencerLayer.fromJson(layer))
           .toList(),
-      metadata: SceneMetadata.fromJson(json['metadata'] ?? {}),
+      metadata: SectionMetadata.fromJson(json['metadata'] ?? {}),
     );
   }
 
@@ -343,14 +343,14 @@ class CellSample {
   };
 }
 
-class SceneMetadata {
+class SectionMetadata {
   final String user;
   final int bpm;
   final String key;
   final String timeSignature;
   final DateTime createdAt;
 
-  const SceneMetadata({
+  const SectionMetadata({
     required this.user,
     required this.bpm,
     required this.key,
@@ -358,8 +358,8 @@ class SceneMetadata {
     required this.createdAt,
   });
 
-  factory SceneMetadata.fromJson(Map<String, dynamic> json) {
-    return SceneMetadata(
+  factory SectionMetadata.fromJson(Map<String, dynamic> json) {
+    return SectionMetadata(
       user: json['user'] ?? '',
       bpm: json['bpm'] ?? 120,
       key: json['key'] ?? 'C Major',

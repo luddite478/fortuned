@@ -235,6 +235,53 @@ class SequencerBindings {
       _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('set_columns');
   late final _set_columns = _set_columnsPtr.asFunction<void Function(int)>();
 
+  /// Section management functions
+  void set_current_section(
+    int section,
+  ) {
+    return _set_current_section(
+      section,
+    );
+  }
+
+  late final _set_current_sectionPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+          'set_current_section');
+  late final _set_current_section =
+      _set_current_sectionPtr.asFunction<void Function(int)>();
+
+  void set_total_sections(
+    int sections,
+  ) {
+    return _set_total_sections(
+      sections,
+    );
+  }
+
+  late final _set_total_sectionsPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>(
+          'set_total_sections');
+  late final _set_total_sections =
+      _set_total_sectionsPtr.asFunction<void Function(int)>();
+
+  int get_current_section() {
+    return _get_current_section();
+  }
+
+  late final _get_current_sectionPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('get_current_section');
+  late final _get_current_section =
+      _get_current_sectionPtr.asFunction<int Function()>();
+
+  int get_total_sections() {
+    return _get_total_sections();
+  }
+
+  late final _get_total_sectionsPtr =
+      _lookup<ffi.NativeFunction<ffi.Int Function()>>('get_total_sections');
+  late final _get_total_sections =
+      _get_total_sectionsPtr.asFunction<int Function()>();
+
   /// Returns the number of available playback slots (always MAX_SLOTS)
   int get_slot_count() {
     return _get_slot_count();

@@ -430,6 +430,26 @@ class SequencerLibrary {
     print('🎛️ Set sequencer columns to $columns');
   }
 
+  // -------------- SECTION MANAGEMENT FUNCTIONS --------------
+  
+  /// Set the current active section (0-based index)
+  void setCurrentSection(int section) {
+    _bindings.set_current_section(section);
+    print('🎵 Set current section to $section');
+  }
+  
+  /// Set the total number of sections
+  void setTotalSections(int sections) {
+    _bindings.set_total_sections(sections);
+    print('🎵 Set total sections to $sections');
+  }
+  
+  /// Get the current active section
+  int get currentSection => _bindings.get_current_section();
+  
+  /// Get the total number of sections
+  int get totalSections => _bindings.get_total_sections();
+
   // -------------- VOLUME CONTROL FUNCTIONS --------------
   
   /// Set volume for a specific sample bank (0.0 to 1.0)

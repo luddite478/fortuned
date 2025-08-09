@@ -195,7 +195,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () {
+                onTap: () async {
+                  // Reset sequencer state for a truly new project
+                  await context.read<SequencerState>().resetToFreshState();
+                  // Clear active thread context
+                  context.read<ThreadsState>().setActiveThread(null);
                   // Navigate to sequencer
                   Navigator.push(
                     context,
@@ -333,7 +337,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 child: Material(
                   color: Colors.transparent,
                   child: InkWell(
-                    onTap: () {
+                    onTap: () async {
+                      // Reset sequencer state for a truly new project
+                      await context.read<SequencerState>().resetToFreshState();
+                      // Clear active thread context
+                      context.read<ThreadsState>().setActiveThread(null);
                       // Navigate to sequencer
                       Navigator.push(
                         context,

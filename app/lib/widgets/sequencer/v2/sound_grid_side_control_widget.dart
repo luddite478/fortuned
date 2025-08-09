@@ -25,9 +25,10 @@ class SoundGridSideControlWidget extends StatelessWidget {
             
             // Use 90% of available height for buttons, leaving small margins
             final buttonsAreaHeight = availableHeight * 0.9;
-            // Each button takes 1/3 of the buttons area with small spacing
+            // Compute layout per side
+            final int buttonCount = side == SideControlSide.left ? 4 : 3;
             final buttonSpacing = buttonsAreaHeight * 0.05;
-            final buttonHeight = (buttonsAreaHeight - (2 * buttonSpacing)) / 3;
+            final buttonHeight = (buttonsAreaHeight - ((buttonCount - 1) * buttonSpacing)) / buttonCount;
             
             // Button width should use most of available width
             final buttonWidth = availableWidth * 0.8;
@@ -56,52 +57,130 @@ class SoundGridSideControlWidget extends StatelessWidget {
               ),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Top Button - Keep blank with icon
+                children: side == SideControlSide.left ? [
+                  // Left Side: Section Control Button
+                  _buildSideControlButtonWithText(
+                    width: buttonWidth,
+                    height: buttonHeight,
+                    text: '${sequencer.currentSectionIndex + 1}',
+                    color: sequencer.isSectionControlOverlayOpen 
+                        ? AppColors.sequencerAccent 
+                        : AppColors.sequencerLightText,
+                    onPressed: () {
+                      sequencer.toggleSectionControlOverlay();
+                    },
+                    tooltip: 'Section Settings',
+                    bottom: ValueListenableBuilder<int>(
+                      valueListenable: sequencer.currentStepNotifier,
+                      builder: (context, _, __) {
+                        final total = sequencer.getSectionLoopCount(sequencer.currentSectionIndex);
+                        final current = (sequencer.currentSectionLoopCounter + 1).clamp(1, total);
+                        final label = '$current/$total';
+                        final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
+                        return Text(
+                          label,
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: buttonWidth * 0.40,
+                            fontWeight: FontWeight.w600,
+                            height: 1.0,
+                            letterSpacing: 0.2,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                   
+                  SizedBox(height: buttonSpacing),
+                  
+                  // Middle Button - Loop/Song mode toggle
                   _buildSideControlButton(
                     width: buttonWidth,
                     height: buttonHeight,
                     iconSize: iconSize,
-                    icon: Icons.circle_outlined, // Generic placeholder icon
-                    color: AppColors.sequencerLightText,
+                    icon: Icons.repeat,
+                    color: sequencer.sectionPlaybackMode == SectionPlaybackMode.loop 
+                        ? Colors.white 
+                        : AppColors.sequencerLightText,
                     onPressed: () {
-                      // TODO: Add functionality
+                      sequencer.toggleSectionPlaybackMode();
                     },
-                    tooltip: side == SideControlSide.left ? 'Left Control 1' : 'Right Control 1',
+                    tooltip: sequencer.sectionPlaybackMode == SectionPlaybackMode.loop 
+                        ? 'Loop Mode (Active)'
+                        : 'Song Mode (Click to Loop)',
+                    backgroundColor: sequencer.sectionPlaybackMode == SectionPlaybackMode.loop 
+                        ? AppColors.sequencerPrimaryButton 
+                        : AppColors.sequencerSurfacePressed,
                   ),
                   
                   SizedBox(height: buttonSpacing),
                   
-                  // Middle Button - Minus on left, Plus on right
+                  // Bottom two buttons: Redo above, Undo at bottom
                   _buildSideControlButton(
                     width: buttonWidth,
                     height: buttonHeight,
                     iconSize: iconSize,
-                    icon: side == SideControlSide.left ? Icons.chevron_left : Icons.chevron_right,
+                    icon: Icons.redo,
+                    color: sequencer.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
+                    onPressed: sequencer.canRedo ? () => sequencer.redo() : null,
+                    tooltip: sequencer.canRedo ? 'Redo' : 'Nothing to Redo',
+                  ),
+                  SizedBox(height: buttonSpacing),
+                  _buildSideControlButton(
+                    width: buttonWidth,
+                    height: buttonHeight,
+                    iconSize: iconSize,
+                    icon: Icons.undo,
+                    color: sequencer.canUndo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
+                    onPressed: sequencer.canUndo ? () => sequencer.undo() : null,
+                    tooltip: sequencer.canUndo ? 'Undo: ${sequencer.currentUndoDescription}' : 'Nothing to Undo',
+                  ),
+                ] : [
+                  // Right Side: Previous, Next, Redo
+                  _buildSideControlButton(
+                    width: buttonWidth,
+                    height: buttonHeight,
+                    iconSize: iconSize,
+                    icon: Icons.chevron_left,
+                    color: sequencer.numSections > 1 
+                        ? AppColors.sequencerLightText 
+                        : AppColors.sequencerLightText.withOpacity(0.5),
+                    onPressed: sequencer.numSections > 1 
+                        ? () => sequencer.switchToPreviousSection()
+                        : null,
+                    tooltip: sequencer.numSections > 1 
+                        ? 'Previous Section (${sequencer.currentSectionIndex + 1}/${sequencer.numSections})'
+                        : 'Only 1 Section',
+                  ),
+                  SizedBox(height: buttonSpacing),
+                  _buildSideControlButton(
+                    width: buttonWidth,
+                    height: buttonHeight,
+                    iconSize: iconSize,
+                    icon: Icons.chevron_right,
                     color: AppColors.sequencerLightText,
                     onPressed: () {
-                      // TODO: Add functionality
+                      if (sequencer.currentSectionIndex == sequencer.numSections - 1) {
+                        sequencer.openSectionCreationOverlay();
+                      } else {
+                        sequencer.switchToNextSection();
+                      }
                     },
-                    tooltip: side == SideControlSide.left ? 'Remove' : 'Add',
+                    tooltip: sequencer.currentSectionIndex == sequencer.numSections - 1 
+                        ? 'Create New Section'
+                        : 'Next Section (${sequencer.currentSectionIndex + 2}/${sequencer.numSections})',
                   ),
-                  
                   SizedBox(height: buttonSpacing),
-                  
-                  // Bottom Button - Undo on left, Redo on right
                   _buildSideControlButton(
                     width: buttonWidth,
                     height: buttonHeight,
                     iconSize: iconSize,
-                    icon: side == SideControlSide.left ? Icons.undo : Icons.redo,
-                    color: side == SideControlSide.left 
-                        ? (sequencer.canUndo ? AppColors.sequencerAccent : AppColors.sequencerLightText)
-                        : (sequencer.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText),
-                    onPressed: side == SideControlSide.left
-                        ? (sequencer.canUndo ? () => sequencer.undo() : null)
-                        : (sequencer.canRedo ? () => sequencer.redo() : null),
-                    tooltip: side == SideControlSide.left 
-                        ? (sequencer.canUndo ? 'Undo: ${sequencer.currentUndoDescription}' : 'Nothing to Undo')
-                        : (sequencer.canRedo ? 'Redo' : 'Nothing to Redo'),
+                    icon: Icons.redo,
+                    color: sequencer.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
+                    onPressed: sequencer.canRedo ? () => sequencer.redo() : null,
+                    tooltip: sequencer.canRedo ? 'Redo' : 'Nothing to Redo',
                   ),
                 ],
               ),
@@ -120,6 +199,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
     required Color color,
     required VoidCallback? onPressed,
     required String tooltip,
+    Color? backgroundColor,
   }) {
     final isEnabled = onPressed != null;
     
@@ -127,9 +207,9 @@ class SoundGridSideControlWidget extends StatelessWidget {
       width: width,
       height: height,
       decoration: BoxDecoration(
-        color: isEnabled 
+        color: backgroundColor ?? (isEnabled 
             ? AppColors.sequencerSurfaceRaised 
-            : AppColors.sequencerSurfacePressed,
+            : AppColors.sequencerSurfacePressed),
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
           color: AppColors.sequencerBorder,
@@ -170,6 +250,86 @@ class SoundGridSideControlWidget extends StatelessWidget {
                 icon,
                 color: color,
                 size: iconSize,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSideControlButtonWithText({
+    required double width,
+    required double height,
+    required String text,
+    required Color color,
+    required VoidCallback? onPressed,
+    required String tooltip,
+    Widget? bottom,
+    Color? backgroundColor,
+  }) {
+    final isEnabled = onPressed != null;
+    
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: backgroundColor ?? (isEnabled 
+            ? AppColors.sequencerSurfaceRaised 
+            : AppColors.sequencerSurfacePressed),
+        borderRadius: BorderRadius.circular(2), // Sharp corners
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 0.5,
+        ),
+        boxShadow: isEnabled
+            ? [
+                // Protruding effect for enabled buttons
+                BoxShadow(
+                  color: AppColors.sequencerShadow,
+                  blurRadius: 1.5,
+                  offset: const Offset(0, 1),
+                ),
+                BoxShadow(
+                  color: AppColors.sequencerSurfaceRaised,
+                  blurRadius: 0.5,
+                  offset: const Offset(0, -0.5),
+                ),
+              ]
+            : [
+                // Recessed effect for disabled buttons
+                BoxShadow(
+                  color: AppColors.sequencerShadow,
+                  blurRadius: 1,
+                  offset: const Offset(0, 0.5),
+                ),
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(2),
+          child: Container(
+            padding: EdgeInsets.zero,
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    text,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: width * 0.55,
+                      fontWeight: FontWeight.w700,
+                      height: 0.9,
+                    ),
+                  ),
+                  if (bottom != null) ...[
+                    SizedBox(height: height * 0.08),
+                    bottom,
+                  ],
+                ],
               ),
             ),
           ),

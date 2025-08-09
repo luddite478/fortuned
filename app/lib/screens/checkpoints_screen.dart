@@ -408,8 +408,8 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
 
   Widget _buildSoundGridPreview(SequencerSnapshot snapshot) {
     if (snapshot.audio.sources.isEmpty || 
-        snapshot.audio.sources.first.scenes.isEmpty ||
-        snapshot.audio.sources.first.scenes.first.layers.isEmpty) {
+        snapshot.audio.sources.first.sections.isEmpty ||
+        snapshot.audio.sources.first.sections.first.layers.isEmpty) {
       return Container(
         height: 80, // Regular messenger size
         decoration: BoxDecoration(
@@ -433,8 +433,8 @@ class _CheckpointsScreenState extends State<CheckpointsScreen> with TickerProvid
       );
     }
 
-    final scene = snapshot.audio.sources.first.scenes.first;
-    final layers = scene.layers;
+    final section = snapshot.audio.sources.first.sections.first;
+    final layers = section.layers;
     
     return Container(
       height: 80, // Regular messenger size

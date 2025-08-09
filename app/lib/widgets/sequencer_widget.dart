@@ -190,7 +190,7 @@ class SequencerWidget extends StatelessWidget {
           
           // Check if this is the current step
           final isCurrentStep = sequencer.isSequencerPlaying && 
-                               sequencer.currentStep == col;
+                               sequencer.currentStep == row;
           
           return Container(
             decoration: BoxDecoration(

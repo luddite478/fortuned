@@ -157,7 +157,7 @@ class MessageBarWidget extends StatelessWidget {
                                   ),
                                 ),
                                 child: Center(
-                                  child: _buildSceneChain(sequencerState.numScenes),
+                                  child: _buildSectionChain(sequencerState.numSections),
                                 ),
                               ),
                             ),
@@ -215,12 +215,12 @@ class MessageBarWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSceneChain(int numScenes) {
+  Widget _buildSectionChain(int numSections) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(numScenes * 2 - 1, (index) {
+      children: List.generate(numSections * 2 - 1, (index) {
         if (index.isEven) {
-          // Square representing a scene
+          // Square representing a section
           return Container(
             width: 12,
             height: 12,
@@ -235,7 +235,7 @@ class MessageBarWidget extends StatelessWidget {
             ),
           );
         } else {
-          // Horizontal line connecting scenes
+          // Horizontal line connecting sections
           return Container(
             width: 8,
             height: 2,

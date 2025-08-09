@@ -4,6 +4,8 @@ import '../v2/sound_grid_widget.dart' as v1;
 import 'sample_selection_widget.dart';
 import 'sound_grid_side_control_widget.dart';
 import 'value_control_overlay.dart';
+import 'section_control_overlay.dart';
+import 'section_creation_overlay.dart';
 import '../../../state/sequencer_state.dart';
 
 // Body element modes for switching between different content
@@ -25,12 +27,22 @@ class SequencerBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<SequencerState, bool>(
-      selector: (context, state) => state.isBodyElementSampleBrowserOpen,
-      builder: (context, isBodyBrowserOpen, child) {
-        return isBodyBrowserOpen
-            ? const SampleSelectionWidget()
-            : Stack(
+    return Selector<SequencerState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen})>(
+      selector: (context, state) => (
+        isBodyBrowserOpen: state.isBodyElementSampleBrowserOpen,
+        isSectionControlOpen: state.isSectionControlOverlayOpen,
+        isSectionCreationOpen: state.isSectionCreationOverlayOpen,
+      ),
+      builder: (context, data, child) {
+        // Priority: Sample browser > Section creation > Section control > Main grid
+        if (data.isBodyBrowserOpen) {
+          return const SampleSelectionWidget();
+        } else if (data.isSectionCreationOpen) {
+          return const SectionCreationOverlay();
+        } else if (data.isSectionControlOpen) {
+          return const SectionControlOverlay();
+        } else {
+          return Stack(
                 children: [
                   // Main sequencer body content
                   RepaintBoundary(
@@ -70,6 +82,7 @@ class SequencerBody extends StatelessWidget {
                   const ValueControlOverlay(),
                 ],
               );
+        }
       },
     );
   }

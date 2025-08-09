@@ -329,7 +329,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       valueListenable: sequencer.currentStepNotifier,
       builder: (context, currentStep, child) {
         final isActivePad = sequencer.activePad == index;
-        final isCurrentStep = currentStep == row && sequencer.isSequencerPlaying;
+        final isCurrentStep = sequencer.isSequencerPlaying && currentStep == row;
         final placedSample = sequencer.gridSamples[index];
         final hasPlacedSample = placedSample != null;
         final isSelected = sequencer.selectedGridCells.contains(index);

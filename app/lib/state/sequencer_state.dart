@@ -18,6 +18,9 @@ import '../services/audio_conversion_service.dart';
 import 'threads_state.dart';
 import '../services/threads_service.dart';
 
+// Section playback modes
+enum SectionPlaybackMode { loop, song }
+
 // Multitask panel modes
 enum MultitaskPanelMode {
   placeholder,
@@ -267,8 +270,16 @@ class SequencerState extends ChangeNotifier {
   int _gridColumns = 4;
   int _gridRows = 16; // Will be validated against _maxSequencerSteps in init
   
-  // Scene chain configuration
-  int _numScenes = 1; // Number of scenes in the chain
+  // Section chain configuration
+  int _numSections = 1; // Number of sections in the chain
+  int _currentSectionIndex = 0; // Currently active section (0-based)
+  List<int> _sectionLoopCounts = [1]; // Loop count for each section
+  SectionPlaybackMode _sectionPlaybackMode = SectionPlaybackMode.loop; // Current playback mode
+  bool _isSectionControlOverlayOpen = false; // Section control overlay state
+  bool _isSectionCreationOverlayOpen = false; // Section creation overlay state
+  
+  // Section-specific storage (persistence) - as per documentation
+  Map<int, List<List<int?>>> _sectionGridData = {}; // Maps section index to grid data
   
   // Grid state - tracks which sample slot is assigned to each grid cell for each sound grid
   late List<List<int?>> _soundGridSamples; // Each sound grid has its own grid samples
@@ -835,10 +846,10 @@ class SequencerState extends ChangeNotifier {
       }
     }
     
-    // Create the scene with metadata
-    final scene = SequencerScene(
+    // Create the section with metadata
+    final section = SequencerSection(
       layers: layers,
-      metadata: SceneMetadata(
+      metadata: SectionMetadata(
         user: _threadsState?.currentUserId ?? 'unknown',
         createdAt: now,
         bpm: _bpm,
@@ -849,7 +860,7 @@ class SequencerState extends ChangeNotifier {
     
     // Create the audio source
     final audioSource = AudioSource(
-      scenes: [scene],
+      sections: [section],
       samples: samples,
     );
     
@@ -880,12 +891,12 @@ class SequencerState extends ChangeNotifier {
       if (audio.sources.isEmpty) return;
       
       final source = audio.sources.first;
-      if (source.scenes.isEmpty) return;
-      
-      final scene = source.scenes.first;
-      
-      // Apply BPM from metadata
-      _bpm = scene.metadata.bpm;
+          if (source.sections.isEmpty) return;
+    
+        final section = source.sections.first;
+    
+    // Apply BPM from metadata
+    _bpm = section.metadata.bpm;
       
       // Clear current state
       _soundGridSamples.clear();
@@ -903,8 +914,8 @@ class SequencerState extends ChangeNotifier {
       }
       
       // Apply layers as sound grids
-      for (int layerIndex = 0; layerIndex < scene.layers.length; layerIndex++) {
-        final layer = scene.layers[layerIndex];
+      for (int layerIndex = 0; layerIndex < section.layers.length; layerIndex++) {
+        final layer = section.layers[layerIndex];
         final gridSamples = <int?>[];
         
         // Convert rows back to grid format
@@ -958,7 +969,7 @@ class SequencerState extends ChangeNotifier {
   int? get selectedSampleSlot => _selectedSampleSlot;
   int get gridColumns => _gridColumns;
   int get gridRows => _gridRows;
-  int get numScenes => _numScenes;
+  int get numSections => _numSections;
   List<int?> get gridSamples => _soundGridSamples.isNotEmpty && _currentSoundGridIndex < _soundGridSamples.length 
       ? List.unmodifiable(_soundGridSamples[_currentSoundGridIndex]) 
       : List.filled(_gridColumns * _gridRows, null);
@@ -1470,7 +1481,8 @@ class SequencerState extends ChangeNotifier {
           final row = cellIndex ~/ _gridColumns;
           final col = cellIndex % _gridColumns;
           final absoluteColumn = gridIndex * _gridColumns + col;
-          _sequencerLibrary.clearGridCell(row, absoluteColumn);
+          final absoluteStep = _currentSectionIndex * _gridRows + row;
+          _sequencerLibrary.clearGridCell(absoluteStep, absoluteColumn);
         }
       }
     }
@@ -1779,7 +1791,8 @@ class SequencerState extends ChangeNotifier {
         final row = cellIndex ~/ _gridColumns;
         final col = cellIndex % _gridColumns;
         final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-        _sequencerLibrary.clearGridCell(row, absoluteColumn);
+        final absoluteStep = _currentSectionIndex * _gridRows + row;
+        _sequencerLibrary.clearGridCell(absoluteStep, absoluteColumn);
       }
     }
 
@@ -1805,7 +1818,8 @@ class SequencerState extends ChangeNotifier {
       final row = cellIndex ~/ _gridColumns;
       final col = cellIndex % _gridColumns;
       final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-      _sequencerLibrary.clearGridCell(row, absoluteColumn);
+      final absoluteStep = _currentSectionIndex * _gridRows + row;
+      _sequencerLibrary.clearGridCell(absoluteStep, absoluteColumn);
       notifyListeners();
     }
   }
@@ -1814,8 +1828,18 @@ class SequencerState extends ChangeNotifier {
   void startSequencer() {
     if (_sequencerLibrary.isSequencerPlaying) return;
     
+    // If grid is empty, ensure native grid is cleared to avoid stale cells
+    final hasAnyCell = _soundGridSamples.any((grid) => grid.any((cell) => cell != null));
+    if (!hasAnyCell) {
+      _sequencerLibrary.clearAllGridCells();
+    }
+    
     // Note: Grid sync is now called explicitly when needed
     // For simple stop/start, nodes are preserved via ma_node_set_state
+    
+    // Reset song mode tracking when starting
+    _currentSectionLoopCounter = 0;
+    _lastAbsoluteStepForSongMode = -1;
     
     // Start sequencer with current BPM and grid size
     bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows);
@@ -1837,6 +1861,8 @@ class SequencerState extends ChangeNotifier {
     _sequencerLibrary.stopSequencer();
     _isSequencerPlaying = false;
     _currentStep = -1;
+    _currentSectionLoopCounter = 0;
+    _lastAbsoluteStepForSongMode = -1;
     
     // 🎯 PERFORMANCE: Update ValueNotifiers for instant UI feedback
     _isSequencerPlayingNotifier.value = false;
@@ -1865,29 +1891,36 @@ class SequencerState extends ChangeNotifier {
     _sequencerLibrary.clearAllGridCells();
     print('🔄 [SYNC] Cleared native sequencer completely');
     
-    // Transfer ALL sound grids to sequencer as one horizontally concatenated table
+    // Transfer ALL SECTIONS for ALL sound grids to native table
     int totalCellsSet = 0;
-    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
-      final gridSamples = _soundGridSamples[gridIndex];
-      int gridCellsSet = 0;
+    for (int sectionIndex = 0; sectionIndex < _numSections; sectionIndex++) {
+      // Determine source grid data for this section
+      final List<List<int?>> sectionGridData = sectionIndex == _currentSectionIndex
+          ? _soundGridSamples.map((g) => List<int?>.from(g)).toList()
+          : (_sectionGridData[sectionIndex]?.map((g) => List<int?>.from(g)).toList() ??
+              List.generate(_soundGridSamples.length, (i) => List.filled(_gridColumns * _gridRows, null)));
       
-      for (int row = 0; row < _gridRows; row++) {
-        for (int col = 0; col < _gridColumns; col++) {
-          final cellIndex = row * _gridColumns + col;
-          final sampleSlot = gridSamples[cellIndex];
-          if (sampleSlot != null) {
-            // Calculate absolute column index: gridIndex * columnsPerGrid + column
-            final absoluteColumn = gridIndex * _gridColumns + col;
-            _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
-            gridCellsSet++;
-            totalCellsSet++;
-            print('🎹 [SYNC] Grid $gridIndex: Set [row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn] = sample $sampleSlot');
+      for (int gridIndex = 0; gridIndex < sectionGridData.length; gridIndex++) {
+        final gridSamples = sectionGridData[gridIndex];
+        int gridCellsSet = 0;
+        for (int row = 0; row < _gridRows; row++) {
+          for (int col = 0; col < _gridColumns; col++) {
+            final cellIndex = row * _gridColumns + col;
+            final sampleSlot = gridSamples[cellIndex];
+            if (sampleSlot != null) {
+              final absoluteStep = sectionIndex * _gridRows + row;
+              final absoluteColumn = gridIndex * _gridColumns + col;
+              _sequencerLibrary.setGridCell(absoluteStep, absoluteColumn, sampleSlot);
+              gridCellsSet++;
+              totalCellsSet++;
+              print('🎹 [SYNC] Section $sectionIndex Grid $gridIndex: Set [row:$row, col:$col] → native [absoluteStep:$absoluteStep, absoluteCol:$absoluteColumn] = sample $sampleSlot');
+            }
           }
         }
+        print('📊 [SYNC] Section $sectionIndex Grid $gridIndex: Set $gridCellsSet cells');
       }
-      print('📊 [SYNC] Grid $gridIndex: Set $gridCellsSet cells');
     }
-    print('✅ [SYNC] Total: Set $totalCellsSet cells across ${_soundGridSamples.length} grids');
+    print('✅ [SYNC] Total: Set $totalCellsSet cells across $_numSections sections × ${_soundGridSamples.length} grids');
   }
   
   void _startUIUpdateTimer() {
@@ -1901,12 +1934,49 @@ class SequencerState extends ChangeNotifier {
         return;
       }
       
-      final currentStep = _sequencerLibrary.currentStep;
-      if (currentStep != _currentStep) {
-        _currentStep = currentStep;
+      final absoluteStep = _sequencerLibrary.currentStep;
+      // Convert to section-relative step for UI highlighting
+      final sectionStart = _currentSectionIndex * _gridRows;
+      final sectionEndExclusive = sectionStart + _gridRows;
+      final relativeStep = absoluteStep - sectionStart;
+      if (relativeStep != _currentStep) {
+        // Song mode: detect wrap-around at section boundary and advance section
+        if (_sectionPlaybackMode == SectionPlaybackMode.song) {
+          // Preemptive stop to avoid retrigger on wrap at the very end of the song
+          if (_currentSectionIndex == _numSections - 1) {
+            final requiredLoops = getSectionLoopCount(_currentSectionIndex);
+            final bool isLastStepOfSection = (relativeStep == _gridRows - 1);
+            if (isLastStepOfSection && (_currentSectionLoopCounter + 1) >= requiredLoops) {
+              // We're on the last step of the final loop of the last section → stop before native wraps to step 0
+              stopSequencer();
+              return;
+            }
+          }
+          if (_lastAbsoluteStepForSongMode != -1 && absoluteStep < _lastAbsoluteStepForSongMode) {
+            // We wrapped. Count a loop for the current section
+            _currentSectionLoopCounter++;
+            final requiredLoops = getSectionLoopCount(_currentSectionIndex);
+            if (_currentSectionLoopCounter >= requiredLoops) {
+              _currentSectionLoopCounter = 0;
+              if (_currentSectionIndex < _numSections - 1) {
+                // Move to next section
+                _switchToSection(_currentSectionIndex + 1);
+                // After switching, ensure native is positioned at new section start
+                _sequencerLibrary.setCurrentSection(_currentSectionIndex);
+              } else {
+                // Last section completed: stop playback
+                stopSequencer();
+                return;
+              }
+            }
+          }
+          _lastAbsoluteStepForSongMode = absoluteStep;
+        }
+        
+        _currentStep = relativeStep;
         
         // 🎯 PERFORMANCE: Update ValueNotifier for step indicator (instant UI update)
-        _currentStepNotifier.value = currentStep;
+        _currentStepNotifier.value = relativeStep;
         
         // 🎯 PERFORMANCE: No notifyListeners() call - only ValueNotifier updates!
         // This eliminates unnecessary widget rebuilds during playback
@@ -1933,11 +2003,6 @@ class SequencerState extends ChangeNotifier {
       final cellCount = _selectedGridCells.length;
       for (int selectedIndex in _selectedGridCells) {
         _setCurrentGridSample(selectedIndex, sampleSlot);
-        // Sync to sequencer using absolute column calculation
-        final row = selectedIndex ~/ _gridColumns;
-        final col = selectedIndex % _gridColumns;
-        final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-        _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
       }
       _selectedGridCells.clear();
       
@@ -1950,11 +2015,6 @@ class SequencerState extends ChangeNotifier {
     } else {
       // Place sample in just this cell
       _setCurrentGridSample(cellIndex, sampleSlot);
-      // Sync to sequencer using absolute column calculation
-      final row = cellIndex ~/ _gridColumns;
-      final col = cellIndex % _gridColumns;
-      final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
-      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
       
       // Record undo action for single cell
       final cellPosition = _getCellPositionString(cellIndex);
@@ -2361,7 +2421,7 @@ Made with Demo Sequencer 🚀
         
         await Share.shareXFiles(
           [XFile(shareFilePath)],
-                  text: 'Check out this beat I made with NIYYA! 🎵\n\nFormat: $fileType (${_formatFileSize(fileSize)})\n\n#NiyyaSequencer #BeatMaking #MusicProduction',
+                  text: 'Check out this beat I made with NIYYA! 🎵\n\nFormat: $fileType (${_formatFileSize(fileSize)})\n\n',
         subject: 'NIYYA Sequencer Recording - $fileName',
         );
         print('🎵 Shared $fileType recording: $fileName');
@@ -2410,13 +2470,13 @@ Made with Demo Sequencer 🚀
     notifyListeners();
   }
 
-  // Update number of scenes in the chain
-  void setNumScenes(int newNumScenes) {
-    if (newNumScenes < 1 || newNumScenes > 10) return; // Limit to reasonable range
+  // Update number of sections in the chain
+  void setNumSections(int newNumSections) {
+    if (newNumSections < 1 || newNumSections > 10) return; // Limit to reasonable range
     
-    _numScenes = newNumScenes;
+    _numSections = newNumSections;
     
-    // Trigger autosave when scene count changes
+    // Trigger autosave when section count changes
     _triggerAutosave();
     
     notifyListeners();
@@ -2540,21 +2600,23 @@ Made with Demo Sequencer 🚀
     }
   }
 
-  // 🔧 NEW: Sync a single cell change to native sequencer immediately
   void _syncSingleCellToNative(int cellIndex, int? sampleSlot) {
-    // Calculate row and column from cell index
-    final row = cellIndex ~/ _gridColumns;
+    // Calculate step and column from cell index
+    final relativeStep = cellIndex ~/ _gridColumns;
     final col = cellIndex % _gridColumns;
+    
+    // Calculate absolute step: section * stepsPerSection + relativeStep
+    final absoluteStep = _currentSectionIndex * _gridRows + relativeStep;
     
     // Calculate absolute column: gridIndex * columnsPerGrid + localColumn
     final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
     
     if (sampleSlot != null) {
-      _sequencerLibrary.setGridCell(row, absoluteColumn, sampleSlot);
-      print('🎹 [SYNC] Set cell [grid:$_currentSoundGridIndex, row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn] = sample $sampleSlot');
+      _sequencerLibrary.setGridCell(absoluteStep, absoluteColumn, sampleSlot);
+      print('🎹 [SYNC] Set cell [grid:$_currentSoundGridIndex, step:$relativeStep, col:$col] → native [absoluteStep:$absoluteStep, absoluteCol:$absoluteColumn] = sample $sampleSlot');
     } else {
-      _sequencerLibrary.clearGridCell(row, absoluteColumn);
-      print('🗑️ [SYNC] Cleared cell [grid:$_currentSoundGridIndex, row:$row, col:$col] → native [row:$row, absoluteCol:$absoluteColumn]');
+      _sequencerLibrary.clearGridCell(absoluteStep, absoluteColumn);
+      print('🗑️ [SYNC] Cleared cell [grid:$_currentSoundGridIndex, step:$relativeStep, col:$col] → native [absoluteStep:$absoluteStep, absoluteCol:$absoluteColumn]');
     }
   }
 
@@ -3056,6 +3118,11 @@ Made with Demo Sequencer 🚀
   Future<void> resetToFreshState() async {
     debugPrint('🧪 Resetting sequencer to fresh state...');
     
+    // Stop everything and fully clear native grid/state
+    _sequencerLibrary.stopAllSounds();
+    _sequencerLibrary.stopSequencer();
+    _sequencerLibrary.clearAllGridCells();
+    
     // Clear all current state
     _clearAllSampleSlots();
     clearAllCells();
@@ -3070,6 +3137,14 @@ Made with Demo Sequencer 🚀
     _isSelecting = false;
     _isInSelectionMode = false;
     _isDragging = false;
+    
+    // Sections: reset to a single blank section
+    _numSections = 1;
+    _currentSectionIndex = 0;
+    _sectionLoopCounts = [1];
+    _sectionGridData.clear();
+    _sequencerLibrary.setTotalSections(_numSections);
+    _sequencerLibrary.setCurrentSection(_currentSectionIndex);
     
     // Clear sound grids
     _soundGridSamples.clear();
@@ -3425,17 +3500,18 @@ Made with Demo Sequencer 🚀
       _cellPitchNotifiers[cellIndex]?.value = clampedPitch;
       
       // Convert cellIndex to step and column for native call
-      final row = cellIndex ~/ _gridColumns;
+      final relativeStep = cellIndex ~/ _gridColumns;
       final col = cellIndex % _gridColumns;
+      final absoluteStep = _currentSectionIndex * _gridRows + relativeStep;
       final absoluteColumn = _currentSoundGridIndex * _gridColumns + col;
       
       // Store pitch in native grid with debouncing for performance
       _debouncedNativePitchCall('cell_$cellIndex', clampedPitch, () {
-        _sequencerLibrary.setCellPitch(row, absoluteColumn, clampedPitch);
+        _sequencerLibrary.setCellPitch(absoluteStep, absoluteColumn, clampedPitch);
         
         // Preview the cell with new pitch for immediate feedback
         final cellVolume = getCellVolume(cellIndex);
-        _previewCellWithAutoStop(row, absoluteColumn, clampedPitch, cellVolume);
+        _previewCellWithAutoStop(absoluteStep, absoluteColumn, clampedPitch, cellVolume);
       });
       
       // Record debounced undo action (will only record after user stops adjusting)
@@ -3909,7 +3985,7 @@ Made with Demo Sequencer 🚀
       // Load basic metadata
       if (snapshot.audio.sources.isNotEmpty) {
         final source = snapshot.audio.sources.first;
-        debugPrint('🔍 Source has ${source.samples.length} samples and ${source.scenes.length} scenes');
+        debugPrint('🔍 Source has ${source.samples.length} samples and ${source.sections.length} sections');
         
         // Load samples first
         final sampleMap = <String, int>{}; // Map sample ID to slot index
@@ -3928,25 +4004,25 @@ Made with Demo Sequencer 🚀
         debugPrint('🗺️ Sample map: $sampleMap');
         
         // Load grid data if available
-        if (source.scenes.isNotEmpty) {
-          final scene = source.scenes.first;
-          debugPrint('🔍 Scene has ${scene.layers.length} layers');
+        if (source.sections.isNotEmpty) {
+          final section = source.sections.first;
+          debugPrint('🔍 Section has ${section.layers.length} layers');
           
           // Update BPM if available
-          if (scene.metadata.bpm > 0) {
-            _bpm = scene.metadata.bpm;
+          if (section.metadata.bpm > 0) {
+            _bpm = section.metadata.bpm;
             debugPrint('🎵 Set BPM to ${_bpm}');
           }
           
           // Load grid patterns
-          if (scene.layers.isNotEmpty) {
+          if (section.layers.isNotEmpty) {
             // Clear existing sound grids and create new ones for each layer
             _soundGridSamples.clear();
             _soundGridOrder.clear();
             _soundGridLabels.clear();
             
-            for (int layerIndex = 0; layerIndex < scene.layers.length; layerIndex++) {
-              final layer = scene.layers[layerIndex];
+            for (int layerIndex = 0; layerIndex < section.layers.length; layerIndex++) {
+              final layer = section.layers[layerIndex];
               debugPrint('🔍 Loading layer ${layerIndex}: ${layer.id} with ${layer.rows.length} rows');
               
               // Add a new sound grid for this layer
@@ -4306,4 +4382,205 @@ Made with Demo Sequencer 🚀
     _sequencerLibrary.cleanup();
     super.dispose();
   }
+
+  int get currentSectionIndex => _currentSectionIndex;
+  bool get isSectionControlOverlayOpen => _isSectionControlOverlayOpen;
+  bool get isSectionCreationOverlayOpen => _isSectionCreationOverlayOpen;
+  SectionPlaybackMode get sectionPlaybackMode => _sectionPlaybackMode;
+
+  // Section management methods
+  int getSectionLoopCount(int sectionIndex) {
+    if (sectionIndex < 0 || sectionIndex >= _sectionLoopCounts.length) {
+      return 1; // Default loop count
+    }
+    return _sectionLoopCounts[sectionIndex];
+  }
+
+  void setSectionLoopCount(int sectionIndex, int loopCount) {
+    if (sectionIndex < 0 || loopCount < 1 || loopCount > 16) return;
+    
+    // Extend list if necessary
+    while (_sectionLoopCounts.length <= sectionIndex) {
+      _sectionLoopCounts.add(1);
+    }
+    
+    _sectionLoopCounts[sectionIndex] = loopCount;
+    _triggerAutosave();
+    notifyListeners();
+  }
+
+  void toggleSectionControlOverlay() {
+    _isSectionControlOverlayOpen = !_isSectionControlOverlayOpen;
+    notifyListeners();
+  }
+
+  void closeSectionControlOverlay() {
+    _isSectionControlOverlayOpen = false;
+    notifyListeners();
+  }
+
+  void openSectionCreationOverlay() {
+    _isSectionCreationOverlayOpen = true;
+    notifyListeners();
+  }
+
+  void closeSectionCreationOverlay() {
+    _isSectionCreationOverlayOpen = false;
+    notifyListeners();
+  }
+
+  void toggleSectionPlaybackMode() {
+    _sectionPlaybackMode = _sectionPlaybackMode == SectionPlaybackMode.loop 
+        ? SectionPlaybackMode.song 
+        : SectionPlaybackMode.loop;
+    notifyListeners();
+  }
+
+  void switchToPreviousSection() {
+    if (_currentSectionIndex > 0) {
+      _switchToSection(_currentSectionIndex - 1);
+    }
+  }
+
+  void switchToNextSection() {
+    if (_currentSectionIndex < _numSections - 1) {
+      _switchToSection(_currentSectionIndex + 1);
+    }
+  }
+
+  // Core section switching logic as per documentation
+  void _switchToSection(int newSectionIndex) {
+    if (newSectionIndex < 0 || newSectionIndex >= _numSections) return;
+    
+    // 1. Save: Current grid data saved to _sectionGridData[current]
+    _sectionGridData[_currentSectionIndex] = _soundGridSamples.map((grid) => List<int?>.from(grid)).toList();
+    
+    // 2. Update: _currentSectionIndex changed
+    _currentSectionIndex = newSectionIndex;
+    
+    // 3. Load: New section's data loaded into _soundGridSamples
+    if (_sectionGridData.containsKey(_currentSectionIndex)) {
+      _soundGridSamples = _sectionGridData[_currentSectionIndex]!.map((grid) => List<int?>.from(grid)).toList();
+    } else {
+      // Initialize empty grid for new section
+      final numGrids = _soundGridSamples.length;
+      _soundGridSamples = List.generate(numGrids, (index) => 
+          List.filled(_gridColumns * _gridRows, null));
+      _sectionGridData[_currentSectionIndex] = _soundGridSamples.map((grid) => List<int?>.from(grid)).toList();
+    }
+    
+    // 4. Sync: Native sequencer updated with new section index
+    _sequencerLibrary.setCurrentSection(_currentSectionIndex);
+    
+    // Reset UI step indicator to section start
+    _currentStep = 0;
+    _currentStepNotifier.value = 0;
+    
+    // Reset song mode counters when section changes
+    _currentSectionLoopCounter = 0;
+    _lastAbsoluteStepForSongMode = -1;
+    
+    // Sync visible section data to native so playback uses correct cells
+    _syncCurrentSectionToNative();
+    
+         // 5. UI: Interface refreshes to show new section's content
+    notifyListeners();
+    print('🎵 [SECTION] Switched to section: ${_currentSectionIndex + 1}');
+  }
+
+  // Section creation methods as per documentation
+  void createEmptySection() {
+    // Save current section data
+    _sectionGridData[_currentSectionIndex] = _soundGridSamples.map((grid) => List<int?>.from(grid)).toList();
+    
+    // Create new section with empty grids
+    _numSections++;
+    final newSectionIndex = _numSections - 1;
+    
+    // Extend loop counts list
+    while (_sectionLoopCounts.length <= newSectionIndex) {
+      _sectionLoopCounts.add(1); // Default 1 loop for new sections
+    }
+    
+    // Update native section count
+    _sequencerLibrary.setTotalSections(_numSections);
+    
+    // Auto-switch to newly created section
+    _switchToSection(newSectionIndex);
+    
+    // Close creation overlay
+    closeSectionCreationOverlay();
+    
+    print('🎵 [SECTION] Created empty section ${newSectionIndex + 1}');
+  }
+
+  void createSectionCopyFrom(int sourceSectionIndex) {
+    if (sourceSectionIndex < 0 || sourceSectionIndex >= _numSections) return;
+    
+    // Save current section data
+    _sectionGridData[_currentSectionIndex] = _soundGridSamples.map((grid) => List<int?>.from(grid)).toList();
+    
+    // Get source section data
+    List<List<int?>> sourceData;
+    if (sourceSectionIndex == _currentSectionIndex) {
+      // Copy current visible data
+      sourceData = _soundGridSamples.map((grid) => List<int?>.from(grid)).toList();
+    } else {
+      // Copy from stored data
+      sourceData = _sectionGridData[sourceSectionIndex]?.map((grid) => List<int?>.from(grid)).toList() 
+          ?? List.generate(_soundGridSamples.length, (index) => List.filled(_gridColumns * _gridRows, null));
+    }
+    
+    // Create new section
+    _numSections++;
+    final newSectionIndex = _numSections - 1;
+    
+    // Extend loop counts list, inherit from source
+    while (_sectionLoopCounts.length <= newSectionIndex) {
+      _sectionLoopCounts.add(getSectionLoopCount(sourceSectionIndex)); // Inherit loop count
+    }
+    
+    // Store copied data for new section
+    _sectionGridData[newSectionIndex] = sourceData;
+    
+    // Update native section count
+    _sequencerLibrary.setTotalSections(_numSections);
+    
+    // Auto-switch to newly created section
+    _switchToSection(newSectionIndex);
+    
+    // Close creation overlay
+    closeSectionCreationOverlay();
+    
+    print('🎵 [SECTION] Created section ${newSectionIndex + 1} copied from section ${sourceSectionIndex + 1}');
+  }
+
+  void _syncCurrentSectionToNative() {
+    // Writes only the currently active section's data to native grid
+    final sectionIndex = _currentSectionIndex;
+    for (int gridIndex = 0; gridIndex < _soundGridSamples.length; gridIndex++) {
+      final gridSamples = _soundGridSamples[gridIndex];
+      for (int row = 0; row < _gridRows; row++) {
+        for (int col = 0; col < _gridColumns; col++) {
+          final cellIndex = row * _gridColumns + col;
+          final sampleSlot = gridSamples[cellIndex];
+          final absoluteStep = sectionIndex * _gridRows + row;
+          final absoluteColumn = gridIndex * _gridColumns + col;
+          if (sampleSlot != null) {
+            _sequencerLibrary.setGridCell(absoluteStep, absoluteColumn, sampleSlot);
+          }
+          // Do NOT clear null cells here; native holds the full table across sections.
+          // Any deletions are applied at edit time; section switching should not trigger clears.
+        }
+      }
+    }
+    print('🔄 [SYNC] Synced current section ${sectionIndex + 1} to native');
+  }
+
+  // Song mode tracking
+  int _currentSectionLoopCounter = 0; // How many loops completed in current section
+  int _lastAbsoluteStepForSongMode = -1; // Track absolute step to detect wrap-around
+
+  // Section loop getter for UI
+  int get currentSectionLoopCounter => _currentSectionLoopCounter;
 } 

@@ -65,6 +65,16 @@ void clear_grid_completely(void);
 __attribute__((visibility("default"))) __attribute__((used))
 void set_columns(int columns);
 
+// Section management functions
+__attribute__((visibility("default"))) __attribute__((used))
+void set_current_section(int section);
+__attribute__((visibility("default"))) __attribute__((used))
+void set_total_sections(int sections);
+__attribute__((visibility("default"))) __attribute__((used))
+int get_current_section(void);
+__attribute__((visibility("default"))) __attribute__((used))
+int get_total_sections(void);
+
 // MAX number of simultaneous playback slots
 #define MAX_SLOTS 1024
 
