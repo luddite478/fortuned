@@ -11,29 +11,7 @@ class SectionControlOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<SequencerState>(
       builder: (context, sequencerState, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceBase,
-            borderRadius: BorderRadius.circular(2), // Sharp corners
-            border: Border.all(
-              color: AppColors.sequencerBorder,
-              width: 1,
-            ),
-            boxShadow: [
-              // Protruding effect
-              BoxShadow(
-                color: AppColors.sequencerShadow,
-                blurRadius: 3,
-                offset: const Offset(0, 2),
-              ),
-              BoxShadow(
-                color: AppColors.sequencerSurfaceRaised,
-                blurRadius: 1,
-                offset: const Offset(0, -1),
-              ),
-            ],
-          ),
-          child: Column(
+        return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
@@ -45,7 +23,6 @@ class SectionControlOverlay extends StatelessWidget {
               // Footer with controls
               _buildFooter(context, sequencerState),
             ],
-          ),
         );
       },
     );
@@ -58,7 +35,7 @@ class SectionControlOverlay extends StatelessWidget {
     return Container(
       height: headerHeight,
       decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised,
+        color: AppColors.sequencerSurfaceRaised.withOpacity(0.85),
         border: Border(
           bottom: BorderSide(
             color: AppColors.sequencerBorder,
@@ -70,41 +47,16 @@ class SectionControlOverlay extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.02),
         child: Row(
           children: [
-            // Title
-            Expanded(
-              child: Text(
-                'Section Settings',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.sequencerLightText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+            const Spacer(),
+            Text(
+              'Section Settings',
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.sequencerLightText,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            
-                         // Close button
-             GestureDetector(
-               onTap: () {
-                 sequencerState.closeSectionControlOverlay();
-               },
-              child: Container(
-                width: screenSize.width * 0.06,
-                height: screenSize.width * 0.06,
-                decoration: BoxDecoration(
-                  color: AppColors.sequencerSurfacePressed,
-                  borderRadius: BorderRadius.circular(2),
-                  border: Border.all(
-                    color: AppColors.sequencerBorder,
-                    width: 0.5,
-                  ),
-                ),
-                child: Icon(
-                  Icons.close,
-                  color: AppColors.sequencerLightText,
-                  size: screenSize.width * 0.03,
-                ),
-              ),
-            ),
+            const Spacer(),
           ],
         ),
       ),
@@ -113,25 +65,12 @@ class SectionControlOverlay extends StatelessWidget {
 
   Widget _buildCurrentSectionSettings(BuildContext context, SequencerState sequencerState) {
     final screenSize = MediaQuery.of(context).size;
-    final currentSectionIndex = sequencerState.currentSectionIndex;
     
     return Container(
       padding: EdgeInsets.all(screenSize.width * 0.04),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Current section title
-          Container(
-            padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
-            child: Text(
-              'Section ${currentSectionIndex + 1}',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerAccent,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
           
           // Loop count controls
           Container(
@@ -159,12 +98,13 @@ class SectionControlOverlay extends StatelessWidget {
                       context,
                       icon: Icons.chevron_left,
                       onTap: () {
-                        final currentCount = sequencerState.getSectionLoopCount(currentSectionIndex);
+                        final currentIndex = sequencerState.currentSectionIndex;
+                        final currentCount = sequencerState.getSectionLoopCount(currentIndex);
                         if (currentCount > 1) {
-                          sequencerState.setSectionLoopCount(currentSectionIndex, currentCount - 1);
+                          sequencerState.setSectionLoopCount(currentIndex, currentCount - 1);
                         }
                       },
-                      enabled: sequencerState.getSectionLoopCount(currentSectionIndex) > 1,
+                      enabled: sequencerState.getSectionLoopCount(sequencerState.currentSectionIndex) > 1,
                     ),
                     
                     SizedBox(width: screenSize.width * 0.06),
@@ -183,7 +123,7 @@ class SectionControlOverlay extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          '${sequencerState.getSectionLoopCount(currentSectionIndex)}',
+                          '${sequencerState.getSectionLoopCount(sequencerState.currentSectionIndex)}',
                           style: GoogleFonts.sourceSans3(
                             color: AppColors.sequencerAccent,
                             fontSize: 18,
@@ -200,12 +140,13 @@ class SectionControlOverlay extends StatelessWidget {
                       context,
                       icon: Icons.chevron_right,
                       onTap: () {
-                        final currentCount = sequencerState.getSectionLoopCount(currentSectionIndex);
+                        final currentIndex = sequencerState.currentSectionIndex;
+                        final currentCount = sequencerState.getSectionLoopCount(currentIndex);
                         if (currentCount < 16) {
-                          sequencerState.setSectionLoopCount(currentSectionIndex, currentCount + 1);
+                          sequencerState.setSectionLoopCount(currentIndex, currentCount + 1);
                         }
                       },
-                      enabled: sequencerState.getSectionLoopCount(currentSectionIndex) < 16,
+                      enabled: sequencerState.getSectionLoopCount(sequencerState.currentSectionIndex) < 16,
                     ),
                   ],
                 ),
@@ -262,38 +203,6 @@ class SectionControlOverlay extends StatelessWidget {
   }
 
   Widget _buildFooter(BuildContext context, SequencerState sequencerState) {
-    final screenSize = MediaQuery.of(context).size;
-    final footerHeight = screenSize.height * 0.08;
-    
-    return Container(
-      height: footerHeight,
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.sequencerBorder,
-            width: 1,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.02),
-        child: Row(
-          children: [
-            const Spacer(),
-            
-            // Current mode indicator
-            Text(
-              sequencerState.sectionPlaybackMode == SectionPlaybackMode.loop ? 'Loop Mode' : 'Song Mode',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    return const SizedBox.shrink();
   }
 } 

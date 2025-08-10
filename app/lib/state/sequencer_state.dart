@@ -4396,6 +4396,28 @@ Made with Demo Sequencer 🚀
     return _sectionLoopCounts[sectionIndex];
   }
 
+  // Get grid samples for a specific section and sound grid
+  List<int?> getSectionGridSamples(int sectionIndex, {int gridIndex = 0}) {
+    // For current section, return live data
+    if (sectionIndex == _currentSectionIndex) {
+      if (gridIndex < _soundGridSamples.length) {
+        return List<int?>.from(_soundGridSamples[gridIndex]);
+      }
+      return List.filled(_gridRows * _gridColumns, null);
+    }
+    
+    // For other sections, return stored data
+    if (_sectionGridData.containsKey(sectionIndex)) {
+      final sectionData = _sectionGridData[sectionIndex]!;
+      if (gridIndex < sectionData.length) {
+        return List<int?>.from(sectionData[gridIndex]);
+      }
+    }
+    
+    // Return empty grid if section doesn't exist
+    return List.filled(_gridRows * _gridColumns, null);
+  }
+
   void setSectionLoopCount(int sectionIndex, int loopCount) {
     if (sectionIndex < 0 || loopCount < 1 || loopCount > 16) return;
     
@@ -4410,6 +4432,9 @@ Made with Demo Sequencer 🚀
   }
 
   void toggleSectionControlOverlay() {
+    if (_isSectionCreationOverlayOpen) {
+      return;
+    }
     _isSectionControlOverlayOpen = !_isSectionControlOverlayOpen;
     notifyListeners();
   }

@@ -23,6 +23,8 @@ class SoundGridSideControlWidget extends StatelessWidget {
             final availableHeight = constraints.maxHeight;
             final availableWidth = constraints.maxWidth;
             
+            final bool hideButtons = sequencer.isSectionCreationOverlayOpen || sequencer.numSections == 0;
+
             // Use 90% of available height for buttons, leaving small margins
             final buttonsAreaHeight = availableHeight * 0.9;
             // Compute layout per side
@@ -55,7 +57,9 @@ class SoundGridSideControlWidget extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
+              child: hideButtons
+                  ? const SizedBox.shrink()
+                  : Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: side == SideControlSide.left ? [
                   // Left Side: Section Control Button
@@ -91,6 +95,9 @@ class SoundGridSideControlWidget extends StatelessWidget {
                         );
                       },
                     ),
+                    backgroundColor: sequencer.isSectionControlOverlayOpen
+                        ? AppColors.sequencerPrimaryButton
+                        : null,
                   ),
                    
                   SizedBox(height: buttonSpacing),

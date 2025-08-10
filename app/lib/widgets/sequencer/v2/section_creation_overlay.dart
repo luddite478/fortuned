@@ -5,7 +5,8 @@ import '../../../utils/app_colors.dart';
 import '../../../state/sequencer_state.dart';
 
 class SectionCreationOverlay extends StatefulWidget {
-  const SectionCreationOverlay({super.key});
+  final VoidCallback? onBack;
+  const SectionCreationOverlay({super.key, this.onBack});
 
   @override
   State<SectionCreationOverlay> createState() => _SectionCreationOverlayState();
@@ -74,26 +75,18 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
         padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.02),
         child: Row(
           children: [
-            // Title
-            Expanded(
-              child: Text(
-                'Create New Section',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.sequencerLightText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            
-            // Close button
+            // Back arrow to return to previous section
             GestureDetector(
               onTap: () {
-                sequencerState.closeSectionCreationOverlay();
+                if (widget.onBack != null) {
+                  widget.onBack!();
+                } else {
+                  sequencerState.closeSectionCreationOverlay();
+                }
               },
               child: Container(
-                width: screenSize.width * 0.06,
-                height: screenSize.width * 0.06,
+                width: screenSize.width * 0.08,
+                height: screenSize.width * 0.08,
                 decoration: BoxDecoration(
                   color: AppColors.sequencerSurfacePressed,
                   borderRadius: BorderRadius.circular(2),
@@ -103,12 +96,23 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
                   ),
                 ),
                 child: Icon(
-                  Icons.close,
+                  Icons.arrow_back_ios_new,
                   color: AppColors.sequencerLightText,
-                  size: screenSize.width * 0.03,
+                  size: screenSize.width * 0.045,
                 ),
               ),
             ),
+            const Spacer(),
+            // Title centered
+            Text(
+              'Create New Section',
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.sequencerLightText,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
           ],
         ),
       ),
@@ -215,7 +219,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
             ),
           ),
           child: Text(
-            'Section ${sectionIndex + 1} (${sequencerState.getSectionLoopCount(sectionIndex)} loops)',
+            'Section ${sectionIndex + 1}',
             style: GoogleFonts.sourceSans3(
               color: AppColors.sequencerLightText,
               fontSize: 14,
@@ -226,6 +230,5 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
       ),
     );
   }
-
-
+ 
 } 

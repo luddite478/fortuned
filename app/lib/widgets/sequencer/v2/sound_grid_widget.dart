@@ -6,6 +6,7 @@ import 'dart:math' as math;
 import '../../../state/sequencer_state.dart';
 import '../../../utils/app_colors.dart';import '../../stacked_cards_widget.dart';
 import '../../../utils/app_colors.dart';
+
 // Custom ScrollPhysics to retain position when content changes
 class PositionRetainedScrollPhysics extends ScrollPhysics {
   final bool shouldRetain;
@@ -46,7 +47,8 @@ class PositionRetainedScrollPhysics extends ScrollPhysics {
 
 
 class SampleGridWidget extends StatefulWidget {
-  const SampleGridWidget({super.key});
+  final int? sectionIndexOverride;
+  const SampleGridWidget({super.key, this.sectionIndexOverride});
 
   @override
   State<SampleGridWidget> createState() => _SampleGridWidgetState();
@@ -222,6 +224,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           return const Center(child: CircularProgressIndicator());
         }
         
+        // Decide which grid samples to render (current section vs preview section)
+        final List<int?> visibleGridSamples = widget.sectionIndexOverride != null
+            ? sequencer.getSectionGridSamples(
+                widget.sectionIndexOverride!,
+                gridIndex: sequencer.currentSoundGridIndex,
+              )
+            : sequencer.gridSamples;
+        
         return Container(
           margin: const EdgeInsets.only(top: 0, bottom: 0), // Move entire sound grid structure
           decoration: BoxDecoration(
@@ -251,86 +261,87 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               AppColors.sequencerSurfaceRaised,
             ],
             activeCardIndex: sequencer.currentSoundGridIndex,
-          cardBuilder: (index, width, height, depth) {
-            // INVERSION LOGIC: Stack index 0 = back card, but we want L1 to be front
-            // So we need to invert: front card (highest stack index) = L1 (first grid)
-            final invertedIndex = numSoundGrids - 1 - index;
-            final actualSoundGridId = sequencer.soundGridOrder[invertedIndex];
-            
-            // Define subtle colors for each card ID (non-vibrant, more professional)
-            final availableColors = [
-              const Color(0xFF4B5563), // Gray-600
-              const Color(0xFF6B7280), // Gray-500  
-              const Color(0xFF374151), // Gray-700
-              const Color(0xFF9CA3AF), // Gray-400
-              const Color(0xFF1F2937), // Gray-800
-              const Color(0xFF111827), // Gray-900
-              const Color(0xFFD1D5DB), // Gray-300
-              const Color(0xFFF3F4F6), // Gray-100
-              const Color(0xFF6B7280), // Gray-500 (repeat for more grids)
-              const Color(0xFF374151), // Gray-700 (repeat for more grids)
-            ];
-            final cardColor = availableColors[actualSoundGridId % availableColors.length];
-            
-            // The front card is the one that matches the current sound grid index
-            final isFrontCard = actualSoundGridId == sequencer.currentSoundGridIndex;
-            
-            // Wrap everything in a container with minimal extra space for the label tab
-            return SizedBox(
-              width: width,
-              height: height + 100, // More space for tabs positioned lower
-              child: Stack(
-                clipBehavior: Clip.none, // Allow tabs to be positioned outside bounds if needed
-                children: [
-                  // Main card positioned to leave space for tab at top
-                  Positioned(
-                    top: 37, // More space for tab positioned lower
-                    left: 0,
-                    child: _buildMainCard(
-                      width: width,
-                      height: height,
-                      cardColor: cardColor,
-                      isFrontCard: isFrontCard,
-                      depth: depth,
-                      actualSoundGridId: actualSoundGridId,
-                      index: index,
-                      sequencer: sequencer,
+            cardBuilder: (index, width, height, depth) {
+              // INVERSION LOGIC: Stack index 0 = back card, but we want L1 to be front
+              // So we need to invert: front card (highest stack index) = L1 (first grid)
+              final invertedIndex = numSoundGrids - 1 - index;
+              final actualSoundGridId = sequencer.soundGridOrder[invertedIndex];
+              
+              // Define subtle colors for each card ID (non-vibrant, more professional)
+              final availableColors = [
+                const Color(0xFF4B5563), // Gray-600
+                const Color(0xFF6B7280), // Gray-500  
+                const Color(0xFF374151), // Gray-700
+                const Color(0xFF9CA3AF), // Gray-400
+                const Color(0xFF1F2937), // Gray-800
+                const Color(0xFF111827), // Gray-900
+                const Color(0xFFD1D5DB), // Gray-300
+                const Color(0xFFF3F4F6), // Gray-100
+                const Color(0xFF6B7280), // Gray-500 (repeat for more grids)
+                const Color(0xFF374151), // Gray-700 (repeat for more grids)
+              ];
+              final cardColor = availableColors[actualSoundGridId % availableColors.length];
+              
+              // The front card is the one that matches the current sound grid index
+              final isFrontCard = actualSoundGridId == sequencer.currentSoundGridIndex;
+              
+              // Wrap everything in a container with minimal extra space for the label tab
+              return SizedBox(
+                width: width,
+                height: height + 100, // More space for tabs positioned lower
+                child: Stack(
+                  clipBehavior: Clip.none, // Allow tabs to be positioned outside bounds if needed
+                  children: [
+                    // Main card positioned to leave space for tab at top
+                    Positioned(
+                      top: 37, // More space for tab positioned lower
+                      left: 0,
+                      child: _buildMainCard(
+                        width: width,
+                        height: height,
+                        cardColor: cardColor,
+                        isFrontCard: isFrontCard,
+                        depth: depth,
+                        actualSoundGridId: actualSoundGridId,
+                        index: index,
+                        sequencer: sequencer,
+                        visibleGridSamples: visibleGridSamples,
+                      ),
                     ),
-                  ),
-                  // Clickable tab label positioned above the card
-                  // Use actualSoundGridId for positioning to maintain fixed horizontal positions
-                  Positioned(
-                    top: 15, // Positioned lower to stay within container bounds
-                    left: _calculateTabPosition(actualSoundGridId, width, numSoundGrids),
-                    child: _buildClickableTabLabel(
-                      gridIndex: actualSoundGridId,
-                      cardColor: cardColor,
-                      isFrontCard: isFrontCard,
-                      depth: depth,
-                      tabWidth: _calculateTabWidth(width, numSoundGrids),
-                      sequencer: sequencer,
+                    // Clickable tab label positioned above the card
+                    // Use actualSoundGridId for positioning to maintain fixed horizontal positions
+                    Positioned(
+                      top: 15, // Positioned lower to stay within container bounds
+                      left: _calculateTabPosition(actualSoundGridId, width, numSoundGrids),
+                      child: _buildClickableTabLabel(
+                        gridIndex: actualSoundGridId,
+                        cardColor: cardColor,
+                        isFrontCard: isFrontCard,
+                        depth: depth,
+                        tabWidth: _calculateTabWidth(width, numSoundGrids),
+                        sequencer: sequencer,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
-    },
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
   // 🎯 PERFORMANCE: Cell that only rebuilds when current step changes
-  Widget _buildEnhancedGridCell(BuildContext context, SequencerState sequencer, int index) {
+  Widget _buildEnhancedGridCell(BuildContext context, SequencerState sequencer, int index, List<int?> visibleGridSamples) {
     final row = index ~/ sequencer.gridColumns;
     
     return ValueListenableBuilder<int>(
       valueListenable: sequencer.currentStepNotifier,
       builder: (context, currentStep, child) {
         final isActivePad = sequencer.activePad == index;
-        final isCurrentStep = sequencer.isSequencerPlaying && currentStep == row;
-        final placedSample = sequencer.gridSamples[index];
+        final isCurrentStep = widget.sectionIndexOverride == null && sequencer.isSequencerPlaying && currentStep == row;
+        final placedSample = index < visibleGridSamples.length ? visibleGridSamples[index] : null;
         final hasPlacedSample = placedSample != null;
         final isSelected = sequencer.selectedGridCells.contains(index);
         
@@ -533,12 +544,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     }
   }
 
-  Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index) {
+
+  Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index, List<int?> visibleGridSamples) {
     // 🎯 PERFORMANCE: Use enhanced cell that listens to currentStepNotifier
-    return _buildEnhancedGridCell(context, sequencer, index);
+    return _buildEnhancedGridCell(context, sequencer, index, visibleGridSamples);
   }
 
-  Widget _buildGridRow(BuildContext context, SequencerState sequencer, int rowIndex) {
+
+
+  Widget _buildGridRow(BuildContext context, SequencerState sequencer, int rowIndex, List<int?> visibleGridSamples) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Calculate dimensions based on percentages
@@ -595,7 +609,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                       margin: EdgeInsets.symmetric(
                         horizontal: actualCellSpacing / 2, // Use calculated cell spacing
                       ),
-                      child: _buildGridCell(context, sequencer, cellIndex),
+                      child: _buildGridCell(context, sequencer, cellIndex, visibleGridSamples),
                     );
                   }),
                 ),
@@ -725,6 +739,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     required int actualSoundGridId,
     required int index,
     required SequencerState sequencer,
+    required List<int?> visibleGridSamples,
   }) {
     // Non-front cards are grayed out but still visible
     if (!isFrontCard) {
@@ -825,7 +840,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             const SizedBox(height: 8),
             // Sound grid
             Expanded(
-              child: _buildGridContent(sequencer),
+              child: _buildGridContent(sequencer, visibleGridSamples),
             ),
           ],
         ),
@@ -833,7 +848,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
-  Widget _buildGridContent(SequencerState sequencer) {
+  Widget _buildGridContent(SequencerState sequencer, List<int?> visibleGridSamples) {
     return GestureDetector(
       onPanStart: (details) {
         _gestureStartPosition = details.localPosition;
@@ -869,7 +884,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         itemBuilder: (context, index) {
           if (index < sequencer.gridRows) {
             // Build a row of grid cells
-            return _buildGridRow(context, sequencer, index);
+            return _buildGridRow(context, sequencer, index, visibleGridSamples);
           } else {
             // Control buttons at the bottom
             return RepaintBoundary(
@@ -913,7 +928,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     // Ensure minimum tab width
     return tabWidth.clamp(40.0, double.infinity);
   }
-
+  
   double _calculateTabSpacing(double width, int numSoundGrids) {
     // Relative spacing based on number of tabs and available width
     // More tabs = smaller spacing, fewer tabs = more spacing

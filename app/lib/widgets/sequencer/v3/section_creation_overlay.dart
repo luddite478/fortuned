@@ -215,7 +215,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
             ),
           ),
           child: Text(
-            'Section ${sectionIndex + 1} (${sequencerState.getSectionLoopCount(sectionIndex)} loops)',
+            'Section ${sectionIndex + 1}',
             style: GoogleFonts.sourceSans3(
               color: AppColors.sequencerLightText,
               fontSize: 14,
