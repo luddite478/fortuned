@@ -120,49 +120,47 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
   }
 
   Widget _buildContent(BuildContext context, SequencerState sequencerState) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.04,
-          vertical: MediaQuery.of(context).size.height * 0.02,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Create Blank Button
-            _buildSimpleButton(
-              context,
-              text: 'Create Blank',
-              onPressed: () {
-                sequencerState.createEmptySection();
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.04,
+        vertical: MediaQuery.of(context).size.height * 0.02,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Create Blank Button
+          _buildSimpleButton(
+            context,
+            text: 'Create Empty',
+            onPressed: () {
+              sequencerState.createEmptySection();
+            },
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+          
+          // Create From Label
+          Text(
+            'Create From:',
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.sequencerLightText,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+          
+          // Scrollable list of sections
+          Expanded(
+            child: ListView.builder(
+              itemCount: sequencerState.numSections,
+              itemBuilder: (context, index) {
+                return _buildSectionCopyButton(context, sequencerState, index);
               },
             ),
-            
-            SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-            
-            // Create From Label
-            Text(
-              'Create From:',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerLightText,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            
-            SizedBox(height: MediaQuery.of(context).size.height * 0.01),
-            
-            // Scrollable list of sections
-            Expanded(
-              child: ListView.builder(
-                itemCount: sequencerState.numSections,
-                itemBuilder: (context, index) {
-                  return _buildSectionCopyButton(context, sequencerState, index);
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

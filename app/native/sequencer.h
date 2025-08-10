@@ -45,7 +45,7 @@ void cleanup(void);
 
 // Sequencer functions (sample-accurate timing)
 __attribute__((visibility("default"))) __attribute__((used))
-int start_sequencer(int bpm, int steps);
+int start_sequencer(int bpm, int steps, int startStep);
 __attribute__((visibility("default"))) __attribute__((used))
 void stop_sequencer(void);
 __attribute__((visibility("default"))) __attribute__((used))
@@ -74,6 +74,8 @@ __attribute__((visibility("default"))) __attribute__((used))
 int get_current_section(void);
 __attribute__((visibility("default"))) __attribute__((used))
 int get_total_sections(void);
+__attribute__((visibility("default"))) __attribute__((used))
+void set_song_mode(int isSongMode);
 
 // MAX number of simultaneous playback slots
 #define MAX_SLOTS 1024

@@ -129,18 +129,20 @@ class SequencerBindings {
   int start_sequencer(
     int bpm,
     int steps,
+    int startStep,
   ) {
     return _start_sequencer(
       bpm,
       steps,
+      startStep,
     );
   }
 
   late final _start_sequencerPtr =
-      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int)>>(
+      _lookup<ffi.NativeFunction<ffi.Int Function(ffi.Int, ffi.Int, ffi.Int)>>(
           'start_sequencer');
   late final _start_sequencer =
-      _start_sequencerPtr.asFunction<int Function(int, int)>();
+      _start_sequencerPtr.asFunction<int Function(int, int, int)>();
 
   void stop_sequencer() {
     return _stop_sequencer();
@@ -281,6 +283,19 @@ class SequencerBindings {
       _lookup<ffi.NativeFunction<ffi.Int Function()>>('get_total_sections');
   late final _get_total_sections =
       _get_total_sectionsPtr.asFunction<int Function()>();
+
+  void set_song_mode(
+    int isSongMode,
+  ) {
+    return _set_song_mode(
+      isSongMode,
+    );
+  }
+
+  late final _set_song_modePtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('set_song_mode');
+  late final _set_song_mode =
+      _set_song_modePtr.asFunction<void Function(int)>();
 
   /// Returns the number of available playback slots (always MAX_SLOTS)
   int get_slot_count() {

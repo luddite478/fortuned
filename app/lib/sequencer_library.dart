@@ -348,16 +348,16 @@ class SequencerLibrary {
   
   /// Start the sequencer with sample-accurate timing
   /// This moves timing logic from Flutter Timer to the audio callback
-  bool startSequencer(int bpm, int steps) {
+  bool startSequencer(int bpm, int steps, {required int startAbsoluteStep}) {
     if (!isInitialized()) {
       print('❌ Audio not initialized');
       return false;
     }
     
-    int result = _bindings.start_sequencer(bpm, steps);
+    int result = _bindings.start_sequencer(bpm, steps, startAbsoluteStep);
     bool success = result == 0;
     if (success) {
-      print('🎵 Sequencer started: $bpm BPM, $steps steps');
+      print('🎵 Sequencer started: $bpm BPM, $steps steps, start=$startAbsoluteStep');
     } else {
       print('❌ Failed to start sequencer');
     }
@@ -449,6 +449,11 @@ class SequencerLibrary {
   
   /// Get the total number of sections
   int get totalSections => _bindings.get_total_sections();
+  
+  /// Set playback mode (true = song mode, false = loop mode)
+  void setSongMode(bool isSongMode) {
+    _bindings.set_song_mode(isSongMode ? 1 : 0);
+  }
 
   // -------------- VOLUME CONTROL FUNCTIONS --------------
   

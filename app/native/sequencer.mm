@@ -396,6 +396,7 @@ static int g_current_section = 0;        // Which section is currently playing (
 static int g_total_sections = 1;         // Total number of sections
 static int g_steps_per_section = 16;     // Steps per section (same as g_sequencer_steps)
 static int g_section_start_step = 0;     // Calculated: g_current_section * g_steps_per_section
+static int g_song_mode = 0;              // 0 = loop mode (within section), 1 = song mode (all sections)
 static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
 static float g_sequencer_grid_volumes[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = volume (0.0 to 1.0)
 static float g_sequencer_grid_pitches[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = pitch (0.03125 to 32.0, 1.0 = normal, covers C0-C10)
@@ -2200,12 +2201,23 @@ static void run_sequencer(ma_uint32 frameCount) {
             // Advance to next absolute step
             g_current_step++;
             
-            // Check if we've reached the end of the current section
-            int section_end_step = g_section_start_step + g_steps_per_section;
-            if (g_current_step >= section_end_step) {
-                // Loop back to the start of the current section
-                g_current_step = g_section_start_step;
-                // prnt("🔄 [SEQUENCER] Looping back to section start (step %d)", g_current_step);
+            // Handle looping based on playback mode
+            if (g_song_mode) {
+                // Song mode: stop at end, don't loop
+                int song_end_step = g_total_sections * g_steps_per_section;
+                if (song_end_step <= 0) song_end_step = g_sequencer_steps; // Fallback
+                if (g_current_step >= song_end_step) {
+                    // Stop playback at end of song
+                    g_sequencer_playing = 0;
+                    prnt("🛑 [SEQUENCER] Song mode ended at step %d", g_current_step);
+                    return; // Exit early, don't play any more steps
+                }
+            } else {
+                // Loop mode: wrap within current section
+                int section_end_step = g_section_start_step + g_steps_per_section;
+                if (g_current_step >= section_end_step) {
+                    g_current_step = g_section_start_step; // Wrap to section start
+                }
             }
             
             // Play samples for the new absolute step
@@ -3150,7 +3162,7 @@ int get_max_cell_node_count(void) {
 }
 
 // Sequencer functions (sample-accurate timing)
-int start_sequencer(int bpm, int steps) {
+int start_sequencer(int bpm, int steps, int startStep) {
     if (!g_is_initialized) {
         prnt_err("🔴 [SEQUENCER] Device not initialized");
         return -1;
@@ -3170,9 +3182,13 @@ int start_sequencer(int bpm, int steps) {
     g_sequencer_bpm = bpm;
     g_sequencer_steps = steps;
     g_frames_per_step = (SAMPLE_RATE * 60) / (bpm * 4); // 1/16 note frames
-    g_current_step = g_section_start_step; // Start at current section's first step
+    int song_end_step = g_total_sections * g_steps_per_section;
+    if (song_end_step <= 0) song_end_step = steps;
+    if (startStep < 0) startStep = 0;
+    if (startStep >= song_end_step) startStep = startStep % song_end_step;
+    g_current_step = startStep; // Start at provided absolute step
     g_step_frame_counter = 0;
-    g_step_just_changed = 1; // Flag to play step 0 immediately
+    g_step_just_changed = 1; // Flag to play current step immediately
     g_sequencer_playing = 1;
     
     prnt("🎵 [SEQUENCER] Started: %d BPM, %d steps, %llu frames per step", bpm, steps, g_frames_per_step);
@@ -3181,7 +3197,7 @@ int start_sequencer(int bpm, int steps) {
 
 void stop_sequencer(void) {
     g_sequencer_playing = 0;
-    g_current_step = g_section_start_step; // Reset to current section start
+    // Do not wrap or reseek; keep current_step so last step can decay
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     
@@ -3314,17 +3330,13 @@ void set_current_section(int section) {
         prnt_err("🔴 [SECTION] Invalid section: %d (total: %d)", section, g_total_sections);
         return;
     }
-    
+
+    // Update metadata only; playback is continuous across absolute steps
     g_current_section = section;
     g_section_start_step = g_current_section * g_steps_per_section;
-    
-    // Jump playback position to the start of the newly selected section
-    g_current_step = g_section_start_step;
-    g_step_frame_counter = 0;
-    g_step_just_changed = 1; // Ensure immediate playback of the first step in new section
-    
-    prnt("🎵 [SECTION] Set current section to %d (steps %d-%d)", 
-         section, g_section_start_step, g_section_start_step + g_steps_per_section - 1);
+
+    prnt("ℹ️ [SECTION] Meta set current section to %d (start step %d). Playback unaffected.",
+         section, g_section_start_step);
 }
 
 void set_total_sections(int sections) {
@@ -3349,6 +3361,11 @@ int get_current_section(void) {
 
 int get_total_sections(void) {
     return g_total_sections;
+}
+
+void set_song_mode(int isSongMode) {
+    g_song_mode = isSongMode ? 1 : 0;
+    prnt("🎵 [SEQUENCER] Set playback mode to %s", g_song_mode ? "song" : "loop");
 }
 
 // Volume control functions

@@ -30,6 +30,7 @@ class SequencerBody extends StatefulWidget {
 
 class _SequencerBodyState extends State<SequencerBody> {
   late final PageController _pageController;
+  bool _isUserScrolling = false;
 
   @override
   void initState() {
@@ -49,14 +50,27 @@ class _SequencerBodyState extends State<SequencerBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<SequencerState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen, int numSections})>(
+    return Selector<SequencerState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen, int numSections, int currentIndex})>(
       selector: (context, state) => (
         isBodyBrowserOpen: state.isBodyElementSampleBrowserOpen,
         isSectionControlOpen: state.isSectionControlOverlayOpen,
         isSectionCreationOpen: state.isSectionCreationOverlayOpen,
         numSections: state.numSections,
+        currentIndex: state.currentSectionIndex,
       ),
       builder: (context, data, child) {
+        // Keep PageView in sync with current section during song mode auto-advance
+        if (_pageController.hasClients) {
+          final double? page = _pageController.page;
+          final bool atTarget = page != null ? page.round() == data.currentIndex : false;
+          final bool swipingTowardCreation = page != null && page > (data.numSections - 1) - 0.01;
+          final bool creationOpen = data.isSectionCreationOpen;
+
+          if (!atTarget && !_isUserScrolling && !creationOpen && !swipingTowardCreation) {
+            _pageController.jumpToPage(data.currentIndex);
+          }
+        }
+
         // Always render base stack and conditionally layer overlay menus so left panel remains visible
         return Stack(
           children: [
@@ -119,77 +133,87 @@ class _SequencerBodyState extends State<SequencerBody> {
         final itemWidth = screenWidth - leftControlWidth; // Sound grid + gutter takes remaining space
         
         // Create a PageView that shows current section + allows preview of adjacent sections
-        return PageView.builder(
-          controller: _pageController,
-          onPageChanged: (index) {
-            // Only change section when page is fully changed
-            if (index < sequencer.numSections) {
-              // Leaving creation page if was open
-              if (sequencer.isSectionCreationOverlayOpen) {
-                sequencer.closeSectionCreationOverlay();
-              }
-              // Use existing section switching logic based on direction
-              final currentIndex = sequencer.currentSectionIndex;
-              if (index > currentIndex) {
-                // Moving forward - use next section logic
-                for (int i = currentIndex; i < index; i++) {
-                  sequencer.switchToNextSection();
-                }
-              } else if (index < currentIndex) {
-                // Moving backward - use previous section logic
-                for (int i = currentIndex; i > index; i--) {
-                  sequencer.switchToPreviousSection();
-                }
-              }
-              // If index == currentIndex, no change needed
-            } else {
-              // Swiped to section creation page: only toggle side-control state
-              sequencer.openSectionCreationOverlay();
+        return NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            if (notification is ScrollStartNotification) {
+              _isUserScrolling = true;
+            } else if (notification is ScrollEndNotification) {
+              _isUserScrolling = false;
             }
+            return false;
           },
-          itemCount: sequencer.numSections + 1, // +1 for section creation
-          itemBuilder: (context, index) {
-            return Container(
-              width: itemWidth,
-              margin: EdgeInsets.only(left: leftControlWidth), // Leave space for fixed left control
-              child: Row(
-                children: [
-                  // Sound grid area
-                  Expanded(
-                    flex: (SequencerBody.soundGridWidthPercent * 100 / (SequencerBody.soundGridWidthPercent + SequencerBody.rightGutterWidthPercent)).round(),
-                    child: index < sequencer.numSections
-                        ? _buildSectionGrid(context, sequencer, index)
-                        : SectionCreationOverlay(
-                            onBack: () {
-                              sequencer.closeSectionCreationOverlay();
-                              _pageController.animateToPage(
-                                sequencer.currentSectionIndex,
-                                duration: const Duration(milliseconds: 220),
-                                curve: Curves.easeOutCubic,
-                              );
-                            },
-                          ), // Show creation overlay as last item
-                  ),
-                  
-                  // Right gutter
-                  Expanded(
-                    flex: (SequencerBody.rightGutterWidthPercent * 100 / (SequencerBody.soundGridWidthPercent + SequencerBody.rightGutterWidthPercent)).round(),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.sequencerPageBackground,
-                        border: Border(
-                          right: BorderSide(
-                            color: AppColors.sequencerBorder,
-                            width: 0.5,
+          child: PageView.builder(
+            controller: _pageController,
+            onPageChanged: (index) {
+              // Only change section when page is fully changed
+              if (index < sequencer.numSections) {
+                // Leaving creation page if was open
+                if (sequencer.isSectionCreationOverlayOpen) {
+                  sequencer.closeSectionCreationOverlay();
+                }
+                // Use existing section switching logic based on direction
+                final currentIndex = sequencer.currentSectionIndex;
+                if (index > currentIndex) {
+                  // Moving forward - use next section logic
+                  for (int i = currentIndex; i < index; i++) {
+                    sequencer.switchToNextSection();
+                  }
+                } else if (index < currentIndex) {
+                  // Moving backward - use previous section logic
+                  for (int i = currentIndex; i > index; i--) {
+                    sequencer.switchToPreviousSection();
+                  }
+                }
+                // If index == currentIndex, no change needed
+              } else {
+                // Swiped to section creation page: only toggle side-control state
+                sequencer.openSectionCreationOverlay();
+              }
+            },
+            itemCount: sequencer.numSections + 1, // +1 for section creation
+            itemBuilder: (context, index) {
+              return Container(
+                width: itemWidth,
+                margin: EdgeInsets.only(left: leftControlWidth), // Leave space for fixed left control
+                child: Row(
+                  children: [
+                    // Sound grid area
+                    Expanded(
+                      flex: (SequencerBody.soundGridWidthPercent * 100 / (SequencerBody.soundGridWidthPercent + SequencerBody.rightGutterWidthPercent)).round(),
+                      child: index < sequencer.numSections
+                          ? _buildSectionGrid(context, sequencer, index)
+                          : SectionCreationOverlay(
+                              onBack: () {
+                                sequencer.closeSectionCreationOverlay();
+                                _pageController.animateToPage(
+                                  sequencer.currentSectionIndex,
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                );
+                              },
+                            ), // Show creation overlay as last item
+                    ),
+                    
+                    // Right gutter
+                    Expanded(
+                      flex: (SequencerBody.rightGutterWidthPercent * 100 / (SequencerBody.soundGridWidthPercent + SequencerBody.rightGutterWidthPercent)).round(),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.sequencerPageBackground,
+                          border: Border(
+                            right: BorderSide(
+                              color: AppColors.sequencerBorder,
+                              width: 0.5,
+                            ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          },
+                  ],
+                ),
+              );
+            },
+          ),
         );
       },
     );

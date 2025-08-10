@@ -1833,16 +1833,24 @@ class SequencerState extends ChangeNotifier {
     if (!hasAnyCell) {
       _sequencerLibrary.clearAllGridCells();
     }
+
+    // For song mode: pre-sync all sections once so native has the complete concatenated table
+    // Ensure native has the complete concatenated table
+    syncFlutterSequencerGridToNativeSequencerGrid();
+    
+    // Set playback mode in native
+    _sequencerLibrary.setSongMode(_sectionPlaybackMode == SectionPlaybackMode.song);
     
     // Note: Grid sync is now called explicitly when needed
     // For simple stop/start, nodes are preserved via ma_node_set_state
     
-    // Reset song mode tracking when starting
+    // Reset song mode tracking when starting (legacy variables, can be removed later)
     _currentSectionLoopCounter = 0;
     _lastAbsoluteStepForSongMode = -1;
     
-    // Start sequencer with current BPM and grid size
-    bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows);
+    // Start sequencer with current BPM, grid size, and start absolute step based on current section
+    final int startAbsoluteStep = (_currentSectionIndex * _gridRows) + 0; // start at step 0 of current section
+    bool success = _sequencerLibrary.startSequencer(_bpm, _gridRows, startAbsoluteStep: startAbsoluteStep);
     if (success) {
       _isSequencerPlaying = true;
       
@@ -1935,52 +1943,41 @@ class SequencerState extends ChangeNotifier {
       }
       
       final absoluteStep = _sequencerLibrary.currentStep;
-      // Convert to section-relative step for UI highlighting
-      final sectionStart = _currentSectionIndex * _gridRows;
-      final sectionEndExclusive = sectionStart + _gridRows;
-      final relativeStep = absoluteStep - sectionStart;
-      if (relativeStep != _currentStep) {
-        // Song mode: detect wrap-around at section boundary and advance section
-        if (_sectionPlaybackMode == SectionPlaybackMode.song) {
-          // Preemptive stop to avoid retrigger on wrap at the very end of the song
-          if (_currentSectionIndex == _numSections - 1) {
-            final requiredLoops = getSectionLoopCount(_currentSectionIndex);
-            final bool isLastStepOfSection = (relativeStep == _gridRows - 1);
-            if (isLastStepOfSection && (_currentSectionLoopCounter + 1) >= requiredLoops) {
-              // We're on the last step of the final loop of the last section → stop before native wraps to step 0
-              stopSequencer();
-              return;
-            }
-          }
-          if (_lastAbsoluteStepForSongMode != -1 && absoluteStep < _lastAbsoluteStepForSongMode) {
-            // We wrapped. Count a loop for the current section
-            _currentSectionLoopCounter++;
-            final requiredLoops = getSectionLoopCount(_currentSectionIndex);
-            if (_currentSectionLoopCounter >= requiredLoops) {
-              _currentSectionLoopCounter = 0;
-              if (_currentSectionIndex < _numSections - 1) {
-                // Move to next section
-                _switchToSection(_currentSectionIndex + 1);
-                // After switching, ensure native is positioned at new section start
-                _sequencerLibrary.setCurrentSection(_currentSectionIndex);
-              } else {
-                // Last section completed: stop playback
-                stopSequencer();
-                return;
-              }
-            }
-          }
-          _lastAbsoluteStepForSongMode = absoluteStep;
+      
+      if (_sectionPlaybackMode == SectionPlaybackMode.song) {
+        // In song mode: compute current section from absolute step
+        final currentSectionFromAbsoluteStep = absoluteStep ~/ _gridRows;
+        final relativeStep = absoluteStep % _gridRows;
+        
+        // Check if we've reached the last step of the last section
+        final songEndStep = _numSections * _gridRows;
+        if (absoluteStep >= songEndStep - 1) {
+          // We're at or past the last step - stop playback to let sounds decay
+          stopSequencer();
+          return;
+        }
+        
+        // Update UI section if it changed
+        if (currentSectionFromAbsoluteStep != _currentSectionIndex) {
+          _currentSectionIndex = currentSectionFromAbsoluteStep;
+          notifyListeners(); // Update UI to show new section
         }
         
         _currentStep = relativeStep;
-        
-        // 🎯 PERFORMANCE: Update ValueNotifier for step indicator (instant UI update)
         _currentStepNotifier.value = relativeStep;
+      } else {
+        // Loop mode: stay within current section
+        final sectionStart = _currentSectionIndex * _gridRows;
+        final relativeStep = absoluteStep - sectionStart;
         
-        // 🎯 PERFORMANCE: No notifyListeners() call - only ValueNotifier updates!
-        // This eliminates unnecessary widget rebuilds during playback
+        if (relativeStep != _currentStep) {
+          _currentStep = relativeStep;
+          _currentStepNotifier.value = relativeStep;
+        }
       }
+        
+      // 🎯 PERFORMANCE: No notifyListeners() call - only ValueNotifier updates!
+      // This eliminates unnecessary widget rebuilds during playback
     });
   }
   
@@ -4494,19 +4491,24 @@ Made with Demo Sequencer 🚀
       _sectionGridData[_currentSectionIndex] = _soundGridSamples.map((grid) => List<int?>.from(grid)).toList();
     }
     
-    // 4. Sync: Native sequencer updated with new section index
-    _sequencerLibrary.setCurrentSection(_currentSectionIndex);
+    // 4. UI switch only: do not change native playback window during playback
+    final bool isPlaying = _sequencerLibrary.isSequencerPlaying;
+    if (!isPlaying) {
+      _sequencerLibrary.setCurrentSection(_currentSectionIndex);
+    }
     
     // Reset UI step indicator to section start
     _currentStep = 0;
     _currentStepNotifier.value = 0;
     
-    // Reset song mode counters when section changes
+    // Reset legacy song mode counters (can be removed later)
     _currentSectionLoopCounter = 0;
     _lastAbsoluteStepForSongMode = -1;
     
-    // Sync visible section data to native so playback uses correct cells
-    _syncCurrentSectionToNative();
+    // Only sync when not playing (editing/view changes)
+    if (!isPlaying) {
+      _syncCurrentSectionToNative();
+    }
     
          // 5. UI: Interface refreshes to show new section's content
     notifyListeners();

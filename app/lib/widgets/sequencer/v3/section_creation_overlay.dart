@@ -128,7 +128,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
             // Create Blank Button
             _buildSimpleButton(
               context,
-              text: 'Create Blank',
+              text: 'Create Empty',
               onPressed: () {
                 sequencerState.createEmptySection();
               },

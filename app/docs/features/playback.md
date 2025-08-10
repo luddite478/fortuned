@@ -8,10 +8,54 @@ The audio system uses **2 nodes per column (A/B switching)** for efficient resou
 
 ### Function Naming
 Updated to consistent naming scheme:
-- `start_sequencer()` / `stop_sequencer()` / `is_sequencer_playing()` - sequencer control
+- `start_sequencer(bpm, steps, startStep)` - now accepts starting absolute step
+- `stop_sequencer()` / `is_sequencer_playing()` - sequencer control
+- `set_song_mode(isSongMode)` - NEW: sets playback mode (loop vs song)
 - `clear_grid_completely()` - clears samples and resets volume/pitch settings  
 - `stop_all_slots()` - stops sample bank playback
 - `syncFlutterSequencerGridToNativeSequencerGrid()` - explicit Flutter→Native sync
+
+### Song Mode vs Loop Mode
+
+#### Loop Mode (Default)
+- **Behavior**: Playback wraps within current section boundaries
+- **Native Logic**: `g_current_step` wraps from `section_end` back to `section_start`
+- **Use Case**: Practice, live performance, jamming on specific sections
+- **Control**: `set_song_mode(0)` or `setSongMode(false)`
+
+#### Song Mode  
+- **Behavior**: Continuous playback across all sections, stops at end
+- **Native Logic**: `g_current_step` advances through entire song length, stops at `total_sections * steps_per_section`
+- **Use Case**: Full song playback, recording complete arrangements
+- **Control**: `set_song_mode(1)` or `setSongMode(true)`
+- **End Behavior**: Playback stops naturally, allowing final sounds to decay
+
+```c
+// Native playback mode handling
+if (g_song_mode) {
+    // Song mode: stop at end, don't loop
+    int song_end_step = g_total_sections * g_steps_per_section;
+    if (g_current_step >= song_end_step) {
+        g_sequencer_playing = 0;  // Stop playback
+        return;
+    }
+} else {
+    // Loop mode: wrap within current section
+    int section_end_step = g_section_start_step + g_steps_per_section;
+    if (g_current_step >= section_end_step) {
+        g_current_step = g_section_start_step;  // Wrap to section start
+    }
+}
+```
+
+### Continuous Playback Architecture
+
+**KEY CHANGE**: Playback is now **truly continuous** across absolute steps - no more section boundary interruptions.
+
+- **Absolute Step System**: Native operates on absolute steps (0, 1, 2... across all sections)
+- **Section Independence**: `set_current_section()` is now metadata-only and doesn't affect playback
+- **Boundary Elimination**: No audio artifacts when moving between sections
+- **Flutter Control**: Song mode advancement handled entirely by native sequencer
 
 ### A/B Column Node Structure
 ```c
@@ -98,45 +142,73 @@ int reset_cell_pitch(int step, int column);
 
 ## Playback Flow
 
-### 1. A/B Node Management
-**Nodes are created on-demand during playback, not when cells are set:**
+### 1. Startup with Section Support
+**NEW**: `start_sequencer()` now accepts a starting absolute step:
 ```c
-// When sequencer triggers a sample:
-play_samples_for_step(step) → setup_column_node(...) → A/B switching
-```
-- **Timing**: Nodes created during first playback of a sample in a column
-- **State**: New nodes start in `ma_node_state_stopped`, activated when triggered
-- **Lifecycle**: Nodes persist and are reused for different samples
-- **A/B Logic**: Always switch to unused node for smooth transitions
-
-### 2. A/B Switching Logic
-**Sequencer manages A/B switching for smooth transitions:**
-```c
-// During playback:
-play_samples_for_step(step) → get_column_node_for_cell(...) → A/B switch + fade
-```
-- **Smart switching**: Different sample = switch A/B, same sample = restart current
-- **Column tracking**: `currently_playing_nodes_per_col[]` tracks active A or B node
-- **Smooth transitions**: Crossfade between A/B nodes (see `docs/smoothing.md`)
-- **Resource efficiency**: Fixed memory usage (16 columns × 2 = 32 nodes total)
-
-### 3. Real-time Control Updates
-```c
-// Update existing nodes when settings change
-static void update_existing_nodes_for_cell(int step, int column, int sample_slot) {
-    cell_node_t* existing_node = find_node_for_cell(step, column, sample_slot);
-    if (existing_node) {
-        // Update pitch immediately
-        float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
-        update_cell_pitch(existing_node, resolved_pitch);
-        
-        // Update stored volume (smoothing uses resolved volume)
-        existing_node->volume = resolve_cell_volume(step, column, sample_slot);
-    }
+int start_sequencer(int bpm, int steps, int startStep) {
+    // Validate and set starting position
+    int song_end_step = g_total_sections * g_steps_per_section;
+    if (startStep >= song_end_step) startStep = startStep % song_end_step;
+    g_current_step = startStep;  // Start at specified absolute step
+    // ...
 }
 ```
 
-### 4. A/B Column System
+**Flutter Integration**:
+```dart
+// Calculate start position based on current section
+final int startAbsoluteStep = (currentSectionIndex * gridRows) + 0;
+sequencerLibrary.startSequencer(bpm, gridRows, startAbsoluteStep: startAbsoluteStep);
+```
+
+### 2. Section Metadata Management
+**IMPORTANT**: Section functions are now **UI-only metadata**:
+
+```c
+void set_current_section(int section) {
+    // Update metadata only; playback is continuous across absolute steps
+    g_current_section = section;
+    g_section_start_step = g_current_section * g_steps_per_section;
+    
+    // NO PLAYBACK INTERRUPTION - continuous audio flow maintained
+    prnt("ℹ️ [SECTION] Meta set current section to %d. Playback unaffected.", section);
+}
+```
+
+### 3. UI Section Tracking
+**NEW APPROACH**: UI computes current section from absolute step instead of wrap-around detection:
+
+```dart
+// OLD: Complex wrap-around detection with timing issues
+if (_lastAbsoluteStepForSongMode != -1 && absoluteStep < _lastAbsoluteStepForSongMode) {
+    // Section change detected...
+}
+
+// NEW: Direct computation from absolute step
+final currentSectionFromAbsoluteStep = absoluteStep ~/ _gridRows;
+if (currentSectionFromAbsoluteStep != _currentSectionIndex) {
+    _currentSectionIndex = currentSectionFromAbsoluteStep;
+    notifyListeners(); // Update UI to show new section
+}
+```
+
+**Benefits**:
+- Eliminates timing-dependent section detection
+- UI always matches actual playback position  
+- No more brief section display lag
+- Simpler, more reliable logic
+
+### 4. Stop Behavior
+**UPDATED**: `stop_sequencer()` preserves position for natural sound decay:
+```c
+void stop_sequencer(void) {
+    g_sequencer_playing = 0;
+    // Do not wrap or reseek; keep current_step so last step can decay
+    // Allows natural fade-out of final triggered sounds
+}
+```
+
+### 5. A/B Column System
 ```c
 static column_nodes_t g_column_nodes[MAX_TOTAL_COLUMNS];  // A/B pairs for each column
 static column_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];  // Track active node
@@ -148,38 +220,6 @@ static column_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];  // Tr
 - **Same sample triggered**: Restart current node from beginning with smooth transition  
 - **Empty cell**: Keep previous node playing (intended sequencer behavior)
 - **Resource limit**: Always exactly 32 nodes total (16 columns × 2)
-
-### 5. Stop/Start Behavior
-```c
-// stop_sequencer() function:
-void stop_sequencer(void) {
-    g_sequencer_playing = 0;
-    g_current_step = 0;
-    
-    // NEW: Use miniaudio node state control (preserves all settings)
-    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        if (g_cell_nodes[i].active) {
-            ma_node_set_state(&g_cell_nodes[i].node, ma_node_state_stopped);
-        }
-    }
-    // Nodes preserved - no destruction/recreation needed
-}
-
-// start_sequencer() function:  
-int start_sequencer(int bpm, int steps) {
-    // Resume existing nodes (much faster than recreation)
-    for (int i = 0; i < MAX_ACTIVE_CELL_NODES; i++) {
-        if (g_cell_nodes[i].active) {
-            ma_node_set_state(&g_cell_nodes[i].node, ma_node_state_started);
-        }
-    }
-    
-    g_sequencer_playing = 1;
-    g_step_just_changed = 1;  // Trigger step 0 immediately
-}
-```
-
-**Result**: Efficient stop/start cycles that preserve volume/pitch settings and avoid node recreation.
 
 ### 6. Pitch Change Handling During Restart
 
@@ -335,3 +375,49 @@ if (different_sample || no_active_sample) {
 ```
 
 This architecture provides smooth, click-free playback with efficient resource management, professional audio quality, and real-time control updates for both volume and pitch.
+
+## Song Mode Implementation Details
+
+### Native State Variables
+```c
+static int g_song_mode = 0;              // 0 = loop mode, 1 = song mode
+static int g_current_section = 0;        // UI metadata (doesn't affect playback)
+static int g_total_sections = 1;         // Total sections for song length calculation
+static int g_steps_per_section = 16;     // Steps per section
+```
+
+### Flutter Integration
+```dart
+// Set playback mode before starting
+sequencerLibrary.setSongMode(sectionPlaybackMode == SectionPlaybackMode.song);
+
+// Start with calculated absolute step
+final startAbsoluteStep = (currentSectionIndex * gridRows) + 0;
+sequencerLibrary.startSequencer(bpm, gridRows, startAbsoluteStep: startAbsoluteStep);
+```
+
+### Song Mode End Detection
+**Native**: Stops automatically when reaching end of final section
+**Flutter**: Also monitors for end condition and calls `stopSequencer()` if needed:
+```dart
+// Check if we've reached the last step of the last section
+final songEndStep = _numSections * _gridRows;
+if (absoluteStep >= songEndStep - 1) {
+    stopSequencer();  // Ensure clean stop
+    return;
+}
+```
+
+## Performance Improvements
+
+### Eliminated Operations
+1. **Section Switching Overhead**: No more playback interruption during section changes
+2. **Timing-Dependent Logic**: Removed complex wrap-around detection
+3. **Flutter-Driven Section Control**: Native handles song progression autonomously
+
+### Enhanced Responsiveness  
+1. **Immediate UI Updates**: Section display matches playback instantly
+2. **Continuous Audio**: No gaps or clicks at section boundaries
+3. **Natural Ending**: Song mode stops smoothly without artifacts
+
+This architecture provides professional-quality continuous playback while maintaining precise UI synchronization and efficient resource management.
