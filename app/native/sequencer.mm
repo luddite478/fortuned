@@ -391,15 +391,21 @@ static int g_sequencer_steps = 16;
 static int g_current_step = 0;
 static int g_columns = 4; // Current number of columns in sequencer (starts with 1 grid × 4 columns)
 
+// Current logical sizes (use these for algorithm bounds; do not exceed capacities above)
+static int g_steps_len = 16;    // total steps used in the flattened grid (sum of all sections)
+static int g_columns_len = 4;   // active columns (num grids * columns per grid)
+
 // Section tracking (vertical stacking of rows)
 static int g_current_section = 0;        // Which section is currently playing (0, 1, 2...)
 static int g_total_sections = 1;         // Total number of sections
 static int g_steps_per_section = 16;     // Steps per section (same as g_sequencer_steps)
 static int g_section_start_step = 0;     // Calculated: g_current_section * g_steps_per_section
 static int g_song_mode = 0;              // 0 = loop mode (within section), 1 = song mode (all sections)
-static int g_sequencer_grid[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = sample_slot (-1 = empty)
-static float g_sequencer_grid_volumes[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = volume (0.0 to 1.0)
-static float g_sequencer_grid_pitches[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS]; // [step][column] = pitch (0.03125 to 32.0, 1.0 = normal, covers C0-C10)
+// Deprecated SoA arrays removed in favor of AoS g_cells
+
+// Playback region [start, end) controls playback window (end is exclusive)
+// Type is declared in sequencer.h
+static playback_region_t g_playback_region = {0, 16};
 static uint64_t g_frames_per_step = 0;
 static uint64_t g_step_frame_counter = 0;
 static int g_step_just_changed = 0; // Flag to handle immediate step playback
@@ -430,6 +436,53 @@ static int setup_column_node(int column, int node_index, int sample_slot, float 
 static column_node_t* get_column_node_for_cell(int step, int column, int sample_slot);
 static void set_target_volume(column_node_t* node, float new_target_volume);
 static void cleanup_column_node(column_node_t* node);
+// Forward declaration for pending op applier (used in run_sequencer)
+static void apply_pending_op_if_exists(void);
+
+// Accessors for FFI if needed
+int get_steps_len(void) { return g_steps_len; }
+int get_columns_len(void) { return g_columns_len; }
+
+// Update columns length (clamped to capacity)
+void set_columns_len(int columns) {
+    if (columns < 1) columns = 1;
+    if (columns > MAX_TOTAL_COLUMNS) columns = MAX_TOTAL_COLUMNS;
+    g_columns_len = columns;
+    prnt("🎛️ [SEQUENCER] Columns length set to %d", g_columns_len);
+}
+
+// Set playback region with validation
+void set_playback_region(playback_region_t region) {
+    if (region.start < 0) region.start = 0;
+    if (region.end < region.start + 1) region.end = region.start + 1;
+    if (region.end > g_steps_len) region.end = g_steps_len;
+    g_playback_region = region;
+    if (g_current_step < g_playback_region.start) g_current_step = g_playback_region.start;
+    if (g_current_step >= g_playback_region.end)  g_current_step = g_playback_region.end - 1;
+    prnt("🎼 [SEQUENCER] Playback region set to [%d, %d)", g_playback_region.start, g_playback_region.end);
+}
+
+// Convenience wrapper for FFI (no struct passing)
+void set_playback_region_bounds(int start, int end) {
+    playback_region_t r; r.start = start; r.end = end;
+    set_playback_region(r);
+}
+
+// Explicit setter for logical steps length (decoupled from sections)
+void set_steps_len(int steps) {
+    if (steps < 1) steps = 1;
+    if (steps > MAX_SEQUENCER_STEPS) steps = MAX_SEQUENCER_STEPS;
+    g_steps_len = steps;
+    // Also clamp playback region to new length
+    if (g_playback_region.end > g_steps_len) g_playback_region.end = g_steps_len;
+    if (g_playback_region.start >= g_playback_region.end) {
+        g_playback_region.start = 0;
+        g_playback_region.end = g_steps_len;
+    }
+    if (g_current_step < g_playback_region.start) g_current_step = g_playback_region.start;
+    if (g_current_step >= g_playback_region.end)  g_current_step = (g_playback_region.end > 0) ? g_playback_region.end - 1 : 0;
+    prnt("🎼 [SEQUENCER] Steps length set to %d, region=[%d,%d)", g_steps_len, g_playback_region.start, g_playback_region.end);
+}
 
 // Debug function to check SoundTouch instance isolation
 #if PITCH_APPROACH_SOUNDTOUCH_REALTIME
@@ -542,7 +595,7 @@ static int initialize_all_column_nodes(void) {
 // Count active column nodes for diagnostics  
 static int count_active_column_nodes(void) {
     int count = 0;
-    for (int col = 0; col < g_columns; col++) {
+    for (int col = 0; col < g_columns_len; col++) {
         if (g_column_nodes[col].active_node >= 0) {
             // Also check that the active node actually has a miniaudio node initialized
             int active_idx = g_column_nodes[col].active_node;
@@ -566,7 +619,7 @@ static float apply_exponential_smoothing(float current, float target, float alph
 
 // Update volume smoothing for all active column nodes
 static void update_volume_smoothing(void) {
-    for (int col = 0; col < g_columns; col++) {
+    for (int col = 0; col < g_columns_len; col++) {
         for (int node_idx = 0; node_idx < 2; node_idx++) {
             column_node_t* node = &g_column_nodes[col].nodes[node_idx];
             // Only process nodes that have been initialized with actual miniaudio nodes
@@ -618,11 +671,94 @@ static float ratio_to_ui_pitch(float ratio) {
     return (semitones + 12.0f) / 24.0f;
 }
 
+// -----------------------------------------------------------------------------
+// Step insert/delete pending operation (applied at step boundary)
+// -----------------------------------------------------------------------------
+enum { OP_NONE = 0, OP_INSERT = 1, OP_DELETE = 2 };
+typedef struct { int op; int step; } pending_op_t;
+static pending_op_t g_pending = { OP_NONE, 0 };
+
+// -----------------------------------------------------------------------------
+// Grid Cell (AoS) - Phase 1: Introduce struct and dual-write paths
+// -----------------------------------------------------------------------------
+typedef struct {
+    int   sample_slot;   // -1 = empty
+    float volume;        // DEFAULT_CELL_VOLUME means use sample bank
+    float pitch;         // DEFAULT_CELL_PITCH means use sample bank
+} Cell;
+
+static Cell g_cells[MAX_SEQUENCER_STEPS][MAX_TOTAL_COLUMNS];
+static const Cell DEFAULT_CELL = { -1, DEFAULT_CELL_VOLUME, DEFAULT_CELL_PITCH };
+
+static inline Cell* cell_at(int step, int col) {
+    if (step < 0 || step >= g_steps_len) return NULL;
+    if (col < 0 || col >= g_columns_len) return NULL;
+    return &g_cells[step][col];
+}
+
+static inline void clear_steps(int startStep, int count) {
+    for (int r = 0; r < count; r++) {
+        int step = startStep + r; if (step >= MAX_SEQUENCER_STEPS) break;
+        for (int c = 0; c < g_columns_len; c++) g_cells[step][c] = DEFAULT_CELL;
+    }
+}
+
+static inline void move_steps(int fromStep, int toStep, int numSteps) {
+    if (numSteps <= 0) return;
+    size_t stepBytes = sizeof(Cell) * (size_t)g_columns_len;
+    memmove(&g_cells[toStep][0], &g_cells[fromStep][0], (size_t)numSteps * stepBytes);
+}
+
+// -----------------------------------------------------------------------------
+// Step insert/delete implementation (single-step ops)
+// -----------------------------------------------------------------------------
+static void apply_insert_1(int step) {
+    if (step < 0) step = 0;
+    if (step > g_steps_len) step = g_steps_len; // insert at tail if beyond current
+    int stepsToMove = (g_steps_len < MAX_SEQUENCER_STEPS ? (g_steps_len - step) : (MAX_SEQUENCER_STEPS - step - 1));
+    if (stepsToMove > 0) move_steps(step, step + 1, stepsToMove);
+    clear_steps(step, 1);
+    if (step <= g_current_step) g_current_step += 1; // keep pointing to same content
+    if (g_steps_len < MAX_SEQUENCER_STEPS) g_steps_len += 1; // grow up to capacity
+}
+
+static void apply_delete_1(int step) {
+    if (step < 0) step = 0;
+    if (step >= g_steps_len) step = g_steps_len - 1; // clamp to last valid step
+    int stepsToMove = g_steps_len - step - 1;
+    if (stepsToMove > 0) move_steps(step + 1, step, stepsToMove);
+    clear_steps(g_steps_len - 1, 1);
+    if (step < g_current_step)      g_current_step -= 1;
+    else if (step == g_current_step) {/* keep index; new content slid in */}
+    if (g_steps_len > 1) g_steps_len -= 1;
+}
+
+void insert_step(int step) {
+    if (g_sequencer_playing && step == g_current_step) { g_pending.op = OP_INSERT; g_pending.step = step; return; }
+    apply_insert_1(step);
+}
+
+void delete_step(int step) {
+    if (g_sequencer_playing && step == g_current_step) { g_pending.op = OP_DELETE; g_pending.step = step; return; }
+    apply_delete_1(step);
+}
+
+void apply_pending_op_if_exists(void) {
+    if (g_pending.op == OP_NONE) return;
+    if (g_pending.op == OP_INSERT) apply_insert_1(g_pending.step);
+    else if (g_pending.op == OP_DELETE) apply_delete_1(g_pending.step);
+    g_pending.op = OP_NONE;
+    // Optionally clamp to region
+    if (g_playback_region.end > g_steps_len) g_playback_region.end = g_steps_len;
+    if (g_current_step < g_playback_region.start) g_current_step = g_playback_region.start;
+    if (g_current_step >= g_playback_region.end)  g_current_step = g_playback_region.end - 1;
+}
+
 // Resolve current volume for a cell (sample bank volume or cell override)
 static float resolve_cell_volume(int step, int column, int sample_slot) {
     audio_slot_t* sample = &g_slots[sample_slot];
     float bank_volume = sample->volume;
-    float cell_volume = g_sequencer_grid_volumes[step][column];
+    float cell_volume = g_cells[step][column].volume;
     return (cell_volume != DEFAULT_CELL_VOLUME) ? cell_volume : bank_volume;
 }
 
@@ -630,7 +766,7 @@ static float resolve_cell_volume(int step, int column, int sample_slot) {
 static float resolve_cell_pitch(int step, int column, int sample_slot) {
     audio_slot_t* sample = &g_slots[sample_slot];
     float bank_pitch = sample->pitch;
-    float cell_pitch = g_sequencer_grid_pitches[step][column];
+    float cell_pitch = g_cells[step][column].pitch;
     return (cell_pitch != DEFAULT_CELL_PITCH) ? cell_pitch : bank_pitch;
 }
 
@@ -644,7 +780,7 @@ static void update_column_node_pitch(column_node_t* node, float new_pitch) {
 
 // Get the appropriate column node for a cell (returns the node that should play this sample)
 static column_node_t* get_column_node_for_cell(int step, int column, int sample_slot) {
-    if (column < 0 || column >= g_columns) return NULL;
+    if (column < 0 || column >= g_columns_len) return NULL;
     
     column_nodes_t* col_nodes = &g_column_nodes[column];
     
@@ -661,7 +797,7 @@ static column_node_t* get_column_node_for_cell(int step, int column, int sample_
 
 // Setup a column node with a specific sample (loads audio data)
 static int setup_column_node(int column, int node_index, int sample_slot, float volume, float pitch) {
-    if (column < 0 || column >= g_columns || node_index < 0 || node_index > 1) {
+    if (column < 0 || column >= g_columns_len || node_index < 0 || node_index > 1) {
         prnt_err("🔴 [COLUMN NODE] Invalid parameters: column=%d, node_index=%d", column, node_index);
         return -1;
     }
@@ -800,7 +936,7 @@ static int setup_column_node(int column, int node_index, int sample_slot, float 
 
 // Update volume/pitch for existing nodes when settings change
 static void update_existing_column_nodes_for_cell(int step, int column, int sample_slot) {
-    if (column < 0 || column >= g_columns) return;
+    if (column < 0 || column >= g_columns_len) return;
     
     column_nodes_t* col_nodes = &g_column_nodes[column];
     float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
@@ -2085,11 +2221,11 @@ static void silence_cell_nodes_in_column(int column) {
 */
 
 static void play_samples_for_step(int step) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) return;
+    if (step < 0 || step >= g_steps_len) return;
     
     // Process all columns using A/B node switching
-    for (int column = 0; column < g_columns; column++) {
-        int sample_to_play = g_sequencer_grid[step][column];
+    for (int column = 0; column < g_columns_len; column++) {
+        int sample_to_play = g_cells[step][column].sample_slot;
         
         // Is there a sample in this grid cell?
         if (sample_to_play >= 0 && sample_to_play < MAX_SLOTS) {
@@ -2187,6 +2323,10 @@ static void run_sequencer(ma_uint32 frameCount) {
     // If sequencer just started, play step 0 immediately
     if (g_step_just_changed) {
         g_step_just_changed = 0;
+        // Apply any pending structural operation at boundary before triggering
+        if (g_pending.op != OP_NONE) {
+            apply_pending_op_if_exists();
+        }
         play_samples_for_step(g_current_step);
     }
     
@@ -2201,23 +2341,30 @@ static void run_sequencer(ma_uint32 frameCount) {
             // Advance to next absolute step
             g_current_step++;
             
-            // Handle looping based on playback mode
-            if (g_song_mode) {
-                // Song mode: stop at end, don't loop
-                int song_end_step = g_total_sections * g_steps_per_section;
-                if (song_end_step <= 0) song_end_step = g_sequencer_steps; // Fallback
-                if (g_current_step >= song_end_step) {
-                    // Stop playback at end of song
+            // Handle playback region
+            int regionStart = g_playback_region.start;
+            int regionEnd = g_playback_region.end;
+            if (regionEnd <= 0 || regionEnd > g_steps_len) regionEnd = g_steps_len;
+            if (regionStart < 0) regionStart = 0;
+
+            // If we've reached or passed region end, either stop (song mode) or wrap (loop mode)
+            if (g_current_step >= regionEnd) {
+                if (g_song_mode) {
                     g_sequencer_playing = 0;
-                    prnt("🛑 [SEQUENCER] Song mode ended at step %d", g_current_step);
-                    return; // Exit early, don't play any more steps
+                    prnt("🛑 [SEQUENCER] Reached region end at step %d", g_current_step);
+                    return;
+                } else {
+                    g_current_step = regionStart;
                 }
-            } else {
-                // Loop mode: wrap within current section
-                int section_end_step = g_section_start_step + g_steps_per_section;
-                if (g_current_step >= section_end_step) {
-                    g_current_step = g_section_start_step; // Wrap to section start
-                }
+            }
+
+            // Apply any pending single-step structural operation at boundary
+            if (g_pending.op != OP_NONE) {
+                apply_pending_op_if_exists();
+                // Re-clamp to region after structure change
+                regionEnd = (g_playback_region.end > g_steps_len) ? g_steps_len : g_playback_region.end;
+                if (g_current_step < regionStart) g_current_step = regionStart;
+                if (g_current_step >= regionEnd) g_current_step = (regionEnd > 0) ? regionEnd - 1 : 0;
             }
             
             // Play samples for the new absolute step
@@ -2310,7 +2457,7 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
         memset(pOutput, 0, frameCount * CHANNEL_COUNT * sizeof(float));
     } else if (g_perf_test_mode == 4) {
         // Test pure mixing overhead by silencing all column nodes first
-        for (int col = 0; col < g_columns; col++) {
+        for (int col = 0; col < g_columns_len; col++) {
             for (int node_idx = 0; node_idx < 2; node_idx++) {
                 column_node_t* node = &g_column_nodes[col].nodes[node_idx];
                 if (node->node_initialized) {
@@ -2320,7 +2467,7 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
         }
         ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
         // Restore volumes after test
-        for (int col = 0; col < g_columns; col++) {
+        for (int col = 0; col < g_columns_len; col++) {
             for (int node_idx = 0; node_idx < 2; node_idx++) {
                 column_node_t* node = &g_column_nodes[col].nodes[node_idx];
                 if (node->node_initialized) {
@@ -2583,13 +2730,12 @@ int init(void) {
     g_step_frame_counter = 0;
     g_step_just_changed = 0;
     g_frames_per_step = (SAMPLE_RATE * 60) / (g_sequencer_bpm * 4); // 1/16 note frames
+    g_columns_len = g_columns; // initialize current columns
     
-    // Initialize sequencer grid (all empty)
+    // Initialize sequencer cells (all empty)
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
-            g_sequencer_grid[step][col] = -1; // -1 means empty
-                    g_sequencer_grid_volumes[step][col] = DEFAULT_CELL_VOLUME; // Default: use sample bank volume
-        g_sequencer_grid_pitches[step][col] = DEFAULT_CELL_PITCH; // Default: use sample bank pitch
+            g_cells[step][col] = DEFAULT_CELL;
         }
     }
     
@@ -2824,7 +2970,7 @@ void stop_all_slots(void) {
     prnt("⏹️ [MINIAUDIO] Stopping all slots (sample bank + sequencer + previews + cell nodes)");
     
     // Stop all column nodes (but don't cleanup - they're persistent)
-    for (int col = 0; col < g_columns; col++) {
+    for (int col = 0; col < g_columns_len; col++) {
         for (int node_idx = 0; node_idx < 2; node_idx++) {
             column_node_t* node = &g_column_nodes[col].nodes[node_idx];
             if (node->node_initialized) {
@@ -2977,7 +3123,7 @@ int preview_cell(int step, int column, float pitch, float volume) {
         return -1;
     }
     
-    int sample_index = g_sequencer_grid[step][column];
+    int sample_index = g_cells[step][column].sample_slot;
     if (sample_index < 0 || sample_index >= MAX_SLOTS) {
         prnt_err("🔴 [CELL PREVIEW] No sample in cell [%d][%d]", step, column);
         return -1;
@@ -3158,7 +3304,7 @@ int get_active_cell_node_count(void) {
 }
 
 int get_max_cell_node_count(void) {
-    return g_columns * 2;  // A/B nodes per column
+    return g_columns_len * 2;  // A/B nodes per column
 }
 
 // Sequencer functions (sample-accurate timing)
@@ -3181,9 +3327,13 @@ int start_sequencer(int bpm, int steps, int startStep) {
     // Configure sequencer
     g_sequencer_bpm = bpm;
     g_sequencer_steps = steps;
+    // Treat provided steps as current logical table height
+    g_steps_len = steps;
     g_frames_per_step = (SAMPLE_RATE * 60) / (bpm * 4); // 1/16 note frames
-    int song_end_step = g_total_sections * g_steps_per_section;
-    if (song_end_step <= 0) song_end_step = steps;
+    // Clamp playback region to current length; default to full table if invalid
+    if (g_playback_region.end <= 0 || g_playback_region.end > g_steps_len) g_playback_region.end = g_steps_len;
+    if (g_playback_region.start < 0) g_playback_region.start = 0;
+    int song_end_step = (g_playback_region.end > 0) ? g_playback_region.end : steps;
     if (startStep < 0) startStep = 0;
     if (startStep >= song_end_step) startStep = startStep % song_end_step;
     g_current_step = startStep; // Start at provided absolute step
@@ -3202,7 +3352,7 @@ void stop_sequencer(void) {
     g_step_just_changed = 0;
     
     // Stop all column nodes but preserve their setup
-    for (int col = 0; col < g_columns; col++) {
+    for (int col = 0; col < g_columns_len; col++) {
         for (int node_idx = 0; node_idx < 2; node_idx++) {
             column_node_t* node = &g_column_nodes[col].nodes[node_idx];
             if (node->node_initialized) {
@@ -3238,8 +3388,8 @@ void set_bpm(int bpm) {
 }
 
 void set_cell(int step, int column, int sample_slot) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [SEQUENCER] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [SEQUENCER] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return;
     }
     if (column < 0 || column >= MAX_TOTAL_COLUMNS) {
@@ -3252,14 +3402,19 @@ void set_cell(int step, int column, int sample_slot) {
     }
     
     // Only set the cell if within current column range
-    if (column >= g_columns) {
-        prnt_err("🔴 [SEQUENCER] Column %d beyond current range (max: %d). Use set_columns() first.", column, g_columns - 1);
+    if (column >= g_columns_len) {
+        prnt_err("🔴 [SEQUENCER] Column %d beyond current range (max: %d). Use set_columns() first.", column, g_columns_len - 1);
         return;
     }
     
     // If removing sample from cell (sample_slot = -1)
     if (sample_slot == -1) {
-        g_sequencer_grid[step][column] = -1;
+        g_cells[step][column].sample_slot = -1;
+        // AoS mirror
+        if (column < g_columns_len) {
+            Cell* cell = cell_at(step, column);
+            if (cell) *cell = DEFAULT_CELL;
+        }
         prnt("🗑️ [SEQUENCER] Cleared cell [step:%d, col:%d]", step, column);
         return;
     }
@@ -3272,40 +3427,47 @@ void set_cell(int step, int column, int sample_slot) {
     }
     
     // Reset cell volume and pitch to defaults when sample changes
-    int old_sample = g_sequencer_grid[step][column];
+    int old_sample = g_cells[step][column].sample_slot;
     if (old_sample >= 0 && old_sample != sample_slot) {
-        g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME;
-        g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;
+        if (column < g_columns_len) {
+            Cell* cell = cell_at(step, column);
+            if (cell) {
+                cell->volume = DEFAULT_CELL_VOLUME;
+                cell->pitch  = DEFAULT_CELL_PITCH;
+            }
+        }
         prnt("🔄 [GRID] Reset cell [step:%d, col:%d] volume/pitch to defaults for new sample %d", 
              step, column, sample_slot);
     }
     
     // Set the grid cell (column nodes will be setup during playback as needed)
-    g_sequencer_grid[step][column] = sample_slot;
+    if (column < g_columns_len) {
+        Cell* cell = cell_at(step, column);
+        if (cell) cell->sample_slot = sample_slot;
+    }
     prnt("🎹 [SEQUENCER] Set cell [step:%d, col:%d] = sample %d", step, column, sample_slot);
 }
 
 void clear_cell(int step, int column) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) return;
+    if (step < 0 || step >= g_steps_len) return;
     if (column < 0 || column >= MAX_TOTAL_COLUMNS) return;
     
     // Reset cell volume and pitch overrides when clearing cell
-    if (g_sequencer_grid[step][column] >= 0) {
-        g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME;
-        g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;
+    if (g_cells[step][column].sample_slot >= 0) {
         prnt("🔄 [GRID] Reset cell [step:%d, col:%d] volume/pitch overrides when clearing", step, column);
     }
     
-    g_sequencer_grid[step][column] = -1;
+    if (column < g_columns_len) {
+        Cell* cell = cell_at(step, column);
+        if (cell) *cell = DEFAULT_CELL;
+    }
     prnt("🗑️ [SEQUENCER] Cleared cell [step:%d, col:%d]", step, column);
 }
 
 void clear_grid_completely(void) {
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
         for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
-            g_sequencer_grid[step][col] = -1;
-                g_sequencer_grid_volumes[step][col] = DEFAULT_CELL_VOLUME; // Reset to use sample bank volume
-    g_sequencer_grid_pitches[step][col] = DEFAULT_CELL_PITCH; // Reset to use sample bank pitch
+            g_cells[step][col] = DEFAULT_CELL;
         }
     }
     prnt("🗑️ [SEQUENCER] Cleared grid completely (samples + volume/pitch reset)");
@@ -3321,38 +3483,19 @@ void set_columns(int columns) {
     }
     
     g_columns = columns;
+    g_columns_len = columns; // update current columns length
     prnt("🎛️ [SEQUENCER] Set columns to %d", columns);
 }
 
 // Section management functions
 void set_current_section(int section) {
-    if (section < 0 || section >= g_total_sections) {
-        prnt_err("🔴 [SECTION] Invalid section: %d (total: %d)", section, g_total_sections);
-        return;
-    }
-
-    // Update metadata only; playback is continuous across absolute steps
-    g_current_section = section;
-    g_section_start_step = g_current_section * g_steps_per_section;
-
-    prnt("ℹ️ [SECTION] Meta set current section to %d (start step %d). Playback unaffected.",
-         section, g_section_start_step);
+    // Deprecated: use playback region to control boundaries
+    prnt("ℹ️ [SECTION] set_current_section deprecated");
 }
 
 void set_total_sections(int sections) {
-    if (sections < 1 || sections > (MAX_SEQUENCER_STEPS / g_steps_per_section)) {
-        prnt_err("🔴 [SECTION] Invalid sections: %d (max: %d)", sections, MAX_SEQUENCER_STEPS / g_steps_per_section);
-        return;
-    }
-    
-    g_total_sections = sections;
-    
-    // Ensure current section is valid
-    if (g_current_section >= sections) {
-        set_current_section(sections - 1);
-    }
-    
-    prnt("🎵 [SECTION] Set total sections to %d", sections);
+    // Deprecated: sections handled by playback region externally
+    prnt("ℹ️ [SECTION] set_total_sections deprecated");
 }
 
 int get_current_section(void) {
@@ -3384,11 +3527,11 @@ int set_sample_bank_volume(int bank, float volume) {
     s->volume = volume;
     
     // Update existing nodes that use this sample bank (if they don't have cell overrides)
-    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
-        for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
-            if (g_sequencer_grid[step][col] == bank) {
+    for (int step = 0; step < g_steps_len; step++) {
+        for (int col = 0; col < g_columns_len; col++) {
+            if (g_cells[step][col].sample_slot == bank) {
                 // Only update if this cell doesn't have a volume override
-                if (g_sequencer_grid_volumes[step][col] == DEFAULT_CELL_VOLUME) {
+                if (g_cells[step][col].volume == DEFAULT_CELL_VOLUME) {
                     update_existing_column_nodes_for_cell(step, col, bank);
                 }
             }
@@ -3409,8 +3552,8 @@ float get_sample_bank_volume(int bank) {
 }
 
 int set_cell_volume(int step, int column, float volume) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [VOLUME] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [VOLUME] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return -1;
     }
     
@@ -3424,10 +3567,14 @@ int set_cell_volume(int step, int column, float volume) {
         return -1;
     }
     
-    g_sequencer_grid_volumes[step][column] = volume;
+    // AoS
+    if (column < g_columns_len) {
+        Cell* cell = cell_at(step, column);
+        if (cell) cell->volume = volume;
+    }
     
     // Update existing column node for this cell if it exists
-    int sample_in_cell = g_sequencer_grid[step][column];
+    int sample_in_cell = g_cells[step][column].sample_slot;
     if (sample_in_cell >= 0) {
         update_existing_column_nodes_for_cell(step, column, sample_in_cell);
     }
@@ -3437,8 +3584,8 @@ int set_cell_volume(int step, int column, float volume) {
 }
 
 int reset_cell_volume(int step, int column) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [VOLUME] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [VOLUME] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return -1;
     }
 
@@ -3447,10 +3594,14 @@ int reset_cell_volume(int step, int column) {
         return -1;
     }
 
-    g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME;
+    // AoS
+    if (column < g_columns_len) {
+        Cell* cell = cell_at(step, column);
+        if (cell) cell->volume = DEFAULT_CELL_VOLUME;
+    }
 
     // Update existing column node for this cell if it exists
-    int sample_in_cell = g_sequencer_grid[step][column];
+    int sample_in_cell = g_cells[step][column].sample_slot;
     if (sample_in_cell >= 0) {
         update_existing_column_nodes_for_cell(step, column, sample_in_cell);
     }
@@ -3460,8 +3611,8 @@ int reset_cell_volume(int step, int column) {
 }
 
 float get_cell_volume(int step, int column) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [VOLUME] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [VOLUME] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return 0.0f;
     }
     
@@ -3470,7 +3621,7 @@ float get_cell_volume(int step, int column) {
         return 0.0f;
     }
     
-    return g_sequencer_grid_volumes[step][column];
+    return g_cells[step][column].volume;
 }
 
 // Pitch control functions
@@ -3489,11 +3640,11 @@ int set_sample_bank_pitch(int bank, float pitch) {
     s->pitch = pitch;
     
     // Update existing nodes that use this sample bank (if they don't have cell overrides)
-    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
-        for (int col = 0; col < MAX_TOTAL_COLUMNS; col++) {
-            if (g_sequencer_grid[step][col] == bank) {
+    for (int step = 0; step < g_steps_len; step++) {
+        for (int col = 0; col < g_columns_len; col++) {
+            if (g_cells[step][col].sample_slot == bank) {
                 // Only update if this cell doesn't have a pitch override
-                if (g_sequencer_grid_pitches[step][col] == DEFAULT_CELL_PITCH) {
+                if (g_cells[step][col].pitch == DEFAULT_CELL_PITCH) {
                     update_existing_column_nodes_for_cell(step, col, bank);
                 }
             }
@@ -3514,8 +3665,8 @@ float get_sample_bank_pitch(int bank) {
 }
 
 int set_cell_pitch(int step, int column, float pitch_ratio) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [PITCH] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [PITCH] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return -1;
     }
 
@@ -3529,10 +3680,14 @@ int set_cell_pitch(int step, int column, float pitch_ratio) {
         return -1;
     }
 
-    g_sequencer_grid_pitches[step][column] = pitch_ratio;
+    // AoS
+    if (column < g_columns_len) {
+        Cell* cell = cell_at(step, column);
+        if (cell) cell->pitch = pitch_ratio;
+    }
 
     // Update existing column node for this cell if it exists
-    int sample_in_cell = g_sequencer_grid[step][column];
+    int sample_in_cell = g_cells[step][column].sample_slot;
     if (sample_in_cell >= 0) {
         update_existing_column_nodes_for_cell(step, column, sample_in_cell);
     }
@@ -3542,8 +3697,8 @@ int set_cell_pitch(int step, int column, float pitch_ratio) {
 }
 
 int reset_cell_pitch(int step, int column) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [PITCH] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [PITCH] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return -1;
     }
 
@@ -3552,10 +3707,14 @@ int reset_cell_pitch(int step, int column) {
         return -1;
     }
 
-    g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;
+    // AoS
+    if (column < g_columns_len) {
+        Cell* cell = cell_at(step, column);
+        if (cell) cell->pitch = DEFAULT_CELL_PITCH;
+    }
 
     // Update existing column node for this cell if it exists
-    int sample_in_cell = g_sequencer_grid[step][column];
+    int sample_in_cell = g_cells[step][column].sample_slot;
     if (sample_in_cell >= 0) {
         update_existing_column_nodes_for_cell(step, column, sample_in_cell);
     }
@@ -3565,8 +3724,8 @@ int reset_cell_pitch(int step, int column) {
 }
 
 float get_cell_pitch(int step, int column) {
-    if (step < 0 || step >= MAX_SEQUENCER_STEPS) {
-        prnt_err("🔴 [PITCH] Invalid step: %d (max: %d)", step, MAX_SEQUENCER_STEPS - 1);
+    if (step < 0 || step >= g_steps_len) {
+        prnt_err("🔴 [PITCH] Invalid step: %d (max: %d)", step, g_steps_len - 1);
         return 1.0f; // Return default pitch ratio
     }
 
@@ -3575,7 +3734,7 @@ float get_cell_pitch(int step, int column) {
         return 1.0f; // Return default pitch ratio
     }
 
-    float pitch_ratio = g_sequencer_grid_pitches[step][column];
+    float pitch_ratio = g_cells[step][column].pitch;
     
     // If it's the default value, return 1.0 (original pitch)
     if (pitch_ratio == DEFAULT_CELL_PITCH) {

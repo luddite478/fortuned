@@ -66,6 +66,7 @@ __attribute__((visibility("default"))) __attribute__((used))
 void set_columns(int columns);
 
 // Section management functions
+// Deprecated: use playback region
 __attribute__((visibility("default"))) __attribute__((used))
 void set_current_section(int section);
 __attribute__((visibility("default"))) __attribute__((used))
@@ -178,6 +179,31 @@ __attribute__((visibility("default"))) __attribute__((used))
 void stop_sample_preview(void);
 __attribute__((visibility("default"))) __attribute__((used))
 void stop_cell_preview(void);
+
+// Current table sizes and playback region APIs
+typedef struct { int start; int end; } playback_region_t;
+__attribute__((visibility("default"))) __attribute__((used))
+int get_steps_len(void);
+__attribute__((visibility("default"))) __attribute__((used))
+int get_columns_len(void);
+__attribute__((visibility("default"))) __attribute__((used))
+void set_columns_len(int columns);
+__attribute__((visibility("default"))) __attribute__((used))
+void set_playback_region(playback_region_t region);
+
+// Convenience wrapper to avoid passing a struct by value over FFI
+__attribute__((visibility("default"))) __attribute__((used))
+void set_playback_region_bounds(int start, int end);
+
+// Explicit setter for logical steps length (decoupled from legacy sections)
+__attribute__((visibility("default"))) __attribute__((used))
+void set_steps_len(int steps);
+
+// Step insert/delete APIs
+__attribute__((visibility("default"))) __attribute__((used))
+void insert_step(int step);
+__attribute__((visibility("default"))) __attribute__((used))
+void delete_step(int step);
 
 #ifdef __cplusplus
 }

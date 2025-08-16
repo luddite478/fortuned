@@ -297,6 +297,38 @@ class SequencerBindings {
   late final _set_song_mode =
       _set_song_modePtr.asFunction<void Function(int)>();
 
+  // --- Playback region and sizes ---
+  void set_playback_region_bounds(
+    int start,
+    int end,
+  ) {
+    return _set_playback_region_bounds(
+      start,
+      end,
+    );
+  }
+
+  late final _set_playback_region_boundsPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int, ffi.Int)>>('set_playback_region_bounds');
+  late final _set_playback_region_bounds = _set_playback_region_boundsPtr.asFunction<void Function(int, int)>();
+
+  void set_steps_len(
+    int steps,
+  ) {
+    return _set_steps_len(
+      steps,
+    );
+  }
+
+  late final _set_steps_lenPtr = _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int)>>('set_steps_len');
+  late final _set_steps_len = _set_steps_lenPtr.asFunction<void Function(int)>();
+
+  int get_steps_len() {
+    return _get_steps_len();
+  }
+
+  late final _get_steps_lenPtr = _lookup<ffi.NativeFunction<ffi.Int Function()>>('get_steps_len');
+  late final _get_steps_len = _get_steps_lenPtr.asFunction<int Function()>();
+
   /// Returns the number of available playback slots (always MAX_SLOTS)
   int get_slot_count() {
     return _get_slot_count();

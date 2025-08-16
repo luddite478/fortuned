@@ -379,6 +379,25 @@ class SequencerLibrary {
   int get currentStep {
     return _bindings.get_current_step();
   }
+
+  // -------------- PLAYBACK REGION AND SIZES --------------
+
+  /// Set playback region [start, end) in absolute steps (end exclusive)
+  void setPlaybackRegionBounds(int start, int end) {
+    _bindings.set_playback_region_bounds(start, end);
+    print('🎼 Set playback region to [$start, $end)');
+  }
+
+  /// Set current logical steps length (total absolute steps)
+  void setStepsLen(int steps) {
+    _bindings.set_steps_len(steps);
+    print('📏 Set steps length to $steps');
+  }
+
+  /// Get current logical steps length from native
+  int getStepsLen() {
+    return _bindings.get_steps_len();
+  }
   
   /// Set sequencer BPM (updates timing instantly)
   void setSequencerBpm(int bpm) {
@@ -387,9 +406,8 @@ class SequencerLibrary {
   
   /// Set sequencer step count (updates loop length instantly)
   void setSequencerSteps(int steps) {
-    // Note: This requires the native set_steps function to be implemented
-    // _bindings.set_steps(steps);
-    print('🎵 Would set sequencer steps to $steps (native function needed)');
+    // Prefer using setStepsLen to update native logical length.
+    setStepsLen(steps);
   }
   
   /// Set a grid cell to play a specific sample slot

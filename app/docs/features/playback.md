@@ -11,6 +11,8 @@ Updated to consistent naming scheme:
 - `start_sequencer(bpm, steps, startStep)` - now accepts starting absolute step
 - `stop_sequencer()` / `is_sequencer_playing()` - sequencer control
 - `set_song_mode(isSongMode)` - NEW: sets playback mode (loop vs song)
+- `set_playback_region_bounds(start, end)` - NEW: sets native playback window [start, end)
+- `set_steps_len(steps)` / `get_steps_len()` - NEW: controls current logical steps length
 - `clear_grid_completely()` - clears samples and resets volume/pitch settings  
 - `stop_all_slots()` - stops sample bank playback
 - `syncFlutterSequencerGridToNativeSequencerGrid()` - explicit Flutter→Native sync
@@ -18,44 +20,42 @@ Updated to consistent naming scheme:
 ### Song Mode vs Loop Mode
 
 #### Loop Mode (Default)
-- **Behavior**: Playback wraps within current section boundaries
-- **Native Logic**: `g_current_step` wraps from `section_end` back to `section_start`
+- **Behavior**: Playback wraps within the native playback region
+- **Native Logic**: `g_current_step` wraps from `region.end` back to `region.start`
+- **Who sets region**: Flutter sets native region to the current UI section window `[sectionStart, sectionStart + gridRows)`
 - **Use Case**: Practice, live performance, jamming on specific sections
 - **Control**: `set_song_mode(0)` or `setSongMode(false)`
 
 #### Song Mode  
-- **Behavior**: Continuous playback across all sections, stops at end
-- **Native Logic**: `g_current_step` advances through entire song length, stops at `total_sections * steps_per_section`
+- **Behavior**: Continuous playback across the whole table, stops at end of region
+- **Native Logic**: `g_current_step` advances until reaching `playback_region.end`, then stops
+- **Who sets region**: Flutter sets native region to cover the full table `[0, stepsLen)`
 - **Use Case**: Full song playback, recording complete arrangements
 - **Control**: `set_song_mode(1)` or `setSongMode(true)`
 - **End Behavior**: Playback stops naturally, allowing final sounds to decay
 
 ```c
-// Native playback mode handling
-if (g_song_mode) {
-    // Song mode: stop at end, don't loop
-    int song_end_step = g_total_sections * g_steps_per_section;
-    if (g_current_step >= song_end_step) {
-        g_sequencer_playing = 0;  // Stop playback
+// Native playback mode handling (playback region driven)
+int regionStart = g_playback_region.start;
+int regionEnd   = g_playback_region.end;   // end is exclusive
+if (g_current_step >= regionEnd) {
+    if (g_song_mode) {
+        g_sequencer_playing = 0;            // Song mode: stop at end
         return;
-    }
-} else {
-    // Loop mode: wrap within current section
-    int section_end_step = g_section_start_step + g_steps_per_section;
-    if (g_current_step >= section_end_step) {
-        g_current_step = g_section_start_step;  // Wrap to section start
+    } else {
+        g_current_step = regionStart;       // Loop mode: wrap to region start
     }
 }
 ```
 
 ### Continuous Playback Architecture
 
-**KEY CHANGE**: Playback is now **truly continuous** across absolute steps - no more section boundary interruptions.
+**KEY CHANGE**: Playback is now **truly continuous** across absolute steps and driven by a native playback region — not by native sections.
 
-- **Absolute Step System**: Native operates on absolute steps (0, 1, 2... across all sections)
-- **Section Independence**: `set_current_section()` is now metadata-only and doesn't affect playback
+- **Absolute Step System**: Native operates on absolute steps (0, 1, 2...)
+- **Regions, not sections**: Flutter controls loop boundaries by setting the native playback region. Native `set_current_section()` is UI-only metadata and does not affect playback.
 - **Boundary Elimination**: No audio artifacts when moving between sections
-- **Flutter Control**: Song mode advancement handled entirely by native sequencer
+- **Flutter Control**: Flutter decides the region for loop vs song and updates it when grid size or visible section changes
 
 ### A/B Column Node Structure
 ```c
@@ -142,41 +142,40 @@ int reset_cell_pitch(int step, int column);
 
 ## Playback Flow
 
-### 1. Startup with Section Support
-**NEW**: `start_sequencer()` now accepts a starting absolute step:
-```c
-int start_sequencer(int bpm, int steps, int startStep) {
-    // Validate and set starting position
-    int song_end_step = g_total_sections * g_steps_per_section;
-    if (startStep >= song_end_step) startStep = startStep % song_end_step;
-    g_current_step = startStep;  // Start at specified absolute step
-    // ...
-}
-```
+### 1. Startup with Playback Region
+`start_sequencer()` accepts a starting absolute step; Flutter must set the playback region and logical length first.
 
 **Flutter Integration**:
 ```dart
-// Calculate start position based on current section
-final int startAbsoluteStep = (currentSectionIndex * gridRows) + 0;
-sequencerLibrary.startSequencer(bpm, gridRows, startAbsoluteStep: startAbsoluteStep);
+final bool isSong = sectionPlaybackMode == SectionPlaybackMode.song;
+final int stepsLen = isSong ? (numSections * gridRows) : gridRows;
+sequencerLibrary.setStepsLen(stepsLen);
+if (isSong) {
+  sequencerLibrary.setPlaybackRegionBounds(0, stepsLen);
+} else {
+  final sectionStart = currentSectionIndex * gridRows;
+  sequencerLibrary.setPlaybackRegionBounds(sectionStart, sectionStart + gridRows);
+}
+final startAbsoluteStep = currentSectionIndex * gridRows;
+sequencerLibrary.startSequencer(bpm, stepsLen, startAbsoluteStep: startAbsoluteStep);
 ```
 
-### 2. Section Metadata Management
-**IMPORTANT**: Section functions are now **UI-only metadata**:
+### 2. Section Metadata Management (Flutter-only)
+Native sections are deprecated for playback. Use playback region instead. Section APIs remain as metadata for UI/serialization only:
 
 ```c
 void set_current_section(int section) {
-    // Update metadata only; playback is continuous across absolute steps
+    // UI metadata only; playback is driven by g_playback_region
     g_current_section = section;
-    g_section_start_step = g_current_section * g_steps_per_section;
+    g_section_start_step = g_current_section * g_steps_per_section; // UI-only
     
     // NO PLAYBACK INTERRUPTION - continuous audio flow maintained
     prnt("ℹ️ [SECTION] Meta set current section to %d. Playback unaffected.", section);
 }
 ```
 
-### 3. UI Section Tracking
-**NEW APPROACH**: UI computes current section from absolute step instead of wrap-around detection:
+### 3. UI Section Tracking (Flutter)
+UI computes current section from absolute step; in loop mode, Flutter also updates the native region whenever the visible section or gridRows changes:
 
 ```dart
 // OLD: Complex wrap-around detection with timing issues
