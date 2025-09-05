@@ -232,6 +232,9 @@ async def send_invitation_handler(request: Request, thread_id: str, invitation_d
             print(f"⚠️  Failed to send WebSocket notification: {e}")
         
         return {"status": "invitation_sent"}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 # Messages handlers (store messages in a separate collection with reference, or inline for simplicity)
 async def get_messages_handler(request: Request, thread_id: str, token: str):
@@ -277,9 +280,6 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
         # update thread messages array and updated_at
         db.threads.update_one({"id": thread_id}, {"$push": {"messages": message_id}, "$set": {"updated_at": created_at}})
         return doc
-    except Exception as e:
-        if isinstance(e, HTTPException): raise e
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

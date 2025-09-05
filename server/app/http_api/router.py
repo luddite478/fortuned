@@ -68,10 +68,6 @@ async def create_thread_new(request: Request, thread_data: dict):
     """Create new thread (new path)"""
     return await create_thread_handler(request, thread_data)
 
-# Legacy endpoints removed per new API spec
-
- 
-
 @router.post("/threads/{thread_id}/users")
 async def join_thread(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
     return await join_thread_handler(request, thread_id, user_data)
