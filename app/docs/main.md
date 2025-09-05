@@ -288,9 +288,9 @@ Look for your running simulator (e.g., "iPhone 15 (E84AFBA4-AB0D-4EEE-9C13-5D7F0
 **Step 2: Launch Simulator**
 ```bash
 rm -rf ~/Library/Developer/CoreSimulator/Caches/*
-xcrun simctl boot "iPhone 15" 
-./run-ios.sh stage simulator 'iPhone SE (3rd generation)'
+xcrun simctl boot "iPhone SE (3rd generation)" 
 open -a Simulator
+./run-ios.sh stage simulator 'iPhone SE (3rd generation)'
 cd ios && flutter run --debug
 xcrun simctl addmedia E84AFBA4-AB0D-4EEE-9C13-5D7F0004BFFF ~/path/to/your/audio.wav
 ```
@@ -318,6 +318,10 @@ This will show your connected iPhone with its ID (e.g., `00008110-000251422E0260
 ios-deploy --bundle build/ios/iphoneos/Runner.app --id <YOUR_DEVICE_ID>
 ```
 Replace `<YOUR_DEVICE_ID>` with your actual device ID from step 3.
+
+5. **IOS physical device logs**
+Xcode -> Window -> Devices and Simulators -> Open Console -> filter "flutter" or "Runner"
+
 
 **Note**: Make sure your iPhone is:
 - Connected via USB

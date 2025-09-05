@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/sample_browser.dart';
+import '../../../state/sequencer/playback.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/multitask_panel.dart';
 
 class SampleBanksWidget extends StatefulWidget {
   const SampleBanksWidget({super.key});
@@ -16,8 +20,8 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer4<SampleBankState, PlaybackState, SampleBrowserState, TableState>(
+      builder: (context, sampleBankState, playbackState, sampleBrowserState, tableState, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
             final panelHeight = constraints.maxHeight;
@@ -111,7 +115,10 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
                           for (int i = 0; i < effectiveCount; i++)
                             _buildBankButton(
                               context: context,
-                              sequencer: sequencer,
+                              sampleBankState: sampleBankState,
+                              playbackState: playbackState,
+                              sampleBrowserState: sampleBrowserState,
+                              tableState: tableState,
                               bank: startIndex + i,
                               buttonHeight: buttonHeight,
                               buttonWidth: buttonWidth,
@@ -145,7 +152,10 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
 
   Widget _buildBankButton({
     required BuildContext context,
-    required SequencerState sequencer,
+    required SampleBankState sampleBankState,
+    required PlaybackState playbackState,
+    required SampleBrowserState sampleBrowserState,
+    required TableState tableState,
     required int bank,
     required double buttonHeight,
     required double buttonWidth,
@@ -154,23 +164,22 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
     required double borderRadius,
     required double letterSize,
   }) {
-    final isActive = sequencer.activeBank == bank;
-    final isSelected = sequencer.selectedSampleSlot == bank;
-    final hasFile = sequencer.fileNames[bank] != null;
-    final isPlaying = sequencer.slotPlaying[bank];
+    final isActive = sampleBankState.activeSlot == bank;
+    final isSelected = sampleBankState.activeSlot == bank; // For now, same as active
+    final hasFile = sampleBankState.isSlotLoaded(bank);
 
     Widget sampleButton = Container(
       height: buttonHeight,
       width: buttonWidth,
       margin: EdgeInsets.only(left: leftMargin, right: rightMargin),
       decoration: BoxDecoration(
-        color: _getButtonColor(isSelected, isActive, hasFile, bank, sequencer),
+        color: _getButtonColor(isSelected, isActive, hasFile, bank, sampleBankState),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: _getBorderColor(isSelected, isActive, isPlaying),
-          width: _getBorderWidth(isSelected, isActive, isPlaying),
+          color: _getBorderColor(isSelected, isActive),
+          width: _getBorderWidth(isSelected, isActive),
         ),
-        boxShadow: _getBoxShadow(isSelected, isActive, isPlaying),
+        boxShadow: _getBoxShadow(isSelected, isActive),
       ),
       child: Center(
         child: Column(
@@ -198,7 +207,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
               width: buttonWidth * 0.9,
               height: buttonHeight,
               decoration: BoxDecoration(
-                color: _getButtonColorForBank(bank, sequencer).withOpacity(0.9),
+                color: _getButtonColorForBank(bank, sampleBankState).withOpacity(0.9),
                 borderRadius: BorderRadius.circular(borderRadius),
                 border: Border.all(color: AppColors.sequencerAccent, width: 2),
               ),
@@ -251,50 +260,59 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
               ),
             ),
             child: GestureDetector(
-              onTap: () => sequencer.handleBankChange(bank, context),
-              onLongPress: () => sequencer.pickFileForSlot(bank, context),
+              onTap: () {
+                sampleBankState.uiHandleBankChange(bank);
+                // Open sample settings for filled slot
+                Provider.of<MultitaskPanelState>(context, listen: false).showSampleSettings();
+              },
+              onLongPress: () => sampleBankState.uiPickFileForSlot(bank),
               child: sampleButton,
             ),
           )
         : GestureDetector(
-            onTap: () => sequencer.handleBankChange(bank, context),
-            onLongPress: () => sequencer.pickFileForSlot(bank, context),
+            onTap: () {
+              sampleBankState.uiHandleBankChange(bank);
+              // If the slot is empty, open sample browser
+              if (!sampleBankState.isSlotLoaded(bank)) {
+                sampleBrowserState.showForSlot(bank);
+              }
+            },
+            onLongPress: () => sampleBankState.uiPickFileForSlot(bank),
             child: sampleButton,
           );
   }
 
-  Color _getButtonColor(bool isSelected, bool isActive, bool hasFile, int bank, SequencerState sequencer) {
+  Color _getButtonColor(bool isSelected, bool isActive, bool hasFile, int bank, SampleBankState sampleBankState) {
     if (hasFile) {
-      return _getButtonColorForBank(bank, sequencer);
+      return _getButtonColorForBank(bank, sampleBankState);
     } else {
       return AppColors.sequencerSurfacePressed;
     }
   }
 
-  Color _getButtonColorForBank(int bank, SequencerState sequencer) {
-    final originalColor = sequencer.bankColors[bank];
+  Color _getButtonColorForBank(int bank, SampleBankState sampleBankState) {
+    final colors = sampleBankState.uiBankColors;
+    final originalColor = bank < colors.length ? colors[bank] : colors[0];
     return Color.lerp(originalColor, AppColors.sequencerSurfaceRaised, 0.7) ?? AppColors.sequencerSurfaceRaised;
   }
 
-  Color _getBorderColor(bool isSelected, bool isActive, bool isPlaying) {
+  Color _getBorderColor(bool isSelected, bool isActive) {
     if (isSelected) {
       return AppColors.sequencerAccent;
-    } else if (isPlaying) {
-      return AppColors.sequencerAccent.withOpacity(0.8);
     } else {
       return AppColors.sequencerBorder;
     }
   }
 
-  double _getBorderWidth(bool isSelected, bool isActive, bool isPlaying) {
-    if (isSelected || isPlaying) {
+  double _getBorderWidth(bool isSelected, bool isActive) {
+    if (isSelected) {
       return 1.5;
     } else {
       return 0.5;
     }
   }
 
-  List<BoxShadow>? _getBoxShadow(bool isSelected, bool isActive, bool isPlaying) {
+  List<BoxShadow>? _getBoxShadow(bool isSelected, bool isActive) {
     if (isSelected) {
       return [
         BoxShadow(

@@ -6,11 +6,13 @@ Creates collections and indexes for application
 
 import os
 import uuid
+import json
 from pymongo import MongoClient, ASCENDING, DESCENDING
 from datetime import datetime, timezone
 import logging
 from typing import Dict, List, Any
 from .connection import get_database
+from jsonschema import validate, ValidationError
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -20,6 +22,43 @@ logger = logging.getLogger(__name__)
 # DATA STRUCTURE CONFIGURATION
 # =============================================================================
 
+# Load JSON Schemas
+def load_json_schema(collection_name: str) -> Dict:
+    """Load JSON schema for a collection from the repository schemas/0.0.1 directory"""
+    # Determine repository root relative to this file: .../server/app/db -> go up 3 levels
+    repo_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
+    schemas_root = os.path.join(repo_root, 'schemas', '0.0.1')
+
+    collection_to_schema_path = {
+        'users': os.path.join(schemas_root, 'user', 'user.json'),
+        'threads': os.path.join(schemas_root, 'thread', 'thread.json'),
+        'samples': os.path.join(schemas_root, 'sample', 'sample.json'),
+        'messages': os.path.join(schemas_root, 'thread', 'message.json'),
+    }
+
+    schema_path = collection_to_schema_path.get(collection_name)
+    if not schema_path:
+        logger.warning(f"No schema mapping found for collection: {collection_name}")
+        return {}
+
+    try:
+        with open(schema_path, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        logger.warning(f"Schema file not found: {schema_path}")
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in schema file {schema_path}: {e}")
+        return {}
+
+# Load all schemas
+JSON_SCHEMAS = {
+    "users": load_json_schema("users"),
+    "threads": load_json_schema("threads"),
+    "samples": load_json_schema("samples"),
+    "messages": load_json_schema("messages"),
+}
+
 # Collection Schema Definitions
 COLLECTIONS_CONFIG = {
     "users": {
@@ -27,177 +66,37 @@ COLLECTIONS_CONFIG = {
             {"fields": "id", "unique": True},
             {"fields": "email", "unique": True},
             {"fields": "username", "unique": True},
-            {"fields": "name", "unique": False},
             {"fields": "created_at", "unique": False},
             {"fields": "last_login", "unique": False}
         ],
-        "schema": {
-            "id": "string (UUID)",
-            "username": "string",
-            "name": "string",
-            "email": "string",
-            "password_hash": "string",
-            "salt": "string",
-            "profile": {
-                "bio": "string", 
-                "location": "string"
-            },
-            "created_at": "datetime",
-            "last_login": "datetime",
-            "last_online": "datetime",
-            "is_active": "boolean",
-            "email_verified": "boolean",
-            "stats": {
-                "total_plays": "number"
-            },
-
-            "preferences": {
-                "theme": "string"
-            }
-        }
+        "schema": {k: v for k, v in JSON_SCHEMAS.get("users", {}).get("properties", {}).items()}
     },
     "threads": {
         "indexes": [
             {"fields": "id", "unique": True},
-            {"fields": "users.id", "unique": False},  # Index on user IDs for quick lookup
+            {"fields": "users.id", "unique": False},
             {"fields": "created_at", "unique": False},
-            {"fields": "updated_at", "unique": False},
-            {"fields": "status", "unique": False}
+            {"fields": "updated_at", "unique": False}
         ],
-        "schema": {
-            "id": "string (UUID)",
-            "title": "string",
-            "users": [
-                {
-                    "id": "string (UUID)",
-                    "name": "string", 
-                    "joined_at": "datetime"
-                }
-            ],
-            "invites": [
-                {
-                    "user_id": "string (UUID)",
-                    "user_name": "string", 
-                    "status": "string",  # pending, accepted, declined, cancelled
-                    "invited_by": "string (UUID)",
-                    "invited_at": "datetime"
-                }
-            ],
-            "checkpoints": [
-                {
-                    "id": "string (UUID)",
-                    "user_id": "string (UUID)",
-                    "user_name": "string",
-                    "timestamp": "datetime",
-                    "comment": "string",
-                    "renders": [
-                        {
-                            "id": "string (UUID)",
-                            "url": "string",
-                            "created_at": "datetime",
-                            "version": "string",
-                            "quality": "string"  # high, medium, low
-                        }
-                    ],
-                    "snapshot": {
-                        "id": "string (UUID)",
-                        "name": "string",
-                        "createdAt": "datetime",
-                        "version": "string",
-                        "audio": {
-                            "sources": [
-                                {
-                                    "scenes": [
-                                        {
-                                            "layers": [
-                                                {
-                                                    "id": "string (UUID)",
-                                                    "index": "number",
-                                                    "rows": [
-                                                        {
-                                                            "cells": [
-                                                                {
-                                                                    "sample": {
-                                                                        "sample_id": "string (UUID)",
-                                                                        "sample_name": "string"
-                                                                    },
-                                                                    "settings": {
-                                                                        "volume": "number (0.0 to 1.0) | null"
-                                                                    }
-                                                                }
-                                                            ]
-                                                        }
-                                                    ]
-                                                }
-                                            ],
-                                            "metadata": {
-                                                "user": "string",
-                                                "bpm": "number",
-                                                "key": "string",
-                                                "time_signature": "string",
-                                                "created_at": "datetime"
-                                            }
-                                        }
-                                    ],
-                                    "samples": [
-                                        {
-                                            "id": "string (UUID)",
-                                            "name": "string",
-                                            "url": "string",
-                                            "is_public": "boolean",
-                                            "settings": {
-                                                "volume": "number (0.0 to 1.0)"
-                                            }
-                                        }
-                                    ]
-                                }
-                            ]
-                        }
-                    }
-                }
-            ],
-            "status": "string",  # active, paused, completed, archived
-            "created_at": "datetime",
-            "updated_at": "datetime",
-            "metadata": {
-                "original_project_id": "string (UUID) | null",  # Reference to original project if this is a collaboration
-                "project_type": "string",  # collaboration, solo, remix, etc.
-                "genre": "string",
-                "tags": ["string"],
-                "description": "string",
-                "is_public": "boolean",
-                "plays_num": "number",
-                "likes_num": "number",
-                "forks_num": "number"
-            }
-        }
+        "schema": {k: v for k, v in JSON_SCHEMAS.get("threads", {}).get("properties", {}).items()}
     },
     "samples": {
         "indexes": [
             {"fields": "id", "unique": True},
             {"fields": "user_id", "unique": False},
-            {"fields": "name", "unique": False},
-            {"fields": "tags", "unique": False}
+            {"fields": "sample_pack_id", "unique": False},
+            {"fields": "created_at", "unique": False}
         ],
-        "schema": {
-            "id": "string (UUID)",
-            "user_id": "string (UUID)",
-            "name": "string",
-            "url": "string",
-            "duration": "number",
-            "file_size": "number",
-            "format": "string",
-            "sample_rate": "number",
-            "channels": "number",
-            "tags": ["string"],
-            "is_public": "boolean",
-            "created_at": "datetime",
-            "plays_num": "number",
-            "likes_num": "number",
-            "settings": {
-                "volume": "number (0.0 to 1.0)"
-            }
-        }
+        "schema": {k: v for k, v in JSON_SCHEMAS.get("samples", {}).get("properties", {}).items()}
+    },
+    "messages": {
+        "indexes": [
+            {"fields": "id", "unique": True},
+            {"fields": "thread_id", "unique": False},
+            {"fields": "user_id", "unique": False},
+            {"fields": "created_at", "unique": False}
+        ],
+        "schema": {k: v for k, v in JSON_SCHEMAS.get("messages", {}).get("properties", {}).items()}
     }
 }
 
@@ -205,90 +104,111 @@ COLLECTIONS_CONFIG = {
 SAMPLE_DATA_TEMPLATES = {
     "users": [
         {
+            "schema_version": 1,
             "id": "550e8400-e29b-41d4-a716-446655440001",
             "username": "dj_vegan",
             "name": "dj_vegan",
             "email": "dj_vegan@test.com",
-            "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
+            "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",
             "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
-            "profile": {
-                "bio": "IT guy",
-                "location": "Los Angeles, CA"
-            },
             "created_at": "2024-01-15T10:30:00Z",
             "last_login": "2024-12-06T15:45:00Z",
             "last_online": "2024-03-20T14:22:00Z",
-            "is_active": True,
             "email_verified": True,
-            "stats": {
-                "total_plays": 15420
-            },
-
-            "preferences": {
-                "theme": "dark"
-            }
+            "preferences": {"theme": "dark"},
+            "threads": []
         },
         {
-            "id": "550e8400-e29b-41d4-a716-446655440002", 
+            "schema_version": 1,
+            "id": "550e8400-e29b-41d4-a716-446655440002",
             "username": "dj_rodry",
             "name": "dj_rodry",
-            "email": "bob@test.com",
-            "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",  # hashed "test123"
+            "email": "dj_rodry@test.com",
+            "password_hash": "$2b$12$xUi41tRzH5FZrf02KTRA7.RZ9/yHYefLa06UJs.dbCCqA.i2Dmpe6",
             "salt": "$2b$12$xUi41tRzH5FZrf02KTRA7.",
-            "profile": {
-                "bio": "Bach interpreter",
-                "location": "Atlanta, GA"
-            },
             "created_at": "2024-02-01T09:15:00Z",
-                          "last_login": "2024-12-05T12:30:00Z",
+            "last_login": "2024-12-05T12:30:00Z",
             "last_online": "2024-03-19T16:45:00Z",
-            "is_active": True,
             "email_verified": True,
-            "stats": {
-                "total_plays": 8930
-            },
-
-            "preferences": {
-                "theme": "light"
-            }
+            "preferences": {"theme": "light"},
+            "threads": []
         }
     ],
     "threads": [],
     "samples": [
         {
-            "id": "sample_kick_001",
-            "user_id": "660e8400-e29b-41d4-a716-446655440001",
+            "schema_version": 1,
+            "id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+            "user_id": "bbbbbbbbbbbbbbbbbbbbbbbb",
             "name": "Kick Heavy",
             "url": "https://example.com/samples/kick_heavy.wav",
             "duration": 1.2,
             "file_size": 52480,
             "format": "wav",
             "sample_rate": 44100,
-            "channels": 1,
-            "tags": ["kick", "heavy", "electronic"],
-            "is_public": True,
             "created_at": "2024-03-10T12:00:00Z",
-            "plays_num": 1250,
-            "likes_num": 89
-        },
-        {
-            "id": "sample_snare_001",
-            "user_id": "660e8400-e29b-41d4-a716-446655440002",
-            "name": "Snare Crisp",
-            "url": "https://example.com/samples/snare_crisp.wav", 
-            "duration": 0.8,
-            "file_size": 35840,
-            "format": "wav",
-            "sample_rate": 44100,
-            "channels": 1,
-            "tags": ["snare", "crisp", "acoustic"],
-            "is_public": True,
-            "created_at": "2024-03-12T15:30:00Z",
-            "plays_num": 980,
-            "likes_num": 67
+            "status": {
+                "loaded": False,
+                "file_path": "",
+                "sample_id": "aaaaaaaaaaaaaaaaaaaaaaaa",
+                "name": "Kick Heavy",
+                "settings": {"volume": 1.0, "pitch": 1.0}
+            }
         }
     ]
 }
+
+# =============================================================================
+# VALIDATION FUNCTIONS
+# =============================================================================
+
+def validate_document(collection_name: str, document: Dict) -> bool:
+    """
+    Validate a document against its JSON schema
+    
+    Args:
+        collection_name: Name of the collection
+        document: Document to validate
+        
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    schema = JSON_SCHEMAS.get(collection_name)
+    if not schema:
+        logger.warning(f"No schema found for collection: {collection_name}")
+        return True  # Skip validation if no schema
+    
+    try:
+        validate(instance=document, schema=schema)
+        return True
+    except ValidationError as e:
+        logger.error(f"Validation error for {collection_name}: {e.message}")
+        return False
+    except Exception as e:
+        logger.error(f"Unexpected validation error for {collection_name}: {e}")
+        return False
+
+def validate_sample_data():
+    """Validate all sample data against their schemas"""
+    logger.info("🔍 Validating sample data against JSON schemas...")
+    
+    for collection_name, sample_data in SAMPLE_DATA_TEMPLATES.items():
+        if not sample_data:
+            continue
+            
+        schema = JSON_SCHEMAS.get(collection_name)
+        if not schema:
+            logger.warning(f"No schema found for {collection_name}, skipping validation")
+            continue
+            
+        for i, document in enumerate(sample_data):
+            if not validate_document(collection_name, document):
+                logger.error(f"Sample data validation failed for {collection_name}[{i}]")
+                return False
+                
+        logger.info(f"✅ Sample data validation passed for {collection_name}")
+    
+    return True
 
 # =============================================================================
 # INITIALIZATION FUNCTIONS
@@ -316,8 +236,11 @@ def init_mongodb(drop_existing: bool = False, insert_samples: bool = True):
         # Create collections and indexes
         create_collections_and_indexes(db)
         
-        # Insert sample data if requested
+        # Validate sample data before insertion
         if insert_samples:
+            if not validate_sample_data():
+                logger.error("❌ Sample data validation failed. Aborting initialization.")
+                return False
             insert_sample_data(db)
         
         # Verify setup

@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
-import '../../../utils/app_colors.dart';import 'recording_widget.dart';
-import '../../../utils/app_colors.dart';import 'sample_selection_widget.dart';
-import '../../../utils/app_colors.dart';import 'share_widget.dart';
-import '../../../utils/app_colors.dart';import 'sound_settings.dart';
-import '../../../utils/app_colors.dart';import 'step_insert_settings_widget.dart';
+import 'package:provider/provider.dart';
+import '../../../state/sequencer_state.dart';
+import 'recording_widget.dart';
+import 'sample_selection_widget.dart';
+import 'share_widget.dart';
+import 'sound_settings.dart';
+import 'step_insert_settings_widget.dart';
 import '../../../utils/app_colors.dart';
 
 class MultitaskPanelWidget extends StatelessWidget {
@@ -93,7 +92,6 @@ class MultitaskPanelWidget extends StatelessWidget {
             return const RecordingWidget();
           
           case MultitaskPanelMode.placeholder:
-          default:
             // Show recording widget if there's a recent recording, otherwise placeholder
             if (sequencerState.lastRecordingPath != null) {
               return const RecordingWidget();
@@ -126,17 +124,6 @@ class MultitaskPanelWidget extends StatelessWidget {
             offset: const Offset(0, -1),
           ),
         ],
-      ),
-      child: Center(
-        child: Text(
-          'Pattern ready to share',
-          style: GoogleFonts.sourceSans3(
-            color: AppColors.sequencerLightText,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.3,
-          ),
-        ),
       ),
     );
   }

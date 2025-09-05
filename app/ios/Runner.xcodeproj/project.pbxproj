@@ -14,8 +14,27 @@
 		55433E352DF4040A00D2AA40 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E342DF4040A00D2AA40 /* CoreAudio.framework */; };
 		55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E362DF4041800D2AA40 /* AudioToolbox.framework */; };
 		55433E3F2DF40A7F00D2AA40 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */; };
-		5571F8BD2DF776970025EF91 /* sequencer.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BC2DF776970025EF91 /* sequencer.mm */; };
+
 		5571F8C02DF776A00025EF91 /* conversion.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BE2DF776980025EF91 /* conversion.mm */; };
+		5571F8E72DF77A000025EF91 /* table.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8E82DF77A000025EF91 /* table.mm */; };
+		5571F8E92DF77A010025EF91 /* playback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8EA2DF77A010025EF91 /* playback.mm */; };
+		5571F8F02DF77A900025EF91 /* sample_bank.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8F12DF77A900025EF91 /* sample_bank.mm */; };
+		5571F8F22DF77B0A0025EF91 /* miniaudio_impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */; };
+		A1B2C3D40000000100000001 /* undo_redo.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D30000000100000001 /* undo_redo.mm */; };
+
+		AA11BB221234567800000001 /* pitch.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB211234567800000001 /* pitch.mm */; };
+		AA11BB231234567800000001 /* SoundTouch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ED50771697404BA7AC634852 /* SoundTouch.cpp */; };
+		AA11BB241234567800000001 /* TDStretch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA3AF4A3912A4ABDAD9E838A /* TDStretch.cpp */; };
+		AA11BB251234567800000001 /* RateTransposer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C4F1830049B42E0AFD95848 /* RateTransposer.cpp */; };
+		AA11BB261234567800000001 /* FIRFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D5AB5CA5AB3F43E0BAC124D5 /* FIRFilter.cpp */; };
+		AA11BB271234567800000001 /* AAFilter.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 35847BE15FCA42C5A76FA2CF /* AAFilter.cpp */; };
+		AA11BB281234567800000001 /* FIFOSampleBuffer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 782A46936B534678A89417F0 /* FIFOSampleBuffer.cpp */; };
+		AA11BB291234567800000001 /* InterpolateLinear.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F2A7EF79040044F2A2CAB030 /* InterpolateLinear.cpp */; };
+		AA11BB2A1234567800000001 /* InterpolateCubic.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 6100C7612C034A51B4EF35D5 /* InterpolateCubic.cpp */; };
+		AA11BB2B1234567800000001 /* InterpolateShannon.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 49324DCB3E834AE8B7C08767 /* InterpolateShannon.cpp */; };
+		AA11BB2C1234567800000001 /* PeakFinder.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3555A7DCA0E24B44AC4B5D8A /* PeakFinder.cpp */; };
+		AA11BB2D1234567800000001 /* cpu_detect_arm.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB201234567800000001 /* cpu_detect_arm.cpp */; };
+
 		5571F8D42DF777200025EF91 /* lame.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C12DF777000025EF91 /* lame.c */; };
 		5571F8D52DF777210025EF91 /* bitstream.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C22DF777010025EF91 /* bitstream.c */; };
 		5571F8D62DF777220025EF91 /* encoder.c in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8C32DF777020025EF91 /* encoder.c */; };
@@ -82,9 +101,20 @@
 
 		55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 
-		5571F8BC2DF776970025EF91 /* sequencer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sequencer.mm; path = ../native/sequencer.mm; sourceTree = "<group>"; };
+
 		5571F8BE2DF776980025EF91 /* conversion.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = conversion.mm; path = ../native/conversion.mm; sourceTree = "<group>"; };
 		5571F8BF2DF776990025EF91 /* conversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = conversion.h; path = ../native/conversion.h; sourceTree = "<group>"; };
+		5571F8E82DF77A000025EF91 /* table.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = table.mm; path = ../native/table.mm; sourceTree = "<group>"; };
+		5571F8EA2DF77A010025EF91 /* playback.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = playback.mm; path = ../native/playback.mm; sourceTree = "<group>"; };
+		5571F8F12DF77A900025EF91 /* sample_bank.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sample_bank.mm; path = ../native/sample_bank.mm; sourceTree = "<group>"; };
+		5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_impl.mm; path = ../native/miniaudio_impl.mm; sourceTree = "<group>"; };
+		AA11BB201234567800000001 /* cpu_detect_arm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = cpu_detect_arm.cpp; path = ../native/soundtouch/cpu_detect_arm.cpp; sourceTree = "<group>"; };
+		AA11BB211234567800000001 /* pitch.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = pitch.mm; path = ../native/pitch.mm; sourceTree = "<group>"; };
+		A1B2C3D30000000100000001 /* undo_redo.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = undo_redo.mm; path = ../native/undo_redo.mm; sourceTree = "<group>"; };
+
+
+		5571F8EB2DF77A020025EF91 /* table.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = table.h; path = ../native/table.h; sourceTree = "<group>"; };
+		5571F8EC2DF77A030025EF91 /* playback.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = playback.h; path = ../native/playback.h; sourceTree = "<group>"; };
 		5571F8C12DF777000025EF91 /* lame.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = lame.c; path = ../native/lame_ios/lame.c; sourceTree = "<group>"; };
 		5571F8C22DF777010025EF91 /* bitstream.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = bitstream.c; path = ../native/lame_ios/bitstream.c; sourceTree = "<group>"; };
 		5571F8C32DF777020025EF91 /* encoder.c */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.c; name = encoder.c; path = ../native/lame_ios/encoder.c; sourceTree = "<group>"; };
@@ -205,8 +235,17 @@
 		97C146E51CF9000F007C117D = {
 			isa = PBXGroup;
 			children = (
-				5571F8BC2DF776970025EF91 /* sequencer.mm */,
 
+				5571F8E82DF77A000025EF91 /* table.mm */,
+				5571F8EA2DF77A010025EF91 /* playback.mm */,
+				5571F8F12DF77A900025EF91 /* sample_bank.mm */,
+				5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */,
+				A1B2C3D30000000100000001 /* undo_redo.mm */,
+
+				AA11BB201234567800000001 /* cpu_detect_arm.cpp */,
+				AA11BB211234567800000001 /* pitch.mm */,
+				5571F8EB2DF77A020025EF91 /* table.h */,
+				5571F8EC2DF77A030025EF91 /* playback.h */,
 
 				5571F8BE2DF776980025EF91 /* conversion.mm */,
 				5571F8BF2DF776990025EF91 /* conversion.h */,
@@ -486,7 +525,25 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				5571F8BD2DF776970025EF91 /* sequencer.mm in Sources */,
+
+				5571F8E72DF77A000025EF91 /* table.mm in Sources */,
+				5571F8E92DF77A010025EF91 /* playback.mm in Sources */,
+				5571F8F02DF77A900025EF91 /* sample_bank.mm in Sources */,
+				5571F8F22DF77B0A0025EF91 /* miniaudio_impl.mm in Sources */,
+				A1B2C3D40000000100000001 /* undo_redo.mm in Sources */,
+
+				AA11BB231234567800000001 /* SoundTouch.cpp in Sources */,
+				AA11BB241234567800000001 /* TDStretch.cpp in Sources */,
+				AA11BB251234567800000001 /* RateTransposer.cpp in Sources */,
+				AA11BB261234567800000001 /* FIRFilter.cpp in Sources */,
+				AA11BB271234567800000001 /* AAFilter.cpp in Sources */,
+				AA11BB281234567800000001 /* FIFOSampleBuffer.cpp in Sources */,
+				AA11BB291234567800000001 /* InterpolateLinear.cpp in Sources */,
+				AA11BB2A1234567800000001 /* InterpolateCubic.cpp in Sources */,
+				AA11BB2B1234567800000001 /* InterpolateShannon.cpp in Sources */,
+				AA11BB2C1234567800000001 /* PeakFinder.cpp in Sources */,
+				AA11BB2D1234567800000001 /* cpu_detect_arm.cpp in Sources */,
+				AA11BB221234567800000001 /* pitch.mm in Sources */,
 				5571F8C02DF776A00025EF91 /* conversion.mm in Sources */,
 				5571F8D42DF777200025EF91 /* lame.c in Sources */,
 				5571F8D52DF777210025EF91 /* bitstream.c in Sources */,
@@ -614,6 +671,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
+					"$(SRCROOT)/../native/nlohmann-json",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -621,8 +679,10 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_CFLAGS = (
-					"-DMINIAUDIO_IMPLEMENTATION",
 					"-DHAVE_CONFIG_H",
+					"-DSOUNDTOUCH_FLOAT_SAMPLES",
+					"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
+					"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
 				);
 				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.niyya;
@@ -802,6 +862,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CC = "/usr/bin/clang";
+				CXX = "/usr/bin/clang++";
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 25C7582VCX;
 				ENABLE_BITCODE = NO;
@@ -814,6 +876,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
+					"$(SRCROOT)/../native/nlohmann-json",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -821,12 +884,10 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_CFLAGS = (
-					"-DMINIAUDIO_IMPLEMENTATION",
 					"-DHAVE_CONFIG_H",
-				);
-				"OTHER_CFLAGS[arch=*]" = (
-					"-DMINIAUDIO_IMPLEMENTATION",
-					"-DHAVE_CONFIG_H",
+					"-DSOUNDTOUCH_FLOAT_SAMPLES",
+					"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
+					"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
 				);
 				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 				PRODUCT_BUNDLE_IDENTIFIER = com.example.niyya;
@@ -845,6 +906,8 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
+				CC = "/usr/bin/clang";
+				CXX = "/usr/bin/clang++";
 				CURRENT_PROJECT_VERSION = "$(FLUTTER_BUILD_NUMBER)";
 				DEVELOPMENT_TEAM = 25C7582VCX;
 				ENABLE_BITCODE = NO;
@@ -857,6 +920,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
+					"$(SRCROOT)/../native/nlohmann-json",
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -864,8 +928,10 @@
 					"@executable_path/Frameworks",
 				);
 				OTHER_CFLAGS = (
-					"-DMINIAUDIO_IMPLEMENTATION",
 					"-DHAVE_CONFIG_H",
+					"-DSOUNDTOUCH_FLOAT_SAMPLES",
+					"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
+					"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
 				);
 				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
 				PRODUCT_BUNDLE_IDENTIFIER = com.roman.niyya;

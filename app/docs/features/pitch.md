@@ -1,15 +1,16 @@
 # 🎵 Pitch Shifting Implementation
 
-**Real-time pitch shifting using miniaudio's resampler, integrated with A/B column node architecture**
+**Pitch processing via SoundTouch preprocessing by default, with optional miniaudio resampler, integrated with A/B column node architecture**
 
 ## Overview
 
-The pitch system provides real-time pitch shifting for all audio playback through a dedicated pitch data source layer. Each audio pipeline includes pitch processing between the decoder and the node graph connection.
+The pitch system provides pitch processing for all audio playback through a dedicated pitch data source layer. Each audio pipeline includes pitch processing between the decoder and the node graph connection.
 
 **Key Features:**
 - ✅ **Per-cell pitch control** - Each grid cell can have independent pitch
 - ✅ **Sample bank pitch** - Global pitch per sample slot  
-- ✅ **Real-time processing** - No latency, applied during playback
+- ✅ **Default: SoundTouch preprocessing** - High-quality offline pitch with async caching
+- ✅ **Optional: Miniaudio resampler** - Real-time resampling when explicitly selected
 - ✅ **10-octave range** - C0 to C10 (pitch ratios 0.03125 to 32.0)
 - ✅ **Node-graph integration** - Seamless with A/B column node architecture
 - ✅ **UI/Native conversion** - Automatic conversion between UI sliders and pitch ratios
@@ -21,44 +22,35 @@ The pitch system provides real-time pitch shifting for all audio playback throug
 ```
 Sample File → Decoder → Pitch Data Source → Data Source Node → Node Graph → Output
                            ↑
-                    Resampler-based
-                    Pitch Shifting
+                     Pitch Processing
+                     (Preprocess by default)
 ```
 
 ### A/B Column Node Architecture
 ```c
 typedef struct {
     ma_decoder decoder;            // Audio decoder
-    ma_pitch_data_source pitch_ds; // ← Pitch processing layer
+    /* pitch_ds is a wrapper data source that either:
+       - uses a preprocessed, memory-backed decoder (preferred), or
+       - reads from the original decoder (unpitched) until cache is ready,
+       - or, if explicitly enabled, resamples in real-time. */
+    ma_data_source* pitch_ds;      // Pitch processing layer
     ma_data_source_node node;      // Node graph connection
     float pitch;                   // Current pitch value (as ratio)
     int pitch_ds_initialized;      // Initialization flag
-} column_node_t;  // A or B node in a column pair
+} ma_column_node_t;  // A or B node in a column pair
 ```
 
 ## Pitch Data Source Implementation
 
 ### Core Structure
-```c
-typedef struct {
-    ma_data_source_base ds;
-    ma_data_source* original_ds;    // Wrapped decoder
-    float pitch_ratio;              // Current pitch multiplier
-    ma_resampler resampler;         // miniaudio resampler
-    int resampler_initialized;
-} ma_pitch_data_source;
-```
+The pitch layer is implemented as a custom `ma_data_source` that wraps the original decoder. In preprocessing mode, it swaps in a memory-backed decoder for preprocessed audio when available.
 
-### Resampler-Based Pitch Shifting
-**Uses miniaudio's `ma_resampler` for pitch shifting:**
-- **Higher pitch** = lower target sample rate = faster playback
-- **Lower pitch** = higher target sample rate = slower playback
+### Optional Method: Miniaudio Resampler (explicit)
+If the pitch method is explicitly set to resampler, the pitch layer applies real-time resampling using an inverted sample-rate calculation:
 
 ```c
-// Inverted calculation (empirically determined):
 target_sample_rate = (ma_uint32)(sampleRate / pitchRatio);
-
-// Examples:
 // 2.0x pitch (1 octave up): 48000 Hz → 24000 Hz target
 // 0.5x pitch (1 octave down): 48000 Hz → 96000 Hz target
 ```
@@ -214,33 +206,20 @@ static void update_column_node_pitch(column_node_t* node, float new_pitch) {
 
 ## Real-time Processing
 
-### SoundTouch Preprocessing Method
-With the SoundTouch preprocessing method, each unique pitch requires its own preprocessed audio data. When a node needs to change pitch during playback (e.g., when restarting for a different step with different pitch), the entire node must be rebuilt rather than just updating the pitch data source.
+### SoundTouch Preprocessing Method (default)
+With preprocessing, each unique pitch for a sample is rendered offline in a background thread and cached in memory. When a node needs to change pitch (e.g., a new trigger with a different pitch), the node is rebuilt to pick up the correct preprocessed audio.
 
-**Key Fix:** In `play_samples_for_step()`, when the same sample is already playing but with a different pitch:
-- **For preprocessing method**: Rebuild the entire node with `setup_column_node()`
-- **For real-time methods**: Update the pitch data source directly
+**Key Policy:** In `play_samples_for_step()`, when the same sample is already playing but with a different pitch:
+- **Preprocessing (default)**: Rebuild the entire node with `setup_column_node()` to bind the correct preprocessed audio
+- **Resampler (optional)**: Update the pitch data source directly for immediate changes
 
 This ensures proper pitch data source initialization for each pitch value.
 
-### Pitch Data Source Read Callback
-```c
-static ma_result ma_pitch_data_source_read(ma_data_source* pDataSource, void* pFramesOut, 
-                                          ma_uint64 frameCount, ma_uint64* pFramesRead) {
-    // 1. Estimate input frames needed based on pitch ratio
-    ma_uint64 inputFramesNeeded = (ma_uint64)(frameCount / pPitch->pitch_ratio);
-    
-    // 2. Read from original decoder
-    ma_data_source_read_pcm_frames(pPitch->original_ds, tempBuffer, inputFramesNeeded, &inputFramesRead);
-    
-    // 3. Process through resampler (pitch shift)
-    ma_resampler_process_pcm_frames(&pPitch->resampler, tempBuffer, &inputFramesToProcess, 
-                                   pFramesOut, &outputFramesProcessed);
-    
-    *pFramesRead = outputFramesProcessed;
-    return MA_SUCCESS;
-}
-```
+### Pitch Data Source Read Behavior
+- **Preprocessing (default)**:
+  - If cache exists: read from the preprocessed memory-backed decoder.
+  - If cache missing: read unpitched from the original decoder while background job runs; subsequent triggers will use cache.
+- **Resampler (optional)**: read from original decoder and resample in real-time.
 
 ## UI Integration
 
@@ -291,24 +270,17 @@ void resetCellPitch(int cellIndex) {
 
 ### Async Preprocessing (Background Threading)
 ```cpp
-// SoundTouch preprocessing runs in background threads to prevent UI blocking
-static void async_preprocess_worker(int job_index, int source_slot, float pitch_ratio) {
-    // Heavy SoundTouch processing happens off main thread
-    int result = preprocess_sample_with_pitch(source_slot, pitch_ratio);
-    // Clean up job when complete
-}
-
-// Non-blocking pitch processing
+// SoundTouch preprocessing runs in background threads (max 4)
 if (!preprocessed && fabs(pitch - 1.0f) > 0.001f) {
     start_async_preprocessing(sample_slot, pitch);  // ← Background thread
-    // Continue with fallback approach for immediate playback
+    // Playback continues unpitched until cache is ready
 }
 ```
 
 **Benefits:**
-- **UI Responsiveness**: No more blocking during SoundTouch preprocessing
-- **Immediate Playback**: Uses fallback resampler while background processes
-- **Future Performance**: Next use gets cached high-quality version
+- **UI Responsiveness**: No blocking during SoundTouch preprocessing
+- **Seamless Triggers**: Plays original pitch immediately; caches target pitch for next trigger
+- **Future Performance**: Subsequent uses get cached high-quality version
 
 ### Native Call Debouncing (Dart Layer)
 ```dart
@@ -329,13 +301,12 @@ _samplePitchNotifiers[sampleIndex]?.value = pitch; // ← Instant UI feedback
 
 ## Performance Characteristics
 
-- **Algorithm**: Linear interpolation resampling via `ma_resampler`
-- **Quality**: Good for real-time use, excellent performance  
-- **Memory**: Minimal overhead per audio pipeline
-- **Latency**: No additional latency beyond normal audio buffering
-- **Concurrent**: Each cell node processes pitch independently
-- **Real-time updates**: Existing nodes update immediately when settings change
-- **Threading**: Heavy preprocessing runs in background (4 max concurrent jobs)
-- **Debouncing**: Native calls throttled to prevent rapid-change performance issues
+- **Default algorithm**: SoundTouch offline preprocessing (high quality)
+- **Optional algorithm**: Linear interpolation resampling via `ma_resampler` (explicit opt-in)
+- **Memory**: Cache uses additional memory per unique (sample, pitch)
+- **Latency**: Immediate playback starts at original pitch if cache is not ready; no blocking on UI thread
+- **Concurrent**: Each cell/node is independent; up to 4 preprocessing jobs run concurrently
+- **Real-time updates**: Preprocessing method rebuilds on next trigger; resampler method updates instantly
+- **Debouncing**: Native calls can be throttled on the Dart side to reduce churn
 
 This implementation provides seamless pitch shifting integrated with the per-cell node architecture, enabling independent pitch control for every playing audio instance with optimal performance and UI responsiveness. 

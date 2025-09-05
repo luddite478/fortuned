@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/recording.dart';
 
 class RecordingWidget extends StatelessWidget {
   const RecordingWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer<RecordingState>(
+      builder: (context, recording, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
             // Calculate responsive sizes based on available space - INHERIT from parent
@@ -25,8 +25,8 @@ class RecordingWidget extends StatelessWidget {
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(borderRadius),
               ),
-              child: sequencer.lastRecordingPath != null 
-                  ? _buildRecordingMenu(context, sequencer, panelHeight, panelWidth, padding, borderRadius)
+              child: recording.currentRecordingPath != null 
+                  ? _buildRecordingMenu(context, recording, panelHeight, panelWidth, padding, borderRadius)
                   : _buildEmptyState(panelHeight, panelWidth, padding, borderRadius),
             );
           },
@@ -57,10 +57,10 @@ class RecordingWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildRecordingMenu(BuildContext context, SequencerState sequencer, 
+  Widget _buildRecordingMenu(BuildContext context, RecordingState recording, 
       double panelHeight, double panelWidth, double padding, double borderRadius) {
     
-    final fileName = path.basename(sequencer.lastRecordingPath!);
+    final fileName = path.basename(recording.currentRecordingPath ?? 'recording.wav');
     
     // Follow sample_banks_widget pattern: only horizontal padding to avoid overflow
     final horizontalPadding = padding;
@@ -116,7 +116,7 @@ class RecordingWidget extends StatelessWidget {
                   color: Colors.greenAccent,
                   size: buttonSize,
                   iconSize: iconSize,
-                  onTap: () => _playRecording(sequencer),
+                  onTap: () => _playRecording(recording),
                 ),
                 
                 // Delete button  
@@ -125,7 +125,7 @@ class RecordingWidget extends StatelessWidget {
                   color: Colors.redAccent,
                   size: buttonSize,
                   iconSize: iconSize,
-                  onTap: () => _showDeleteConfirmation(context, sequencer),
+                  onTap: () => _showDeleteConfirmation(context, recording),
                 ),
                 
                 // Share button
@@ -134,20 +134,17 @@ class RecordingWidget extends StatelessWidget {
                   color: Colors.cyanAccent,
                   size: buttonSize,
                   iconSize: iconSize,
-                  onTap: () => sequencer.shareRecordedAudioAsMp3(),
+                  onTap: () => _shareRecording(recording.currentRecordingPath),
                 ),
                 
                 // Convert to MP3 button
+                // Convert button not available in new state yet
                 _buildActionButton(
                   icon: Icons.audiotrack,
-                  color: sequencer.lastMp3Path != null 
-                      ? Colors.grey 
-                      : Colors.orangeAccent,
+                  color: Colors.grey,
                   size: buttonSize,
                   iconSize: iconSize,
-                  onTap: sequencer.lastMp3Path != null || sequencer.isConverting
-                      ? null
-                      : () => sequencer.convertLastRecordingToMp3(),
+                  onTap: null,
                 ),
               ],
             ),
@@ -156,7 +153,7 @@ class RecordingWidget extends StatelessWidget {
           // Status section
           Container(
             height: statusHeight,
-            child: _buildStatusArea(sequencer, statusFontSize, iconSize, horizontalPadding),
+            child: _buildStatusArea(recording, statusFontSize, iconSize, horizontalPadding),
           ),
         ],
       ),
@@ -197,8 +194,9 @@ class RecordingWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusArea(SequencerState sequencer, double fontSize, double iconSize, double horizontalPadding) {
-    if (sequencer.conversionError != null) {
+  Widget _buildStatusArea(RecordingState recording, double fontSize, double iconSize, double horizontalPadding) {
+    // Conversion status not implemented in new state yet
+    if (false) {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
         decoration: BoxDecoration(
@@ -225,7 +223,7 @@ class RecordingWidget extends StatelessWidget {
       );
     } 
     
-    if (sequencer.isConverting) {
+    if (false) {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
         decoration: BoxDecoration(
@@ -242,7 +240,7 @@ class RecordingWidget extends StatelessWidget {
               child: Container(
                 width: double.infinity,
                 child: LinearProgressIndicator(
-                  value: sequencer.conversionProgress,
+                  value: 0.0,
                   backgroundColor: Colors.orange.withOpacity(0.2),
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
                   minHeight: iconSize * 0.3,
@@ -256,7 +254,7 @@ class RecordingWidget extends StatelessWidget {
             Expanded(
               flex: 2,
               child: Text(
-                'Converting: ${(sequencer.conversionProgress * 100).toInt()}%',
+                'Converting: 0%',
                 style: TextStyle(color: Colors.orange, fontSize: fontSize),
                 overflow: TextOverflow.ellipsis,
               ),
@@ -266,7 +264,7 @@ class RecordingWidget extends StatelessWidget {
       );
     }
     
-    if (sequencer.lastMp3Path != null) {
+    if (false) {
       return Container(
         padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
         decoration: BoxDecoration(
@@ -294,13 +292,13 @@ class RecordingWidget extends StatelessWidget {
     return Container();
   }
 
-  void _playRecording(SequencerState sequencer) {
+  void _playRecording(RecordingState recording) {
     // TODO: Implement audio playback functionality
     // For now, show a placeholder message
-    debugPrint('🎵 Play recording: ${sequencer.lastRecordingPath}');
+    debugPrint('🎵 Play recording: ${recording.currentRecordingPath}');
   }
 
-  void _showDeleteConfirmation(BuildContext context, SequencerState sequencer) {
+  void _showDeleteConfirmation(BuildContext context, RecordingState recording) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -328,7 +326,7 @@ class RecordingWidget extends StatelessWidget {
             TextButton(
               onPressed: () {
                 Navigator.of(context).pop();
-                sequencer.clearLastRecording();
+                recording.clearRecording();
               },
               child: const Text(
                 'Delete', 
@@ -339,5 +337,16 @@ class RecordingWidget extends StatelessWidget {
         );
       },
     );
+  }
+
+  void _shareRecording(String? filePath) async {
+    // TODO: Move to a shared service; kept minimal here
+    try {
+      if (filePath == null) return;
+      // No dependency here to Share; widget may not import share_plus
+      debugPrint('Share recording: $filePath');
+    } catch (e) {
+      debugPrint('Failed to share recording: $e');
+    }
   }
 } 

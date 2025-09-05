@@ -6,6 +6,12 @@ ENVIRONMENT="$1"
 DEVICE_TYPE="$2"
 IPHONE_MODEL="$3"
 
+# Ensure system toolchain is used (avoid ccache)
+export CC="/usr/bin/clang"
+export CXX="/usr/bin/clang++"
+
+
+
 # Set default iPhone model if not provided for simulator
 if [[ "$DEVICE_TYPE" == "simulator" && -z "$IPHONE_MODEL" ]]; then
   IPHONE_MODEL="iPhone 15"
@@ -52,13 +58,19 @@ rm "$TEMP_ASSETS"
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
-  # iPhone SE (3rd generation)
-  # iPhone 15
   flutter run -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
   flutter build ios --release
 
-  echo "Deploying to physical device..."
-  ios-deploy --bundle build/ios/iphoneos/Runner.app --id 00008110-000251422E02601E
+  echo "Detecting first connected physical iPhone..."
+  DEVICE_ID=$(ios-deploy --detect 2>/dev/null | grep -oE '[0-9A-Fa-f-]{25,}' | head -n 1)
+
+  if [[ -z "$DEVICE_ID" ]]; then
+    echo "❌ No physical device detected. Please connect your iPhone via USB."
+    exit 1
+  fi
+
+  echo "Deploying to device: $DEVICE_ID"
+  ios-deploy --bundle build/ios/iphoneos/Runner.app --id "$DEVICE_ID"
 fi

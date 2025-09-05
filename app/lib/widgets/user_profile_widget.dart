@@ -6,8 +6,7 @@ import '../services/threads_service.dart';
 import '../services/auth_service.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
-import '../screens/checkpoints_screen.dart';
-import '../screens/sequencer_screen.dart';
+import '../screens/sequencer_screen_v2.dart';
 import '../utils/app_colors.dart';
 
 class UserProfileWidget extends StatefulWidget {
@@ -362,11 +361,11 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
       final success = await sequencerState.loadFromThread(project.id);
 
       if (success && mounted) {
-        // Navigate to sequencer screen
+        // Navigate to V2 sequencer screen
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const PatternScreen(),
+            builder: (context) => const SequencerScreenV2(),
           ),
         );
       } else if (mounted) {

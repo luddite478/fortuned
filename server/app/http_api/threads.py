@@ -7,6 +7,7 @@ from typing import Optional, Dict, Any, List
 import os
 from db.connection import get_database
 from ws.router import send_thread_invitation_notification
+from bson import ObjectId
 
 # Initialize database connection
 db = get_database()
@@ -24,33 +25,38 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
     verify_token(thread_data.get("token", ""))
     try:
         db = get_db()
-        thread_id = str(uuid.uuid4())
+        thread_id = str(ObjectId())
         now = datetime.utcnow().isoformat() + "Z"
-        title = thread_data.get("title", "Untitled Thread")
         users = thread_data.get("users", [])
-        initial_checkpoint = thread_data.get("initial_checkpoint")  # Can be None
-        metadata = thread_data.get("metadata", {})
-        
-        # Only process initial checkpoint if provided
-        checkpoints = []
-        if initial_checkpoint:
-            if not initial_checkpoint.get("id"):
-                initial_checkpoint["id"] = str(uuid.uuid4())
-            if not initial_checkpoint.get("timestamp"):
-                initial_checkpoint["timestamp"] = now
-            checkpoints = [initial_checkpoint]
-        
+
+        # Ensure users array items have required fields (id, name, joined_at)
+        normalized_users: List[Dict[str, Any]] = []
+        for u in users:
+            if not isinstance(u, dict):
+                continue
+            user_id = u.get("id")
+            user_name = u.get("name")
+            joined_at = u.get("joined_at") or now
+            if not user_id or not user_name:
+                continue
+            normalized_users.append({
+                "id": user_id,
+                "name": user_name,
+                "joined_at": joined_at
+            })
+
+        invites = thread_data.get("invites", [])
+
         thread_doc = {
+            "schema_version": 1,
             "id": thread_id,
-            "title": title,
-            "users": users,
-            "checkpoints": checkpoints,  # Can be empty list
-            "status": "active",
+            "users": normalized_users,
+            "messages": [],
+            "invites": invites,
             "created_at": now,
-            "updated_at": now,
-            "metadata": metadata
+            "updated_at": now
         }
-        
+
         db.threads.insert_one(thread_doc)
         return {"thread_id": thread_id, "status": "created"}
     except Exception as e:
@@ -59,29 +65,8 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
 
 async def add_checkpoint_handler(request: Request, thread_id: str, checkpoint_data: Dict[str, Any] = Body(...)):
     verify_token(checkpoint_data.get("token", ""))
-    try:
-        db = get_db()
-        thread = db.threads.find_one({"id": thread_id})
-        if not thread:
-            raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
-        
-        checkpoint = checkpoint_data.get("checkpoint", {})
-        if not checkpoint.get("id"):
-            checkpoint["id"] = str(uuid.uuid4())
-        if not checkpoint.get("timestamp"):
-            checkpoint["timestamp"] = datetime.utcnow().isoformat() + "Z"
-        
-        db.threads.update_one(
-            {"id": thread_id},
-            {
-                "$push": {"checkpoints": checkpoint},
-                "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
-            }
-        )
-        return {"status": "checkpoint_added", "checkpoint_id": checkpoint["id"]}
-    except Exception as e:
-        if isinstance(e, HTTPException): raise e
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    # Checkpoints are deprecated in the new schema
+    raise HTTPException(status_code=410, detail="Checkpoints are deprecated. Use messages and snapshots instead.")
 
 async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
     verify_token(user_data.get("token", ""))
@@ -162,16 +147,14 @@ async def update_thread_handler(request: Request, thread_id: str, update_data: D
         if not thread:
             raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
         
-        # If there's a checkpoint in the update data, add it to the thread
-        if "checkpoint" in update_data:
-            checkpoint = update_data.pop("checkpoint")
-            db.threads.update_one(
-                {"id": thread_id},
-                {"$push": {"checkpoints": checkpoint}}
-            )
-        
-        # Update other fields
-        update_fields = {k: v for k, v in update_data.items() if k != "token"}
+        # Allow only schema fields: users, messages, invites
+        allowed_fields = {"users", "messages", "invites"}
+        provided_fields = set(update_data.keys()) - {"token"}
+        unsupported = provided_fields - allowed_fields
+        if unsupported:
+            raise HTTPException(status_code=400, detail=f"Unsupported fields: {', '.join(sorted(unsupported))}")
+
+        update_fields = {k: v for k, v in update_data.items() if k in allowed_fields}
         update_fields["updated_at"] = datetime.utcnow().isoformat() + "Z"
         
         result = db.threads.update_one({"id": thread_id}, {"$set": update_fields})

@@ -7,13 +7,18 @@ import 'value_control_overlay.dart';
 import 'section_control_overlay.dart';
 import 'section_creation_overlay.dart';
 import 'sequencer_body_overlay_menu.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/playback.dart';
+import '../../../state/sequencer/sample_browser.dart';
+import '../../../state/sequencer/edit.dart';
+import '../../../state/sequencer/section_settings.dart';
 import '../../../utils/app_colors.dart';
 
 // Body element modes for switching between different content
 enum SequencerBodyMode {
   soundGrid,
   sampleSelection,
+  sampleBrowser,
 }
 
 class SequencerBody extends StatefulWidget {
@@ -35,7 +40,7 @@ class _SequencerBodyState extends State<SequencerBody> {
   @override
   void initState() {
     super.initState();
-    final initialPage = context.read<SequencerState>().currentSectionIndex;
+    final initialPage = context.read<TableState>().uiSelectedSection;
     _pageController = PageController(
       initialPage: initialPage,
       viewportFraction: 1.0,
@@ -50,21 +55,22 @@ class _SequencerBodyState extends State<SequencerBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Selector<SequencerState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen, int numSections, int currentIndex})>(
-      selector: (context, state) => (
-        isBodyBrowserOpen: state.isBodyElementSampleBrowserOpen,
-        isSectionControlOpen: state.isSectionControlOverlayOpen,
-        isSectionCreationOpen: state.isSectionCreationOverlayOpen,
-        numSections: state.numSections,
-        currentIndex: state.currentSectionIndex,
+    return Selector3<TableState, PlaybackState, SampleBrowserState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen, int numSections, int currentIndex})>(
+      selector: (context, tableState, playbackState, sampleBrowserState) => (
+        isBodyBrowserOpen: sampleBrowserState.isVisible,
+        isSectionControlOpen: false, // Moved to SectionSettingsState
+        isSectionCreationOpen: false, // Moved to SectionSettingsState
+        numSections: tableState.sectionsCount,
+        currentIndex: tableState.uiSelectedSection,
       ),
       builder: (context, data, child) {
+        final sectionSettings = context.watch<SectionSettingsState>();
         // Keep PageView in sync with current section during song mode auto-advance
         if (_pageController.hasClients) {
           final double? page = _pageController.page;
           final bool atTarget = page != null ? page.round() == data.currentIndex : false;
           final bool swipingTowardCreation = page != null && page > (data.numSections - 1) - 0.01;
-          final bool creationOpen = data.isSectionCreationOpen;
+          final bool creationOpen = sectionSettings.isSectionCreationOpen;
 
           if (!atTarget && !_isUserScrolling && !creationOpen && !swipingTowardCreation) {
             _pageController.jumpToPage(data.currentIndex);
@@ -105,7 +111,7 @@ class _SequencerBodyState extends State<SequencerBody> {
                 ),
               ),
 
-            if (data.isSectionControlOpen)
+            if (sectionSettings.isSectionControlOpen)
               Positioned(
                 left: MediaQuery.of(context).size.width * (SequencerBody.sideControlWidthPercent / 100.0),
                 right: 0,
@@ -126,8 +132,8 @@ class _SequencerBodyState extends State<SequencerBody> {
   }
 
   Widget _buildHorizontalSectionView(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer2<TableState, PlaybackState>(
+      builder: (context, tableState, playbackState, child) {
         final screenWidth = MediaQuery.of(context).size.width;
         final leftControlWidth = screenWidth * (SequencerBody.sideControlWidthPercent / 100.0);
         final itemWidth = screenWidth - leftControlWidth; // Sound grid + gutter takes remaining space
@@ -142,35 +148,33 @@ class _SequencerBodyState extends State<SequencerBody> {
             }
             return false;
           },
-          child: PageView.builder(
+          child: Consumer<EditState>(
+            builder: (context, editState, _) => PageView.builder(
             controller: _pageController,
+            physics: editState.isInSelectionMode
+                ? const NeverScrollableScrollPhysics()
+                : const PageScrollPhysics(),
             onPageChanged: (index) {
               // Only change section when page is fully changed
-              if (index < sequencer.numSections) {
-                // Leaving creation page if was open
-                if (sequencer.isSectionCreationOverlayOpen) {
-                  sequencer.closeSectionCreationOverlay();
-                }
-                // Use existing section switching logic based on direction
-                final currentIndex = sequencer.currentSectionIndex;
+              if (index < tableState.sectionsCount) {
+                // Switch both playback (sound) and UI (visuals) separately
+                final currentIndex = tableState.uiSelectedSection;
                 if (index > currentIndex) {
-                  // Moving forward - use next section logic
+                  // Moving forward - update both playback and UI
                   for (int i = currentIndex; i < index; i++) {
-                    sequencer.switchToNextSection();
+                    playbackState.switchToNextSection();
                   }
                 } else if (index < currentIndex) {
-                  // Moving backward - use previous section logic
+                  // Moving backward - update both playback and UI
                   for (int i = currentIndex; i > index; i--) {
-                    sequencer.switchToPreviousSection();
+                    playbackState.switchToPreviousSection();
                   }
                 }
-                // If index == currentIndex, no change needed
-              } else {
-                // Swiped to section creation page: only toggle side-control state
-                sequencer.openSectionCreationOverlay();
+                // Update UI selection separately
+                tableState.setUiSelectedSection(index);
               }
             },
-            itemCount: sequencer.numSections + 1, // +1 for section creation
+            itemCount: tableState.sectionsCount + 1, // +1 for section creation
             itemBuilder: (context, index) {
               return Container(
                 width: itemWidth,
@@ -180,13 +184,12 @@ class _SequencerBodyState extends State<SequencerBody> {
                     // Sound grid area
                     Expanded(
                       flex: (SequencerBody.soundGridWidthPercent * 100 / (SequencerBody.soundGridWidthPercent + SequencerBody.rightGutterWidthPercent)).round(),
-                      child: index < sequencer.numSections
-                          ? _buildSectionGrid(context, sequencer, index)
+                      child: index < tableState.sectionsCount
+                          ? _buildSectionGrid(context, tableState, index)
                           : SectionCreationOverlay(
                               onBack: () {
-                                sequencer.closeSectionCreationOverlay();
                                 _pageController.animateToPage(
-                                  sequencer.currentSectionIndex,
+                                  tableState.uiSelectedSection,
                                   duration: const Duration(milliseconds: 220),
                                   curve: Curves.easeOutCubic,
                                 );
@@ -214,30 +217,31 @@ class _SequencerBodyState extends State<SequencerBody> {
               );
             },
           ),
+          ),
         );
       },
     );
   }
 
-  Widget _buildSectionGrid(BuildContext context, SequencerState sequencer, int sectionIndex) {
+  Widget _buildSectionGrid(BuildContext context, TableState tableState, int sectionIndex) {
     // Always show the actual grid widget - for previews, we'll temporarily load the section data
-    return Consumer<SequencerState>(
+    return Consumer<TableState>(
       builder: (context, state, child) {
-        if (sectionIndex == state.currentSectionIndex) {
+        if (sectionIndex == state.uiSelectedSection) {
           // Current section: normal interactive grid
           return const SampleGridWidget();
         } else {
-          // Preview section: show actual StackedCardsWidget but non-interactive and with preview data
+          // Preview section: show grid but non-interactive and with preview data
           return _buildPreviewStackedCards(context, state, sectionIndex);
         }
       },
     );
   }
 
-  Widget _buildPreviewStackedCards(BuildContext context, SequencerState sequencer, int sectionIndex) {
+  Widget _buildPreviewStackedCards(BuildContext context, TableState tableState, int sectionIndex) {
     // For current section: use the real widget, for others: simple approach
-    if (sectionIndex == sequencer.currentSectionIndex) {
-                return const SampleGridWidget();
+    if (sectionIndex == tableState.uiSelectedSection) {
+      return const SampleGridWidget();
     } else {
       return IgnorePointer(
         child: SampleGridWidget(sectionIndexOverride: sectionIndex),

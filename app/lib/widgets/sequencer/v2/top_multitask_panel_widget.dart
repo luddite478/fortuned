@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
-import '../../../utils/app_colors.dart';import 'recording_widget.dart';
-import '../../../utils/app_colors.dart';import 'sample_selection_widget.dart';
-import '../../../utils/app_colors.dart';import 'share_widget.dart';
-import '../../../utils/app_colors.dart';import 'sound_settings.dart';
-import '../../../utils/app_colors.dart';import 'step_insert_settings_widget.dart';
+// duplicate import removed
+import 'package:provider/provider.dart';
+import '../../../state/sequencer/multitask_panel.dart';
+import '../../../state/sequencer/recording.dart';
+import 'recording_widget.dart';
+import 'sample_selection_widget.dart';
+import 'share_widget.dart';
+import 'sound_settings.dart';
+import 'step_insert_settings_widget.dart';
 import '../../../utils/app_colors.dart';
 
 class MultitaskPanelWidget extends StatelessWidget {
@@ -14,9 +15,9 @@ class MultitaskPanelWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
-        switch (sequencerState.currentPanelMode) {
+    return Consumer2<MultitaskPanelState, RecordingState>(
+      builder: (context, panelState, recordingState, child) {
+        switch (panelState.currentMode) {
           case MultitaskPanelMode.sampleSelection:
             return const SampleSelectionWidget();
           
@@ -26,15 +27,7 @@ class MultitaskPanelWidget extends StatelessWidget {
               type: cellSettings.type,
               title: cellSettings.title,
               headerButtons: cellSettings.headerButtons,
-              infoTextBuilder: cellSettings.infoTextBuilder,
-              hasDataChecker: cellSettings.hasDataChecker,
-              indexProvider: cellSettings.indexProvider,
-              volumeGetter: cellSettings.volumeGetter,
-              volumeSetter: cellSettings.volumeSetter,
-              pitchGetter: cellSettings.pitchGetter,
-              pitchSetter: cellSettings.pitchSetter,
-              deleteActionProvider: cellSettings.deleteActionProvider,
-              closeAction: () => sequencerState.setPanelMode(MultitaskPanelMode.placeholder),
+              closeAction: () => context.read<MultitaskPanelState>().showPlaceholder(),
               noDataMessage: cellSettings.noDataMessage,
               noDataIcon: cellSettings.noDataIcon,
               showDeleteButton: cellSettings.showDeleteButton,
@@ -47,15 +40,7 @@ class MultitaskPanelWidget extends StatelessWidget {
               type: sampleSettings.type,
               title: sampleSettings.title,
               headerButtons: sampleSettings.headerButtons,
-              infoTextBuilder: sampleSettings.infoTextBuilder,
-              hasDataChecker: sampleSettings.hasDataChecker,
-              indexProvider: sampleSettings.indexProvider,
-              volumeGetter: sampleSettings.volumeGetter,
-              volumeSetter: sampleSettings.volumeSetter,
-              pitchGetter: sampleSettings.pitchGetter,
-              pitchSetter: sampleSettings.pitchSetter,
-              deleteActionProvider: sampleSettings.deleteActionProvider,
-              closeAction: () => sequencerState.setPanelMode(MultitaskPanelMode.placeholder),
+              closeAction: () => context.read<MultitaskPanelState>().showPlaceholder(),
               noDataMessage: sampleSettings.noDataMessage,
               noDataIcon: sampleSettings.noDataIcon,
               showDeleteButton: sampleSettings.showDeleteButton,
@@ -68,15 +53,7 @@ class MultitaskPanelWidget extends StatelessWidget {
               type: masterSettings.type,
               title: masterSettings.title,
               headerButtons: masterSettings.headerButtons,
-              infoTextBuilder: masterSettings.infoTextBuilder,
-              hasDataChecker: masterSettings.hasDataChecker,
-              indexProvider: masterSettings.indexProvider,
-              volumeGetter: masterSettings.volumeGetter,
-              volumeSetter: masterSettings.volumeSetter,
-              pitchGetter: masterSettings.pitchGetter,
-              pitchSetter: masterSettings.pitchSetter,
-              deleteActionProvider: masterSettings.deleteActionProvider,
-              closeAction: () => sequencerState.setPanelMode(MultitaskPanelMode.placeholder),
+              closeAction: () => context.read<MultitaskPanelState>().showPlaceholder(),
               noDataMessage: masterSettings.noDataMessage,
               noDataIcon: masterSettings.noDataIcon,
               showDeleteButton: masterSettings.showDeleteButton,
@@ -93,12 +70,15 @@ class MultitaskPanelWidget extends StatelessWidget {
             return const RecordingWidget();
           
           case MultitaskPanelMode.placeholder:
-          default:
             // Show recording widget if there's a recent recording, otherwise placeholder
-            if (sequencerState.lastRecordingPath != null) {
-              return const RecordingWidget();
-            }
-            return _buildPlaceholder();
+            return Consumer<RecordingState>(
+              builder: (context, rec, _) {
+                if (rec.currentRecordingPath != null) {
+                  return const RecordingWidget();
+                }
+                return _buildPlaceholder();
+              },
+            );
         }
       },
     );
@@ -126,17 +106,6 @@ class MultitaskPanelWidget extends StatelessWidget {
             offset: const Offset(0, -1),
           ),
         ],
-      ),
-      child: Center(
-        child: Text(
-          'Pattern ready to share',
-          style: GoogleFonts.sourceSans3(
-            color: AppColors.sequencerLightText,
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 0.3,
-          ),
-        ),
       ),
     );
   }

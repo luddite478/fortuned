@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+// duplicate import removed
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../state/sequencer/slider_overlay.dart';
 import '../../../utils/app_colors.dart';
 
 class ValueControlOverlay extends StatelessWidget {
@@ -9,10 +10,10 @@ class ValueControlOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer<SliderOverlayState>(
+      builder: (context, sliderOverlay, child) {
         return ValueListenableBuilder<bool>(
-          valueListenable: sequencer.sliderInteractionNotifier,
+          valueListenable: sliderOverlay.isInteractingNotifier,
           builder: (context, isInteracting, child) {
             if (!isInteracting) {
               return const SizedBox.shrink();
@@ -60,7 +61,7 @@ class ValueControlOverlay extends StatelessWidget {
                         children: [
                           // Setting name
                           ValueListenableBuilder<String>(
-                            valueListenable: sequencer.sliderSettingNotifier,
+                            valueListenable: sliderOverlay.settingNameNotifier,
                             builder: (context, setting, child) {
                               return Text(
                                 setting,
@@ -78,7 +79,7 @@ class ValueControlOverlay extends StatelessWidget {
                           
                           // Value display
                           ValueListenableBuilder<String>(
-                            valueListenable: sequencer.sliderValueNotifier,
+                            valueListenable: sliderOverlay.valueNotifier,
                             builder: (context, value, child) {
                               return Text(
                                 value,

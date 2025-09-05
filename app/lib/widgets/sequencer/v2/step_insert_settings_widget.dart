@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+// duplicate import removed
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../state/sequencer/edit.dart';
+import '../../../state/sequencer/multitask_panel.dart';
 import '../../../utils/app_colors.dart';
 
 class StepInsertSettingsWidget extends StatelessWidget {
@@ -9,8 +11,8 @@ class StepInsertSettingsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer2<EditState, MultitaskPanelState>(
+      builder: (context, editState, panelState, child) {
         return Container(
           decoration: BoxDecoration(
             color: AppColors.sequencerSurfaceBase,
@@ -49,7 +51,7 @@ class StepInsertSettingsWidget extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Text(
-                            'Step Insert: ${sequencer.stepInsertSize} steps',
+                            'Jump Insert: ${editState.stepInsertSize} cells',
                             style: GoogleFonts.sourceSans3(
                               color: AppColors.sequencerText,
                               fontSize: 14,
@@ -58,7 +60,7 @@ class StepInsertSettingsWidget extends StatelessWidget {
                           ),
                         ),
                         GestureDetector(
-                          onTap: () => sequencer.setPanelMode(MultitaskPanelMode.placeholder),
+                          onTap: () => panelState.showPlaceholder(),
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             child: Icon(
@@ -95,12 +97,12 @@ class StepInsertSettingsWidget extends StatelessWidget {
                               trackHeight: 4,
                             ),
                             child: Slider(
-                              value: sequencer.stepInsertSize.toDouble(),
+                              value: editState.stepInsertSize.toDouble(),
                               min: 1,
-                              max: sequencer.maxGridRows.toDouble(),
-                              divisions: sequencer.maxGridRows - 1,
+                              max: 16,
+                              divisions: 15,
                               onChanged: (value) {
-                                sequencer.setStepInsertSize(value.round());
+                                editState.setStepInsertSize(value.round());
                               },
                             ),
                           ),

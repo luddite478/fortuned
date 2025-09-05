@@ -7,9 +7,14 @@
 - grid cell appearance 
     - color on the right side 
     - show key,vol,effects - done
+- 2 A/B ma nodes per column - done
+- slide to next section - done
 
-- slide to next slide (scene?)
-- 2 A/B ma nodes per column
+
+- pitch reimplment
+- unify ui sound settings into one structure
+
+
 - paste + jump 
 - smooth volume and pitch change ui
 - recording fix and ui change

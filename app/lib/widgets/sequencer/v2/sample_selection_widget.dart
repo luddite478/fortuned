@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
+import '../../../state/sequencer/sample_browser.dart';
+import '../../../state/sequencer/sample_bank.dart';
 
 // Main sizing control variables for easy adjustment
 class SampleBrowserSizing {
@@ -26,8 +27,10 @@ class SampleSelectionWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
+    return Consumer2<SampleBrowserState, SampleBankState>(
+      builder: (context, sampleBrowserState, sampleBankState, child) {
+
+        
         return Container(
           decoration: BoxDecoration(
             color: AppColors.sequencerSurfaceBase,
@@ -50,13 +53,13 @@ class SampleSelectionWidget extends StatelessWidget {
               ),
             ],
           ),
-          child: _buildSampleBrowser(context, sequencerState),
+          child: _buildSampleBrowser(context),
         );
       },
     );
   }
 
-  Widget _buildSampleBrowser(BuildContext context, SequencerState sequencerState) {
+  Widget _buildSampleBrowser(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(12),
       child: Column(
@@ -71,13 +74,16 @@ class SampleSelectionWidget extends StatelessWidget {
               final headerFontSize = screenWidth * 0.035;
               final pathFontSize = screenWidth * 0.025;
               
+              // Access state from context within the nested builder
+              final browserState = context.read<SampleBrowserState>();
+              
               return Row(
                 children: [
-                  if (sequencerState.currentSamplePath.isNotEmpty) ...[
+                  if (browserState.currentPath.isNotEmpty) ...[
                                           GestureDetector(
                         onTap: () {
                           // Navigation works the same for both browsers
-                          sequencerState.navigateBackInSamples();
+                          browserState.navigateBack();
                         },
                       child: Container(
                         height: backButtonHeight.clamp(32.0, 50.0),
@@ -126,9 +132,9 @@ class SampleSelectionWidget extends StatelessWidget {
                   ],
                   Expanded(
                     child: Text(
-                      sequencerState.currentSamplePath.isEmpty 
+                      browserState.currentPath.isEmpty 
                           ? 'samples/' 
-                          : 'samples/${sequencerState.currentSamplePath.join('/')}/',
+                          : 'samples/${browserState.currentPath.join('/')}/',
                       style: GoogleFonts.sourceSans3(
                         color: AppColors.sequencerLightText,
                         fontSize: pathFontSize.clamp(10.0, 14.0),
@@ -140,12 +146,8 @@ class SampleSelectionWidget extends StatelessWidget {
                   ),
                   GestureDetector(
                     onTap: () {
-                      // Use appropriate close method based on usage context
-                      if (sequencerState.isBodyElementSampleBrowserOpen) {
-                        sequencerState.closeBodyElementSampleBrowser();
-                      } else {
-                        sequencerState.cancelSampleSelection();
-                      }
+                      // Close the sample browser using the new state
+                      browserState.hide();
                     },
                     child: Container(
                       width: closeButtonSize.clamp(40.0, 60.0),
@@ -180,7 +182,7 @@ class SampleSelectionWidget extends StatelessWidget {
           
           // Vertical scrolling 2-column grid as requested
           Expanded(
-            child: sequencerState.currentSampleItems.isEmpty
+            child: context.watch<SampleBrowserState>().isLoading
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -202,6 +204,28 @@ class SampleSelectionWidget extends StatelessWidget {
                       ],
                     ),
                   )
+                : context.watch<SampleBrowserState>().currentItems.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.folder_open,
+                          color: AppColors.sequencerLightText,
+                          size: 24,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'No samples found',
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerLightText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
                 : LayoutBuilder(
                     builder: (context, constraints) {
                       final screenWidth = constraints.maxWidth;
@@ -214,13 +238,20 @@ class SampleSelectionWidget extends StatelessWidget {
                           mainAxisSpacing: spacing,
                           childAspectRatio: SampleBrowserSizing.tileAspectRatio, // Controlled aspect ratio
                         ),
-                        itemCount: sequencerState.currentSampleItems.length,
+                        itemCount: context.watch<SampleBrowserState>().currentItems.length,
                         padding: EdgeInsets.all(spacing),
                     itemBuilder: (context, index) {
-                      final item = sequencerState.currentSampleItems[index];
+                      final item = context.read<SampleBrowserState>().currentItems[index];
+                      final browserState = context.read<SampleBrowserState>();
                             
                       return GestureDetector(
-                        onTap: () => sequencerState.selectSampleItem(item),
+                        onTap: () {
+                          // Only handle folder navigation at the main tile level
+                          if (item.isFolder) {
+                            browserState.navigateToFolder(item.name);
+                          }
+                          // File selection is handled by the bottom part's onTap
+                        },
                         child: Container(
                           decoration: BoxDecoration(
                             color: item.isFolder 
@@ -291,7 +322,10 @@ class SampleSelectionWidget extends StatelessWidget {
                                         Expanded(
                                           flex: (SampleBrowserSizing.playButtonAreaRatio * 100).round(),
                                           child: GestureDetector(
-                                            onTap: () => sequencerState.previewSample(item.path),
+                                            onTap: () {
+                                              // TODO: Implement preview via new audio preview pathway (out of scope here)
+                                              debugPrint('Preview ${item.path} (not implemented)');
+                                            },
                                             child: Container(
                                               width: double.infinity,
                                               decoration: BoxDecoration(
@@ -340,7 +374,24 @@ class SampleSelectionWidget extends StatelessWidget {
                                         Expanded(
                                           flex: (SampleBrowserSizing.pickAreaRatio * 100).round(),
                                           child: GestureDetector(
-                                            onTap: () => sequencerState.selectSampleItem(item),
+                                            onTap: () async {
+                                              final browserState = context.read<SampleBrowserState>();
+                                              final sampleBankState = context.read<SampleBankState>();
+                                              
+                                              if (item.isFolder) {
+                                                browserState.navigateToFolder(item.name);
+                                              } else {
+                                                // Load sample by manifest id into the target slot
+                                                final targetSlot = browserState.targetCol;
+                                                if (targetSlot != null && item.sampleId != null) {
+                                                  debugPrint('🎵 Loading sample id=${item.sampleId} into slot $targetSlot');
+                                                  final success = await sampleBankState.loadSample(targetSlot, item.sampleId!);
+                                                  debugPrint(success ? '✅ Sample loaded successfully' : '❌ Failed to load sample');
+                                                }
+                                                // Hide the browser after selection
+                                                browserState.hide();
+                                              }
+                                            },
                                             child: Container(
                                               width: double.infinity,
                                               padding: EdgeInsets.all(tilePadding),

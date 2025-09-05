@@ -360,6 +360,23 @@ class ThreadsService {
     }
   }
 
+  // Add a checkpoint from raw JSON map (snake_case), for new snapshot flow
+  static Future<void> addCheckpointJson(String threadId, Map<String, dynamic> checkpointJson) async {
+    try {
+      final body = <String, dynamic>{
+        'checkpoint': checkpointJson,
+      };
+
+      final response = await ApiHttpClient.post('/threads/$threadId/checkpoints', body: body);
+
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Failed to add checkpoint: ${response.statusCode} ${response.body}');
+      }
+    } catch (e) {
+      throw Exception('Network error adding checkpoint: $e');
+    }
+  }
+
   // Join an existing thread
   static Future<void> joinThread(String threadId, String userId, String userName) async {
     try {

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
-import '../../../utils/app_colors.dart';import '../../../state/threads_state.dart';
-import '../../../utils/app_colors.dart';import '../../../screens/checkpoints_screen.dart';
+import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/playback.dart';
+import '../../../state/threads_state.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../screens/checkpoints_screen.dart';
 
 class MessageBarWidget extends StatelessWidget {
   // Configuration variables for easy control
@@ -61,8 +62,8 @@ class MessageBarWidget extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Consumer2<SequencerState, ThreadsState>(
-          builder: (context, sequencerState, threadsState, child) {
+        child: Consumer3<ThreadsState, TableState, PlaybackState>(
+          builder: (context, threadsState, tableState, playbackState, child) {
             return LayoutBuilder(
               builder: (context, constraints) {
                 final barHeight = constraints.maxHeight;
@@ -122,7 +123,7 @@ class MessageBarWidget extends StatelessWidget {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(leftBorderRadius),
-                                    onTap: () => _navigateToCheckpoints(context, sequencerState, threadsState),
+                                    onTap: () => _navigateToCheckpoints(context, threadsState),
                                     child: Center(
                                       child: Icon(
                                         Icons.format_list_bulleted,
@@ -157,7 +158,7 @@ class MessageBarWidget extends StatelessWidget {
                                   ),
                                 ),
                                 child: Center(
-                                  child: _buildSectionChain(sequencerState.numSections),
+                                  child: _buildSectionChain(tableState.sectionsCount),
                                 ),
                               ),
                             ),
@@ -190,7 +191,7 @@ class MessageBarWidget extends StatelessWidget {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(rightBorderRadius),
-                                    onTap: () => _sendCheckpointAndNavigate(context, sequencerState, threadsState),
+                                    onTap: () => _sendCheckpointAndNavigate(context, threadsState),
                                     child: Center(
                                       child: CustomPaint(
                                         size: Size(rightButtonSize * 0.4, rightButtonSize * 0.4),
@@ -250,9 +251,9 @@ class MessageBarWidget extends StatelessWidget {
     );
   }
 
-  void _navigateToCheckpoints(BuildContext context, SequencerState sequencer, ThreadsState threadsState) {
+  void _navigateToCheckpoints(BuildContext context, ThreadsState threadsState) {
     // Same logic as in app_header_widget.dart
-    final thread = sequencer.sourceThread ?? threadsState.activeThread;
+    final thread = threadsState.activeThread;
     
     if (thread != null) {
       // Set the active thread in ThreadsState so CheckpointsScreen can access it
@@ -279,9 +280,9 @@ class MessageBarWidget extends StatelessWidget {
     }
   }
 
-  void _navigateToCheckpointsWithHighlight(BuildContext context, SequencerState sequencer, ThreadsState threadsState) {
+  void _navigateToCheckpointsWithHighlight(BuildContext context, ThreadsState threadsState) {
     // Same as _navigateToCheckpoints but with highlight for newest checkpoint
-    final thread = sequencer.sourceThread ?? threadsState.activeThread;
+    final thread = threadsState.activeThread;
     
     if (thread != null) {
       // Set the active thread in ThreadsState so CheckpointsScreen can access it
@@ -300,25 +301,12 @@ class MessageBarWidget extends StatelessWidget {
     }
   }
 
-  void _sendCheckpointAndNavigate(BuildContext context, SequencerState sequencer, ThreadsState threadsState) async {
+  void _sendCheckpointAndNavigate(BuildContext context, ThreadsState threadsState) async {
     // Same save/send logic as in app_header_widget.dart but without popups
     final activeThread = threadsState.activeThread;
-    final sourceThread = sequencer.sourceThread;
     
     try {
-      if (sourceThread != null) {
-        // Case: Sourced project - create fork with modifications (SEND)
-        final success = await sequencer.createProjectFork(
-          comment: 'Modified version',
-          threadsService: null, // Use default threads service
-        );
-        
-        if (success && context.mounted) {
-          // Navigate to checkpoints after successful send
-          _navigateToCheckpointsWithHighlight(context, sequencer, threadsState);
-        }
-        return; // Exit early after handling sourced project
-      } else if (activeThread != null) {
+      if (activeThread != null) {
         // Check if this is unpublished solo thread (SAVE) or published/collaborative (SEND)
         final isUnpublishedSolo = activeThread.users.length == 1 && 
                                  activeThread.users.first.id == threadsState.currentUserId &&
@@ -326,27 +314,31 @@ class MessageBarWidget extends StatelessWidget {
         
         if (isUnpublishedSolo) {
           // Case: Unpublished solo thread - add checkpoint to same thread (SAVE)
-          final success = await threadsState.addCheckpointFromSequencer(
-            activeThread.id,
-            'Saved changes',
-            sequencer,
+          await threadsState.addCheckpointFromV2(
+            threadId: activeThread.id,
+            comment: 'Saved changes',
+            tableState: Provider.of<TableState>(context, listen: false),
+            sampleBankState: Provider.of<SampleBankState>(context, listen: false),
+            playbackState: Provider.of<PlaybackState>(context, listen: false),
           );
           
           if (context.mounted) {
             // Navigate to checkpoints after successful save
-            _navigateToCheckpointsWithHighlight(context, sequencer, threadsState);
+            _navigateToCheckpointsWithHighlight(context, threadsState);
           }
         } else {
           // Case: Published/collaborative thread - create fork or add checkpoint (SEND)
-          final success = await threadsState.addCheckpointFromSequencer(
-            activeThread.id,
-            'New contribution',
-            sequencer,
+          await threadsState.addCheckpointFromV2(
+            threadId: activeThread.id,
+            comment: 'New contribution',
+            tableState: Provider.of<TableState>(context, listen: false),
+            sampleBankState: Provider.of<SampleBankState>(context, listen: false),
+            playbackState: Provider.of<PlaybackState>(context, listen: false),
           );
           
           if (context.mounted) {
             // Navigate to checkpoints after successful send
-            _navigateToCheckpointsWithHighlight(context, sequencer, threadsState);
+            _navigateToCheckpointsWithHighlight(context, threadsState);
           }
         }
       }

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
-import '../state/sequencer_state.dart';
+
 import '../utils/app_colors.dart';
-import 'sequencer_screen.dart';
+import 'sequencer_screen_v2.dart';
 import '../widgets/common_header_widget.dart';
+import '../ffi/table_bindings.dart';
+import '../ffi/playback_bindings.dart';
+import '../ffi/sample_bank_bindings.dart';
 
 class ProjectsScreen extends StatefulWidget {
   const ProjectsScreen({Key? key}) : super(key: key);
@@ -196,15 +199,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () async {
-                  // Reset sequencer state for a truly new project
-                  await context.read<SequencerState>().resetToFreshState();
-                  // Clear active thread context
+                  // Clear active thread context for new project
                   context.read<ThreadsState>().setActiveThread(null);
-                  // Navigate to sequencer
+                  // Initialize native subsystems (idempotent: init performs cleanup)
+                  try {
+                    TableBindings().tableInit();
+                    PlaybackBindings().playbackInit();
+                    SampleBankBindings().sampleBankInit();
+                  } catch (e) {
+                    debugPrint('❌ Failed to init native subsystems: $e');
+                  }
+                  // Navigate to V2 sequencer implementation
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => const PatternScreen(),
+                      builder: (context) => const SequencerScreenV2(),
                     ),
                   );
                 },
@@ -338,15 +347,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: () async {
-                      // Reset sequencer state for a truly new project
-                      await context.read<SequencerState>().resetToFreshState();
-                      // Clear active thread context
+                      // Clear active thread context for new project
                       context.read<ThreadsState>().setActiveThread(null);
-                      // Navigate to sequencer
+                      // Initialize native subsystems (idempotent: init performs cleanup)
+                      try {
+                        TableBindings().tableInit();
+                        PlaybackBindings().playbackInit();
+                        SampleBankBindings().sampleBankInit();
+                      } catch (e) {
+                        debugPrint('❌ Failed to init native subsystems: $e');
+                      }
+                      // Navigate to V2 sequencer implementation
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const PatternScreen(),
+                          builder: (context) => const SequencerScreenV2(),
                         ),
                       );
                     },
@@ -503,24 +518,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         );
       }
 
-      // Load the project into sequencer
-      final sequencerState = context.read<SequencerState>();
-      final success = await sequencerState.loadFromThread(project.id);
-
-      if (success && mounted) {
-        // Navigate to sequencer screen
+      // Navigate to V2 sequencer screen
+      if (mounted) {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const PatternScreen(),
-          ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to load project'),
-            backgroundColor: AppColors.menuErrorColor,
-            duration: Duration(seconds: 2),
+            builder: (context) => const SequencerScreenV2(),
           ),
         );
       }

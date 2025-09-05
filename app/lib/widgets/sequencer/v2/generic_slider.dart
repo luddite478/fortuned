@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
-import '../../../utils/app_colors.dart';import '../../../utils/musical_notes.dart';
-import '../../../utils/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../../../state/sequencer/slider_overlay.dart';
+// musical note formatting handled externally if needed
 class MusicalNotes {
   static const List<String> _noteNames = [
     'C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'
@@ -102,7 +101,7 @@ class GenericSlider extends StatelessWidget {
   final SliderType type;
   final Function(double) onChanged;
   final double height;
-  final SequencerState sequencer;
+  final SliderOverlayState? sliderOverlay; // optional overlay state
 
   const GenericSlider({
     super.key,
@@ -113,7 +112,7 @@ class GenericSlider extends StatelessWidget {
     required this.type,
     required this.onChanged,
     required this.height,
-    required this.sequencer,
+    required this.sliderOverlay,
   });
 
   String _getSettingName() {
@@ -161,13 +160,19 @@ class GenericSlider extends StatelessWidget {
         value: value,
         onChanged: (newValue) {
           onChanged(newValue);
-          sequencer.updateSliderValue(_formatValue(newValue));
+          if (sliderOverlay != null) {
+            sliderOverlay!.updateValue(_formatValue(newValue));
+          }
         },
         onChangeStart: (newValue) {
-          sequencer.startSliderInteraction(_getSettingName(), _formatValue(newValue));
+          if (sliderOverlay != null) {
+            sliderOverlay!.startInteraction(_getSettingName(), _formatValue(newValue));
+          }
         },
         onChangeEnd: (newValue) {
-          sequencer.stopSliderInteraction();
+          if (sliderOverlay != null) {
+            sliderOverlay!.stopInteraction();
+          }
         },
         min: min,
         max: max,

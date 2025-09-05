@@ -7,7 +7,7 @@ import '../services/auth_service.dart';
 import '../services/threads_service.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'user_profile_screen.dart';
-import 'sequencer_screen.dart';
+import 'sequencer_screen_v2.dart';
 import 'checkpoints_screen.dart';
 import '../state/threads_state.dart';
 import '../state/sequencer_state.dart';
@@ -397,11 +397,11 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            // Just navigate to sequencer - no need to create threads locally
+            // Navigate to V2 sequencer implementation
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const PatternScreen(),
+                builder: (context) => const SequencerScreenV2(),
               ),
             );
           },

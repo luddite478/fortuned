@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Message Schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "enum": [1]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{24}$",
+      "minLength": 24,
+      "maxLength": 24
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "user_id": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{24}$",
+      "minLength": 24,
+      "maxLength": 24
+    },
+    "parent_thread": {
+      "oneOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-fA-F0-9]{24}$",
+          "minLength": 24,
+          "maxLength": 24
+        },
+        { "type": "null" }
+      ]
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "snapshot": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  },
+  "required": [
+    "schema_version",
+    "id",
+    "created_at",
+    "timestamp",
+    "user_id",
+    "parent_thread"
+  ],
+  "additionalProperties": false
+}

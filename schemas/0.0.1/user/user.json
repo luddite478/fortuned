@@ -1,0 +1,85 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "title": "User Schema",
+    "type": "object",
+    "properties": {
+        "schema_version": {
+            "type": "number",
+            "enum": [1]
+        },
+        "id": {
+            "type": "string",
+            "format": "uuid"
+        },
+        "username": {
+            "type": "string",
+            "minLength": 1
+        },
+        "name": {
+            "type": "string",
+            "minLength": 1
+        },
+        "email": {
+            "type": "string",
+            "format": "email"
+        },
+        "password_hash": {
+            "type": "string"
+        },
+        "salt": {
+            "type": "string"
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "last_login": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "last_online": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "email_verified": {
+            "type": "boolean"
+        },
+        "preferences": {
+            "type": "object",
+            "properties": {
+                "theme": {
+                    "type": "string"
+                }
+            },
+            "additionalProperties": false
+        },
+        "threads": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+            }
+        }
+    },
+    "required": [
+        "id",
+        "username",
+        "name",
+        "email",
+        "password_hash",
+        "salt",
+        "created_at",
+        "email_verified",
+        "preferences",
+        "threads"
+    ],
+    "additionalProperties": false,
+    "indexes": [
+        {"fields": "id", "unique": true},
+        {"fields": "email", "unique": true},
+        {"fields": "username", "unique": true},
+        {"fields": "name", "unique": false},
+        {"fields": "created_at", "unique": false},
+        {"fields": "last_login", "unique": false}
+    ]
+}

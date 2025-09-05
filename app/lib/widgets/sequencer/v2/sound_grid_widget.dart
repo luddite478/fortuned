@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import 'dart:async';
+import 'package:provider/provider.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'dart:async';
 import 'dart:math' as math;
-import '../../../state/sequencer_state.dart';
-import '../../../utils/app_colors.dart';import '../../stacked_cards_widget.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/playback.dart';
+import '../../../state/sequencer/edit.dart';
+import '../../../state/sequencer/multitask_panel.dart';
+import '../../../ffi/table_bindings.dart';
 import '../../../utils/app_colors.dart';
+import '../../stacked_cards_widget.dart';
 
 // Custom ScrollPhysics to retain position when content changes
 class PositionRetainedScrollPhysics extends ScrollPhysics {
@@ -111,7 +116,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     super.dispose();
   }
 
-  void _startAutoScroll(double direction, Offset initialPosition, SequencerState sequencer) {
+  void _startAutoScroll(double direction, Offset initialPosition) {
     if (_autoScrollTimer != null) {
       return;
     }
@@ -132,9 +137,11 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         _scrollController.jumpTo(clampedOffset);
         
         final positionToUse = _currentPanPosition ?? initialPosition;
-        final cellIndex = sequencer.getCellIndexFromPosition(positionToUse, context, scrollOffset: clampedOffset);
+        final renderBox = context.findRenderObject() as RenderBox?;
+        final width = renderBox?.size.width ?? MediaQuery.of(context).size.width;
+        final cellIndex = _positionToCellIndex(positionToUse, width);
         if (cellIndex != null) {
-          sequencer.handleGridCellSelection(cellIndex, true);
+          context.read<EditState>().selectCell(cellIndex, extend: true);
         }
       } else {
         timer.cancel();
@@ -148,7 +155,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     _autoScrollTimer = null;
   }
 
-  void _handlePanUpdate(DragUpdateDetails details, SequencerState sequencer) {
+  void _handlePanUpdate(DragUpdateDetails details) {
     final localPosition = details.localPosition;
     _currentPanPosition = localPosition;
     
@@ -158,7 +165,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       if (delta.distance > _gestureThreshold) {
         final isVertical = delta.dy.abs() > delta.dx.abs();
         
-        if (sequencer.isInSelectionMode) {
+        if (context.read<EditState>().isInSelectionMode) {
           _gestureMode = GestureMode.selecting;
         } else if (isVertical) {
           _gestureMode = GestureMode.scrolling;
@@ -169,13 +176,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     }
     
     if (_gestureMode == GestureMode.selecting) {
-      _handleSelectionGesture(localPosition, sequencer);
+      _handleSelectionGesture(localPosition);
     }
   }
   
-  void _handleSelectionGesture(Offset localPosition, SequencerState sequencer) {
-    final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-    final cellIndex = sequencer.getCellIndexFromPosition(localPosition, context, scrollOffset: scrollOffset);
+  void _handleSelectionGesture(Offset localPosition) {
+    final rb2 = context.findRenderObject() as RenderBox?;
+    final width = rb2?.size.width ?? MediaQuery.of(context).size.width;
+    final cellIndex = _positionToCellIndex(localPosition, width);
     
     final renderBox = context.findRenderObject() as RenderBox?;
     if (renderBox != null) {
@@ -183,15 +191,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       final yPosition = localPosition.dy;
       
       if (yPosition < _edgeThreshold && _scrollController.hasClients && _scrollController.offset > 0) {
-        _startAutoScroll(-1.0, localPosition, sequencer);
+        _startAutoScroll(-1.0, localPosition);
         if (cellIndex != null) {
-          sequencer.handleGridCellSelection(cellIndex, true);
+          context.read<EditState>().selectCell(cellIndex, extend: true);
         }
         return;
       } else if (yPosition > containerHeight - _edgeThreshold && _scrollController.hasClients && _scrollController.offset < _scrollController.position.maxScrollExtent) {
-        _startAutoScroll(1.0, localPosition, sequencer);
+        _startAutoScroll(1.0, localPosition);
         if (cellIndex != null) {
-          sequencer.handleGridCellSelection(cellIndex, true);
+          context.read<EditState>().selectCell(cellIndex, extend: true);
         }
         return;
       } else {
@@ -200,37 +208,66 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     }
     
     if (cellIndex != null) {
-      sequencer.handleGridCellSelection(cellIndex, true);
+      context.read<EditState>().selectCell(cellIndex, extend: true);
     }
   }
 
-  Color _getSampleColorForGrid(int sampleSlot, SequencerState sequencer) {
-    // Convert original bank colors to darker gray-beige variants for grid cells
-    final originalColor = sequencer.bankColors[sampleSlot];
-    return Color.lerp(originalColor, AppColors.sequencerCellFilled, 0.6) ?? AppColors.sequencerCellFilled;
+  int? _positionToCellIndex(Offset localPosition, double width) {
+    final baseRowHeight = 50.0;
+    final actualRowHeight = baseRowHeight * (cellHeightPercent / 100.0);
+    final actualRowSpacing = baseRowHeight * (rowSpacingPercent / 100.0);
+    final rowBlock = actualRowHeight + actualRowSpacing;
+    if (rowBlock <= 0) return null;
+    final rowIndex = (localPosition.dy / rowBlock).floor();
+    if (rowIndex < 0) return null;
+    
+    final gridCols = context.read<TableState>().getVisibleCols().length;
+    final actualRowNumberColumnWidth = width * (rowNumberColumnWidthPercent / 100.0);
+    final xInGrid = localPosition.dx - actualRowNumberColumnWidth;
+    if (xInGrid < 0) return null;
+    final actualCellSpacing = width * (cellSpacingPercent / 100.0);
+    final availableWidthForGrid = width - actualRowNumberColumnWidth;
+    final totalHorizontalSpacing = actualCellSpacing * (gridCols - 1);
+    final availableWidthForCells = availableWidthForGrid - totalHorizontalSpacing;
+    final fullCellWidth = availableWidthForCells / gridCols;
+    final actualCellWidth = fullCellWidth * (cellWidthPercent / 100.0);
+    final cellBlock = actualCellWidth + actualCellSpacing;
+    if (cellBlock <= 0) return null;
+    int colIndex = (xInGrid / cellBlock).floor();
+    if (colIndex < 0) return null;
+    if (colIndex >= gridCols) colIndex = gridCols - 1;
+    return rowIndex * gridCols + colIndex;
+  }
+
+  Color _getSampleColorForGrid(int sampleSlot, BuildContext context) {
+    // Get sample bank colors - these are the authoritative colors for samples
+    final sampleBankState = Provider.of<SampleBankState>(context, listen: false);
+    
+    // Use sample bank colors directly, with slight darkening for grid cells
+    if (sampleSlot >= 0 && sampleSlot < sampleBankState.uiBankColors.length) {
+      final originalColor = sampleBankState.uiBankColors[sampleSlot];
+      return Color.lerp(originalColor, AppColors.sequencerCellFilled, 0.3) ?? AppColors.sequencerCellFilled;
+    }
+    
+    // Fallback color for invalid sample slots
+    return AppColors.sequencerCellFilled;
   }
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
-        const int numSoundGrids = 4; // Can be changed to any number
+    return Consumer<TableState>(
+      builder: (context, tableState, child) {
+        final int numSoundGrids = tableState.totalLayers; // Derive from table state
         
         // Initialize sound grids if not already done or if number changed
-        if (sequencer.soundGridOrder.length != numSoundGrids) {
+        if (tableState.uiSoundGridOrder.length != numSoundGrids) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            sequencer.initializeSoundGrids(numSoundGrids);
+            tableState.uiInitializeSoundGrids(numSoundGrids);
           });
           return const Center(child: CircularProgressIndicator());
         }
         
-        // Decide which grid samples to render (current section vs preview section)
-        final List<int?> visibleGridSamples = widget.sectionIndexOverride != null
-            ? sequencer.getSectionGridSamples(
-                widget.sectionIndexOverride!,
-                gridIndex: sequencer.currentSoundGridIndex,
-              )
-            : sequencer.gridSamples;
+        // Get TableState for reading cell data from the new table system (already provided)
         
         return Container(
           margin: const EdgeInsets.only(top: 0, bottom: 0), // Move entire sound grid structure
@@ -260,12 +297,12 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               AppColors.sequencerSurfaceBase,
               AppColors.sequencerSurfaceRaised,
             ],
-            activeCardIndex: sequencer.currentSoundGridIndex,
+            activeCardIndex: tableState.uiCurrentSoundGridIndex,
             cardBuilder: (index, width, height, depth) {
               // INVERSION LOGIC: Stack index 0 = back card, but we want L1 to be front
               // So we need to invert: front card (highest stack index) = L1 (first grid)
               final invertedIndex = numSoundGrids - 1 - index;
-              final actualSoundGridId = sequencer.soundGridOrder[invertedIndex];
+              final actualSoundGridId = tableState.uiSoundGridOrder[invertedIndex];
               
               // Define subtle colors for each card ID (non-vibrant, more professional)
               final availableColors = [
@@ -283,7 +320,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               final cardColor = availableColors[actualSoundGridId % availableColors.length];
               
               // The front card is the one that matches the current sound grid index
-              final isFrontCard = actualSoundGridId == sequencer.currentSoundGridIndex;
+              final isFrontCard = actualSoundGridId == tableState.uiCurrentSoundGridIndex;
               
               // Wrap everything in a container with minimal extra space for the label tab
               return SizedBox(
@@ -304,8 +341,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         depth: depth,
                         actualSoundGridId: actualSoundGridId,
                         index: index,
-                        sequencer: sequencer,
-                        visibleGridSamples: visibleGridSamples,
+                        tableState: tableState,
                       ),
                     ),
                     // Clickable tab label positioned above the card
@@ -319,7 +355,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                         isFrontCard: isFrontCard,
                         depth: depth,
                         tabWidth: _calculateTabWidth(width, numSoundGrids),
-                        sequencer: sequencer,
+                        tableState: tableState,
                       ),
                     ),
                   ],
@@ -332,18 +368,28 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
-  // 🎯 PERFORMANCE: Cell that only rebuilds when current step changes
-  Widget _buildEnhancedGridCell(BuildContext context, SequencerState sequencer, int index, List<int?> visibleGridSamples) {
-    final row = index ~/ sequencer.gridColumns;
+  // 🎯 PERFORMANCE: Cell that only rebuilds when current step changes or cell data changes
+  Widget _buildEnhancedGridCell(BuildContext context, TableState tableState, int index) {
+    final gridCols = tableState.getVisibleCols().length;
+    final row = index ~/ gridCols;
+    final col = index % gridCols;
+    
+    // Calculate absolute step and column for TableState (respect section override)
+    final sectionIndex = widget.sectionIndexOverride ?? tableState.uiSelectedSection;
+    final absoluteStep = tableState.getSectionStartStep(sectionIndex) + row;
+    final layerStartCol = tableState.getLayerStartCol();
+    final absoluteCol = layerStartCol + col;
     
     return ValueListenableBuilder<int>(
-      valueListenable: sequencer.currentStepNotifier,
+      valueListenable: context.read<PlaybackState>().currentStepNotifier,
       builder: (context, currentStep, child) {
-        final isActivePad = sequencer.activePad == index;
-        final isCurrentStep = widget.sectionIndexOverride == null && sequencer.isSequencerPlaying && currentStep == row;
-        final placedSample = index < visibleGridSamples.length ? visibleGridSamples[index] : null;
-        final hasPlacedSample = placedSample != null;
-        final isSelected = sequencer.selectedGridCells.contains(index);
+        return ValueListenableBuilder<CellData>(
+          valueListenable: tableState.getCellNotifier(absoluteStep, absoluteCol),
+          builder: (context, cellData, child) {
+            final isActivePad = false; // UI-only highlight not yet wired in TableState
+            final isCurrentStep = widget.sectionIndexOverride == null && currentStep >= 0 && currentStep == absoluteStep;
+            final placedSample = cellData.sampleSlot >= 0 ? cellData.sampleSlot : null;
+            final hasPlacedSample = placedSample != null;
         
         // 🎯 PERFORMANCE: Light bulb-bluish-white highlight for current step
         Color cellColor;
@@ -352,10 +398,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                  } else if (isCurrentStep) {
            // Light bulb-bluish-white highlight for current step
            cellColor = hasPlacedSample 
-               ? _getSampleColorForGrid(placedSample, sequencer).withOpacity(0.9)
+               ? _getSampleColorForGrid(placedSample, context).withOpacity(0.9)
                : const Color(0xFF87CEEB).withOpacity(0.4); // Light blue highlight
          } else if (hasPlacedSample) {
-           cellColor = _getSampleColorForGrid(placedSample, sequencer);
+           cellColor = _getSampleColorForGrid(placedSample, context);
         } else {
           // Alternate cell color for every 4th row (1, 5, 9, etc. in 1-indexed terms)
           final isAlternateRow = row % 4 == 0;
@@ -366,16 +412,60 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         
         return DragTarget<int>(
           onAccept: (int sampleSlot) {
-            sequencer.placeSampleInGrid(sampleSlot, index);
+            // Use TableState instead of legacy SequencerState for drag operations
+            final tableState = Provider.of<TableState>(context, listen: false);
+            final gridCols = tableState.getVisibleCols().length;
+            final row = index ~/ gridCols;
+            final col = index % gridCols;
+            
+            // Calculate absolute step and column based on current (or overridden) section and layer
+            final sectionIndex = widget.sectionIndexOverride ?? tableState.uiSelectedSection;
+            final absoluteStep = tableState.getSectionStartStep(sectionIndex) + row;
+            final layerStartCol = tableState.getLayerStartCol();
+            final absoluteCol = layerStartCol + col;
+            
+            // Use the new table system instead of legacy sequencer
+            tableState.setCell(absoluteStep, absoluteCol, sampleSlot, 1.0, 1.0);
+            debugPrint('🎵 [DRAG] Set cell [$absoluteStep, $absoluteCol] = sample $sampleSlot');
           },
           builder: (context, candidateData, rejectedData) {
             final bool isDragHovering = candidateData.isNotEmpty;
             
             return GestureDetector(
               onTap: () {
-                sequencer.handlePadPress(index);
+                final edit = Provider.of<EditState>(context, listen: false);
+                if (edit.isInSelectionMode) {
+                  if (edit.selectedCells.contains(index)) {
+                    // Tap inside selected area → select single tapped cell
+                    edit.selectSingleCell(index);
+                  } else {
+                    // Tap outside selected area → clear then select single
+                    edit.clearSelection();
+                    edit.selectSingleCell(index);
+                  }
+                } else {
+                  // Not in selection mode → select single cell
+                  edit.selectSingleCell(index);
+                }
+                tableState.uiHandlePadPress(index);
+
+                // Open cell settings only if the tapped cell has a placed sample (always open for filled)
+                final gridColsLocal = tableState.getVisibleCols().length;
+                final rowLocal = index ~/ gridColsLocal;
+                final colLocal = index % gridColsLocal;
+                final sectionIndexLocal = widget.sectionIndexOverride ?? tableState.uiSelectedSection;
+                final absoluteStepLocal = tableState.getSectionStartStep(sectionIndexLocal) + rowLocal;
+                final absoluteColLocal = tableState.getLayerStartCol() + colLocal;
+                final cellDataLocal = tableState.getCellNotifier(absoluteStepLocal, absoluteColLocal).value;
+                if (cellDataLocal.sampleSlot >= 0) {
+                  Provider.of<MultitaskPanelState>(context, listen: false).showCellSettings();
+                }
               },
-              child: Container(
+              child: ValueListenableBuilder<Set<int>>( 
+                valueListenable: context.read<EditState>().selectedCellsNotifier,
+                builder: (context, selectedSet, _) {
+                  final bool isSelected = selectedSet.contains(index);
+                  return Container(
                 width: double.infinity, // Fill available width
                 height: double.infinity, // Fill available height
                 decoration: BoxDecoration(
@@ -429,24 +519,36 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                     final actualPadding = math.min(constraints.maxWidth, constraints.maxHeight) * (cellPaddingPercent / 100.0);
                     return Padding(
                       padding: EdgeInsets.all(actualPadding), // Use percentage-based padding relative to cell size
-                      child: hasPlacedSample ? _buildSampleCellContent(sequencer, index, placedSample!, isActivePad, isCurrentStep, isDragHovering) : _buildEmptyCellContent(),
+                      child: hasPlacedSample ? _buildSampleCellContent(context, tableState, index, placedSample, isActivePad, isCurrentStep, isDragHovering) : _buildEmptyCellContent(),
                     );
                   },
                 ),
+                  );
+                },
               ),
             );
+          },
+        );
           },
         );
       },
     );
   }
 
-  Widget _buildSampleCellContent(SequencerState sequencer, int index, int sampleSlot, bool isActivePad, bool isCurrentStep, bool isDragHovering) {
-    // Get volume and pitch values
-    final cellVolume = sequencer.getCellVolume(index);
-    final sampleVolume = sequencer.getSampleVolume(sampleSlot);
-    final cellPitch = sequencer.getCellPitch(index);
-    final samplePitch = sequencer.getSamplePitch(sampleSlot);
+  Widget _buildSampleCellContent(BuildContext context, TableState tableState, int index, int sampleSlot, bool isActivePad, bool isCurrentStep, bool isDragHovering) {
+    // Get volume and pitch values from new states
+    final sectionStart = tableState.getSectionStartStep(widget.sectionIndexOverride ?? tableState.uiSelectedSection);
+    final gridCols = tableState.getVisibleCols().length;
+    final row = index ~/ gridCols;
+    final colInSlice = index % gridCols;
+    final step = sectionStart + row;
+    final col = tableState.getLayerStartCol() + colInSlice;
+    final cellData = tableState.getCellNotifier(step, col).value;
+    final cellVolume = cellData.volume;
+    final cellPitch = cellData.pitch;
+    final sampleData = context.read<SampleBankState>().getSampleData(sampleSlot);
+    final sampleVolume = sampleData.volume;
+    final samplePitch = sampleData.pitch;
     
     // Check if values are non-default (cell overrides)
     final hasVolumeOverride = (cellVolume - sampleVolume).abs() > 0.001;
@@ -545,14 +647,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   }
 
 
-  Widget _buildGridCell(BuildContext context, SequencerState sequencer, int index, List<int?> visibleGridSamples) {
+  Widget _buildGridCell(BuildContext context, TableState tableState, int index) {
     // 🎯 PERFORMANCE: Use enhanced cell that listens to currentStepNotifier
-    return _buildEnhancedGridCell(context, sequencer, index, visibleGridSamples);
+    return _buildEnhancedGridCell(context, tableState, index);
   }
 
 
 
-  Widget _buildGridRow(BuildContext context, SequencerState sequencer, int rowIndex, List<int?> visibleGridSamples) {
+  Widget _buildGridRow(BuildContext context, TableState tableState, int rowIndex) {
     return LayoutBuilder(
       builder: (context, constraints) {
         // Calculate dimensions based on percentages
@@ -565,9 +667,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         // Calculate row number column width and grid area
         final actualRowNumberColumnWidth = availableWidth * (rowNumberColumnWidthPercent / 100.0);
         final availableWidthForGrid = availableWidth - actualRowNumberColumnWidth;
-        final totalHorizontalSpacing = actualCellSpacing * (sequencer.gridColumns - 1);
+        final gridCols = tableState.getVisibleCols().length;
+        final totalHorizontalSpacing = actualCellSpacing * (gridCols - 1);
         final availableWidthForCells = availableWidthForGrid - totalHorizontalSpacing;
-        final fullCellWidth = availableWidthForCells / sequencer.gridColumns;
+        final fullCellWidth = availableWidthForCells / gridCols;
         final actualCellWidth = fullCellWidth * (cellWidthPercent / 100.0);
         
         return Container(
@@ -601,15 +704,15 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               Expanded(
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: List.generate(sequencer.gridColumns, (colIndex) {
-                    final cellIndex = rowIndex * sequencer.gridColumns + colIndex;
+                  children: List.generate(gridCols, (colIndex) {
+                    final cellIndex = rowIndex * gridCols + colIndex;
                     return Container(
                       width: actualCellWidth,
                       height: actualRowHeight,
                       margin: EdgeInsets.symmetric(
                         horizontal: actualCellSpacing / 2, // Use calculated cell spacing
                       ),
-                      child: _buildGridCell(context, sequencer, cellIndex, visibleGridSamples),
+                      child: _buildGridCell(context, tableState, cellIndex),
                     );
                   }),
                 ),
@@ -628,12 +731,13 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     required bool isFrontCard,
     required int depth,
     required double tabWidth,
-    required SequencerState sequencer,
+    required TableState tableState,
   }) {
     return GestureDetector(
       onTap: () {
-        // Bring this grid to front when its label is tapped
-        sequencer.bringGridToFront(gridIndex);
+        // Bring this grid to front and switch UI-visible layer
+        tableState.uiBringGridToFront(gridIndex);
+        tableState.setUiSelectedLayer(gridIndex);
       },
       child: Container(
         width: tabWidth,
@@ -689,6 +793,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
+  // Unused helper retained for reference - can be deleted if not needed
   Widget _buildTabLabel({
     required int gridIndex,
     required Color cardColor,
@@ -738,8 +843,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     required int depth,
     required int actualSoundGridId,
     required int index,
-    required SequencerState sequencer,
-    required List<int?> visibleGridSamples,
+    required TableState tableState,
   }) {
     // Non-front cards are grayed out but still visible
     if (!isFrontCard) {
@@ -782,7 +886,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  sequencer.getGridLabel(actualSoundGridId),
+                  'Layer ${actualSoundGridId + 1}',
                   style: GoogleFonts.sourceSans3(
                     color: AppColors.sequencerLightText,
                     fontSize: 14,
@@ -806,10 +910,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         color: AppColors.sequencerSurfaceRaised, // Gray-beige surface
         borderRadius: BorderRadius.circular(2), // Sharp corners
         border: Border.all(
-          color: sequencer.isInSelectionMode 
+          color: context.read<EditState>().isInSelectionMode 
               ? AppColors.sequencerAccent 
               : AppColors.sequencerBorder, // Brown accent or subtle border
-          width: sequencer.isInSelectionMode ? 2 : 1, // Thicker border when in selection mode
+          width: context.read<EditState>().isInSelectionMode ? 2 : 1, // Thicker border when in selection mode
         ),
         boxShadow: [
           // Strong protruding effect for front card
@@ -824,7 +928,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             offset: const Offset(0, -1),
           ),
           // Additional highlight for selection mode
-          if (sequencer.isInSelectionMode)
+          if (context.read<EditState>().isInSelectionMode)
             BoxShadow(
               color: AppColors.sequencerAccent.withOpacity(0.3),
               blurRadius: 6,
@@ -840,7 +944,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             const SizedBox(height: 8),
             // Sound grid
             Expanded(
-              child: _buildGridContent(sequencer, visibleGridSamples),
+              child: _buildGridContent(tableState),
             ),
           ],
         ),
@@ -848,22 +952,23 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
-  Widget _buildGridContent(SequencerState sequencer, List<int?> visibleGridSamples) {
+  Widget _buildGridContent(TableState tableState) {
     return GestureDetector(
       onPanStart: (details) {
         _gestureStartPosition = details.localPosition;
         _gestureMode = GestureMode.undetermined;
         
-        if (sequencer.isInSelectionMode) {
-          final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
-          final cellIndex = sequencer.getCellIndexFromPosition(details.localPosition, context, scrollOffset: scrollOffset);
+        if (context.read<EditState>().isInSelectionMode) {
+          final rb = context.findRenderObject() as RenderBox?;
+          final width = rb?.size.width ?? MediaQuery.of(context).size.width;
+          final cellIndex = _positionToCellIndex(details.localPosition, width);
           if (cellIndex != null) {
-            sequencer.handleGridCellSelection(cellIndex, true);
+            context.read<EditState>().beginDragSelectionAt(cellIndex);
           }
         }
       },
       onPanUpdate: (details) {
-        _handlePanUpdate(details, sequencer);
+        _handlePanUpdate(details);
       },
       onPanEnd: (details) {
         _gestureStartPosition = null;
@@ -871,26 +976,24 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         _gestureMode = GestureMode.undetermined;
         _stopAutoScroll();
         
-        if (sequencer.isInSelectionMode) {
-          sequencer.handlePanEnd();
-        }
+        // No-op for new selection logic: selection is finalized incrementally
       },
       child: ListView.builder(
         controller: _scrollController,
-        physics: (sequencer.isInSelectionMode || _gestureMode == GestureMode.selecting)
+        physics: (context.watch<EditState>().isInSelectionMode || _gestureMode == GestureMode.selecting)
             ? const NeverScrollableScrollPhysics()
             : const PositionRetainedScrollPhysics(), // Prevents jumping when rows are added/removed
-        itemCount: sequencer.gridRows + 1, // +1 for the control buttons at the bottom
+        itemCount: tableState.getSectionStepCount(widget.sectionIndexOverride ?? tableState.uiSelectedSection) + 1, // +1 for the control buttons at the bottom
         itemBuilder: (context, index) {
-          if (index < sequencer.gridRows) {
+          if (index < tableState.getSectionStepCount(widget.sectionIndexOverride ?? tableState.uiSelectedSection)) {
             // Build a row of grid cells
-            return _buildGridRow(context, sequencer, index, visibleGridSamples);
+            return _buildGridRow(context, tableState, index);
           } else {
             // Control buttons at the bottom
             return RepaintBoundary(
               child: Container(
                 margin: const EdgeInsets.only(left: 16, right: 16, bottom: 60, top: 4),
-                child: _buildGridRowControls(sequencer),
+                child: _buildGridRowControls(tableState),
               ),
             );
           }
@@ -944,7 +1047,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   bool _isDecreasePressed = false;
   bool _isIncreasePressed = false;
   
-  Widget _buildGridRowControls(SequencerState sequencer) {
+  Widget _buildGridRowControls(TableState tableState) {
     return Container(
       height: 30, // Reduced height from 40 to 30
       margin: const EdgeInsets.symmetric(horizontal: 16), // Full width like grid rows
@@ -953,8 +1056,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           // Remove rows button - left half
           Expanded(
             child: _buildControlButton(
-              isEnabled: sequencer.gridRows > 4,
-              onAction: () => _handleDecreaseRows(sequencer),
+              isEnabled: tableState.getSectionStepCount() > 4,
+              onAction: () => _handleDecreaseRows(tableState),
               icon: Icons.remove,
               borderRadius: const BorderRadius.only(
                 topLeft: Radius.circular(6),
@@ -968,8 +1071,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           // Add rows button - right half
           Expanded(
             child: _buildControlButton(
-              isEnabled: sequencer.gridRows < sequencer.maxGridRows,
-              onAction: () => _handleIncreaseRows(sequencer),
+              isEnabled: tableState.getSectionStepCount() < tableState.maxSteps,
+              onAction: () => _handleIncreaseRows(tableState),
               icon: Icons.add,
               borderRadius: const BorderRadius.only(
                 topRight: Radius.circular(6),
@@ -1088,33 +1191,33 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   
 
   
-  void _handleIncreaseRows(SequencerState sequencer) {
+  void _handleIncreaseRows(TableState tableState) {
     // Check limits - if at limit, stop continuous action
-    if (sequencer.gridRows >= sequencer.maxGridRows) {
+    if (tableState.getSectionStepCount() >= tableState.maxSteps) {
       _isLongPressing = false;
       _stopContinuousAction();
       return;
     }
-    sequencer.increaseGridRows();
+    tableState.uiAppendStep();
     
     // Check if we just reached the limit and stop
-    if (sequencer.gridRows >= sequencer.maxGridRows) {
+    if (tableState.getSectionStepCount() >= tableState.maxSteps) {
       _isLongPressing = false;
       _stopContinuousAction();
     }
   }
   
-  void _handleDecreaseRows(SequencerState sequencer) {
+  void _handleDecreaseRows(TableState tableState) {
     // Check limits - if at limit, stop continuous action
-    if (sequencer.gridRows <= 4) {
+    if (tableState.getSectionStepCount() <= 4) {
       _isLongPressing = false;
       _stopContinuousAction();
       return;
     }
-    sequencer.decreaseGridRows();
+    tableState.uiDeleteLastStep();
     
     // Check if we just reached the limit and stop
-    if (sequencer.gridRows <= 4) {
+    if (tableState.getSectionStepCount() <= 4) {
       _isLongPressing = false;
       _stopContinuousAction();
     }

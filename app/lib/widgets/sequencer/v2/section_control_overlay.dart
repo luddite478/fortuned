@@ -2,33 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/playback.dart';
 
 class SectionControlOverlay extends StatelessWidget {
   const SectionControlOverlay({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
+    return Consumer<PlaybackState>(
+      builder: (context, playbackState, child) {
         return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
-              _buildHeader(context, sequencerState),
+              _buildHeader(context),
               
               // Current section settings
-              _buildCurrentSectionSettings(context, sequencerState),
+              _buildCurrentSectionSettings(context, playbackState),
               
               // Footer with controls
-              _buildFooter(context, sequencerState),
+              _buildFooter(context),
             ],
         );
       },
     );
   }
 
-  Widget _buildHeader(BuildContext context, SequencerState sequencerState) {
+  Widget _buildHeader(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final headerHeight = screenSize.height * 0.08;
     
@@ -63,7 +63,7 @@ class SectionControlOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildCurrentSectionSettings(BuildContext context, SequencerState sequencerState) {
+  Widget _buildCurrentSectionSettings(BuildContext context, PlaybackState playbackState) {
     final screenSize = MediaQuery.of(context).size;
     
     return Container(
@@ -98,13 +98,13 @@ class SectionControlOverlay extends StatelessWidget {
                       context,
                       icon: Icons.chevron_left,
                       onTap: () {
-                        final currentIndex = sequencerState.currentSectionIndex;
-                        final currentCount = sequencerState.getSectionLoopCount(currentIndex);
-                        if (currentCount > 1) {
-                          sequencerState.setSectionLoopCount(currentIndex, currentCount - 1);
+                        final currentIndex = playbackState.currentSection;
+                        final currentCount = playbackState.currentSectionLoopsNum;
+                        if (currentCount > PlaybackState.minLoopsPerSection) {
+                          playbackState.setSectionLoopsNum(currentIndex, currentCount - 1);
                         }
                       },
-                      enabled: sequencerState.getSectionLoopCount(sequencerState.currentSectionIndex) > 1,
+                      enabled: playbackState.currentSectionLoopsNum > PlaybackState.minLoopsPerSection,
                     ),
                     
                     SizedBox(width: screenSize.width * 0.06),
@@ -123,7 +123,7 @@ class SectionControlOverlay extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          '${sequencerState.getSectionLoopCount(sequencerState.currentSectionIndex)}',
+                          '${playbackState.currentSectionLoopsNum}',
                           style: GoogleFonts.sourceSans3(
                             color: AppColors.sequencerAccent,
                             fontSize: 18,
@@ -140,13 +140,13 @@ class SectionControlOverlay extends StatelessWidget {
                       context,
                       icon: Icons.chevron_right,
                       onTap: () {
-                        final currentIndex = sequencerState.currentSectionIndex;
-                        final currentCount = sequencerState.getSectionLoopCount(currentIndex);
-                        if (currentCount < 16) {
-                          sequencerState.setSectionLoopCount(currentIndex, currentCount + 1);
+                        final currentIndex = playbackState.currentSection;
+                        final currentCount = playbackState.currentSectionLoopsNum;
+                        if (currentCount < PlaybackState.maxLoopsPerSection) {
+                          playbackState.setSectionLoopsNum(currentIndex, currentCount + 1);
                         }
                       },
-                      enabled: sequencerState.getSectionLoopCount(sequencerState.currentSectionIndex) < 16,
+                      enabled: playbackState.currentSectionLoopsNum < PlaybackState.maxLoopsPerSection,
                     ),
                   ],
                 ),
@@ -202,7 +202,7 @@ class SectionControlOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter(BuildContext context, SequencerState sequencerState) {
+  Widget _buildFooter(BuildContext context) {
     return const SizedBox.shrink();
   }
 } 

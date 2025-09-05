@@ -3387,6 +3387,7 @@ void set_bpm(int bpm) {
     }
 }
 
+__attribute__((visibility("default"))) __attribute__((used))
 void set_cell(int step, int column, int sample_slot) {
     if (step < 0 || step >= g_steps_len) {
         prnt_err("🔴 [SEQUENCER] Invalid step: %d (max: %d)", step, g_steps_len - 1);

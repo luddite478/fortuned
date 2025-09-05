@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/table.dart';
 
 class SectionCreationOverlay extends StatefulWidget {
   final VoidCallback? onBack;
@@ -16,8 +16,8 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
+    return Consumer<TableState>(
+      builder: (context, tableState, child) {
         return Container(
           decoration: BoxDecoration(
             color: AppColors.sequencerSurfaceBase,
@@ -43,11 +43,11 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
           child: Column(
             children: [
               // Header
-              _buildHeader(context, sequencerState),
+              _buildHeader(context),
               
               // Content
               Expanded(
-                child: _buildContent(context, sequencerState),
+                child: _buildContent(context, tableState),
               ),
             ],
           ),
@@ -56,7 +56,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, SequencerState sequencerState) {
+  Widget _buildHeader(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final headerHeight = screenSize.height * 0.08;
     
@@ -80,8 +80,6 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
               onTap: () {
                 if (widget.onBack != null) {
                   widget.onBack!();
-                } else {
-                  sequencerState.closeSectionCreationOverlay();
                 }
               },
               child: Container(
@@ -119,7 +117,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
     );
   }
 
-  Widget _buildContent(BuildContext context, SequencerState sequencerState) {
+  Widget _buildContent(BuildContext context, TableState tableState) {
     return Padding(
       padding: EdgeInsets.symmetric(
         horizontal: MediaQuery.of(context).size.width * 0.04,
@@ -133,7 +131,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
             context,
             text: 'Create Empty',
             onPressed: () {
-              sequencerState.createEmptySection();
+              tableState.appendSection();
             },
           ),
           
@@ -154,9 +152,9 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
           // Scrollable list of sections
           Expanded(
             child: ListView.builder(
-              itemCount: sequencerState.numSections,
+              itemCount: tableState.sectionsCount,
               itemBuilder: (context, index) {
-                return _buildSectionCopyButton(context, sequencerState, index);
+                return _buildSectionCopyButton(context, tableState, index);
               },
             ),
           ),
@@ -195,12 +193,12 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
     );
   }
 
-  Widget _buildSectionCopyButton(BuildContext context, SequencerState sequencerState, int sectionIndex) {
+  Widget _buildSectionCopyButton(BuildContext context, TableState tableState, int sectionIndex) {
     return Container(
       margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height * 0.01),
       child: GestureDetector(
         onTap: () {
-          sequencerState.createSectionCopyFrom(sectionIndex);
+          tableState.appendSection(copyFrom: sectionIndex);
         },
         child: Container(
           width: double.infinity,

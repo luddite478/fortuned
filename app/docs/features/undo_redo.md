@@ -1,115 +1,143 @@
-# Undo-Redo System
+## Undo/Redo (Snapshot-Based)
 
-**Professional-grade undo-redo functionality for all sequencer operations with smart debouncing for slider controls.**
+### Overview
 
-## Overview
+Undo/Redo uses simple, self-contained snapshots of native module state:
 
-The sequencer includes a comprehensive undo-redo system that tracks all user actions and allows them to experiment freely without fear of losing work. The system maintains up to 100 actions in history with intelligent batching for rapid changes.
+- 100-entry linear history managed by `UndoRedoManager` (oldest entries are dropped when full)
+- Each history entry is a composite sequencer snapshot (`SequencerSnapshot`) built via the shared snapshot module:
+  - `TableState`
+  - `PlaybackState`
+  - `SampleBankState`
+- Snapshots are recorded after each mutation (post-state), so each entry represents the user-visible state immediately after an action
+- Undo/Redo applies module `*_apply_state` functions to restore state
+- A small public, seqlock-protected struct exposes Undo/Redo availability to Flutter without calls
 
-## User Interface
 
-**Location:** Bottom edit bar alongside selection, copy, paste, and delete controls
+### Native data structures
 
-**Buttons:**
-- **Undo** (↶): Reverts the last action with descriptive tooltip
-- **Redo** (↷): Re-applies undone actions
+- `PublicUndoRedoState` (read-only, seqlock)
+  - `uint32_t version` (even=stable, odd=writer)
+  - `int count`, `int cursor`
+  - `int can_undo`, `int can_redo`
+  - Getter: `const PublicUndoRedoState* UndoRedoManager_get_state_ptr(void)`
 
-**Visual Feedback:**
-- Buttons are enabled/disabled based on availability
-- Tooltips show action descriptions (e.g., "Undo: Place Sample A at R1C2")
+- `SequencerSnapshot` (defined in `sequencer_snapshot.h`)
+  - `TableState table`
+  - `PlaybackState playback`
+  - `SampleBankState sample_bank`
 
-## Tracked Operations
+- `TableState`
+  - Inline `table[MAX_SEQUENCER_STEPS][MAX_SEQUENCER_COLS]`
+  - Inline arrays for `sections` and `layers`
 
-### Immediate Recording
-- **Grid Operations**: Place/remove samples in cells, multi-cell batch operations
-- **Sample Management**: Load/remove samples from slots  
-- **Grid Management**: Add/remove sound grid layers
-- **Batch Operations**: Copy/paste/delete multiple cells
+- `PlaybackState` (no pointers, no play/transport)
+  - `int bpm`
+  - `int region_start`, `region_end`
+  - `int song_mode`
+  - `int current_section`, `current_section_loop`
+  - `int sections_loops_num[MAX_SECTIONS]`
+  - Excludes `is_playing`/`current_step` to avoid unwanted transport side-effects during undo/redo
 
-### Debounced Recording (800ms delay)
-- **Volume Controls**: Sample and cell-level volume adjustments
-- **Pitch Controls**: Sample and cell-level pitch modifications
+- `SampleBankState` (no pointers)
+  - `int loaded[MAX_SAMPLE_SLOTS]`
+  - `float volume[MAX_SAMPLE_SLOTS]`, `pitch[MAX_SAMPLE_SLOTS]`
+  - `char file_path[MAX_SAMPLE_SLOTS][SAMPLE_MAX_PATH]`
+  - `char display_name[MAX_SAMPLE_SLOTS][SAMPLE_MAX_NAME]`
+  - `char sample_id[MAX_SAMPLE_SLOTS][SAMPLE_MAX_ID]`
 
-## Smart Debouncing
 
-**Problem:** Slider controls generate hundreds of micro-changes that would flood the undo history.
+### Native APIs
 
-**Solution:** Debounced recording captures initial state on first change and final state after 800ms of inactivity.
+- Manager
+  - `void UndoRedoManager_init(void)` / `void UndoRedoManager_clear(void)`
+  - `int UndoRedoManager_canUndo(void)` / `int UndoRedoManager_canRedo(void)`
+  - `int UndoRedoManager_undo(void)` / `int UndoRedoManager_redo(void)`
+  - `const PublicUndoRedoState* UndoRedoManager_get_state_ptr(void)`
+  - Recording (post-mutation): `void UndoRedoManager_record(void)`
 
-**Example:**
-- **Before:** Moving volume slider 0% → 100% creates 50+ undo actions
-- **After:** Same movement creates 1 clean action: `"Set Sample A Volume: 75%"`
+- Table
+  - `const TableState* table_state_get_ptr(void)`
+  - `void table_apply_state(const TableState*)`
 
-**Auto-Flush:** Pending debounced actions are automatically flushed before major operations (undo/redo, grid changes, sample operations).
+- Playback
+  - `const PlaybackState* playback_state_get_ptr(void)`
+  - `void playback_apply_state(const PlaybackState*)`
 
-## Technical Implementation
+- Sample bank
+  - `const SampleBankState* sample_bank_state_get_ptr(void)`
+  - `void sample_bank_apply_state(const SampleBankState*)`
 
-### Core Components
+- Snapshot module
+  - `void sequencer_capture_snapshot(SequencerSnapshot* out)`
+  - `void sequencer_apply_snapshot(const SequencerSnapshot* s)`
 
-```dart
-// Action types for different operations
-enum UndoRedoActionType {
-  gridCellChange, sampleLoad, sampleRemove, 
-  volumeChange, pitchChange, gridAdd, gridRemove,
-  multipleCellChange
-}
 
-// Manages 100-action rolling history
-class UndoRedoManager {
-  static const int maxHistorySize = 100;
-  // ... implementation
-}
-```
+### Recording strategy (modules)
 
-### State Management
+Record a snapshot after each user-visible mutation. One Undo reverts exactly one action.
 
-**Full State Capture:** Each action stores complete before/after snapshots including:
-- Sound grid samples data
-- Sample file paths and metadata  
-- Volume/pitch settings (sample and cell level)
-- Grid labels and ordering
-- BPM settings
+- Table: `table_set_cell`, `table_clear_cell`, `table_insert_step`, `table_delete_step`, `table_set_section_step_count`, `table_append_section`, `table_delete_section`, `table_update_many_(cells|sections|layers)`
+- Playback: `playback_set_bpm`, `playback_set_region`, `playback_set_mode`, `switch_to_section`, `playback_set_section_loops_num`
+- Sample bank: `sample_bank_load`, `sample_bank_load_with_id` (no extra record beyond load), `sample_bank_unload`, `sample_bank_set_sample_volume`, `sample_bank_set_sample_pitch`
 
-**Native Sync:** All undo/redo operations automatically synchronize with the native audio engine.
+On first init of each module, seed a baseline snapshot to allow Undo of the first change.
 
-### Performance Optimizations
 
-- **Minimal Overhead:** State capture only occurs during actual changes
-- **Memory Efficient:** Rolling 100-action history with automatic cleanup
-- **Thread Safe:** Proper isolation during undo/redo operations
+### Global consistency per entry
 
-## Usage Examples
+Even when only one module changed, the manager captures a full composite snapshot so Undo/Redo always restores a consistent system-wide state.
 
-### Basic Operations
-```
-User Action                 → Undo Description
-─────────────────────────── → ─────────────────────
-Place sample in cell       → "Place Sample A at R1C2"
-Delete 5 selected cells    → "Delete 5 cells"  
-Load drum sample           → "Load Sample B: drum_kick.wav"
-Add new sound grid         → "Add Sound Grid 3"
-Paste to multiple cells    → "Paste to 8 cells"
-```
 
-### Slider Operations
-```
-User Action                 → Undo Description
-─────────────────────────── → ─────────────────────
-Adjust volume slider       → "Set Sample A Volume: 85%"
-Modify pitch control       → "Set Cell R2C1 Pitch: 1.25x"
-```
+### Apply order
 
-## Integration Points
+When undoing/redoing, the manager applies in order:
+1) `table_apply_state`
+2) `playback_apply_state`
+3) `sample_bank_apply_state`
+This order preserves dependencies.
 
-- **SequencerState**: Core state management with undo tracking
-- **EditButtonsWidget**: UI controls for undo/redo operations
-- **Native Audio Engine**: Automatic synchronization during state restoration
-- **Settings Widgets**: Debounced recording for slider controls
 
-## Benefits
+### Flutter integration
 
-- **Creative Freedom**: Experiment without fear of losing work
-- **Clean History**: Smart debouncing prevents clutter from slider adjustments
-- **Descriptive Actions**: Clear, human-readable action descriptions
-- **Professional UX**: Industry-standard undo/redo behavior
-- **Performance**: Optimized for real-time audio applications 
+- FFI mapping for `PublicUndoRedoState` mirrors native layout.
+- A `UndoRedoState.syncFromNative()` method uses seqlock reads to update `canUndo`/`canRedo` ValueNotifiers.
+- The frame ticker (`TimerState`) calls `undoRedoState.syncFromNative()` each frame alongside other modules.
+- Buttons call native `undo`/`redo` directly; state refresh occurs on the next tick.
+- For JSON export of the entire sequencer, use the snapshot module (see `docs/features/snapshot.md`).
+
+
+### Usage examples
+
+- Add a sample to bank, then place it in the grid:
+  - Two snapshots are recorded (sample bank change, table cell change)
+  - A single Undo reverts both table and sample bank to the previous consistent state
+
+- Insert/delete steps:
+  - Snapshots recorded post-mutation, `table_apply_state` restores `sections` and `layers` and updates public state; UI observes active section `num_steps` change
+
+
+### Limits and behavior
+
+- History length: 100 entries (oldest dropped)
+- Undo after some undos discards redo tail upon new record
+- Public state uses seqlock; Flutter reads are lock-free and consistent
+- Playback state does not change transport (play/stop) during Undo/Redo
+
+
+### Implementation notes
+
+- Unified recording API: `UndoRedoManager_record()` calls the snapshot module to build a composite snapshot and appends it.
+- Apply guard: recording is suppressed while applying snapshots to prevent polluting history.
+- Deduplication: identical consecutive entries are skipped.
+- Table snapshot optimization: only the active rows (sum of section lengths) are copied; trailing rows are reset to defaults on apply.
+
+
+### Debug tips
+
+- Verify module init seeds a baseline snapshot
+- Ensure recording is post-mutation (state reflects what user sees)
+- Confirm `*_apply_state` updates module public state inside seqlock begin/end
+- If UI doesn’t refresh, check the Flutter side’s change detection for that specific property (e.g., active section `num_steps`)
+
+

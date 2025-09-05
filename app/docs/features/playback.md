@@ -1,422 +1,182 @@
-# 🎵 Audio Playback Implementation
+## Playback Engine: Implementation and Core Ideas
 
-**A/B column node architecture with smooth transitions and efficient resource usage**
+This document summarizes the current playback engine implementation, the realtime data flow between native and Flutter, and the core ideas behind the design. It complements the shared pattern in `app/docs/native_state_sync_pattern.md`.
 
-## Core Architecture
+### Goals
 
-The audio system uses **2 nodes per column (A/B switching)** for efficient resource management and smooth transitions. Instead of creating nodes for each grid cell, we maintain exactly 2 nodes per column and switch between them as needed.
+- **Low-latency, glitch-free playback** using a lock-free audio callback
+- **Smooth transitions** when rapidly triggering samples in a sequencer
+- **Deterministic timing** with sample-accurate step advances
+- **Efficient UI syncing** via a zero-copy read-only single state exposed to Flutter
 
-### Function Naming
-Updated to consistent naming scheme:
-- `start_sequencer(bpm, steps, startStep)` - now accepts starting absolute step
-- `stop_sequencer()` / `is_sequencer_playing()` - sequencer control
-- `set_song_mode(isSongMode)` - NEW: sets playback mode (loop vs song)
-- `set_playback_region_bounds(start, end)` - NEW: sets native playback window [start, end)
-- `set_steps_len(steps)` / `get_steps_len()` - NEW: controls current logical steps length
-- `clear_grid_completely()` - clears samples and resets volume/pitch settings  
-- `stop_all_slots()` - stops sample bank playback
-- `syncFlutterSequencerGridToNativeSequencerGrid()` - explicit Flutter→Native sync
+## Architecture Overview
 
-### Song Mode vs Loop Mode
+### Audio Backend (miniaudio)
 
-#### Loop Mode (Default)
-- **Behavior**: Playback wraps within the native playback region
-- **Native Logic**: `g_current_step` wraps from `region.end` back to `region.start`
-- **Who sets region**: Flutter sets native region to the current UI section window `[sectionStart, sectionStart + gridRows)`
-- **Use Case**: Practice, live performance, jamming on specific sections
-- **Control**: `set_song_mode(0)` or `setSongMode(false)`
+- Uses miniaudio’s CoreAudio backend on iOS and appropriate backends on other platforms
+- A single global `ma_node_graph` feeds the audio device
+- The device’s `audio_callback` drives sequencing and audio graph reads
 
-#### Song Mode  
-- **Behavior**: Continuous playback across the whole table, stops at end of region
-- **Native Logic**: `g_current_step` advances until reaching `playback_region.end`, then stops
-- **Who sets region**: Flutter sets native region to cover the full table `[0, stepsLen)`
-- **Use Case**: Full song playback, recording complete arrangements
-- **Control**: `set_song_mode(1)` or `setSongMode(true)`
-- **End Behavior**: Playback stops naturally, allowing final sounds to decay
+Key globals in `app/native/playback.mm`:
+- `g_device`: miniaudio device
+- `g_nodeGraph`: miniaudio node graph root
+- `g_initialized`: init guard
 
-```c
-// Native playback mode handling (playback region driven)
-int regionStart = g_playback_region.start;
-int regionEnd   = g_playback_region.end;   // end is exclusive
-if (g_current_step >= regionEnd) {
-    if (g_song_mode) {
-        g_sequencer_playing = 0;            // Song mode: stop at end
-        return;
-    } else {
-        g_current_step = regionStart;       // Loop mode: wrap to region start
-    }
-}
+### Column Nodes (A/B Switching)
+
+- Each sequencer column has two nodes: A and B, represented by `MAColumnNodes`
+- The engine alternates between A and B when retriggering a sample on the same column to avoid cut-offs and clicks
+- Each node owns its own decoder and `ma_data_source_node`, attached to the graph endpoint
+
+When setting up a node for a step:
+- If the node is already initialized with the same sample, the decoder is rewound to frame 0, the node is started, and exponential volume smoothing is re-primed for a clean fade-in
+- Otherwise, the previous node is torn down and a new decoder/node pair is created and attached to the endpoint
+
+### Volume Smoothing (Exponential)
+
+- Separate rise/fall coefficients provide fast attacks and controlled releases
+- Smoothing is applied every callback via `update_volume_smoothing()` and pushed to the miniaudio node’s output bus
+- Nodes are auto-stopped when both target and current volume stay under a small threshold
+
+Time constants (see `app/native/playback.h`):
+- `VOLUME_RISE_TIME_MS = 6ms`
+- `VOLUME_FALL_TIME_MS = 12ms`
+- `VOLUME_THRESHOLD = 0.0001f`
+
+### Sequencer Timing
+
+- Timing is based on frames-per-step computed from BPM: `framesPerStep = (sampleRate * 60) / (bpm * 4)` for 1/16 notes
+- `run_sequencer(frameCount)` increments an internal frame counter and advances steps when the threshold is reached
+- On step advance:
+  - Current step is updated with region wrapping
+  - `play_samples_for_step(step)` triggers column nodes
+  - The single state’s `current_step` and `is_playing` are updated using the seqlock writer pattern
+
+### Playback Region and Mode
+
+- Two modes:
+  - **Loop**: loop a selected section's range
+  - **Song**: span all sections end-to-end, with per-section loop counts
+- `playback_set_region(start, end)` sets inclusive start and exclusive end
+- `playback_set_mode(song_mode)` switches between song/loop and recomputes the active region using `table` queries
+
+### Section Loops (Song Mode)
+
+In song mode, each section can be configured to loop a specific number of times before advancing to the next section:
+
+- After completing all loops of the final section, playback stops
+- Current section and loop progress are tracked and exposed to Flutter
+
+Functions:
+- `playback_set_section_loops_num(int section, int loops)`: Set loop count for a section
+
+The sequencer tracks:
+- `g_current_section`: Which section is currently playing
+- `g_current_section_loop`: Current loop within the section (0-based)
+- `sections_loops_num_storage[MAX_SECTIONS]`: Per-section loop counts
+
+## Single State (Native → Flutter)
+
+The engine exposes one read-only state struct via FFI that Flutter reads using the seqlock reader pattern. The FFI-visible prefix (version + scalars + pointer views) is updated in small, bounded critical sections on the audio thread.
+
+State struct (see `app/native/playback.h`):
+
 ```
-
-### Continuous Playback Architecture
-
-**KEY CHANGE**: Playback is now **truly continuous** across absolute steps and driven by a native playback region — not by native sections.
-
-- **Absolute Step System**: Native operates on absolute steps (0, 1, 2...)
-- **Regions, not sections**: Flutter controls loop boundaries by setting the native playback region. Native `set_current_section()` is UI-only metadata and does not affect playback.
-- **Boundary Elimination**: No audio artifacts when moving between sections
-- **Flutter Control**: Flutter decides the region for loop vs song and updates it when grid size or visible section changes
-
-### A/B Column Node Structure
-```c
-// Single column node (A or B)
 typedef struct {
-    int node_initialized;          // 1 when miniaudio node is created
-    int sample_slot;               // Which sample this node plays (-1 = none)
-    ma_decoder decoder;            // Independent audio decoder
-    ma_pitch_data_source pitch_ds; // Pitch shifting layer
-    ma_data_source_node node;      // Individual node in graph
-    float volume, pitch;           // Current settings
-    
-    // Volume smoothing (see docs/smoothing.md)
-    float current_volume;          // Current smoothed volume
-    float target_volume;           // Target volume we're smoothing towards
-    float volume_rise_coeff;       // Smoothing coefficient for fade-in
-    float volume_fall_coeff;       // Smoothing coefficient for fade-out
-    int is_volume_smoothing;       // Whether smoothing is active
-    
-    uint64_t id;                   // Unique identifier
-} column_node_t;
+    uint32_t version;               // even=stable, odd=writer in progress
+    int is_playing;                 // 0/1
+    int current_step;               // current sequencer step
+    int bpm;                        // current BPM
+    int region_start;               // inclusive start of playback region
+    int region_end;                 // exclusive end of playback region
+    int song_mode;                  // 0=loop, 1=song
+    int* sections_loops_num;        // &sections_loops_num_storage[0]
+    int current_section;            // current section being played
+    int current_section_loop;       // current loop within section (0-based)
 
-// Column nodes container (A/B pair per column)
-typedef struct {
-    column_node_t nodes[2];        // A and B nodes for this column
-    int active_node;               // 0 = A active, 1 = B active, -1 = none
-    int next_node;                 // Which node (0 or 1) to use for next sample
-    int column;                    // Column index
-} column_nodes_t;
+    int sections_loops_num_storage[MAX_SECTIONS];
+} PlaybackState;
 ```
 
-### Audio Flow Architecture
+Writer usage (simplified; see `playback.mm`):
+
 ```
-Sample File → Decoder → Pitch Data Source → Data Source Node → Node Graph → Output
-                                              ↑
-                                      Volume Smoothing
-                                    (see docs/smoothing.md)
-```
-
-## Volume and Pitch Control Hierarchy
-
-### Sample Bank Controls (Global)
-```c
-// Sample bank volume/pitch affect all instances of that sample
-g_slots[bank].volume = 1.0f;  // Default: 100% volume
-g_slots[bank].pitch = 1.0f;   // Default: original pitch
-```
-
-### Cell-Level Overrides
-```c
-// Cell-specific volume/pitch override sample bank settings when set
-g_sequencer_grid_volumes[step][column] = DEFAULT_CELL_VOLUME; // -1.0 = use sample bank
-g_sequencer_grid_pitches[step][column] = DEFAULT_CELL_PITCH;  // -1.0 = use sample bank
-```
-
-### Default Value System
-```c
-// Special default values indicating "no override" (use sample bank setting)
-#define DEFAULT_CELL_VOLUME -1.0f   // Use sample bank volume
-#define DEFAULT_CELL_PITCH -1.0f    // Use sample bank pitch
-
-// Resolution logic (cell overrides take precedence when not default)
-static float resolve_cell_volume(int step, int column, int sample_slot) {
-    audio_slot_t* sample = &g_slots[sample_slot];
-    float bank_volume = sample->volume;
-    float cell_volume = g_sequencer_grid_volumes[step][column];
-    return (cell_volume != DEFAULT_CELL_VOLUME) ? cell_volume : bank_volume;
-}
-
-static float resolve_cell_pitch(int step, int column, int sample_slot) {
-    audio_slot_t* sample = &g_slots[sample_slot];
-    float bank_pitch = sample->pitch;
-    float cell_pitch = g_sequencer_grid_pitches[step][column];
-    return (cell_pitch != DEFAULT_CELL_PITCH) ? cell_pitch : bank_pitch;
+static inline void state_write_begin() { g_playback_state.version++; }
+static inline void state_write_end()   { g_playback_state.version++; }
+static inline void state_update_prefix() {
+  g_playback_state.is_playing = g_sequencer_playing;
+  g_playback_state.current_step = g_current_step;
+  g_playback_state.sections_loops_num = &g_playback_state.sections_loops_num_storage[0];
 }
 ```
 
-### Reset Functions
-```c
-// Reset cell controls to use sample bank defaults
-int reset_cell_volume(int step, int column);
-int reset_cell_pitch(int step, int column);
-```
+The writer wraps updates with `state_write_begin()` and `state_write_end()` on:
+- Initialization, start/stop, BPM/region/mode changes
+- Each step advance inside the callback (for `current_step`)
 
-## Playback Flow
+The reader (Flutter) mirrors the prefix fields exactly, reads twice with version checks, and only accepts on an even, equal version.
 
-### 1. Startup with Playback Region
-`start_sequencer()` accepts a starting absolute step; Flutter must set the playback region and logical length first.
+## Native API Surface (exported)
 
-**Flutter Integration**:
-```dart
-final bool isSong = sectionPlaybackMode == SectionPlaybackMode.song;
-final int stepsLen = isSong ? (numSections * gridRows) : gridRows;
-sequencerLibrary.setStepsLen(stepsLen);
-if (isSong) {
-  sequencerLibrary.setPlaybackRegionBounds(0, stepsLen);
-} else {
-  final sectionStart = currentSectionIndex * gridRows;
-  sequencerLibrary.setPlaybackRegionBounds(sectionStart, sectionStart + gridRows);
-}
-final startAbsoluteStep = currentSectionIndex * gridRows;
-sequencerLibrary.startSequencer(bpm, stepsLen, startAbsoluteStep: startAbsoluteStep);
-```
+Core functions (see `app/native/playback.h`):
+- `int playback_init(void);`
+- `void playback_cleanup(void);`
+- `int playback_start(int bpm, int start_step);`
+- `void playback_stop(void);`
+- `int playback_is_playing(void);` (if exposed)
+- `void playback_set_bpm(int bpm);`
+- `void playback_set_region(int start, int end);`
+- `void playback_set_mode(int song_mode);`
+- `void playback_set_section_loops_num(int section, int loops);`
+- `const PlaybackState* playback_get_state_ptr(void);`
 
-### 2. Section Metadata Management (Flutter-only)
-Native sections are deprecated for playback. Use playback region instead. Section APIs remain as metadata for UI/serialization only:
+Supporting sample-bank calls are forward-declared in `playback.h` and implemented in `app/native/sample_bank.mm`.
 
-```c
-void set_current_section(int section) {
-    // UI metadata only; playback is driven by g_playback_region
-    g_current_section = section;
-    g_section_start_step = g_current_section * g_steps_per_section; // UI-only
-    
-    // NO PLAYBACK INTERRUPTION - continuous audio flow maintained
-    prnt("ℹ️ [SECTION] Meta set current section to %d. Playback unaffected.", section);
-}
-```
+## Flutter Integration
 
-### 3. UI Section Tracking (Flutter)
-UI computes current section from absolute step; in loop mode, Flutter also updates the native region whenever the visible section or gridRows changes:
+On the Flutter side:
+- `app/lib/ffi/playback_bindings.dart` mirrors `PlaybackState` prefix in `NativePlaybackState`
+- `app/lib/state/sequencer/playback.dart` implements `syncPlaybackState()` using the seqlock reader pattern and updates `ValueNotifier`s in a single pass, then calls `notifyListeners()` once
+- A periodic timer (e.g., ~16ms) can drive `syncPlaybackState()` to keep UI responsive without overloading the main thread
 
-```dart
-// OLD: Complex wrap-around detection with timing issues
-if (_lastAbsoluteStepForSongMode != -1 && absoluteStep < _lastAbsoluteStepForSongMode) {
-    // Section change detected...
-}
+## Design Principles
 
-// NEW: Direct computation from absolute step
-final currentSectionFromAbsoluteStep = absoluteStep ~/ _gridRows;
-if (currentSectionFromAbsoluteStep != _currentSectionIndex) {
-    _currentSectionIndex = currentSectionFromAbsoluteStep;
-    notifyListeners(); // Update UI to show new section
-}
-```
+- **Lock-free audio path**: No mutexes in the callback; seqlock snapshot ensures safe cross-thread reads
+- **Zero-copy UI sync**: Flutter reads a stable pointer to a native struct; no allocations per frame
+- **Seqlock pattern**: All state exposed via snapshot, no individual getters - native is source of truth
+- **A/B node switching**: Avoids abrupt cutoffs and enables rapid retriggers without artifacts
+- **Exponential smoothing**: Clean volume ramps with distinct attack/release behavior
+- **Deterministic timing**: Step timing derived from sample rate and BPM for stable sequencing
 
-**Benefits**:
-- Eliminates timing-dependent section detection
-- UI always matches actual playback position  
-- No more brief section display lag
-- Simpler, more reliable logic
+## Resource Management & Lifecycle
 
-### 4. Stop Behavior
-**UPDATED**: `stop_sequencer()` preserves position for natural sound decay:
-```c
-void stop_sequencer(void) {
-    g_sequencer_playing = 0;
-    // Do not wrap or reseek; keep current_step so last step can decay
-    // Allows natural fade-out of final triggered sounds
-}
-```
+- All miniaudio objects (device, node graph, nodes, decoders) are created outside performance-critical paths when possible
+- `playback_cleanup()` tears down nodes/decoders, stops the device, uninitializes the graph, and updates the public snapshot to reflect stopped state
+- Per-column nodes are uninitialized safely when replaced or when playback stops
 
-### 5. A/B Column System
-```c
-static column_nodes_t g_column_nodes[MAX_TOTAL_COLUMNS];  // A/B pairs for each column
-static column_node_t* currently_playing_nodes_per_col[MAX_TOTAL_COLUMNS];  // Track active node
-```
-**Purpose**: Provide exactly 2 reusable nodes per column for efficient resource management.
+## Extending the System
 
-**A/B Switching Behavior**:
-- **New sample in column**: Fade out current node, setup & fade in alternate node (A→B or B→A)
-- **Same sample triggered**: Restart current node from beginning with smooth transition  
-- **Empty cell**: Keep previous node playing (intended sequencer behavior)
-- **Resource limit**: Always exactly 32 nodes total (16 columns × 2)
+To add a new public playback field:
+1. Extend `PublicPlaybackState` in `playback.h`
+2. Update `public_state_update()` in `playback.mm`
+3. Update the Dart FFI struct in `app/lib/ffi/playback_bindings.dart`
+4. Add read/compare logic in `app/lib/state/sequencer/playback.dart` and propagate changes via notifiers
 
-### 6. Pitch Change Handling During Restart
+Example: Section loops feature adds per-section loop counts in song mode, tracking current section and loop progress. The entire sections loops array is exposed via pointer for flexible access, with UI controls adjusting values through setters while state syncs through the seqlock pattern.
 
-**Issue Fixed**: With SoundTouch preprocessing, when the same sample plays from different steps with different pitches, the node must be completely rebuilt rather than just updating the pitch data source.
+Other extension ideas:
+- Per-column DSP (filters, panning) via additional nodes
+- Per-step swing/humanization in `run_sequencer()`
+- Parameter automation lanes that modulate smoothing targets
 
-```c
-// In play_samples_for_step() restart logic:
-if (g_current_pitch_method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && 
-    target_node->pitch != resolved_pitch) {
-    
-    // Rebuild the entire node with new pitch for preprocessing
-    setup_column_node(column, target_node_idx, sample_to_play, resolved_volume, resolved_pitch);
-} else {
-    // For real-time methods, just update the pitch data source
-    update_column_node_pitch(target_node, resolved_pitch);
-}
-```
+## Platform Notes
 
-**Result**: Individual cell pitch overrides work correctly with preprocessing method.
+- iOS build defines specific miniaudio flags and avoids AVFoundation-side defaults that can force speaker routing; see `playback.mm` preprocessor section for details
+- Miniaudio implementation is compiled in `app/native/miniaudio_impl.mm`; headers are included where needed
 
-### 7. Grid Sync Strategy
-```dart
-// Explicit sync when actually needed
-syncFlutterSequencerGridToNativeSequencerGrid();
+## References
 
-// Call only when:
-// - App startup after loading saved state  
-// - Loading different saved state
-// - Switching sound grids
-// - Major grid changes (resize, etc.)
+- Pattern details: `app/docs/native_state_sync_pattern.md`
+- Playback engine: `app/native/playback.h`, `app/native/playback.mm`
+- Flutter bindings/state: `app/lib/ffi/playback_bindings.dart`, `app/lib/state/sequencer/playback.dart`
 
-// NOT needed for:
-// - Simple stop/start (nodes preserved via ma_node_set_state)
-// - Individual cell changes (handled by _syncSingleCellToNative)
-```
-
-**Result**: ~90% fewer sync operations, much faster restart times.
-
-## Click Elimination
-
-**Volume smoothing prevents audio clicks during transitions.**
-See `docs/smoothing.md` for detailed implementation.
-
-**Key points**:
-- **Exponential smoothing**: Natural fade curves (6ms rise, 12ms fall)
-- **Per-callback updates**: `update_volume_smoothing()` called every ~11ms
-- **Separate rise/fall**: Different timing for fade-in vs fade-out
-- **Click-free**: Eliminates discontinuities in audio waveform
-
-## Node Graph Integration
-
-**Following miniaudio node graph pattern:**
-```c
-// Initialize node graph
-ma_node_graph_init(&nodeGraphConfig, NULL, &g_nodeGraph);
-
-// Each cell node connects to endpoint
-ma_node_attach_output_bus(&cell->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
-
-// Audio callback reads from graph
-ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
-```
-
-**Benefits**:
-- **Automatic mixing**: Node graph handles all audio mixing
-- **Polyphonic playback**: Multiple cells can play same sample simultaneously
-- **Independent processing**: Each cell has its own audio pipeline
-
-## Performance Characteristics
-
-### Resource Management
-- **32 total nodes**: Always exactly 16 columns × 2 A/B nodes = 32 nodes
-- **Fixed allocation**: Node structures pre-allocated, miniaudio nodes created on-demand
-- **Memory efficiency**: ~75% fewer nodes than old per-cell system
-- **No cleanup needed**: Nodes are persistent and reused for different samples
-
-### Real-time Performance
-- **Volume-only control**: Sequencer just changes volume, no node creation/destruction
-- **Smooth transitions**: Exponential volume smoothing prevents clicks
-- **Frame-accurate timing**: Sample triggers aligned to audio frames
-- **Low latency**: Minimal processing overhead per node
-- **Real-time updates**: Settings changes applied immediately to existing nodes
-
-## Other Playback Systems
-
-### Sample Bank Playback
-- **Purpose**: Manual sample triggering outside sequencer
-- **Implementation**: Dedicated audio pipeline per slot
-- **Independence**: Separate from sequencer grid playback
-
-### Preview Systems
-- **Sample Preview**: For file browser (`g_sample_preview`)
-- **Cell Preview**: For grid cells (`g_cell_preview`) - **Now with immediate feedback!**
-- **Implementation**: Dedicated preview nodes independent of other playback
-- **Auto-stop**: Preview automatically stops after 1.5 seconds
-- **Integration**: Triggered when changing cell pitch/volume for immediate feedback
-
-**New Features**: 
-1. **Cell Settings Preview**: When you adjust a cell's pitch or volume, the system immediately previews the cell with the new settings
-2. **Sample Bank Settings Preview**: When you adjust a sample's default pitch or volume (sample bank level), the system immediately previews that sample with the new settings - **even if no cells use that sample on the grid**
-3. **Tap Preview**: When the sequencer is NOT playing, tapping any cell with a sample will preview it with current pitch/volume settings
-4. **Auto-stop**: All previews automatically stop after 1.5 seconds to avoid audio clutter
-5. **Smart Preview Management**: New previews automatically cancel previous ones to avoid overlapping sounds
-6. **Debounced Native Calls**: Rapid UI changes (fast slider movements) are debounced with 50ms delay to prevent performance issues from excessive native calls
-
-**Performance Optimizations**:
-- **UI Responsiveness**: UI updates immediately via ValueNotifiers for instant visual feedback
-- **Native Call Throttling**: Heavy native operations are debounced to prevent lag during rapid adjustments
-- **Async Preprocessing**: SoundTouch processing runs in background threads to avoid UI blocking
-
-This gives instant audio feedback with optimal performance regardless of sequencer state, grid content, or interaction speed.
-
-## Technical Implementation
-
-### Main Audio Callback
-```c
-static void audio_callback(...) {
-    // 1. Run sequencer (timing + sample triggering)
-    run_sequencer(frameCount);  // Internal function - same name
-    
-    // 2. Update volume smoothing to prevent clicks
-    update_volume_smoothing();
-    
-    // 3. Monitor cell nodes (cleanup finished)
-    monitor_cell_nodes();
-    
-    // 4. Mix all playing samples into output buffer
-    ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
-}
-```
-
-### A/B Switching Logic
-```c
-// In play_samples_for_step():
-column_nodes_t* col_nodes = &g_column_nodes[column];
-if (different_sample || no_active_sample) {
-    // A/B switch: fade out current, setup & fade in alternate
-    target_node_idx = col_nodes->next_node;  // Get A or B
-    setup_column_node(column, target_node_idx, sample, volume, pitch);
-    
-    if (col_nodes->active_node >= 0) {
-        set_target_volume(&col_nodes->nodes[col_nodes->active_node], 0.0f);  // Fade out
-    }
-    set_target_volume(&col_nodes->nodes[target_node_idx], volume);  // Fade in
-    
-    col_nodes->active_node = target_node_idx;
-    col_nodes->next_node = (target_node_idx + 1) % 2;  // Alternate for next time
-} else {
-    // Same sample - restart current node
-    ma_decoder_seek_to_pcm_frame(&current_node->decoder, 0);
-    set_target_volume(current_node, volume);
-}
-```
-
-This architecture provides smooth, click-free playback with efficient resource management, professional audio quality, and real-time control updates for both volume and pitch.
-
-## Song Mode Implementation Details
-
-### Native State Variables
-```c
-static int g_song_mode = 0;              // 0 = loop mode, 1 = song mode
-static int g_current_section = 0;        // UI metadata (doesn't affect playback)
-static int g_total_sections = 1;         // Total sections for song length calculation
-static int g_steps_per_section = 16;     // Steps per section
-```
-
-### Flutter Integration
-```dart
-// Set playback mode before starting
-sequencerLibrary.setSongMode(sectionPlaybackMode == SectionPlaybackMode.song);
-
-// Start with calculated absolute step
-final startAbsoluteStep = (currentSectionIndex * gridRows) + 0;
-sequencerLibrary.startSequencer(bpm, gridRows, startAbsoluteStep: startAbsoluteStep);
-```
-
-### Song Mode End Detection
-**Native**: Stops automatically when reaching end of final section
-**Flutter**: Also monitors for end condition and calls `stopSequencer()` if needed:
-```dart
-// Check if we've reached the last step of the last section
-final songEndStep = _numSections * _gridRows;
-if (absoluteStep >= songEndStep - 1) {
-    stopSequencer();  // Ensure clean stop
-    return;
-}
-```
-
-## Performance Improvements
-
-### Eliminated Operations
-1. **Section Switching Overhead**: No more playback interruption during section changes
-2. **Timing-Dependent Logic**: Removed complex wrap-around detection
-3. **Flutter-Driven Section Control**: Native handles song progression autonomously
-
-### Enhanced Responsiveness  
-1. **Immediate UI Updates**: Section display matches playback instantly
-2. **Continuous Audio**: No gaps or clicks at section boundaries
-3. **Natural Ending**: Song mode stops smoothly without artifacts
-
-This architecture provides professional-quality continuous playback while maintaining precise UI synchronization and efficient resource management.

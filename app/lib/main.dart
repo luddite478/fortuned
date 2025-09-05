@@ -9,7 +9,7 @@ import 'services/auth_service.dart';
 import 'services/threads_service.dart';
 import 'services/users_service.dart';
 import 'services/http_client.dart';
-import 'state/sequencer_state.dart';
+
 import 'state/threads_state.dart';
 import 'services/ws_client.dart';
 // import 'state/patterns_state.dart';
@@ -39,7 +39,6 @@ class NiyyaApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthService()),
-        ChangeNotifierProvider(create: (context) => SequencerState()),
         ChangeNotifierProvider(create: (context) => ThreadsState()),
         Provider(create: (context) => WebSocketClient()),
         Provider(
@@ -86,16 +85,14 @@ class _MainPageState extends State<MainPage> {
   void _syncCurrentUser() {
     final authService = Provider.of<AuthService>(context, listen: false);
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
-    final sequencerState = Provider.of<SequencerState>(context, listen: false);
     final threadsService = Provider.of<ThreadsService>(context, listen: false);
     
     print('🔍 Attempting to sync current user...');
     print('🔍 AuthService currentUser: ${authService.currentUser?.id} (${authService.currentUser?.name})');
     print('🔍 ThreadsState currentUserId: ${threadsState.currentUserId}');
     
-    // Set the ThreadsState reference in SequencerState
-    sequencerState.setThreadsState(threadsState);
-    print('🔗 Set ThreadsState reference in SequencerState');
+    // Note: Removed SequencerState integration since we're using new sequencer implementation
+    print('🔗 Using new sequencer implementation - no SequencerState integration needed');
     
     if (authService.currentUser != null) {
       threadsState.setCurrentUser(

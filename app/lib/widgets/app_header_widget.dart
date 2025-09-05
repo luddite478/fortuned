@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../state/sequencer_state.dart';
+import '../state/sequencer/playback.dart';
+import '../state/sequencer/recording.dart';
 import '../state/threads_state.dart';
-import '../screens/checkpoints_screen.dart';
 import '../screens/sequencer_settings_screen.dart';
-import '../screens/test_screen.dart';
 import '../utils/app_colors.dart';
 
 enum HeaderMode {
@@ -191,184 +190,149 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       // Percentage-based spacing
       SizedBox(width: spacingWidth),
       
-      // Checkpoints menu button (conditionally shown)
-      Consumer2<SequencerState, ThreadsState>(
-        builder: (context, sequencer, threadsState, child) {
-          // Hide in V2 layout
-          if (sequencer.selectedLayout == SequencerLayoutVersion.v2) {
-            return const SizedBox.shrink();
-          }
+      // V2: hide legacy checkpoints control
+      const SizedBox.shrink(),
+      
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // V2: hide legacy save/send control
+      const SizedBox.shrink(),
+      
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // Share button (legacy hidden)
+      // const SizedBox.shrink(),
+      
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // V2: hide legacy master settings control
+      const SizedBox.shrink(),
+      
+      // Percentage-based spacing
+      SizedBox(width: spacingWidth),
+      
+      // Recording controls - core functionality (V2 only)
+      Builder(
+        builder: (context) {
+          final playbackState = context.watch<PlaybackState?>();
+          final recordingState = context.watch<RecordingState?>();
+          final useNewPlayback = playbackState != null;
           
-          return IconButton(
-            icon: Icon(
-              Icons.format_list_bulleted,
-              color: AppColors.sequencerAccent,
-            ),
-            onPressed: () => _navigateToCheckpoints(context, sequencer, threadsState),
-            iconSize: 14,
-            padding: const EdgeInsets.all(2),
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          );
-        },
-      ),
-      
-      // Percentage-based spacing (conditionally shown)
-      Consumer<SequencerState>(
-        builder: (context, sequencer, child) {
-          // Hide spacing in V2 layout
-          if (sequencer.selectedLayout == SequencerLayoutVersion.v2) {
-            return const SizedBox.shrink();
-          }
-          return SizedBox(width: spacingWidth);
-        },
-      ),
-      
-      // Save/Send button (conditionally shown)
-      Consumer2<SequencerState, ThreadsState>(
-        builder: (context, sequencer, threadsState, child) {
-          // Hide in V2 layout
-          if (sequencer.selectedLayout == SequencerLayoutVersion.v2) {
-            return const SizedBox.shrink();
-          }
-          
-          return IconButton(
-            icon: Icon(
-              Icons.save,
-              color: AppColors.sequencerAccent,
-            ),
-            onPressed: () => _sendCheckpoint(context, sequencer, threadsState),
-            iconSize: 14,
-            padding: const EdgeInsets.all(2),
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          );
-        },
-      ),
-      
-      // Percentage-based spacing
-      SizedBox(width: spacingWidth),
-      
-      // Share button
-      // Consumer<SequencerState>(
-      //   builder: (context, sequencer, child) {
-      //     return IconButton(
-      //       icon: Icon(
-      //         Icons.share,
-      //         color: AppColors.sequencerAccent,
-      //       ),
-      //       onPressed: () => sequencer.setShowShareWidget(!sequencer.isShowingShareWidget),
-      //       iconSize: 14,
-      //       padding: const EdgeInsets.all(2),
-      //       constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-      //     );
-      //   },
-      // ),
-      
-      // Percentage-based spacing
-      SizedBox(width: spacingWidth),
-      
-      // Mix (Master Settings) button
-      Consumer<SequencerState>(
-        builder: (context, sequencer, child) {
-          return IconButton(
-            icon: Icon(
-              Icons.tune,
-              color: AppColors.sequencerAccent,
-            ),
-            onPressed: () => sequencer.setShowMasterSettings(!sequencer.showMasterSettings),
-            iconSize: 14,
-            padding: const EdgeInsets.all(2),
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          );
-        },
-      ),
-      
-      // Percentage-based spacing
-      SizedBox(width: spacingWidth),
-      
-      // Recording controls - core functionality
-      Consumer<SequencerState>(
-        builder: (context, sequencer, child) {
           return Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Recording button and timer display
-              if (sequencer.isRecording) ...[
-                // Recording timer display
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.sequencerAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.sequencerAccent.withOpacity(0.5),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Pulsing red recording indicator
-                      _RecordingIndicatorDot(),
-                      SizedBox(width: spacingWidth * 0.2),
-                      Text(
-                        sequencer.formattedRecordingDuration,
-                        style: TextStyle(
+              if (useNewPlayback && recordingState != null) ...[
+                ...(){
+                  final rs = recordingState;
+                  return [
+                ValueListenableBuilder<bool>(
+                  valueListenable: rs.isRecordingNotifier,
+                  builder: (context, isRecording, child) {
+                    if (isRecording) {
+                      return Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.sequencerAccent.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: AppColors.sequencerAccent.withOpacity(0.5),
+                                width: 1,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _RecordingIndicatorDot(),
+                                SizedBox(width: spacingWidth * 0.2),
+                                ValueListenableBuilder<Duration>(
+                                  valueListenable: rs.recordingDurationNotifier,
+                                  builder: (context, duration, child) {
+                                    final minutes = duration.inMinutes;
+                                    final seconds = duration.inSeconds % 60;
+                                    final text = '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+                                    return Text(
+                                      text,
+                                      style: TextStyle(
+                                        color: AppColors.sequencerAccent,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        fontFamily: 'monospace',
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                            ),
+                          ),
+                          SizedBox(width: spacingWidth * 0.3),
+                          IconButton(
+                            icon: Icon(
+                              Icons.stop,
+                              color: Colors.red,
+                            ),
+                            onPressed: () => rs.stopRecording(),
+                            iconSize: 16,
+                            padding: const EdgeInsets.all(2),
+                            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                          ),
+                        ],
+                      );
+                    } else {
+                      return IconButton(
+                        icon: Icon(
+                          Icons.fiber_manual_record,
                           color: AppColors.sequencerAccent,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'monospace',
                         ),
-                      ),
-                    ],
-                  ),
+                        onPressed: () => rs.startRecording(),
+                        iconSize: 16,
+                        padding: const EdgeInsets.all(2),
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                      );
+                    }
+                  },
                 ),
-                SizedBox(width: spacingWidth * 0.3),
-                
-                // Stop recording button
-                IconButton(
-                  icon: Icon(
-                    Icons.stop,
-                    color: Colors.red,
-                  ),
-                  onPressed: () => sequencer.stopRecording(),
-                  iconSize: 16,
-                  padding: const EdgeInsets.all(2),
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                ),
-              ] else ...[
-                // Start recording button
-                IconButton(
-                  icon: Icon(
-                    Icons.fiber_manual_record,
-                    color: AppColors.sequencerAccent,
-                  ),
-                  onPressed: () => sequencer.startRecording(),
-                  iconSize: 16,
-                  padding: const EdgeInsets.all(2),
-                  constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-                ),
-              ],
+                  ];
+                }(),
+              ] else ...[const SizedBox.shrink()],
               
               // Spacing between recording and sequencer controls
               SizedBox(width: spacingWidth * 0.5),
               
-              // Sequencer play/stop button
-              IconButton(
-                icon: Icon(
-                  sequencer.isSequencerPlaying ? Icons.stop : Icons.play_arrow,
-                  color: AppColors.sequencerAccent,
+              // Sequencer play/stop button - V2 only
+              if (useNewPlayback) ...[
+                ...(){
+                  final ps = playbackState;
+                  return [
+                ValueListenableBuilder<bool>(
+                  valueListenable: ps.isPlayingNotifier,
+                  builder: (context, isPlaying, child) {
+                    return IconButton(
+                      icon: Icon(
+                        isPlaying ? Icons.stop : Icons.play_arrow,
+                        color: AppColors.sequencerAccent,
+                      ),
+                      onPressed: () {
+                        if (isPlaying) {
+                          ps.stop();
+                        } else {
+                          ps.start();
+                        }
+                      },
+                      iconSize: 16,
+                      padding: const EdgeInsets.all(2),
+                      constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    );
+                  },
                 ),
-                onPressed: () {
-                  if (sequencer.isSequencerPlaying) {
-                    sequencer.stopSequencer();
-                  } else {
-                    sequencer.startSequencer();
-                  }
-                },
-                iconSize: 16,
-                padding: const EdgeInsets.all(2),
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-              ),
+                  ];
+                }(),
+              ] else ...[const SizedBox.shrink()],
             ],
           );
         },
@@ -390,35 +354,6 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     ];
   }
 
-  void _navigateToCheckpoints(BuildContext context, SequencerState sequencer, ThreadsState threadsState) {
-    // Determine which thread to open
-    final thread = sequencer.sourceThread ?? threadsState.activeThread;
-    
-    if (thread != null) {
-      // Set the active thread in ThreadsState so CheckpointsScreen can access it
-      threadsState.setActiveThread(thread);
-      
-      // Navigate to checkpoints screen for this thread
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CheckpointsScreen(
-            threadId: thread.id,
-          ),
-        ),
-      );
-    } else {
-      // No active thread - show message that user needs to publish first
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Publish your project first to create checkpoints'),
-          backgroundColor: Colors.orangeAccent,
-          duration: Duration(seconds: 2),
-        ),
-      );
-    }
-  }
-
   void _navigateToSequencerSettings(BuildContext context) {
     Navigator.push(
       context,
@@ -428,139 +363,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     );
   }
 
-  void _navigateToTestScreen(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const TestScreen(),
-      ),
-    );
-  }
-
-  void _sendCheckpoint(BuildContext context, SequencerState sequencer, ThreadsState threadsState) async {
-    // Determine context and create checkpoint accordingly
-    final activeThread = threadsState.activeThread;
-    final sourceThread = sequencer.sourceThread;
-    
-    try {
-      if (sourceThread != null) {
-        // Case: Sourced project - create fork with modifications (SEND)
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Creating fork...'),
-            backgroundColor: Colors.orangeAccent,
-            duration: Duration(seconds: 1),
-          ),
-        );
-        
-        final success = await sequencer.createProjectFork(
-          comment: 'Modified version',
-          threadsService: threadsService,
-        );
-        
-        if (success) {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Fork created successfully! 🎉'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Failed to create fork'),
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        }
-        return; // Exit early after handling sourced project
-      } else if (activeThread != null) {
-        // Check if this is unpublished solo thread (SAVE) or published/collaborative (SEND)
-        final isUnpublishedSolo = activeThread.users.length == 1 && 
-                                 activeThread.users.first.id == threadsState.currentUserId &&
-                                 !(activeThread.metadata['is_public'] ?? false);
-        
-        if (isUnpublishedSolo) {
-          // Case: Unpublished solo thread - add checkpoint to same thread (SAVE)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Saving checkpoint...'),
-              backgroundColor: Colors.orangeAccent,
-              duration: Duration(seconds: 1),
-            ),
-          );
-          
-          final success = await threadsState.addCheckpointFromSequencer(
-            activeThread.id,
-            'Saved changes',
-            sequencer,
-          );
-          
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Checkpoint saved! 💾'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } else {
-          // Case: Published/collaborative thread - create fork or add checkpoint (SEND)
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Adding to collaboration...'),
-              backgroundColor: Colors.orangeAccent,
-              duration: Duration(seconds: 1),
-            ),
-          );
-          
-          final success = await threadsState.addCheckpointFromSequencer(
-            activeThread.id,
-            'New contribution',
-            sequencer,
-          );
-          
-          if (context.mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Contribution added! 📤'),
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        }
-      } else {
-        // No active thread - this shouldn't happen now with auto-creation
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('No active project to save'),
-              backgroundColor: Colors.orange,
-              duration: Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    }
-  }
+  // Test navigation removed (unused)
 }
 
 // Helper widget for pulsing recording indicator

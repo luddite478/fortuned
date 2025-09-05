@@ -5,6 +5,10 @@ import time
 import logging
 from collections import defaultdict
 import os
+from datetime import datetime
+from typing import Optional, Dict, Any
+from bson import ObjectId
+from db.connection import get_database
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -25,6 +29,9 @@ connection_attempts = defaultdict(lambda: {'count': 0, 'reset_time': time.time()
 # Chat storage: maps (user1, user2) tuple to list of messages
 chats = defaultdict(list)
 
+# Database
+db = get_database()
+
 # --- Utility Functions ---
 
 def is_valid_token(token):
@@ -34,6 +41,42 @@ def sanitize_input(text):
     if not isinstance(text, str):
         return ""
     return text.replace('\x00', '').strip()[:1000]
+
+def is_hex24(value: str) -> bool:
+    if not isinstance(value, str) or len(value) != 24:
+        return False
+    try:
+        int(value, 16)
+        return True
+    except Exception:
+        return False
+
+def now_iso() -> str:
+    return datetime.utcnow().isoformat() + "Z"
+
+def persist_message_document(*, user_id: str, parent_thread: Optional[str], metadata: Dict[str, Any], snapshot: Optional[Dict[str, Any]] = None) -> str:
+    message_id = str(ObjectId())
+    doc: Dict[str, Any] = {
+        "schema_version": 1,
+        "id": message_id,
+        "created_at": now_iso(),
+        "timestamp": now_iso(),
+        "user_id": user_id,
+        "parent_thread": parent_thread,
+        "metadata": metadata or {},
+    }
+    if snapshot is not None:
+        doc["snapshot"] = snapshot
+    db.messages.insert_one(doc)
+    return message_id
+
+def push_message_to_thread(thread_id: str, message_id: str) -> None:
+    if not is_hex24(thread_id):
+        return
+    db.threads.update_one({"id": thread_id}, {
+        "$push": {"messages": message_id},
+        "$set": {"updated_at": now_iso()}
+    })
 
 async def send_json(websocket, data, timeout=5.0):
     try:
@@ -103,8 +146,9 @@ async def authenticate_client(websocket, client_ip):
             await send_error(websocket, "Invalid authentication token")
             return None
 
-        if len(client_id) < 3 or len(client_id) > 50:
-            await send_error(websocket, "Client ID must be between 3-50 characters")
+        # Enforce 24-hex schema-compliant IDs
+        if not is_hex24(client_id):
+            await send_error(websocket, "Client ID must be a 24-character hex string")
             return None
 
         if client_id in clients:
@@ -162,7 +206,17 @@ async def handle_direct_message(websocket, client_id, message):
         await send_error(websocket, "Target ID and message cannot be empty")
         return
 
-    store_message(client_id, target_id, real_msg)
+    # Persist message using the new schema (parent_thread = null)
+    if not is_hex24(target_id):
+        await send_error(websocket, "Target ID must be a 24-character hex string")
+        return
+    metadata = {"to": target_id, "content": real_msg}
+    try:
+        message_id = persist_message_document(user_id=client_id, parent_thread=None, metadata=metadata)
+    except Exception as e:
+        logger.error(f"Failed to persist direct message: {e}")
+        await send_error(websocket, "Failed to store message")
+        return
 
     target_ws = clients.get(target_id)
     if target_ws:
@@ -171,7 +225,8 @@ async def handle_direct_message(websocket, client_id, message):
                 "type": "message",
                 "from": client_id,
                 "message": real_msg,
-                "timestamp": int(time.time())
+                "timestamp": int(time.time()),
+                "message_id": message_id
             })
         except Exception as e:
             logger.error(f"Delivery error from {client_id} to {target_id}: {e}")
@@ -179,7 +234,8 @@ async def handle_direct_message(websocket, client_id, message):
     await send_json(websocket, {
         "type": "delivered",
         "to": target_id,
-        "message": "Message stored and sent (if user online)"
+        "message": "Message stored and sent (if user online)",
+        "message_id": message_id
     })
 
 async def handle_special_command(websocket, client_id, message_obj):
@@ -195,12 +251,30 @@ async def handle_special_command(websocket, client_id, message_obj):
         if not with_user:
             await send_error(websocket, "Missing 'with' field in chat_history request")
             return True
-        history = get_chat_history(client_id, with_user)
-        await send_json(websocket, {
-            "type": "chat_history",
-            "with": with_user,
-            "messages": history
-        })
+        # Load from database based on metadata.to/user_id
+        try:
+            if not is_hex24(with_user):
+                await send_error(websocket, "User ID must be a 24-character hex string")
+                return True
+            cursor = db.messages.find(
+                {
+                    "$or": [
+                        {"user_id": client_id, "metadata.to": with_user},
+                        {"user_id": with_user, "metadata.to": client_id}
+                    ],
+                    "parent_thread": None
+                },
+                {"_id": 0}
+            ).sort("created_at", -1).limit(100)
+            history = list(cursor)
+            await send_json(websocket, {
+                "type": "chat_history",
+                "with": with_user,
+                "messages": history
+            })
+        except Exception as e:
+            logger.error(f"Failed to load chat history: {e}")
+            await send_error(websocket, "Failed to load chat history")
         return True
     elif msg_type == "thread_invitation":
         # Handle thread invitation notification
@@ -248,9 +322,23 @@ async def handle_special_command(websocket, client_id, message_obj):
         if not target_user or not thread_id:
             await send_error(websocket, "Missing required fields for thread message")
             return True
+        if not is_hex24(target_user) or not is_hex24(thread_id):
+            await send_error(websocket, "IDs must be 24-character hex strings")
+            return True
             
-        # Store as a special message type
-        store_thread_message(client_id, target_user, thread_id, thread_title)
+        # Persist message with parent_thread = thread_id
+        try:
+            metadata = {
+                "target_user": target_user,
+                "thread_title": thread_title,
+                "event": "thread_message"
+            }
+            message_id = persist_message_document(user_id=client_id, parent_thread=thread_id, metadata=metadata)
+            push_message_to_thread(thread_id, message_id)
+        except Exception as e:
+            logger.error(f"Failed to persist thread message: {e}")
+            await send_error(websocket, "Failed to store thread message")
+            return True
         
         # Send real-time notification to target user if online
         target_ws = clients.get(target_user)
@@ -261,7 +349,8 @@ async def handle_special_command(websocket, client_id, message_obj):
                     "from": client_id,
                     "thread_id": thread_id,
                     "thread_title": thread_title,
-                    "timestamp": int(time.time())
+                    "timestamp": int(time.time()),
+                    "message_id": message_id
                 })
             except Exception as e:
                 logger.error(f"Failed to send thread message to {target_user}: {e}")
@@ -271,7 +360,8 @@ async def handle_special_command(websocket, client_id, message_obj):
             "type": "message_sent",
             "to": target_user,
             "thread_id": thread_id,
-            "message": "Thread shared successfully"
+            "message": "Thread shared successfully",
+            "message_id": message_id
         })
         return True
     return False

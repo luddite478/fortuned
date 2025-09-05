@@ -1,6 +1,11 @@
 import 'package:flutter/foundation.dart';
 import '../services/threads_service.dart';
 import 'sequencer_state.dart';
+import 'sequencer/table.dart';
+import '../ffi/table_bindings.dart' show Cell;
+import 'dart:ffi' as ffi;
+import 'sequencer/sample_bank.dart';
+import 'sequencer/playback.dart';
 
 enum ThreadStatus { active, paused, completed, archived }
 
@@ -743,6 +748,98 @@ class ThreadsState extends ChangeNotifier {
   // Convenience method to add checkpoint from current sequencer state
   Future<void> addCheckpointFromSequencer(String threadId, String comment, SequencerState sequencerState) async {
     final snapshot = sequencerState.createSnapshot(comment: comment);
+    await addCheckpoint(
+      threadId: threadId,
+      userId: _currentUserId ?? 'unknown',
+      userName: _currentUserName ?? 'Unknown User',
+      comment: comment,
+      snapshot: snapshot,
+    );
+  }
+
+  // V2: Convenience method to add checkpoint from modular V2 states
+  Future<void> addCheckpointFromV2({
+    required String threadId,
+    required String comment,
+    required TableState tableState,
+    required SampleBankState sampleBankState,
+    required PlaybackState playbackState,
+  }) async {
+    // Build a simple snapshot from current UI-selected section
+    final sectionIndex = tableState.uiSelectedSection;
+    final rows = tableState.getSectionStepCount(sectionIndex);
+    final cols = tableState.maxCols;
+
+    // Build layers (single layer representing full column range for now)
+    final layerRows = <SequencerRow>[];
+    for (int r = 0; r < rows; r++) {
+      final cells = <SequencerCell>[];
+      for (int c = 0; c < cols; c++) {
+        final step = tableState.getSectionStartStep(sectionIndex) + r;
+        final ffi.Pointer<Cell> cellPtr = tableState.getCellPointer(step, c);
+        if (cellPtr.address != 0 && cellPtr.ref.sample_slot >= 0) {
+          final slot = cellPtr.ref.sample_slot;
+          cells.add(SequencerCell(
+            sample: CellSample(
+              sampleId: 'slot_$slot',
+              sampleName: sampleBankState.getSlotName(slot) ?? 'Sample $slot',
+            ),
+          ));
+        } else {
+          cells.add(const SequencerCell());
+        }
+      }
+      layerRows.add(SequencerRow(cells: cells));
+    }
+
+    final layer = SequencerLayer(
+      id: 'layer_000',
+      index: 0,
+      rows: layerRows,
+    );
+
+    // Build samples list from loaded slots (best-effort)
+    final samples = <SampleInfo>[];
+    for (int i = 0; i < sampleBankState.maxSlots; i++) {
+      if (sampleBankState.isSlotLoaded(i)) {
+        samples.add(SampleInfo(
+          id: 'slot_$i',
+          name: sampleBankState.getSlotName(i) ?? 'Sample $i',
+          url: sampleBankState.getSlotPath(i) ?? '',
+          isPublic: true,
+        ));
+      }
+    }
+
+    final section = SequencerSection(
+      layers: [layer],
+      metadata: SectionMetadata(
+        user: _currentUserId ?? 'unknown',
+        bpm: playbackState.bpm,
+        key: 'C Major',
+        timeSignature: '4/4',
+        createdAt: DateTime.now(),
+      ),
+    );
+
+    final audio = ProjectAudio(
+      format: 'wav',
+      duration: 0.0,
+      sampleRate: 48000,
+      channels: 2,
+      url: '',
+      renders: const [],
+      sources: [AudioSource(sections: [section], samples: samples)],
+    );
+
+    final snapshot = SequencerSnapshot(
+      id: 'snapshot_${DateTime.now().millisecondsSinceEpoch}',
+      name: comment,
+      createdAt: DateTime.now(),
+      version: '2.0',
+      audio: audio,
+    );
+
     await addCheckpoint(
       threadId: threadId,
       userId: _currentUserId ?? 'unknown',

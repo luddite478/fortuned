@@ -6,11 +6,22 @@ import '../widgets/sequencer/v2/top_multitask_panel_widget.dart' as v1;
 import '../widgets/sequencer/v2/message_bar_widget.dart';
 import '../widgets/sequencer/v2/sequencer_body.dart';
 import '../widgets/app_header_widget.dart';
-import '../state/sequencer_state.dart';
 import '../state/threads_state.dart';
 import '../services/threads_service.dart';
-import 'checkpoints_screen.dart';
 import '../utils/app_colors.dart';
+// New state imports for migration
+import '../state/sequencer/table.dart';
+import '../state/sequencer/playback.dart';
+import '../state/sequencer/sample_bank.dart';
+import '../state/sequencer/sample_browser.dart';
+import '../state/sequencer/timer.dart';
+import '../state/sequencer/multitask_panel.dart';
+import '../state/sequencer/sound_settings.dart';
+import '../state/sequencer/recording.dart';
+import '../state/sequencer/edit.dart';
+import '../state/sequencer/section_settings.dart';
+import '../state/sequencer/slider_overlay.dart';
+import '../state/sequencer/undo_redo.dart';
 
 class SequencerScreenV2 extends StatefulWidget {
   const SequencerScreenV2({super.key});
@@ -21,18 +32,57 @@ class SequencerScreenV2 extends StatefulWidget {
 
 class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindingObserver {
   late ThreadsService _threadsService;
-
+  
+  // New state instances for migration
+  late final TableState _tableState;
+  late final PlaybackState _playbackState;
+  late final SampleBankState _sampleBankState;
+  late final SampleBrowserState _sampleBrowserState;
+  late final TimerState _timerState;
+  late final MultitaskPanelState _multitaskPanelState;
+  late final SoundSettingsState _soundSettingsState;
+  late final RecordingState _recordingState;
+  late final EditState _editState;
+  late final SectionSettingsState _sectionSettingsState;
+  late final SliderOverlayState _sliderOverlayState;
+  late final UndoRedoState _undoRedoState;
+  
+  
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
+    // Initialize new state system
+    debugPrint('🎵 [SEQUENCER_V2] Initializing new state system');
+    _undoRedoState = UndoRedoState();
+    _tableState = TableState();
+    _playbackState = PlaybackState(_tableState);
+    _sampleBankState = SampleBankState();
+    _sampleBrowserState = SampleBrowserState();
+    _multitaskPanelState = MultitaskPanelState();
+    _soundSettingsState = SoundSettingsState();
+    _recordingState = RecordingState();
+    _editState = EditState(_tableState);
+    _sectionSettingsState = SectionSettingsState();
+    _sliderOverlayState = SliderOverlayState();
+    
+    // Initialize timer with dependencies
+    _timerState = TimerState(
+      tableState: _tableState,
+      playbackState: _playbackState,
+      sampleBankState: _sampleBankState,
+      undoRedoState: _undoRedoState,
+    );
+    
     // Use the global ThreadsService from Provider instead of creating a new one
     _threadsService = Provider.of<ThreadsService>(context, listen: false);
     _setupThreadsServiceListeners();
     
-    // Ensure there's an active thread for saving work
+    // Start new state system and ensure active thread
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _timerState.start();
+      _sampleBrowserState.initialize();
       _ensureActiveThread();
     });
   }
@@ -59,10 +109,9 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
 
   void _ensureActiveThread() async {
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
-    final sequencerState = Provider.of<SequencerState>(context, listen: false);
     
-    // If there's no active thread and we're not in collaboration mode, create one
-    if (threadsState.activeThread == null && !sequencerState.isCollaborating) {
+    // If there's no active thread, create one (no collaboration logic)
+    if (threadsState.activeThread == null) {
       try {
         debugPrint('📝 No active thread found, creating new unpublished thread for sequencer V2');
         
@@ -97,6 +146,20 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
 
   @override
   void dispose() {
+    debugPrint('🧹 [SEQUENCER_V2] Disposing new state system');
+    
+    _timerState.dispose();
+    _tableState.dispose();
+    _playbackState.dispose();
+    _sampleBankState.dispose();
+    _sampleBrowserState.dispose();
+    _multitaskPanelState.dispose();
+    _soundSettingsState.dispose();
+    _recordingState.dispose();
+    _editState.dispose();
+    _sectionSettingsState.dispose();
+    _undoRedoState.dispose();
+    
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -112,47 +175,38 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     }
   }
 
-  void _navigateToCheckpoints() {
-    final threadsState = context.read<ThreadsState>();
-    final currentThread = threadsState.currentThread;
-    
-    if (currentThread != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => CheckpointsScreen(
-            threadId: currentThread.id,
-          ),
-        ),
-      );
-    }
-  }
+  // Note: navigation to checkpoints is handled in header
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.sequencerPageBackground,
-      appBar: AppHeaderWidget(
-        mode: HeaderMode.sequencer,
-        onBack: () => Navigator.of(context).pop(),
-        threadsService: _threadsService,
-      ),
-      body: SafeArea(
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _tableState),
+        ChangeNotifierProvider.value(value: _playbackState),
+        ChangeNotifierProvider.value(value: _sampleBankState),
+        ChangeNotifierProvider.value(value: _sampleBrowserState),
+        ChangeNotifierProvider.value(value: _multitaskPanelState),
+        ChangeNotifierProvider.value(value: _soundSettingsState),
+        ChangeNotifierProvider.value(value: _recordingState),
+        ChangeNotifierProvider.value(value: _editState),
+        ChangeNotifierProvider.value(value: _sectionSettingsState),
+        ChangeNotifierProvider.value(value: _sliderOverlayState),
+        ChangeNotifierProvider.value(value: _undoRedoState),
+      ],
+      child: Scaffold(
+        backgroundColor: AppColors.sequencerPageBackground,
+        appBar: AppHeaderWidget(
+          mode: HeaderMode.sequencer,
+          onBack: () => Navigator.of(context).pop(),
+          threadsService: _threadsService,
+        ),
+        body: SafeArea(
         child: Column(
           children: [
             Expanded(
               flex: 7,
               child: RepaintBoundary(
-                child: Selector<SequencerState, ({List<String?> fileNames, List<bool> slotLoaded, int activeBank})>(
-                  selector: (context, state) => (
-                    fileNames: state.fileNamesForSelector,
-                    slotLoaded: state.slotLoadedForSelector, 
-                    activeBank: state.activeBank,
-                  ),
-                  builder: (context, data, child) {
-                    return const v1.SampleBanksWidget();
-                  },
-                ),
+                child: const v1.SampleBanksWidget(),
               ),
             ),
             // 🎯 PERFORMANCE: Body element with switching capability between sound grid and sample browser
@@ -165,17 +219,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
             Expanded(
               flex: 8,
               child: RepaintBoundary(
-                child: Selector<SequencerState, ({Set<int> selectedCells, bool isStepInsertMode, bool canUndo, bool canRedo})>(
-                  selector: (context, state) => (
-                    selectedCells: state.selectedGridCellsForSelector,
-                    isStepInsertMode: state.isStepInsertMode,
-                    canUndo: state.canUndo,
-                    canRedo: state.canRedo,
-                  ),
-                  builder: (context, data, child) {
-                    return const v1.EditButtonsWidget();
-                  },
-                ),
+                child: const v1.EditButtonsWidget(),
               ),
             ),
 
@@ -186,12 +230,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
             Expanded(
               flex: 15, // Reduced from 18 to make space for message bar
               child: RepaintBoundary(
-                child: Selector<SequencerState, MultitaskPanelMode>(
-                  selector: (context, state) => state.currentPanelModeForSelector,
-                  builder: (context, panelMode, child) {
-                    return const v1.MultitaskPanelWidget();
-                  },
-                ),
+                child: const v1.MultitaskPanelWidget(),
               ),
             ),
 
@@ -203,6 +242,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
           ],
         ),
       ),
+    ),
     );
   }
 } 

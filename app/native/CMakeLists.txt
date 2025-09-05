@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 project(niyya_native LANGUAGES C CXX)
 
-# SoundTouch configuration - Set to 1 to use SoundTouch (high quality), 0 for miniaudio resampler (fast)
-option(USE_SOUNDTOUCH_PITCH "Use SoundTouch for high-quality pitch shifting" OFF)
+# Ensure modern C++ for header-only libraries like nlohmann/json
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# SoundTouch configuration - default ON to support preprocessing in pitch module
+option(USE_SOUNDTOUCH_PITCH "Use SoundTouch for high-quality pitch shifting" ON)
 
 # SoundTouch source files (mobile-optimized, excluding x86-specific files)
 set(SOUNDTOUCH_SOURCES
@@ -51,6 +55,9 @@ set(LAME_SOURCES
 set(SEQUENCER_SOURCES
   sequencer.mm
   conversion.mm
+  sample_bank.mm
+  pitch.mm
+  undo_redo.mm
 )
 
 # Add SoundTouch sources if enabled
@@ -64,6 +71,8 @@ endif()
 set_source_files_properties(
   sequencer.mm
   conversion.mm
+  sample_bank.mm
+  undo_redo.mm
   PROPERTIES
   LANGUAGE CXX
   COMPILE_FLAGS "-x c++"
@@ -128,6 +137,9 @@ else()
 endif()
 
 include_directories(miniaudio)
+
+# nlohmann/json (header-only)
+include_directories(nlohmann-json)
 
 # Add SoundTouch include directory if enabled
 if(USE_SOUNDTOUCH_PITCH)

@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
+// duplicate import removed
+import 'package:provider/provider.dart';
+import '../../../state/sequencer/section_settings.dart';
+import '../../../state/sequencer/undo_redo.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/playback.dart';
 import '../../../utils/app_colors.dart';
 
 enum SideControlSide { left, right }
@@ -15,15 +19,20 @@ class SoundGridSideControlWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    final sectionSettings = context.watch<SectionSettingsState>();
+    final playbackState = context.watch<PlaybackState>();
+    // final editState = context.watch<EditState>(); // reserved for future selection-mode awareness
+    final undoRedo = context.watch<UndoRedoState>();
+    final tableState = context.watch<TableState>();
+    return Builder(
+      builder: (context) {
         return LayoutBuilder(
           builder: (context, constraints) {
             // Calculate responsive button size based on available space
             final availableHeight = constraints.maxHeight;
             final availableWidth = constraints.maxWidth;
             
-            final bool hideButtons = sequencer.isSectionCreationOverlayOpen || sequencer.numSections == 0;
+            final bool hideButtons = sectionSettings.isSectionCreationOpen || tableState.sectionsCount == 0;
 
             // Use 90% of available height for buttons, leaving small margins
             final buttonsAreaHeight = availableHeight * 0.9;
@@ -66,36 +75,40 @@ class SoundGridSideControlWidget extends StatelessWidget {
                   _buildSideControlButtonWithText(
                     width: buttonWidth,
                     height: buttonHeight,
-                    text: '${sequencer.currentSectionIndex + 1}',
-                    color: sequencer.isSectionControlOverlayOpen 
+                    text: '${tableState.uiSelectedSection + 1}',
+                    color: sectionSettings.isSectionControlOpen 
                         ? AppColors.sequencerAccent 
                         : AppColors.sequencerLightText,
                     onPressed: () {
-                      sequencer.toggleSectionControlOverlay();
+                      sectionSettings.toggleSectionControlOverlay();
                     },
                     tooltip: 'Section Settings',
                     bottom: ValueListenableBuilder<int>(
-                      valueListenable: sequencer.currentStepNotifier,
-                      builder: (context, _, __) {
-                        final total = sequencer.getSectionLoopCount(sequencer.currentSectionIndex);
-                        final current = (sequencer.currentSectionLoopCounter + 1).clamp(1, total);
-                        final label = '$current/$total';
-                        final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
-                        return Text(
-                          label,
-                          overflow: TextOverflow.fade,
-                          softWrap: false,
-                          style: TextStyle(
-                            color: color,
-                            fontSize: buttonWidth * 0.40,
-                            fontWeight: FontWeight.w600,
-                            height: 1.0,
-                            letterSpacing: 0.2,
-                          ),
+                      valueListenable: playbackState.currentSectionLoopNotifier,
+                      builder: (context, currentLoopZeroBased, __) {
+                        return ValueListenableBuilder<int>(
+                          valueListenable: playbackState.currentSectionLoopsNumNotifier,
+                          builder: (context, totalLoops, ___) {
+                            final displayCurrent = (currentLoopZeroBased + 1).clamp(1, totalLoops);
+                            final label = '$displayCurrent/$totalLoops';
+                            final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
+                            return Text(
+                              label,
+                              overflow: TextOverflow.fade,
+                              softWrap: false,
+                              style: TextStyle(
+                                color: color,
+                                fontSize: buttonWidth * 0.40,
+                                fontWeight: FontWeight.w600,
+                                height: 1.0,
+                                letterSpacing: 0.2,
+                              ),
+                            );
+                          },
                         );
                       },
                     ),
-                    backgroundColor: sequencer.isSectionControlOverlayOpen
+                    backgroundColor: sectionSettings.isSectionControlOpen
                         ? AppColors.sequencerPrimaryButton
                         : null,
                   ),
@@ -108,16 +121,16 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: Icons.repeat,
-                    color: sequencer.sectionPlaybackMode == SectionPlaybackMode.loop 
+                    color: playbackState.songModeNotifier.value == false 
                         ? Colors.white 
                         : AppColors.sequencerLightText,
                     onPressed: () {
-                      sequencer.toggleSectionPlaybackMode();
+                      playbackState.setSongMode(!(playbackState.songModeNotifier.value));
                     },
-                    tooltip: sequencer.sectionPlaybackMode == SectionPlaybackMode.loop 
+                    tooltip: (playbackState.songModeNotifier.value == false) 
                         ? 'Loop Mode (Active)'
                         : 'Song Mode (Click to Loop)',
-                    backgroundColor: sequencer.sectionPlaybackMode == SectionPlaybackMode.loop 
+                    backgroundColor: (playbackState.songModeNotifier.value == false) 
                         ? AppColors.sequencerPrimaryButton 
                         : AppColors.sequencerSurfacePressed,
                   ),
@@ -130,9 +143,9 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: Icons.redo,
-                    color: sequencer.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
-                    onPressed: sequencer.canRedo ? () => sequencer.redo() : null,
-                    tooltip: sequencer.canRedo ? 'Redo' : 'Nothing to Redo',
+                    color: undoRedo.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
+                    onPressed: undoRedo.canRedo ? () => undoRedo.redo() : null,
+                    tooltip: undoRedo.canRedo ? 'Redo' : 'Nothing to Redo',
                   ),
                   SizedBox(height: buttonSpacing),
                   _buildSideControlButton(
@@ -140,9 +153,9 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: Icons.undo,
-                    color: sequencer.canUndo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
-                    onPressed: sequencer.canUndo ? () => sequencer.undo() : null,
-                    tooltip: sequencer.canUndo ? 'Undo: ${sequencer.currentUndoDescription}' : 'Nothing to Undo',
+                    color: undoRedo.canUndo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
+                    onPressed: undoRedo.canUndo ? () => undoRedo.undo() : null,
+                    tooltip: undoRedo.canUndo ? 'Undo' : 'Nothing to Undo',
                   ),
                 ] : [
                   // Right Side: Previous, Next, Redo
@@ -151,14 +164,14 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: Icons.chevron_left,
-                    color: sequencer.numSections > 1 
+                    color: tableState.sectionsCount > 1 
                         ? AppColors.sequencerLightText 
                         : AppColors.sequencerLightText.withOpacity(0.5),
-                    onPressed: sequencer.numSections > 1 
-                        ? () => sequencer.switchToPreviousSection()
+                    onPressed: tableState.sectionsCount > 1 
+                        ? () => tableState.setUiSelectedSection((tableState.uiSelectedSection - 1).clamp(0, tableState.sectionsCount - 1))
                         : null,
-                    tooltip: sequencer.numSections > 1 
-                        ? 'Previous Section (${sequencer.currentSectionIndex + 1}/${sequencer.numSections})'
+                    tooltip: tableState.sectionsCount > 1 
+                        ? 'Previous Section (${tableState.uiSelectedSection + 1}/${tableState.sectionsCount})'
                         : 'Only 1 Section',
                   ),
                   SizedBox(height: buttonSpacing),
@@ -169,15 +182,15 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     icon: Icons.chevron_right,
                     color: AppColors.sequencerLightText,
                     onPressed: () {
-                      if (sequencer.currentSectionIndex == sequencer.numSections - 1) {
-                        sequencer.openSectionCreationOverlay();
+                      if (tableState.uiSelectedSection == tableState.sectionsCount - 1) {
+                        sectionSettings.openSectionCreationOverlay();
                       } else {
-                        sequencer.switchToNextSection();
+                        tableState.setUiSelectedSection((tableState.uiSelectedSection + 1).clamp(0, tableState.sectionsCount - 1));
                       }
                     },
-                    tooltip: sequencer.currentSectionIndex == sequencer.numSections - 1 
+                    tooltip: tableState.uiSelectedSection == tableState.sectionsCount - 1 
                         ? 'Create New Section'
-                        : 'Next Section (${sequencer.currentSectionIndex + 2}/${sequencer.numSections})',
+                        : 'Next Section (${tableState.uiSelectedSection + 2}/${tableState.sectionsCount})',
                   ),
                   SizedBox(height: buttonSpacing),
                   _buildSideControlButton(
@@ -185,9 +198,9 @@ class SoundGridSideControlWidget extends StatelessWidget {
                     height: buttonHeight,
                     iconSize: iconSize,
                     icon: Icons.redo,
-                    color: sequencer.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
-                    onPressed: sequencer.canRedo ? () => sequencer.redo() : null,
-                    tooltip: sequencer.canRedo ? 'Redo' : 'Nothing to Redo',
+                    color: undoRedo.canRedo ? AppColors.sequencerAccent : AppColors.sequencerLightText,
+                    onPressed: undoRedo.canRedo ? () => undoRedo.redo() : null,
+                    tooltip: undoRedo.canRedo ? 'Redo' : 'Nothing to Redo',
                   ),
                 ],
               ),
