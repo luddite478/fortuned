@@ -104,3 +104,7 @@ app/working_example
 app/samples/
 app/samples-old/
 **/__pycache__/
+
+.DS_Store
+app/ios/Runner.xcodeproj/project.pbxproj.backup
+app/ios/ThirdParty/
