@@ -111,7 +111,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  title ?? thread?.title ?? 'Thread',
+                  title ?? (thread != null ? 'Thread ${thread.id.substring(0, 8)}' : 'Thread'),
                   style: _isPhoneBookMode 
                       ? GoogleFonts.sourceSans3(
                           fontSize: 16, 
@@ -123,7 +123,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
                 ),
                 if (subtitle != null || thread != null)
                   Text(
-                    subtitle ?? '${thread?.users.length ?? 0} collaborators • ${thread?.checkpoints.length ?? 0} checkpoints',
+                    subtitle ?? '${thread?.users.length ?? 0} collaborators • ${thread?.messageIds.length ?? 0} messages',
                     style: _isPhoneBookMode
                         ? GoogleFonts.sourceSans3(
                             fontSize: 11,

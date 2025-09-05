@@ -1,597 +1,62 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import '../services/threads_service.dart';
-import 'sequencer_state.dart';
+
+import '../models/thread/thread.dart';
+import '../models/thread/message.dart';
+import '../models/thread/thread_user.dart';
+import '../models/thread/thread_invite.dart';
+import '../services/threads_api.dart';
+import '../services/ws_client.dart';
+import '../services/snapshot/snapshot_service.dart';
 import 'sequencer/table.dart';
-import '../ffi/table_bindings.dart' show Cell;
-import 'dart:ffi' as ffi;
-import 'sequencer/sample_bank.dart';
 import 'sequencer/playback.dart';
-
-enum ThreadStatus { active, paused, completed, archived }
-
-enum InviteStatus { pending, accepted, declined, cancelled }
-
-class ThreadInvite {
-  final String userId;
-  final String userName;
-  final InviteStatus status;
-  final String invitedBy;
-  final DateTime invitedAt;
-  
-  const ThreadInvite({
-    required this.userId,
-    required this.userName,
-    required this.status,
-    required this.invitedBy,
-    required this.invitedAt,
-  });
-  
-  Map<String, dynamic> toJson() => {
-    'user_id': userId,
-    'user_name': userName,
-    'status': status.name,
-    'invited_by': invitedBy,
-    'invited_at': invitedAt.toIso8601String(),
-  };
-  
-  factory ThreadInvite.fromJson(Map<String, dynamic> json) {
-    return ThreadInvite(
-      userId: json['user_id'] ?? '',
-      userName: json['user_name'] ?? '',
-      status: InviteStatus.values.firstWhere(
-        (s) => s.name == (json['status'] ?? 'pending'),
-        orElse: () => InviteStatus.pending,
-      ),
-      invitedBy: json['invited_by'] ?? '',
-      invitedAt: DateTime.parse(json['invited_at'] ?? DateTime.now().toIso8601String()),
-    );
-  }
-}
-
-class ThreadUser {
-  final String id;
-  final String name;
-  final DateTime joinedAt;
-  
-  const ThreadUser({
-    required this.id,
-    required this.name,
-    required this.joinedAt,
-  });
-  
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'joined_at': joinedAt.toIso8601String(),
-  };
-  
-  factory ThreadUser.fromJson(Map<String, dynamic> json) {
-    return ThreadUser(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      joinedAt: DateTime.parse(json['joined_at'] ?? DateTime.now().toIso8601String()),
-    );
-  }
-}
-
-// Complete sequencer state snapshot - matches project.audio.sources structure
-class SequencerSnapshot {
-  final String id; // unique snapshot ID
-  final String name; // descriptive name for this version
-  final DateTime createdAt;
-  final String version; // version string like "1.0", "2.1", etc.
-  final ProjectAudio audio; // Full audio structure matching database
-
-  const SequencerSnapshot({
-    required this.id,
-    required this.name,
-    required this.createdAt,
-    required this.version,
-    required this.audio,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'createdAt': createdAt.toIso8601String(),
-    'version': version,
-    'audio': audio.toJson(),
-  };
-
-  factory SequencerSnapshot.fromJson(Map<String, dynamic> json) {
-    return SequencerSnapshot(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
-      version: json['version'] ?? '1.0',
-      audio: ProjectAudio.fromJson(json['audio'] ?? {}),
-    );
-  }
-
-  SequencerSnapshot copyWith({
-    String? id,
-    String? name,
-    DateTime? createdAt,
-    String? version,
-    ProjectAudio? audio,
-  }) {
-    return SequencerSnapshot(
-      id: id ?? this.id,
-      name: name ?? this.name,
-      createdAt: createdAt ?? this.createdAt,
-      version: version ?? this.version,
-      audio: audio ?? this.audio,
-    );
-  }
-}
-
-// Matches project.audio structure from database
-class ProjectAudio {
-  final String format; // mp3, wav, etc.
-  final double duration; // seconds
-  final int sampleRate;
-  final int channels;
-  final String url;
-  final List<AudioRender> renders;
-  final List<AudioSource> sources; // The actual sequencer data
-
-  const ProjectAudio({
-    required this.format,
-    required this.duration,
-    required this.sampleRate,
-    required this.channels,
-    required this.url,
-    required this.renders,
-    required this.sources,
-  });
-
-  factory ProjectAudio.fromJson(Map<String, dynamic> json) {
-    return ProjectAudio(
-      format: json['format'] ?? 'mp3',
-      duration: (json['duration'] ?? 0.0).toDouble(),
-      sampleRate: json['sample_rate'] ?? 44100,
-      channels: json['channels'] ?? 2,
-      url: json['url'] ?? '',
-      renders: (json['renders'] as List<dynamic>? ?? [])
-          .map((render) => AudioRender.fromJson(render))
-          .toList(),
-      sources: (json['sources'] as List<dynamic>? ?? [])
-          .map((source) => AudioSource.fromJson(source))
-          .toList(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'format': format,
-    'duration': duration,
-    'sample_rate': sampleRate,
-    'channels': channels,
-    'url': url,
-    'renders': renders.map((r) => r.toJson()).toList(),
-    'sources': sources.map((s) => s.toJson()).toList(),
-  };
-}
-
-class AudioRender {
-  final String id;
-  final String url;
-  final String createdAt;
-  final String version;
-  final String quality;
-
-  const AudioRender({
-    required this.id,
-    required this.url,
-    required this.createdAt,
-    required this.version,
-    required this.quality,
-  });
-
-  factory AudioRender.fromJson(Map<String, dynamic> json) {
-    return AudioRender(
-      id: json['id'] ?? '',
-      url: json['url'] ?? '',
-      createdAt: json['created_at'] ?? '',
-      version: json['version'] ?? '',
-      quality: json['quality'] ?? '',
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'url': url,
-    'created_at': createdAt,
-    'version': version,
-    'quality': quality,
-  };
-}
-
-class AudioSource {
-  final List<SequencerSection> sections;
-  final List<SampleInfo> samples;
-
-  const AudioSource({
-    required this.sections,
-    required this.samples,
-  });
-
-  factory AudioSource.fromJson(Map<String, dynamic> json) {
-    return AudioSource(
-      sections: (json['sections'] as List<dynamic>? ?? [])
-          .map((section) => SequencerSection.fromJson(section))
-          .toList(),
-      samples: (json['samples'] as List<dynamic>? ?? [])
-          .map((sample) => SampleInfo.fromJson(sample))
-          .toList(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'sections': sections.map((s) => s.toJson()).toList(),
-    'samples': samples.map((s) => s.toJson()).toList(),
-  };
-}
-
-class SequencerSection {
-  final List<SequencerLayer> layers;
-  final SectionMetadata metadata;
-
-  const SequencerSection({
-    required this.layers,
-    required this.metadata,
-  });
-
-  factory SequencerSection.fromJson(Map<String, dynamic> json) {
-    return SequencerSection(
-      layers: (json['layers'] as List<dynamic>? ?? [])
-          .map((layer) => SequencerLayer.fromJson(layer))
-          .toList(),
-      metadata: SectionMetadata.fromJson(json['metadata'] ?? {}),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'layers': layers.map((l) => l.toJson()).toList(),
-    'metadata': metadata.toJson(),
-  };
-}
-
-class SequencerLayer {
-  final String id;
-  final int index;
-  final List<SequencerRow> rows;
-
-  const SequencerLayer({
-    required this.id,
-    required this.index,
-    required this.rows,
-  });
-
-  factory SequencerLayer.fromJson(Map<String, dynamic> json) {
-    return SequencerLayer(
-      id: json['id'] ?? '',
-      index: json['index'] ?? 0,
-      rows: (json['rows'] as List<dynamic>? ?? [])
-          .map((row) => SequencerRow.fromJson(row))
-          .toList(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'index': index,
-    'rows': rows.map((r) => r.toJson()).toList(),
-  };
-}
-
-class SequencerRow {
-  final List<SequencerCell> cells;
-
-  const SequencerRow({
-    required this.cells,
-  });
-
-  factory SequencerRow.fromJson(Map<String, dynamic> json) {
-    return SequencerRow(
-      cells: (json['cells'] as List<dynamic>? ?? [])
-          .map((cell) => SequencerCell.fromJson(cell))
-          .toList(),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'cells': cells.map((c) => c.toJson()).toList(),
-  };
-}
-
-class SequencerCell {
-  final CellSample? sample;
-
-  const SequencerCell({
-    this.sample,
-  });
-
-  factory SequencerCell.fromJson(Map<String, dynamic> json) {
-    return SequencerCell(
-      sample: json['sample'] != null 
-          ? CellSample.fromJson(json['sample'])
-          : null,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'sample': sample?.toJson(),
-  };
-}
-
-class CellSample {
-  final String? sampleId;
-  final String? sampleName;
-
-  const CellSample({
-    this.sampleId,
-    this.sampleName,
-  });
-
-  bool get hasSample => sampleId != null && sampleId!.isNotEmpty;
-
-  factory CellSample.fromJson(Map<String, dynamic> json) {
-    return CellSample(
-      sampleId: json['sample_id'],
-      sampleName: json['sample_name'],
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'sample_id': sampleId,
-    'sample_name': sampleName,
-  };
-}
-
-class SectionMetadata {
-  final String user;
-  final int bpm;
-  final String key;
-  final String timeSignature;
-  final DateTime createdAt;
-
-  const SectionMetadata({
-    required this.user,
-    required this.bpm,
-    required this.key,
-    required this.timeSignature,
-    required this.createdAt,
-  });
-
-  factory SectionMetadata.fromJson(Map<String, dynamic> json) {
-    return SectionMetadata(
-      user: json['user'] ?? '',
-      bpm: json['bpm'] ?? 120,
-      key: json['key'] ?? 'C Major',
-      timeSignature: json['time_signature'] ?? '4/4',
-      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'user': user,
-    'bpm': bpm,
-    'key': key,
-    'time_signature': timeSignature,
-    'created_at': createdAt.toIso8601String(),
-  };
-}
-
-class SampleInfo {
-  final String id;
-  final String name;
-  final String url;
-  final bool isPublic;
-
-  const SampleInfo({
-    required this.id,
-    required this.name,
-    required this.url,
-    required this.isPublic,
-  });
-
-  factory SampleInfo.fromJson(Map<String, dynamic> json) {
-    return SampleInfo(
-      id: json['id'] ?? '',
-      name: json['name'] ?? '',
-      url: json['url'] ?? '',
-      isPublic: json['is_public'] ?? false,
-    );
-  }
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'url': url,
-    'is_public': isPublic,
-  };
-}
-
-// A checkpoint represents a project state at a specific point in time
-class ProjectCheckpoint {
-  final String id;
-  final String userId; // User who created this checkpoint
-  final String userName;
-  final DateTime timestamp;
-  final String comment; // Optional description of changes
-  final SequencerSnapshot snapshot; // Complete project state
-
-  const ProjectCheckpoint({
-    required this.id,
-    required this.userId,
-    required this.userName,
-    required this.timestamp,
-    required this.comment,
-    required this.snapshot,
-  });
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'user_id': userId,
-    'user_name': userName,
-    'timestamp': timestamp.toIso8601String(),
-    'comment': comment,
-    'snapshot': snapshot.toJson(),
-  };
-
-  factory ProjectCheckpoint.fromJson(Map<String, dynamic> json) {
-    return ProjectCheckpoint(
-      id: json['id'] ?? '',
-      userId: json['user_id'] ?? '',
-      userName: json['user_name'] ?? '',
-      timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
-      comment: json['comment'] ?? '',
-      snapshot: SequencerSnapshot.fromJson(json['snapshot'] ?? {}),
-    );
-  }
-}
-
-// A thread represents the complete history of a project
-class Thread {
-  final String id;
-  final String title;
-  final List<ThreadUser> users; // First user is always the initial author
-  final List<ThreadInvite> invites; // Pending/historical invitations
-  final List<ProjectCheckpoint> checkpoints;
-  final ThreadStatus status;
-  final DateTime createdAt;
-  final DateTime updatedAt;
-  final Map<String, dynamic> metadata; // Additional project metadata
-
-  const Thread({
-    required this.id,
-    required this.title,
-    required this.users,
-    this.invites = const [],
-    required this.checkpoints,
-    required this.status,
-    required this.createdAt,
-    required this.updatedAt,
-    this.metadata = const {},
-  });
-
-  // Get the initial author (first user)
-  ThreadUser get author => users.first;
-  
-  // Get the latest checkpoint
-  ProjectCheckpoint? get latestCheckpoint =>
-      checkpoints.isNotEmpty ? checkpoints.last : null;
-  
-  // Check if user is part of this thread
-  bool hasUser(String userId) => users.any((user) => user.id == userId);
-  
-  // Get user by ID
-  ThreadUser? getUser(String userId) => 
-      users.where((user) => user.id == userId).firstOrNull;
-
-  // Check if user has been invited to this thread
-  bool isUserInvited(String userId) => invites.any((invite) => invite.userId == userId);
-  
-  // Check if user has a pending invitation
-  bool hasPendingInvite(String userId) => 
-      invites.any((invite) => invite.userId == userId && invite.status == InviteStatus.pending);
-  
-  // Get invite by user ID
-  ThreadInvite? getInvite(String userId) => 
-      invites.where((invite) => invite.userId == userId).firstOrNull;
-  
-  // Get all pending invites
-  List<ThreadInvite> get pendingInvites => 
-      invites.where((invite) => invite.status == InviteStatus.pending).toList();
-
-  Map<String, dynamic> toJson() => {
-    'id': id,
-    'title': title,
-    'users': users.map((u) => u.toJson()).toList(),
-    'invites': invites.map((i) => i.toJson()).toList(),
-    'checkpoints': checkpoints.map((c) => c.toJson()).toList(),
-    'status': status.name,
-    'created_at': createdAt.toIso8601String(),
-    'updated_at': updatedAt.toIso8601String(),
-    'metadata': metadata,
-  };
-
-  factory Thread.fromJson(Map<String, dynamic> json) {
-    return Thread(
-      id: json['id'] ?? '',
-      title: json['title'] ?? '',
-      users: (json['users'] as List<dynamic>? ?? [])
-          .map((user) => ThreadUser.fromJson(user))
-          .toList(),
-      invites: (json['invites'] as List<dynamic>? ?? [])
-          .map((invite) => ThreadInvite.fromJson(invite))
-          .toList(),
-      checkpoints: (json['checkpoints'] as List<dynamic>? ?? [])
-          .map((checkpoint) => ProjectCheckpoint.fromJson(checkpoint))
-          .toList(),
-      status: ThreadStatus.values.firstWhere(
-        (s) => s.name == (json['status'] ?? 'active'),
-        orElse: () => ThreadStatus.active,
-      ),
-      createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
-      updatedAt: DateTime.parse(json['updated_at'] ?? DateTime.now().toIso8601String()),
-      metadata: json['metadata'] ?? {},
-    );
-  }
-
-  Thread copyWith({
-    String? id,
-    String? title,
-    List<ThreadUser>? users,
-    List<ThreadInvite>? invites,
-    List<ProjectCheckpoint>? checkpoints,
-    ThreadStatus? status,
-    DateTime? createdAt,
-    DateTime? updatedAt,
-    Map<String, dynamic>? metadata,
-  }) {
-    return Thread(
-      id: id ?? this.id,
-      title: title ?? this.title,
-      users: users ?? this.users,
-      invites: invites ?? this.invites,
-      checkpoints: checkpoints ?? this.checkpoints,
-      status: status ?? this.status,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      metadata: metadata ?? this.metadata,
-    );
-  }
-}
+import 'sequencer/sample_bank.dart';
 
 class ThreadsState extends ChangeNotifier {
-  List<Thread> _threads = [];
+  final WebSocketClient _wsClient;
+
+  // Identity
   String? _currentUserId;
   String? _currentUserName;
+
+  // Data
+  final List<Thread> _threads = [];
   Thread? _activeThread;
+  final Map<String, List<Message>> _messagesByThread = {};
+
+  // UI state
   bool _isLoading = false;
   String? _error;
-  String? _expandedCheckpointId; // Track which checkpoint is magnified
+
+  // Snapshot service factory deps
+  final TableState _tableState;
+  final PlaybackState _playbackState;
+  final SampleBankState _sampleBankState;
+
+  ThreadsState({
+    required WebSocketClient wsClient,
+    required TableState tableState,
+    required PlaybackState playbackState,
+    required SampleBankState sampleBankState,
+  })  : _wsClient = wsClient,
+        _tableState = tableState,
+        _playbackState = playbackState,
+        _sampleBankState = sampleBankState {
+    _registerWsHandlers();
+  }
 
   // Getters
-  List<Thread> get threads => _threads;
-  String? get currentUserId => _currentUserId;
-  String? get currentUserName => _currentUserName;
+  List<Thread> get threads => List.unmodifiable(_threads);
   Thread? get activeThread => _activeThread;
-  Thread? get currentThread => _activeThread; // Alias for convenience
+  // Backward-compat alias for older call sites
+  Thread? get currentThread => _activeThread;
+  List<Message> get activeThreadMessages =>
+      _activeThread == null ? const [] : List.unmodifiable(_messagesByThread[_activeThread!.id] ?? const []);
   bool get isLoading => _isLoading;
   String? get error => _error;
-  String? get expandedCheckpointId => _expandedCheckpointId;
-
-  // Get threads where user is a participant
-  List<Thread> getUserThreads(String userId) {
-    return _threads.where((thread) => thread.hasUser(userId)).toList();
-  }
-
-  // Get threads created by a specific user
-  List<Thread> getUserCreatedThreads(String userId) {
-    return _threads.where((thread) => thread.author.id == userId).toList();
-  }
+  String? get currentUserId => _currentUserId;
+  String? get currentUserName => _currentUserName;
 
   void setCurrentUser(String userId, [String? userName]) {
     _currentUserId = userId;
@@ -604,492 +69,283 @@ class ThreadsState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setLoading(bool loading) {
-    _isLoading = loading;
+  void _setLoading(bool value) {
+    _isLoading = value;
     notifyListeners();
   }
 
-  void setError(String? error) {
-    _error = error;
+  void _setError(String? value) {
+    _error = value;
     notifyListeners();
   }
 
-  void setExpandedCheckpoint(String? checkpointId) {
-    _expandedCheckpointId = checkpointId;
-    notifyListeners();
-  }
-
-  // Create a new thread (can be solo or with collaborators)
-  Future<String> createThread({
-    required String title,
-    required String authorId,
-    required String authorName,
-    List<String> collaboratorIds = const [],
-    List<String> collaboratorNames = const [],
-    SequencerSnapshot? initialSnapshot,
-    Map<String, dynamic> metadata = const {},
-    bool createInitialCheckpoint = true, // New parameter to control initial checkpoint
-  }) async {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Create thread users list (author first, then collaborators)
-      final users = <ThreadUser>[
-        ThreadUser(
-          id: authorId,
-          name: authorName,
-          joinedAt: DateTime.now(),
-        ),
-      ];
-
-      // Add collaborators
-      for (int i = 0; i < collaboratorIds.length; i++) {
-        users.add(ThreadUser(
-          id: collaboratorIds[i],
-          name: i < collaboratorNames.length ? collaboratorNames[i] : 'User ${collaboratorIds[i]}',
-          joinedAt: DateTime.now(),
-        ));
-      }
-
-      // Create initial checkpoint only if requested
-      ProjectCheckpoint? initialCheckpoint;
-      if (createInitialCheckpoint && initialSnapshot != null) {
-        initialCheckpoint = ProjectCheckpoint(
-          id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
-          userId: authorId,
-          userName: authorName,
-          timestamp: DateTime.now(),
-          comment: collaboratorIds.isEmpty 
-              ? 'Created project "${title}"'
-              : 'Started collaboration on "${title}"',
-          snapshot: initialSnapshot,
-        );
-      }
-
-      // Create thread using service
-      final threadId = await ThreadsService.createThread(
-        title: title,
-        users: users,
-        initialCheckpoint: initialCheckpoint, // Can be null now
-        metadata: metadata,
-      );
-
-      // Create local thread object
-      final thread = Thread(
-        id: threadId,
-        title: title,
-        users: users,
-        checkpoints: initialCheckpoint != null ? [initialCheckpoint] : [], // Empty list if no initial checkpoint
-        status: ThreadStatus.active,
-        createdAt: DateTime.now(),
-        updatedAt: DateTime.now(),
-        metadata: metadata,
-      );
-
-      // Add to local state
-      _threads.add(thread);
-      setActiveThread(thread);
-
-      return threadId;
-    } catch (e) {
-      setError('Failed to create thread: $e');
-      rethrow;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Add a checkpoint to an existing thread
-  Future<void> addCheckpoint({
-    required String threadId,
-    required String userId,
-    required String userName,
-    required String comment,
-    required SequencerSnapshot snapshot,
-  }) async {
-    try {
-      setLoading(true);
-      setError(null);
-
-      final checkpoint = ProjectCheckpoint(
-        id: 'checkpoint_${DateTime.now().millisecondsSinceEpoch}',
-        userId: userId,
-        userName: userName,
-        timestamp: DateTime.now(),
-        comment: comment,
-        snapshot: snapshot,
-      );
-
-      await ThreadsService.addCheckpoint(threadId, checkpoint);
-
-      // Update local state
-      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
-      if (threadIndex != -1) {
-        final thread = _threads[threadIndex];
-        final updatedCheckpoints = [...thread.checkpoints, checkpoint];
-        _threads[threadIndex] = thread.copyWith(
-          checkpoints: updatedCheckpoints,
-          updatedAt: DateTime.now(),
-        );
-
-        if (_activeThread?.id == threadId) {
-          setActiveThread(_threads[threadIndex]);
-        }
-      }
-    } catch (e) {
-      setError('Failed to add checkpoint: $e');
-      rethrow;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Convenience method to add checkpoint from current sequencer state
-  Future<void> addCheckpointFromSequencer(String threadId, String comment, SequencerState sequencerState) async {
-    final snapshot = sequencerState.createSnapshot(comment: comment);
-    await addCheckpoint(
-      threadId: threadId,
-      userId: _currentUserId ?? 'unknown',
-      userName: _currentUserName ?? 'Unknown User',
-      comment: comment,
-      snapshot: snapshot,
-    );
-  }
-
-  // V2: Convenience method to add checkpoint from modular V2 states
-  Future<void> addCheckpointFromV2({
-    required String threadId,
-    required String comment,
-    required TableState tableState,
-    required SampleBankState sampleBankState,
-    required PlaybackState playbackState,
-  }) async {
-    // Build a simple snapshot from current UI-selected section
-    final sectionIndex = tableState.uiSelectedSection;
-    final rows = tableState.getSectionStepCount(sectionIndex);
-    final cols = tableState.maxCols;
-
-    // Build layers (single layer representing full column range for now)
-    final layerRows = <SequencerRow>[];
-    for (int r = 0; r < rows; r++) {
-      final cells = <SequencerCell>[];
-      for (int c = 0; c < cols; c++) {
-        final step = tableState.getSectionStartStep(sectionIndex) + r;
-        final ffi.Pointer<Cell> cellPtr = tableState.getCellPointer(step, c);
-        if (cellPtr.address != 0 && cellPtr.ref.sample_slot >= 0) {
-          final slot = cellPtr.ref.sample_slot;
-          cells.add(SequencerCell(
-            sample: CellSample(
-              sampleId: 'slot_$slot',
-              sampleName: sampleBankState.getSlotName(slot) ?? 'Sample $slot',
-            ),
-          ));
-        } else {
-          cells.add(const SequencerCell());
-        }
-      }
-      layerRows.add(SequencerRow(cells: cells));
-    }
-
-    final layer = SequencerLayer(
-      id: 'layer_000',
-      index: 0,
-      rows: layerRows,
-    );
-
-    // Build samples list from loaded slots (best-effort)
-    final samples = <SampleInfo>[];
-    for (int i = 0; i < sampleBankState.maxSlots; i++) {
-      if (sampleBankState.isSlotLoaded(i)) {
-        samples.add(SampleInfo(
-          id: 'slot_$i',
-          name: sampleBankState.getSlotName(i) ?? 'Sample $i',
-          url: sampleBankState.getSlotPath(i) ?? '',
-          isPublic: true,
-        ));
-      }
-    }
-
-    final section = SequencerSection(
-      layers: [layer],
-      metadata: SectionMetadata(
-        user: _currentUserId ?? 'unknown',
-        bpm: playbackState.bpm,
-        key: 'C Major',
-        timeSignature: '4/4',
-        createdAt: DateTime.now(),
-      ),
-    );
-
-    final audio = ProjectAudio(
-      format: 'wav',
-      duration: 0.0,
-      sampleRate: 48000,
-      channels: 2,
-      url: '',
-      renders: const [],
-      sources: [AudioSource(sections: [section], samples: samples)],
-    );
-
-    final snapshot = SequencerSnapshot(
-      id: 'snapshot_${DateTime.now().millisecondsSinceEpoch}',
-      name: comment,
-      createdAt: DateTime.now(),
-      version: '2.0',
-      audio: audio,
-    );
-
-    await addCheckpoint(
-      threadId: threadId,
-      userId: _currentUserId ?? 'unknown',
-      userName: _currentUserName ?? 'Unknown User',
-      comment: comment,
-      snapshot: snapshot,
-    );
-  }
-
-  // Note: Removed createSoloThread and ensureActiveSoloThread methods
-  // ThreadsState should only manage server data, not create local threads
-  // Use the sequencer's publishToDatabase method to create threads on server
-
-  // Join an existing thread
-  Future<void> joinThread({
-    required String threadId,
-    required String userId,
-    required String userName,
-  }) async {
-    try {
-      setLoading(true);
-      setError(null);
-
-      await ThreadsService.joinThread(threadId, userId, userName);
-
-      // Update local state
-      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
-      if (threadIndex != -1) {
-        final thread = _threads[threadIndex];
-        final newUser = ThreadUser(
-          id: userId,
-          name: userName,
-          joinedAt: DateTime.now(),
-        );
-        final updatedUsers = [...thread.users, newUser];
-        _threads[threadIndex] = thread.copyWith(
-          users: updatedUsers,
-          updatedAt: DateTime.now(),
-        );
-      }
-    } catch (e) {
-      setError('Failed to join thread: $e');
-      rethrow;
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // Load threads from service
   Future<void> loadThreads() async {
     try {
-      setLoading(true);
-      setError(null);
-
-      // Only load threads for the current user
-      if (_currentUserId == null) {
-        setError('User not authenticated');
-        return;
-      }
-      
-      final threads = await ThreadsService.getThreads(userId: _currentUserId);
-      _threads = threads;
+      _setLoading(true);
+      _setError(null);
+      final result = await ThreadsApi.getThreads(userId: _currentUserId);
+      _threads
+        ..clear()
+        ..addAll(result);
     } catch (e) {
-      setError('Failed to load threads: $e');
+      _setError('Failed to load threads: $e');
+      rethrow;
     } finally {
-      setLoading(false);
+      _setLoading(false);
     }
   }
 
-  // Load a specific thread
-  Future<Thread?> loadThread(String threadId) async {
+  Future<void> loadThread(String threadId) async {
     try {
-      setLoading(true);
-      setError(null);
-
-      final thread = await ThreadsService.getThread(threadId);
-      if (thread != null) {
-        final existingIndex = _threads.indexWhere((t) => t.id == threadId);
-        if (existingIndex != -1) {
-          _threads[existingIndex] = thread;
-        } else {
-          _threads.add(thread);
-        }
+      _setLoading(true);
+      _setError(null);
+      final thread = await ThreadsApi.getThread(threadId);
+      final existingIndex = _threads.indexWhere((t) => t.id == threadId);
+      if (existingIndex >= 0) {
+        _threads[existingIndex] = thread;
+      } else {
+        _threads.add(thread);
       }
-      return thread;
+      _activeThread = thread;
+      final messages = await ThreadsApi.getMessages(threadId);
+      _messagesByThread[threadId] = messages;
     } catch (e) {
-      setError('Failed to load thread: $e');
-      return null;
+      _setError('Failed to load thread: $e');
+      rethrow;
     } finally {
-      setLoading(false);
+      _setLoading(false);
+      notifyListeners();
     }
   }
 
-  void clearError() {
-    _error = null;
-    notifyListeners();
-  }
-
-  // Send invitation to user for a thread
-  Future<void> sendInvitation({
-    required String threadId,
-    required String userId,
-    required String userName,
-    required String invitedBy,
+  Future<String> createThread({
+    required List<ThreadUser> users,
+    Map<String, dynamic>? metadata,
   }) async {
     try {
-      setLoading(true);
-      setError(null);
+      _setLoading(true);
+      _setError(null);
+      final threadId = await ThreadsApi.createThread(users: users, metadata: metadata);
+      await loadThread(threadId);
+      return threadId;
+    } catch (e) {
+      _setError('Failed to create thread: $e');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
 
-      // Check if user is already part of thread or already invited
-      final thread = _threads.firstWhere((t) => t.id == threadId);
-      
-      if (thread.hasUser(userId)) {
-        throw Exception('User is already a member of this thread');
-      }
-      
-      if (thread.hasPendingInvite(userId)) {
-        throw Exception('User already has a pending invitation');
-      }
+  Future<void> sendMessageFromSequencer({
+    required String threadId,
+    Map<String, dynamic>? metadata,
+  }) async {
+    final snapshotService = SnapshotService(
+      tableState: _tableState,
+      playbackState: _playbackState,
+      sampleBankState: _sampleBankState,
+    );
+    final jsonString = snapshotService.exportToJson(name: metadata?['name'] ?? 'Snapshot');
+    final Map<String, dynamic> snapshotMap = json.decode(jsonString) as Map<String, dynamic>;
 
-      await ThreadsService.sendInvitation(threadId, userId, userName, invitedBy);
+    final tempId = 'local_${DateTime.now().microsecondsSinceEpoch}';
+    final pending = Message(
+      id: '',
+      createdAt: DateTime.now(),
+      timestamp: DateTime.now(),
+      userId: _currentUserId ?? 'unknown',
+      parentThread: threadId,
+      metadata: metadata ?? <String, dynamic>{},
+      snapshot: snapshotMap,
+      localTempId: tempId,
+      sendStatus: SendStatus.sending,
+    );
+    _messagesByThread.putIfAbsent(threadId, () => []);
+    _messagesByThread[threadId] = [..._messagesByThread[threadId]!, pending];
+    notifyListeners();
 
-      // Update local state - add the invite to the thread
-      final invite = ThreadInvite(
-        userId: userId,
-        userName: userName,
-        status: InviteStatus.pending,
-        invitedBy: invitedBy,
-        invitedAt: DateTime.now(),
+    try {
+      final saved = await ThreadsApi.createMessage(
+        threadId: threadId,
+        userId: _currentUserId ?? 'unknown',
+        snapshot: snapshotMap,
+        metadata: metadata,
+        timestamp: pending.timestamp,
       );
 
-      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
-      if (threadIndex != -1) {
-        final updatedInvites = [..._threads[threadIndex].invites, invite];
-        _threads[threadIndex] = _threads[threadIndex].copyWith(
-          invites: updatedInvites,
-          updatedAt: DateTime.now(),
-        );
-
-        if (_activeThread?.id == threadId) {
-          setActiveThread(_threads[threadIndex]);
+      // Replace pending with saved
+      final list = _messagesByThread[threadId] ?? [];
+      final idx = list.indexWhere((m) => m.localTempId == tempId);
+      if (idx >= 0) {
+        final updated = saved.copyWith(sendStatus: SendStatus.sent, localTempId: null);
+        list[idx] = updated;
+        _messagesByThread[threadId] = List<Message>.from(list);
+        notifyListeners();
+      } else {
+        // If not found (e.g., reconciled by websocket), append if missing by id
+        final exists = list.any((m) => m.id == saved.id);
+        if (!exists) {
+          _messagesByThread[threadId] = [...list, saved.copyWith(sendStatus: SendStatus.sent)];
+          notifyListeners();
         }
       }
     } catch (e) {
-      setError('Failed to send invitation: $e');
-      rethrow;
-    } finally {
-      setLoading(false);
+      // Mark as failed
+      final list = _messagesByThread[threadId] ?? [];
+      final idx = list.indexWhere((m) => m.localTempId == tempId);
+      if (idx >= 0) {
+        list[idx] = list[idx].copyWith(sendStatus: SendStatus.failed);
+        _messagesByThread[threadId] = List<Message>.from(list);
+        notifyListeners();
+      }
     }
   }
 
-  // Accept an invitation
-  Future<void> acceptInvitation({
+  Future<void> retrySendMessage(String threadId, String localTempId) async {
+    final list = _messagesByThread[threadId] ?? [];
+    final idx = list.indexWhere((m) => m.localTempId == localTempId);
+    if (idx < 0) return;
+    final pending = list[idx];
+    if (pending.sendStatus != SendStatus.failed) return;
+
+    _messagesByThread[threadId] = [
+      ...list..removeAt(idx),
+      pending.copyWith(sendStatus: SendStatus.sending),
+    ];
+    notifyListeners();
+
+    try {
+      final saved = await ThreadsApi.createMessage(
+        threadId: threadId,
+        userId: _currentUserId ?? 'unknown',
+        snapshot: pending.snapshot,
+        metadata: pending.metadata,
+        timestamp: pending.timestamp,
+      );
+      final refreshed = _messagesByThread[threadId] ?? [];
+      final idx2 = refreshed.indexWhere((m) => m.localTempId == localTempId);
+      if (idx2 >= 0) {
+        refreshed[idx2] = saved.copyWith(sendStatus: SendStatus.sent, localTempId: null);
+        _messagesByThread[threadId] = List<Message>.from(refreshed);
+        notifyListeners();
+      }
+    } catch (e) {
+      final refreshed = _messagesByThread[threadId] ?? [];
+      final idx2 = refreshed.indexWhere((m) => m.localTempId == localTempId);
+      if (idx2 >= 0) {
+        refreshed[idx2] = refreshed[idx2].copyWith(sendStatus: SendStatus.failed);
+        _messagesByThread[threadId] = List<Message>.from(refreshed);
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> applyMessage(Message message) async {
+    final service = SnapshotService(
+      tableState: _tableState,
+      playbackState: _playbackState,
+      sampleBankState: _sampleBankState,
+    );
+    try {
+      final jsonString = json.encode(message.snapshot);
+      final ok = await service.importFromJson(jsonString);
+      return ok;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // Invites
+  Future<void> sendInvite({
     required String threadId,
     required String userId,
     required String userName,
   }) async {
-    try {
-      setLoading(true);
-      setError(null);
-
-      await ThreadsService.acceptInvitation(threadId, userId);
-
-      // Update local state - add user to thread and remove invite
-      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
-      if (threadIndex != -1) {
-        final thread = _threads[threadIndex];
-        
-        // Add user to users list
-        final newUser = ThreadUser(
-          id: userId,
-          name: userName,
-          joinedAt: DateTime.now(),
-        );
-        final updatedUsers = [...thread.users, newUser];
-        
-        // Remove invite from invites list
-        final updatedInvites = thread.invites
-            .where((invite) => invite.userId != userId)
-            .toList();
-
-        _threads[threadIndex] = thread.copyWith(
-          users: updatedUsers,
-          invites: updatedInvites,
-          updatedAt: DateTime.now(),
-        );
-
+    if (_currentUserId == null) throw Exception('User not authenticated');
+    await ThreadsApi.sendInvite(
+      threadId: threadId,
+      userId: userId,
+      userName: userName,
+      invitedBy: _currentUserId!,
+    );
+    // Update local thread invites list
+    final index = _threads.indexWhere((t) => t.id == threadId);
+    if (index >= 0) {
+      final invites = [..._threads[index].invites];
+      invites.add(ThreadInvite(
+        userId: userId,
+        userName: userName,
+        status: 'pending',
+        invitedBy: _currentUserId!,
+        invitedAt: DateTime.now(),
+      ));
+      _threads[index] = _threads[index].copyWith(invites: invites);
         if (_activeThread?.id == threadId) {
-          setActiveThread(_threads[threadIndex]);
-        }
+        _activeThread = _threads[index];
       }
-    } catch (e) {
-      setError('Failed to accept invitation: $e');
-      rethrow;
-    } finally {
-      setLoading(false);
+      notifyListeners();
     }
   }
 
-  // Decline an invitation
-  Future<void> declineInvitation({
-    required String threadId,
-    required String userId,
-  }) async {
-    try {
-      setLoading(true);
-      setError(null);
-
-      await ThreadsService.declineInvitation(threadId, userId);
-
-      // Update local state - remove invite
-      final threadIndex = _threads.indexWhere((t) => t.id == threadId);
-      if (threadIndex != -1) {
-        final thread = _threads[threadIndex];
-        
-        // Remove invite from invites list
-        final updatedInvites = thread.invites
-            .where((invite) => invite.userId != userId)
-            .toList();
-
-        _threads[threadIndex] = thread.copyWith(
-          invites: updatedInvites,
-          updatedAt: DateTime.now(),
-        );
-
+  Future<void> acceptInvite({required String threadId, required String userId, required String userName}) async {
+    await ThreadsApi.acceptInvite(threadId: threadId, userId: userId);
+    final index = _threads.indexWhere((t) => t.id == threadId);
+    if (index >= 0) {
+      final thread = _threads[index];
+      final users = [...thread.users, ThreadUser(id: userId, name: userName, joinedAt: DateTime.now())];
+      final invites = thread.invites.where((i) => i.userId != userId).toList();
+      _threads[index] = thread.copyWith(users: users, invites: invites);
         if (_activeThread?.id == threadId) {
-          setActiveThread(_threads[threadIndex]);
-        }
+        _activeThread = _threads[index];
       }
-    } catch (e) {
-      setError('Failed to decline invitation: $e');
-      rethrow;
-    } finally {
-      setLoading(false);
+      notifyListeners();
     }
   }
 
-  // Get all threads where user has pending invitations
-  List<Thread> getThreadsWithPendingInvites(String userId) {
-    return _threads.where((thread) => thread.hasPendingInvite(userId)).toList();
+  Future<void> declineInvite({required String threadId, required String userId}) async {
+    await ThreadsApi.declineInvite(threadId: threadId, userId: userId);
+    final index = _threads.indexWhere((t) => t.id == threadId);
+    if (index >= 0) {
+      final thread = _threads[index];
+      final invites = thread.invites.where((i) => i.userId != userId).toList();
+      _threads[index] = thread.copyWith(invites: invites);
+        if (_activeThread?.id == threadId) {
+        _activeThread = _threads[index];
+      }
+      notifyListeners();
+    }
   }
 
-  // Get count of pending invitations for a user
-  int getPendingInvitesCount(String userId) {
-    int count = 0;
-    for (final thread in _threads) {
-      if (thread.hasPendingInvite(userId)) {
-        count++;
-      }
-    }
-    return count;
+  // WebSocket integration
+  void _registerWsHandlers() {
+    _wsClient.registerMessageHandler('message_created', _onMessageCreated);
   }
-} 
+
+  void disposeWs() {
+    _wsClient.unregisterAllHandlers('message_created');
+  }
+
+  void _onMessageCreated(Map<String, dynamic> payload) {
+    try {
+      final threadId = payload['parent_thread'] as String? ?? payload['thread_id'] as String?;
+      if (threadId == null) return;
+      final message = Message.fromJson(payload);
+      final list = _messagesByThread[threadId] ?? [];
+      // Reconcile: replace pending by snapshot/timestamp match or append if new
+      final pendingIdx = list.indexWhere((m) => m.sendStatus != null && m.sendStatus != SendStatus.sent && _isSameMessageContent(m, message));
+      if (pendingIdx >= 0) {
+        list[pendingIdx] = message.copyWith(sendStatus: SendStatus.sent, localTempId: null);
+      } else if (!list.any((m) => m.id == message.id)) {
+        list.add(message.copyWith(sendStatus: SendStatus.sent));
+      }
+      _messagesByThread[threadId] = List<Message>.from(list);
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  bool _isSameMessageContent(Message a, Message b) {
+    return a.userId == b.userId && (a.timestamp.difference(b.timestamp).inSeconds.abs() <= 2);
+  }
+}
+
+

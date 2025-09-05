@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
+import '../models/thread/thread.dart';
 
 import '../utils/app_colors.dart';
 import 'sequencer_screen_v2.dart';
@@ -297,7 +298,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             bottom: 0,
                             left: 0,
                             child: Text(
-                              mostRecentProject.title,
+                              'Project ${mostRecentProject.id.substring(0, 8)}',
                               style: GoogleFonts.sourceSans3(
                                 color: AppColors.menuPrimaryButtonText, // White text on dark button
                                 fontSize: 9,
@@ -436,7 +437,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        project.title,
+                        'Project ${project.id.substring(0, 10)}',
                         style: GoogleFonts.sourceSans3(
                           color: AppColors.menuText,
                           fontSize: 14,
@@ -445,7 +446,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         ),
                       ),
                       Text(
-                        '${project.checkpoints.length} checkpoints',
+                        '${project.messageIds.length} messages',
                         style: GoogleFonts.sourceSans3(
                           color: AppColors.menuLightText,
                           fontSize: 11,

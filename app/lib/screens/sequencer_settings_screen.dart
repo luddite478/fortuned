@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
-import '../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../utils/app_colors.dart';import '../widgets/app_header_widget.dart';
-import '../utils/app_colors.dart';import '../state/sequencer_state.dart';
-import '../utils/app_colors.dart';import '../state/threads_state.dart';
-import '../utils/app_colors.dart';import '../sequencer_library.dart';
-import '../utils/app_colors.dart';import 'checkpoints_screen.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../widgets/app_header_widget.dart';
+import '../sequencer_library.dart';
 import '../utils/app_colors.dart';
 class SequencerSettingsScreen extends StatefulWidget {
   const SequencerSettingsScreen({super.key});
@@ -184,79 +180,36 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
   }
 
   Widget _buildLayoutSelection() {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceBase,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(
-              color: AppColors.sequencerBorder,
-              width: 1,
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceBase,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.dashboard,
+            color: AppColors.sequencerAccent,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Layout selection unified in Sequencer V2',
+              style: GoogleFonts.sourceSans3(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.sequencerText,
+              ),
             ),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(
-                    Icons.dashboard,
-                    color: AppColors.sequencerAccent,
-                    size: 20,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    'Sequencer Layout',
-                    style: GoogleFonts.sourceSans3(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.sequencerText,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              
-              const SizedBox(height: 8),
-              
-              // Layout options
-              ...SequencerLayoutVersion.values.map((layout) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: RadioListTile<SequencerLayoutVersion>(
-                    value: layout,
-                    groupValue: sequencerState.selectedLayout,
-                    onChanged: (value) {
-                      if (value != null) {
-                        sequencerState.setSelectedLayout(value);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Layout changed to ${value.displayName}'),
-                            backgroundColor: Colors.green,
-                            duration: const Duration(seconds: 2),
-                          ),
-                        );
-                      }
-                    },
-                    title: Text(
-                      layout.displayName,
-                      style: GoogleFonts.sourceSans3(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.sequencerText,
-                      ),
-                    ),
-                    activeColor: AppColors.sequencerAccent,
-                    dense: true,
-                  ),
-                );
-              }).toList(),
-            ],
-          ),
-        );
-      },
+        ],
+      ),
     );
   }
 

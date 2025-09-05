@@ -9,6 +9,7 @@ import '../widgets/app_header_widget.dart';
 import '../state/threads_state.dart';
 import '../services/threads_service.dart';
 import '../utils/app_colors.dart';
+import '../models/thread/thread_user.dart';
 // New state imports for migration
 import '../state/sequencer/table.dart';
 import '../state/sequencer/playback.dart';
@@ -121,16 +122,15 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
         if (currentUserId != null) {
           // Create an unpublished thread for this new project
           final threadId = await threadsState.createThread(
-            title: 'Untitled ${DateTime.now().toString().substring(5, 16)}', // e.g. "Untitled Project 12-25 14:30"
-            authorId: currentUserId,
-            authorName: currentUserName ?? 'User',
+            users: [
+              ThreadUser(id: currentUserId, name: currentUserName ?? 'User', joinedAt: DateTime.now()),
+            ],
             metadata: {
               'project_type': 'solo',
-              'is_public': false, // Unpublished initially
-              // 'created_from': 'sequencer_v2',
-              // 'layout_version': 'v2',
+              'is_public': false,
+              'created_from': 'sequencer_v2',
+              'layout_version': 'v2',
             },
-            createInitialCheckpoint: false, // Don't create checkpoint until user makes changes
           );
           
           debugPrint('✅ Created new unpublished thread: $threadId');

@@ -3,11 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/users_service.dart';
 import '../services/threads_service.dart';
-import '../services/auth_service.dart';
 import '../state/threads_state.dart';
-import '../state/sequencer_state.dart';
-import '../screens/sequencer_screen_v2.dart';
+import '../screens/thread_screen.dart';
 import '../utils/app_colors.dart';
+import '../models/thread/thread.dart';
 
 class UserProfileWidget extends StatefulWidget {
   final String userId;
@@ -235,7 +234,7 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        project.title,
+                        'Project ${project.id.substring(0, 8)}',
                         style: GoogleFonts.sourceSans3(
                           color: AppColors.menuText,
                           fontSize: 14,
@@ -356,24 +355,14 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
         );
       }
 
-      // Load the project into sequencer
-      final sequencerState = context.read<SequencerState>();
-      final success = await sequencerState.loadFromThread(project.id);
-
-      if (success && mounted) {
-        // Navigate to V2 sequencer screen
+      // Load the thread and navigate to thread screen
+      final threadsState = context.read<ThreadsState>();
+      await threadsState.loadThread(project.id);
+      if (mounted) {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (context) => const SequencerScreenV2(),
-          ),
-        );
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to load project'),
-            backgroundColor: AppColors.menuErrorColor,
-            duration: Duration(seconds: 2),
+            builder: (context) => ThreadScreen(threadId: project.id),
           ),
         );
       }

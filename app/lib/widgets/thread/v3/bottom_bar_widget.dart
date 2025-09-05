@@ -4,7 +4,7 @@ import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
 import '../../../utils/app_colors.dart';import '../../../state/threads_state.dart';
 import '../../../utils/app_colors.dart';import '../../../services/threads_service.dart';
-import '../../../utils/app_colors.dart';import '../../../screens/checkpoints_screen.dart';
+import '../../../utils/app_colors.dart';import '../../../screens/thread_screen.dart';
 import '../../../utils/app_colors.dart';
 
 class BottomBarWidget extends StatefulWidget {

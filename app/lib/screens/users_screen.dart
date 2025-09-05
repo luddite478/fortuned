@@ -4,17 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import '../services/threads_service.dart';
 import '../services/users_service.dart';
 import '../services/auth_service.dart';
-import '../services/threads_service.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'user_profile_screen.dart';
 import 'sequencer_screen_v2.dart';
-import 'checkpoints_screen.dart';
+import 'thread_screen.dart';
 import '../state/threads_state.dart';
-import '../state/sequencer_state.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
-import 'package:path/path.dart' as p;
 import '../utils/app_colors.dart';
+import '../models/thread/thread.dart';
 
 class UsersScreen extends StatefulWidget {
   const UsersScreen({Key? key}) : super(key: key);
@@ -47,7 +42,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   void initState() {
     super.initState();
     
-          // Use the global ThreadsService and UsersService from Provider instead of creating new ones
+    // Use the global ThreadsService and UsersService from Provider instead of creating new ones
     _threadsService = Provider.of<ThreadsService>(context, listen: false);
     _usersService = Provider.of<UsersService>(context, listen: false);
     
@@ -60,7 +55,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     _setupThreadsServiceListeners();
   }
 
-  void _setupThreadsServiceListeners() async {
+  Future<void> _setupThreadsServiceListeners() async {
     // Setup listeners for online users from UsersService
     _usersService.onlineUsersStream.listen((users) {
       setState(() {
@@ -131,10 +126,8 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     // No need to connect here - it's already connected globally
     debugPrint('📡 Using global ThreadsService connection in users screen');
 
-    // Load user profiles from API
+    // Load user profiles and threads
     await _loadUserProfiles();
-    
-    // Load threads to check for pending invitations
     await _loadThreadsAndCheckInvitations();
   }
 
@@ -181,7 +174,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     final usersWithInvites = <String>{};
     for (final thread in threadsState.threads) {
       for (final invite in thread.invites) {
-        if (invite.userId == currentUserId && invite.status == InviteStatus.pending) {
+        if (invite.userId == currentUserId && invite.status == 'pending') {
           usersWithInvites.add(invite.invitedBy);
         }
       }
@@ -229,7 +222,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.menupageBackground,
+      backgroundColor: AppColors.menuPageBackground,
       body: SafeArea(
         child: Column(
           children: [
@@ -246,19 +239,19 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
             Expanded(
               child: _isLoading
                   ? Center(
-                      child: CircularProgressIndicator(color: AppColors.menulightText),
+                      child: CircularProgressIndicator(color: AppColors.menuLightText),
                     )
                   : _error != null
                       ? Center(
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.error_outline, color: AppColors.menulightText, size: 48),
+                              Icon(Icons.error_outline, color: AppColors.menuLightText, size: 48),
                               const SizedBox(height: 12),
                               Text(
                                 _error!, 
                                 style: GoogleFonts.sourceSans3(
-                                  color: AppColors.menulightText,
+                                  color: AppColors.menuLightText,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -272,12 +265,12 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                                   _loadUserProfiles();
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.menubuttonBackground,
+                                  backgroundColor: AppColors.menuButtonBackground,
                                 ),
                                 child: Text(
                                   'RETRY',
                                   style: GoogleFonts.sourceSans3(
-                                    color: AppColors.menutext,
+                                    color: AppColors.menuText,
                                     fontWeight: FontWeight.bold,
                                     letterSpacing: 1.0,
                                   ),
@@ -310,10 +303,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            color: AppColors.menuentryBackground,
+            color: AppColors.menuEntryBackground,
             border: Border(
               bottom: BorderSide(
-                color: AppColors.menuborder,
+                color: AppColors.menuBorder,
                 width: 1,
               ),
             ),
@@ -332,7 +325,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                         style: GoogleFonts.sourceSans3(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.menutext,
+                          color: AppColors.menuText,
                           letterSpacing: 1.5,
                         ),
                       ),
@@ -352,7 +345,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                   child: Icon(
                     Icons.logout,
                     size: 16,
-                    color: AppColors.menutext,
+                    color: AppColors.menuText,
                   ),
                 ),
               ),
@@ -364,7 +357,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 width: 8,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: AppColors.menuonlineIndicator,
+                  color: AppColors.menuOnlineIndicator,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -379,10 +372,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     return Container(
       height: 70, // Slightly taller to emphasize importance
       decoration: BoxDecoration(
-        color: AppColors.menubuttonBackground,
+        color: AppColors.menuButtonBackground,
         borderRadius: BorderRadius.circular(4), // Sharp, boxy corners like old directories
         border: Border.all(
-          color: AppColors.menubuttonBorder,
+          color: AppColors.menuButtonBorder,
           width: 2,
         ),
         boxShadow: [
@@ -414,7 +407,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                   child: Text(
                     'MY SEQUENCER',
                     style: GoogleFonts.sourceSans3(
-                      color: AppColors.menutext,
+                      color: AppColors.menuText,
                       fontSize: 17,
                       fontWeight: FontWeight.w800,
                       letterSpacing: 2,
@@ -423,7 +416,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 ),
                 Icon(
                   Icons.arrow_forward,
-                  color: AppColors.menutext,
+                  color: AppColors.menuText,
                   size: 20,
                 ),
               ],
@@ -452,10 +445,10 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       height: 48, // Compact like phone book entries
       margin: const EdgeInsets.only(bottom: 2), // Tight spacing like phone book
       decoration: BoxDecoration(
-        color: AppColors.menuentryBackground,
+        color: AppColors.menuEntryBackground,
         border: Border(
           bottom: BorderSide(
-            color: AppColors.menuborder,
+            color: AppColors.menuBorder,
             width: 0.5,
           ),
         ),
@@ -479,7 +472,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                       child: Text(
                         user.name,
                         style: GoogleFonts.sourceSans3(
-                          color: AppColors.menutext,
+                          color: AppColors.menuText,
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 1.2,
@@ -540,7 +533,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                           margin: const EdgeInsets.only(right: 4),
                           child: Icon(
                             isExpanded ? Icons.expand_less : Icons.expand_more,
-                            color: AppColors.menutext,
+                            color: AppColors.menuText,
                             size: 16,
                           ),
                         ),
@@ -552,7 +545,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                       height: 6,
                       decoration: BoxDecoration(
                         color: user.isOnline 
-                            ? AppColors.menuonlineIndicator 
+                            ? AppColors.menuOnlineIndicator 
                             : Colors.transparent,
                         shape: BoxShape.circle,
                       ),
@@ -632,7 +625,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
       width: double.infinity,
       height: double.infinity,
       color: Color.lerp(
-        AppColors.menuentryBackground,
+        AppColors.menuEntryBackground,
         const Color(0xFFF5F0D0), // Slightly highlighted yellow when active
         intensity,
       ),
@@ -660,15 +653,15 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     return Container(
       margin: const EdgeInsets.only(left: 16, right: 8, bottom: 2),
       decoration: BoxDecoration(
-        color: AppColors.menupageBackground.withOpacity(0.7),
+        color: AppColors.menuPageBackground.withOpacity(0.7),
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.menuborder, width: 0.5),
+        border: Border.all(color: AppColors.menuBorder, width: 0.5),
       ),
       child: Column(
         children: threads.map((thread) {
-          // Check if user has pending invitation to this thread
-          final hasPendingInvite = currentUserId != null && 
-              thread.hasPendingInvite(currentUserId);
+          // Check if user has pending invitation to this thread (new schema)
+          final hasPendingInvite = currentUserId != null &&
+              thread.invites.any((i) => i.userId == currentUserId && i.status == 'pending');
           
           return Container(
             padding: const EdgeInsets.all(8),
@@ -677,7 +670,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 bottom: BorderSide(
                   color: thread == threads.last 
                       ? Colors.transparent 
-                      : AppColors.menuborder,
+                      : AppColors.menuBorder,
                   width: 0.5,
                 ),
               ),
@@ -691,7 +684,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                   decoration: BoxDecoration(
                     color: hasPendingInvite 
                         ? const Color(0xFF3B82F6) 
-                        : AppColors.menulightText,
+                        : AppColors.menuLightText,
                     borderRadius: BorderRadius.circular(2),
                   ),
                   child: Icon(
@@ -711,9 +704,9 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                         children: [
                           Expanded(
                             child: Text(
-                              thread.title,
+                              'Thread',
                               style: GoogleFonts.sourceSans3(
-                                color: AppColors.menutext,
+                                color: AppColors.menuText,
                                 fontSize: 12,
                                 fontWeight: hasPendingInvite 
                                     ? FontWeight.w600 
@@ -745,16 +738,16 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                         Text(
                           'Invitation to collaborate',
                           style: GoogleFonts.sourceSans3(
-                            color: AppColors.menulightText,
+                            color: AppColors.menuLightText,
                             fontSize: 10,
                             fontWeight: FontWeight.w400,
                           ),
                         )
                       else
                         Text(
-                          '${thread.checkpoints.length} checkpoints',
+                          '${thread.messageIds.length} messages',
                           style: GoogleFonts.sourceSans3(
-                            color: AppColors.menulightText,
+                            color: AppColors.menuLightText,
                             fontSize: 10,
                             fontWeight: FontWeight.w400,
                           ),
@@ -767,7 +760,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
                 Text(
                   _formatThreadTimestamp(thread.updatedAt),
                   style: GoogleFonts.sourceSans3(
-                    color: AppColors.menulightText,
+                    color: AppColors.menuLightText,
                     fontSize: 9,
                     fontWeight: FontWeight.w400,
                   ),
@@ -810,28 +803,25 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
     final commonThreads = await _getCommonThreadsWithUser(user.id);
     
     if (commonThreads.isNotEmpty) {
-      // We have collaborations - navigate directly to checkpoints screen
+      // We have collaborations - navigate directly to thread screen
       debugPrint('🤝 Found ${commonThreads.length} common threads with ${user.name}');
       
       // Sort by updated date to get the latest thread
       commonThreads.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
       final latestThread = commonThreads.first;
       
-      debugPrint('📋 Opening checkpoints for latest thread: ${latestThread.title}');
+      debugPrint('📋 Opening thread: ${latestThread.id}');
       
       // Set the active thread in ThreadsState before navigating
       final threadsState = Provider.of<ThreadsState>(context, listen: false);
       threadsState.setActiveThread(latestThread);
       
-      // Navigate to checkpoints screen (chat-like interface)
+      // Navigate to thread screen (chat-like interface)
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CheckpointsScreenWithUserContext(
+          builder: (context) => ThreadScreen(
             threadId: latestThread.id,
-            targetUserId: user.id,
-            targetUserName: user.name,
-            commonThreads: commonThreads,
           ),
         ),
       );
@@ -857,6 +847,7 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
   Future<List<Thread>> _getCommonThreadsWithUser(String targetUserId) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
+      final threadsState = Provider.of<ThreadsState>(context, listen: false);
       final currentUserId = authService.currentUser?.id;
       
       debugPrint('🔍 Checking common threads: current=$currentUserId, target=$targetUserId');
@@ -866,27 +857,22 @@ class _UsersScreenState extends State<UsersScreen> with TickerProviderStateMixin
         return [];
       }
 
-      // Get threads for the target user
-      final targetUserThreads = await ThreadsService.getUserThreads(targetUserId);
-      debugPrint('📋 Found ${targetUserThreads.length} threads for target user');
-      
-      // Debug: Print thread participants
-      for (final thread in targetUserThreads) {
-        final userIds = thread.users.map((u) => u.id).toList();
-        debugPrint('   Thread "${thread.title}": users=$userIds');
+      // Filter locally by users list (new Thread model has users: List<ThreadUser>)
+      final threads = threadsState.threads;
+      final results = <Thread>[];
+      for (final thread in threads) {
+        final userIds = thread.users.map((u) => u.id).toSet();
+        if (userIds.contains(currentUserId) && userIds.contains(targetUserId)) {
+          results.add(thread);
+        }
       }
       
-      // Find threads where both current user and target user are participants
-      final commonThreads = targetUserThreads.where((thread) => 
-        thread.hasUser(currentUserId) && thread.hasUser(targetUserId)
-      ).toList();
-      
-      debugPrint('🤝 Found ${commonThreads.length} common threads');
-      for (final thread in commonThreads) {
-        debugPrint('   Common: "${thread.title}" (${thread.id})');
+      debugPrint('🤝 Found ${results.length} common threads');
+      for (final thread in results) {
+        debugPrint('   Common: ${thread.id}');
       }
       
-      return commonThreads;
+      return results;
     } catch (e) {
       debugPrint('❌ Error getting common threads: $e');
       return [];

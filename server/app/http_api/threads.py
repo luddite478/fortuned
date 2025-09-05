@@ -225,13 +225,61 @@ async def send_invitation_handler(request: Request, thread_id: str, invitation_d
                 from_user_id=invited_by,
                 from_user_name=inviter_name,
                 thread_id=thread_id,
-                thread_title=thread.get("title", "Untitled Thread")
+                thread_title=f"Thread {thread_id[:6]}"
             )
         except Exception as e:
             # Don't fail the request if WebSocket notification fails
             print(f"⚠️  Failed to send WebSocket notification: {e}")
         
         return {"status": "invitation_sent"}
+
+# Messages handlers (store messages in a separate collection with reference, or inline for simplicity)
+async def get_messages_handler(request: Request, thread_id: str, token: str):
+    verify_token(token)
+    try:
+        db = get_db()
+        # For now messages are stored in separate 'messages' collection
+        messages_cursor = db.messages.find({"parent_thread": thread_id}, {"_id": 0}).sort("timestamp", 1)
+        return {"messages": list(messages_cursor)}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+async def create_message_handler(request: Request, message_data: Dict[str, Any] = Body(...)):
+    verify_token(message_data.get("token", ""))
+    try:
+        db = get_db()
+        thread_id = message_data.get("parent_thread")
+        user_id = message_data.get("user_id")
+        snapshot = message_data.get("snapshot")
+        metadata = message_data.get("metadata", {})
+        timestamp = message_data.get("timestamp") or datetime.utcnow().isoformat() + "Z"
+        if not thread_id or not user_id or snapshot is None:
+            raise HTTPException(status_code=400, detail="parent_thread, user_id and snapshot are required")
+
+        # ensure thread exists
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
+
+        message_id = str(ObjectId())
+        created_at = datetime.utcnow().isoformat() + "Z"
+        doc = {
+            "id": message_id,
+            "created_at": created_at,
+            "timestamp": timestamp,
+            "user_id": user_id,
+            "parent_thread": thread_id,
+            "metadata": metadata,
+            "snapshot": snapshot,
+        }
+        db.messages.insert_one(doc)
+        # update thread messages array and updated_at
+        db.threads.update_one({"id": thread_id}, {"$push": {"messages": message_id}, "$set": {"updated_at": created_at}})
+        return doc
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer/sample_bank.dart';
 import '../../../state/sequencer/playback.dart';
 import '../../../state/threads_state.dart';
 import '../../../state/sequencer/table.dart';
-import '../../../screens/checkpoints_screen.dart';
+import '../../../screens/thread_screen.dart';
 
 class MessageBarWidget extends StatelessWidget {
   // Configuration variables for easy control
@@ -123,7 +122,7 @@ class MessageBarWidget extends StatelessWidget {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(leftBorderRadius),
-                                    onTap: () => _navigateToCheckpoints(context, threadsState),
+                                    onTap: () => _navigateToThread(context, threadsState),
                                     child: Center(
                                       child: Icon(
                                         Icons.format_list_bulleted,
@@ -191,7 +190,7 @@ class MessageBarWidget extends StatelessWidget {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(rightBorderRadius),
-                                    onTap: () => _sendCheckpointAndNavigate(context, threadsState),
+                                    onTap: () => _sendMessageAndNavigate(context, threadsState),
                                     child: Center(
                                       child: CustomPaint(
                                         size: Size(rightButtonSize * 0.4, rightButtonSize * 0.4),
@@ -251,19 +250,19 @@ class MessageBarWidget extends StatelessWidget {
     );
   }
 
-  void _navigateToCheckpoints(BuildContext context, ThreadsState threadsState) {
+  void _navigateToThread(BuildContext context, ThreadsState threadsState) {
     // Same logic as in app_header_widget.dart
     final thread = threadsState.activeThread;
     
     if (thread != null) {
-      // Set the active thread in ThreadsState so CheckpointsScreen can access it
+      // Set the active thread in ThreadsState
       threadsState.setActiveThread(thread);
       
-      // Navigate to checkpoints screen for this thread
+      // Navigate to thread screen for this thread
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CheckpointsScreen(
+          builder: (context) => ThreadScreen(
             threadId: thread.id,
           ),
         ),
@@ -280,71 +279,39 @@ class MessageBarWidget extends StatelessWidget {
     }
   }
 
-  void _navigateToCheckpointsWithHighlight(BuildContext context, ThreadsState threadsState) {
+  void _navigateToThreadWithHighlight(BuildContext context, ThreadsState threadsState) {
     // Same as _navigateToCheckpoints but with highlight for newest checkpoint
     final thread = threadsState.activeThread;
     
     if (thread != null) {
-      // Set the active thread in ThreadsState so CheckpointsScreen can access it
+      // Set the active thread in ThreadsState
       threadsState.setActiveThread(thread);
       
-      // Navigate to checkpoints screen with highlight for newest checkpoint
+      // Navigate to thread screen with highlight for newest message
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CheckpointsScreen(
+          builder: (context) => ThreadScreen(
             threadId: thread.id,
-            highlightNewest: true, // Flag to highlight the newest checkpoint
+            highlightNewest: true,
           ),
         ),
       );
     }
   }
 
-  void _sendCheckpointAndNavigate(BuildContext context, ThreadsState threadsState) async {
-    // Same save/send logic as in app_header_widget.dart but without popups
+  void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) async {
     final activeThread = threadsState.activeThread;
-    
     try {
       if (activeThread != null) {
-        // Check if this is unpublished solo thread (SAVE) or published/collaborative (SEND)
-        final isUnpublishedSolo = activeThread.users.length == 1 && 
-                                 activeThread.users.first.id == threadsState.currentUserId &&
-                                 !(activeThread.metadata['is_public'] ?? false);
-        
-        if (isUnpublishedSolo) {
-          // Case: Unpublished solo thread - add checkpoint to same thread (SAVE)
-          await threadsState.addCheckpointFromV2(
-            threadId: activeThread.id,
-            comment: 'Saved changes',
-            tableState: Provider.of<TableState>(context, listen: false),
-            sampleBankState: Provider.of<SampleBankState>(context, listen: false),
-            playbackState: Provider.of<PlaybackState>(context, listen: false),
-          );
-          
-          if (context.mounted) {
-            // Navigate to checkpoints after successful save
-            _navigateToCheckpointsWithHighlight(context, threadsState);
-          }
-        } else {
-          // Case: Published/collaborative thread - create fork or add checkpoint (SEND)
-          await threadsState.addCheckpointFromV2(
-            threadId: activeThread.id,
-            comment: 'New contribution',
-            tableState: Provider.of<TableState>(context, listen: false),
-            sampleBankState: Provider.of<SampleBankState>(context, listen: false),
-            playbackState: Provider.of<PlaybackState>(context, listen: false),
-          );
-          
-          if (context.mounted) {
-            // Navigate to checkpoints after successful send
-            _navigateToCheckpointsWithHighlight(context, threadsState);
-          }
+        await threadsState.sendMessageFromSequencer(threadId: activeThread.id);
+        if (context.mounted) {
+          _navigateToThreadWithHighlight(context, threadsState);
         }
       }
     } catch (e) {
       // Silent error handling - no popups
-      debugPrint('Error saving checkpoint: $e');
+      debugPrint('Error sending message: $e');
     }
   }
 }

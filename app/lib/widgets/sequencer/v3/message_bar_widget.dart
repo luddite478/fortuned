@@ -1,55 +1,38 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';import 'package:google_fonts/google_fonts.dart';
-import '../../../utils/app_colors.dart';import 'package:provider/provider.dart';
-import '../../../utils/app_colors.dart';import '../../../state/sequencer_state.dart';
-import '../../../utils/app_colors.dart';import '../../../state/threads_state.dart';
-import '../../../utils/app_colors.dart';import '../../../screens/checkpoints_screen.dart';
 import '../../../utils/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../../../state/threads_state.dart';
+import '../../../screens/thread_screen.dart';
+import '../../../state/sequencer/table.dart';
 
 class MessageBarWidget extends StatelessWidget {
-  // Configuration variables for easy control
-  // Container space allocation (must sum to 1.0 or less)
-  static const double leftButtonContainerPercent = 0.15; // 15% of bar width
-  static const double centerButtonContainerPercent = 0.7; // 65% of bar width  
-  static const double rightButtonContainerPercent = 0.15; // 20% of bar width
-  
-  // Button positioning within containers (0.0 = left/top, 1.0 = right/bottom)
-  static const double leftButtonHorizontalPosition = 0.8; // Center horizontally
-  static const double centerButtonHorizontalPosition = 0.5; // Center horizontally
-  static const double rightButtonHorizontalPosition = 0.5; // Center horizontally
-  
-  // Button sizes (as percentage of container size)
-  static const double leftButtonWidthPercent = 0.9; // 80% of container width
-  static const double leftButtonHeightPercent = 0.7; // 80% of container height
-  static const double centerButtonWidthPercent = 1; // 90% of container width
-  static const double centerButtonHeightPercent = 0.7; // 80% of container height
-  static const double rightButtonSizePercent = 0.5; // 80% of container size (square)
-  
-  // Border radius controls
-  static const double leftButtonsBorderRadiusPercent = 0.1; // 0.0 = square, 0.5 = fully round
-  static const double rightButtonBorderRadiusPercent = 0.5; // 50% for perfect circle
-  
-  // Container background colors
-  // static const Color leftContainerBackgroundColor = Color.fromARGB(255, 168, 168, 45);
-  // static const Color centerContainerBackgroundColor = Color.fromARGB(255, 154, 14, 14);
-  // static const Color rightContainerBackgroundColor = Color.fromARGB(255, 82, 11, 104);
-
+  static const double leftButtonContainerPercent = 0.15;
+  static const double centerButtonContainerPercent = 0.7;
+  static const double rightButtonContainerPercent = 0.15;
+  static const double leftButtonHorizontalPosition = 0.8;
+  static const double centerButtonHorizontalPosition = 0.5;
+  static const double rightButtonHorizontalPosition = 0.5;
+  static const double leftButtonWidthPercent = 0.9;
+  static const double leftButtonHeightPercent = 0.7;
+  static const double centerButtonWidthPercent = 1;
+  static const double centerButtonHeightPercent = 0.7;
+  static const double rightButtonSizePercent = 0.5;
+  static const double leftButtonsBorderRadiusPercent = 0.1;
+  static const double rightButtonBorderRadiusPercent = 0.5;
   static const Color leftContainerBackgroundColor = AppColors.sequencerCellEmpty;
   static const Color centerContainerBackgroundColor = AppColors.sequencerCellEmpty;
   static const Color rightContainerBackgroundColor = Color.fromARGB(255, 67, 65, 65);
-  
-  // Parent container settings
-  static const double parentContainerWidthPercent = 0.975; // 90% of bar width
-  static const double parentContainerHeightPercent = 1; // 100% of bar height
+  static const double parentContainerWidthPercent = 0.975;
+  static const double parentContainerHeightPercent = 1;
   static const Color parentContainerBackgroundColor = Color.fromARGB(255, 255, 3, 3);
-  static const double parentContainerBorderRadiusPercent = 0.5; // 0.0 = square, 0.5 = fully round
-  
+  static const double parentContainerBorderRadiusPercent = 0.5;
+
   const MessageBarWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4), // Removed horizontal padding
+      padding: const EdgeInsets.symmetric(vertical: 4),
       decoration: BoxDecoration(
         color: AppColors.sequencerSurfaceBase,
         border: Border(
@@ -61,34 +44,26 @@ class MessageBarWidget extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Consumer2<SequencerState, ThreadsState>(
-          builder: (context, sequencerState, threadsState, child) {
+        child: Consumer2<TableState, ThreadsState>(
+          builder: (context, tableState, threadsState, child) {
             return LayoutBuilder(
               builder: (context, constraints) {
                 final barHeight = constraints.maxHeight;
                 final barWidth = constraints.maxWidth;
-                
-                // Calculate container sizes
                 final leftContainerWidth = barWidth * leftButtonContainerPercent;
                 final centerContainerWidth = barWidth * centerButtonContainerPercent;
                 final rightContainerWidth = barWidth * rightButtonContainerPercent;
-                
-                // Calculate button sizes
                 final leftButtonWidth = leftContainerWidth * leftButtonWidthPercent;
                 final leftButtonHeight = barHeight * leftButtonHeightPercent;
                 final centerButtonWidth = centerContainerWidth * centerButtonWidthPercent;
                 final centerButtonHeight = barHeight * centerButtonHeightPercent;
                 final rightButtonSize = rightContainerWidth * rightButtonSizePercent;
-                
-                // Calculate border radius
                 final leftBorderRadius = leftButtonHeight * leftButtonsBorderRadiusPercent;
                 final rightBorderRadius = rightButtonSize * rightButtonBorderRadiusPercent;
-                
-                // Calculate parent container size
                 final parentContainerWidth = barWidth * parentContainerWidthPercent;
                 final parentContainerHeight = barHeight * parentContainerHeightPercent;
                 final parentBorderRadius = parentContainerHeight * parentContainerBorderRadiusPercent;
-                
+
                 return Center(
                   child: Container(
                     width: parentContainerWidth,
@@ -99,7 +74,6 @@ class MessageBarWidget extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        // Left button container
                         Expanded(
                           flex: (leftButtonContainerPercent * 100).round(),
                           child: Container(
@@ -122,7 +96,7 @@ class MessageBarWidget extends StatelessWidget {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(leftBorderRadius),
-                                    onTap: () => _navigateToCheckpoints(context, sequencerState, threadsState),
+                                    onTap: () => _navigateToThread(context, threadsState),
                                     child: Center(
                                       child: Icon(
                                         Icons.format_list_bulleted,
@@ -136,8 +110,6 @@ class MessageBarWidget extends StatelessWidget {
                             ),
                           ),
                         ),
-                        
-                        // Center button container
                         Expanded(
                           flex: (centerButtonContainerPercent * 100).round(),
                           child: Container(
@@ -157,14 +129,12 @@ class MessageBarWidget extends StatelessWidget {
                                   ),
                                 ),
                                 child: Center(
-                                  child: _buildSectionChain(sequencerState.numSections),
+                                  child: _buildSectionChain(tableState.sectionsCount),
                                 ),
                               ),
                             ),
                           ),
                         ),
-                        
-                        // Right button container
                         Expanded(
                           flex: (rightButtonContainerPercent * 100).round(),
                           child: Container(
@@ -190,7 +160,7 @@ class MessageBarWidget extends StatelessWidget {
                                   color: Colors.transparent,
                                   child: InkWell(
                                     borderRadius: BorderRadius.circular(rightBorderRadius),
-                                    onTap: () => _sendCheckpointAndNavigate(context, sequencerState, threadsState),
+                                    onTap: () => _sendMessageAndNavigate(context, threadsState),
                                     child: Center(
                                       child: CustomPaint(
                                         size: Size(rightButtonSize * 0.4, rightButtonSize * 0.4),
@@ -220,7 +190,6 @@ class MessageBarWidget extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(numSections * 2 - 1, (index) {
         if (index.isEven) {
-          // Square representing a section
           return Container(
             width: 12,
             height: 12,
@@ -235,7 +204,6 @@ class MessageBarWidget extends StatelessWidget {
             ),
           );
         } else {
-          // Horizontal line connecting sections
           return Container(
             width: 8,
             height: 2,
@@ -250,25 +218,17 @@ class MessageBarWidget extends StatelessWidget {
     );
   }
 
-  void _navigateToCheckpoints(BuildContext context, SequencerState sequencer, ThreadsState threadsState) {
-    // Same logic as in app_header_widget.dart
-    final thread = sequencer.sourceThread ?? threadsState.activeThread;
-    
+  void _navigateToThread(BuildContext context, ThreadsState threadsState) {
+    final thread = threadsState.activeThread;
     if (thread != null) {
-      // Set the active thread in ThreadsState so CheckpointsScreen can access it
       threadsState.setActiveThread(thread);
-      
-      // Navigate to checkpoints screen for this thread
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CheckpointsScreen(
-            threadId: thread.id,
-          ),
+          builder: (context) => ThreadScreen(threadId: thread.id),
         ),
       );
     } else {
-      // No active thread - show message that user needs to publish first
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Publish your project first to create checkpoints'),
@@ -279,85 +239,34 @@ class MessageBarWidget extends StatelessWidget {
     }
   }
 
-  void _navigateToCheckpointsWithHighlight(BuildContext context, SequencerState sequencer, ThreadsState threadsState) {
-    // Same as _navigateToCheckpoints but with highlight for newest checkpoint
-    final thread = sequencer.sourceThread ?? threadsState.activeThread;
-    
+  void _navigateToThreadWithHighlight(BuildContext context, ThreadsState threadsState) {
+    final thread = threadsState.activeThread;
     if (thread != null) {
-      // Set the active thread in ThreadsState so CheckpointsScreen can access it
       threadsState.setActiveThread(thread);
-      
-      // Navigate to checkpoints screen with highlight for newest checkpoint
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => CheckpointsScreen(
-            threadId: thread.id,
-            highlightNewest: true, // Flag to highlight the newest checkpoint
-          ),
+          builder: (context) => ThreadScreen(threadId: thread.id, highlightNewest: true),
         ),
       );
     }
   }
 
-  void _sendCheckpointAndNavigate(BuildContext context, SequencerState sequencer, ThreadsState threadsState) async {
-    // Same save/send logic as in app_header_widget.dart but without popups
+  void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) async {
     final activeThread = threadsState.activeThread;
-    final sourceThread = sequencer.sourceThread;
-    
     try {
-      if (sourceThread != null) {
-        // Case: Sourced project - create fork with modifications (SEND)
-        final success = await sequencer.createProjectFork(
-          comment: 'Modified version',
-          threadsService: null, // Use default threads service
-        );
-        
-        if (success && context.mounted) {
-          // Navigate to checkpoints after successful send
-          _navigateToCheckpointsWithHighlight(context, sequencer, threadsState);
-        }
-        return; // Exit early after handling sourced project
-      } else if (activeThread != null) {
-        // Check if this is unpublished solo thread (SAVE) or published/collaborative (SEND)
-        final isUnpublishedSolo = activeThread.users.length == 1 && 
-                                 activeThread.users.first.id == threadsState.currentUserId &&
-                                 !(activeThread.metadata['is_public'] ?? false);
-        
-        if (isUnpublishedSolo) {
-          // Case: Unpublished solo thread - add checkpoint to same thread (SAVE)
-          final success = await threadsState.addCheckpointFromSequencer(
-            activeThread.id,
-            'Saved changes',
-            sequencer,
-          );
-          
-          if (context.mounted) {
-            // Navigate to checkpoints after successful save
-            _navigateToCheckpointsWithHighlight(context, sequencer, threadsState);
-          }
-        } else {
-          // Case: Published/collaborative thread - create fork or add checkpoint (SEND)
-          final success = await threadsState.addCheckpointFromSequencer(
-            activeThread.id,
-            'New contribution',
-            sequencer,
-          );
-          
-          if (context.mounted) {
-            // Navigate to checkpoints after successful send
-            _navigateToCheckpointsWithHighlight(context, sequencer, threadsState);
-          }
+      if (activeThread != null) {
+        await threadsState.sendMessageFromSequencer(threadId: activeThread.id);
+        if (context.mounted) {
+          _navigateToThreadWithHighlight(context, threadsState);
         }
       }
     } catch (e) {
-      // Silent error handling - no popups
-      debugPrint('Error saving checkpoint: $e');
+      debugPrint('Error sending message: $e');
     }
   }
 }
 
-// Custom painter for outlined triangle pointing downward
 class TrianglePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
@@ -367,20 +276,9 @@ class TrianglePainter extends CustomPainter {
       ..strokeWidth = 2.0;
 
     final path = Path();
-    
-    // path.moveTo(size.width * 0.0, size.height * 0.2);
-    // path.lineTo(size.width * 0.8, size.height * 1); 
-    // path.lineTo(size.width * 0.8, size.height * 0.0); 
-    
-    // path.moveTo(size.width * 0.2, size.height * 0.2); 
-    // path.lineTo(size.width * 0.5, size.height * 0.8); 
-    // path.lineTo(size.width * 0.8, size.height * 0.2); 
-
-    path.moveTo(size.width * 0.0, size.height * 0.0); // Top-left
-    path.lineTo(size.width * 1, size.height * 0.5); // Middle-right (point)
-    path.lineTo(size.width * 0.0, size.height * 1); // Bottom-left
-
-    
+    path.moveTo(size.width * 0.0, size.height * 0.0);
+    path.lineTo(size.width * 1, size.height * 0.5);
+    path.lineTo(size.width * 0.0, size.height * 1);
     canvas.drawPath(path, paint);
   }
 

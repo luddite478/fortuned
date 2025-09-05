@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../state/threads_state.dart';
+// import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../models/thread/thread.dart';
+import '../models/thread/thread_user.dart';
 import 'http_client.dart';
 import 'ws_client.dart';
 
@@ -98,18 +98,7 @@ class ThreadInvitationNotification {
 }
 
 class ThreadsService {
-  static String get _baseUrl {
-    final serverIp = dotenv.env['SERVER_HOST'] ?? '';
-    final apiPort = dotenv.env['HTTPS_API_PORT'] ?? '443';
-    final protocol = 'https';
-    final port = apiPort == '443' ? '' : ':$apiPort';
-    return '$protocol://$serverIp$port/api/v1';
-  }
-  
-  static String get _apiToken {
-    final token = dotenv.env['API_TOKEN'] ?? '';
-    return token;
-  }
+  // Legacy REST base URL and token kept for reference; not used in new flow
 
   // WebSocket client for real-time communication (injected)
   final WebSocketClient _wsClient;
@@ -316,7 +305,6 @@ class ThreadsService {
   static Future<String> createThread({
     required String title,
     required List<ThreadUser> users,
-    ProjectCheckpoint? initialCheckpoint,
     Map<String, dynamic> metadata = const {},
   }) async {
     try {
@@ -326,9 +314,7 @@ class ThreadsService {
         'metadata': metadata,
       };
       
-      if (initialCheckpoint != null) {
-        body['initial_checkpoint'] = initialCheckpoint.toJson();
-      }
+      // initialCheckpoint is removed in new snapshot flow
 
       final response = await ApiHttpClient.post('/threads', body: body);
 
@@ -344,21 +330,7 @@ class ThreadsService {
   }
 
   // Add a checkpoint to an existing thread
-  static Future<void> addCheckpoint(String threadId, ProjectCheckpoint checkpoint) async {
-    try {
-      final body = <String, dynamic>{
-        'checkpoint': checkpoint.toJson(),
-      };
-
-      final response = await ApiHttpClient.post('/threads/$threadId/checkpoints', body: body);
-
-      if (response.statusCode != 200 && response.statusCode != 201) {
-        throw Exception('Failed to add checkpoint: ${response.statusCode} ${response.body}');
-      }
-    } catch (e) {
-      throw Exception('Network error adding checkpoint: $e');
-    }
-  }
+  // Legacy checkpoint APIs removed in favor of message snapshots
 
   // Add a checkpoint from raw JSON map (snake_case), for new snapshot flow
   static Future<void> addCheckpointJson(String threadId, Map<String, dynamic> checkpointJson) async {
@@ -459,14 +431,14 @@ class ThreadsService {
   // Update thread metadata
   static Future<void> updateThread(String threadId, {
     String? title,
-    ThreadStatus? status,
+    String? status,
     Map<String, dynamic>? metadata,
   }) async {
     try {
       final updateData = <String, dynamic>{};
       
       if (title != null) updateData['title'] = title;
-      if (status != null) updateData['status'] = status.name;
+      if (status != null) updateData['status'] = status;
       if (metadata != null) updateData['metadata'] = metadata;
 
       final response = await ApiHttpClient.put('/threads/$threadId', body: updateData);

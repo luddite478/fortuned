@@ -13,6 +13,9 @@ import 'services/http_client.dart';
 import 'state/threads_state.dart';
 import 'services/ws_client.dart';
 // import 'state/patterns_state.dart';
+import 'state/sequencer/table.dart';
+import 'state/sequencer/playback.dart';
+import 'state/sequencer/sample_bank.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,19 +31,29 @@ void main() async {
     print('Applied DevHttpOverrides for stage environment');
   }
   
-  runApp(const NiyyaApp());
+  runApp(const App());
 }
 
-class NiyyaApp extends StatelessWidget {
-  const NiyyaApp({super.key});
+class App extends StatelessWidget {
+  const App({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthService()),
-        ChangeNotifierProvider(create: (context) => ThreadsState()),
         Provider(create: (context) => WebSocketClient()),
+        ChangeNotifierProvider(create: (context) => TableState()),
+        ChangeNotifierProvider(create: (context) => PlaybackState(Provider.of<TableState>(context, listen: false))),
+        ChangeNotifierProvider(create: (context) => SampleBankState()),
+        ChangeNotifierProvider(
+          create: (context) => ThreadsState(
+            wsClient: Provider.of<WebSocketClient>(context, listen: false),
+            tableState: Provider.of<TableState>(context, listen: false),
+            playbackState: Provider.of<PlaybackState>(context, listen: false),
+            sampleBankState: Provider.of<SampleBankState>(context, listen: false),
+          ),
+        ),
         Provider(
           create: (context) => ThreadsService(
             wsClient: Provider.of<WebSocketClient>(context, listen: false),
@@ -53,7 +66,7 @@ class NiyyaApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'NIYYA',
+        title: 'App',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),

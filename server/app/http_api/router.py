@@ -15,7 +15,9 @@ from http_api.threads import (
     get_thread_handler,
     update_thread_handler,
     send_invitation_handler,
-    manage_invitation_handler
+    manage_invitation_handler,
+    get_messages_handler,
+    create_message_handler,
 )
 from typing import Dict, Any
 import json
@@ -50,21 +52,23 @@ async def get_users(request: Request, token: str = Query(...), limit: int = Quer
     """Get list of users"""
     return await get_users_handler(request, token, limit, offset)
 
-# Threads endpoints
-@router.get("/threads/thread")
-async def get_thread(request: Request, id: str = Query(...), token: str = Query(...)):
-    """Get thread by ID"""
-    return await get_thread_handler(request, id, token)
-
-@router.get("/threads/list")
+# Threads endpoints (new paths)
+@router.get("/threads")
 async def get_threads(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0), user_id: Optional[str] = Query(None)):
-    """Get list of threads"""
+    """Get list of threads (new path)"""
     return await get_threads_handler(request, token, limit, offset, user_id)
 
-@router.post("/threads/create")
-async def create_thread(request: Request, thread_data: dict):
-    """Create new thread"""
+@router.get("/threads/{thread_id}")
+async def get_thread_by_path(request: Request, thread_id: str, token: str = Query(...)):
+    """Get thread by ID (new path)"""
+    return await get_thread_handler(request, thread_id, token)
+
+@router.post("/threads")
+async def create_thread_new(request: Request, thread_data: dict):
+    """Create new thread (new path)"""
     return await create_thread_handler(request, thread_data)
+
+# Legacy endpoints removed per new API spec
 
  
 
@@ -85,3 +89,14 @@ async def send_invitation(request: Request, thread_id: str, invitation_data: Dic
 async def manage_invitation(request: Request, thread_id: str, user_id: str, action_data: Dict[str, Any] = Body(...)):
     """Accept or decline thread invitation"""
     return await manage_invitation_handler(request, thread_id, user_id, action_data)
+
+# Messages endpoints
+@router.get("/messages")
+async def get_messages(request: Request, thread_id: str = Query(...), token: str = Query(...)):
+    """List messages for a thread"""
+    return await get_messages_handler(request, thread_id, token)
+
+@router.post("/messages")
+async def create_message(request: Request, message_data: Dict[str, Any] = Body(...)):
+    """Create a message (snapshot) for a thread"""
+    return await create_message_handler(request, message_data)

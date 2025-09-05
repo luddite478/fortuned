@@ -8,6 +8,7 @@ import '../state/threads_state.dart';
 import '../utils/app_colors.dart';
 import '../widgets/common_header_widget.dart';
 import 'user_profile_screen.dart';
+import '../models/thread/thread.dart';
 
 class NetworkScreen extends StatefulWidget {
   const NetworkScreen({Key? key}) : super(key: key);
@@ -198,7 +199,7 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
     final usersWithInvites = <String>{};
     for (final thread in threadsState.threads) {
       for (final invite in thread.invites) {
-        if (invite.userId == currentUserId && invite.status == InviteStatus.pending) {
+        if (invite.userId == currentUserId && invite.status == 'pending') {
           usersWithInvites.add(invite.invitedBy);
         }
       }
@@ -592,10 +593,14 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
     if (currentUserId == null) return [];
     
     // Find threads where both current user and the target user are participants
-    return threadsState.threads.where((thread) {
-      final userIds = thread.users.map((u) => u.id).toList();
-      return userIds.contains(currentUserId) && userIds.contains(userId);
-    }).toList();
+    final List<Thread> list = [];
+    for (final t in threadsState.threads) {
+      final userIds = t.users.map((u) => u.id).toList();
+      if (userIds.contains(currentUserId) && userIds.contains(userId)) {
+        list.add(t);
+      }
+    }
+    return list;
   }
 
   Widget _buildThreadsList(User user, List<Thread> threads) {
@@ -612,8 +617,8 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
       child: Column(
         children: threads.map((thread) {
           // Check if user has pending invitation to this thread
-          final hasPendingInvite = currentUserId != null && 
-              thread.hasPendingInvite(currentUserId);
+          final hasPendingInvite = currentUserId != null &&
+              thread.invites.any((i) => i.userId == currentUserId && i.status == 'pending');
           
           return Container(
             padding: const EdgeInsets.all(8),
@@ -656,7 +661,7 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
                         children: [
                           Expanded(
                             child: Text(
-                              thread.title,
+                              'Project ${thread.id.substring(0, 8)}',
                               style: GoogleFonts.sourceSans3(
                                 color: AppColors.menuText,
                                 fontSize: 12,
@@ -697,7 +702,7 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
                         )
                       else
                         Text(
-                          '${thread.checkpoints.length} checkpoints',
+                          '${thread.messageIds.length} messages',
                           style: GoogleFonts.sourceSans3(
                             color: AppColors.menuLightText,
                             fontSize: 10,
@@ -787,17 +792,18 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
       // Debug: Print thread participants
       for (final thread in targetUserThreads) {
         final userIds = thread.users.map((u) => u.id).toList();
-        debugPrint('   Thread "${thread.title}": users=$userIds');
+        debugPrint('   Thread ${thread.id}: users=$userIds');
       }
       
       // Find threads where both current user and target user are participants
-      final commonThreads = targetUserThreads.where((thread) => 
-        thread.hasUser(currentUserId) && thread.hasUser(targetUserId)
-      ).toList();
+      final commonThreads = targetUserThreads.where((thread) {
+        final ids = thread.users.map((u) => u.id).toSet();
+        return ids.contains(currentUserId) && ids.contains(targetUserId);
+      }).toList();
       
       debugPrint('🤝 Found ${commonThreads.length} common threads');
       for (final thread in commonThreads) {
-        debugPrint('   Common: "${thread.title}" (${thread.id})');
+        debugPrint('   Common: ${thread.id}');
       }
       
       return commonThreads;

@@ -36,12 +36,8 @@ class ShareWidget extends StatelessWidget {
               final padding = panelHeight * 0.05; // 5% of given height
               final borderRadius = contentHeight * 0.08; // Scale with content height
               
-              // Show publish button if available
-              final activeThread = threadsState.activeThread;
-              final canPublish = activeThread == null || 
-                                (activeThread.users.length == 1 && 
-                                 activeThread.users.first.id == threadsState.currentUserId &&
-                                 !(activeThread.metadata['is_public'] ?? false));
+              // Publish flow removed in new model; hide publish button
+              final canPublish = false;
               
               // Calculate layout: top button row + spacing + recordings area
               final buttonRowHeight = contentHeight * 0.25; // 25% of content for button row
@@ -399,7 +395,7 @@ class ShareWidget extends StatelessWidget {
       final activeThread = threadsState.activeThread;
       
       print('📋 Active thread before publish: ${activeThread?.id}');
-      print('📋 Active thread checkpoints count: ${activeThread?.checkpoints.length ?? 0}');
+      print('📋 Active thread messages count: ${activeThread?.messageIds.length ?? 0}');
       print('👤 Current user ID: ${threadsState.currentUserId}');
       print('👤 Current user name: ${threadsState.currentUserName}');
 
@@ -412,7 +408,7 @@ class ShareWidget extends StatelessWidget {
       // Check active thread after publishing
       final activeThreadAfter = threadsState.activeThread;
       print('📋 Active thread after publish: ${activeThreadAfter?.id}');
-      print('📋 Active thread checkpoints count after: ${activeThreadAfter?.checkpoints.length ?? 0}');
+      print('📋 Active thread messages count after: ${activeThreadAfter?.messageIds.length ?? 0}');
       
       if (!context.mounted) return;
       
