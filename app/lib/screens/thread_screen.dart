@@ -8,6 +8,7 @@ import '../models/thread/thread.dart';
 import '../utils/app_colors.dart';
 import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
+import '../widgets/sections_chain_squares.dart';
 
 class ThreadScreen extends StatefulWidget {
   final String threadId;
@@ -218,16 +219,28 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               ],
             ),
             const SizedBox(height: 8),
-            GestureDetector(
-              onTap: () => _applyMessage(context, message),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildSoundGridPreview(message.snapshot),
-                  const SizedBox(height: 8),
-                  _buildMediaBar(message),
-                ],
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMessagePreviewFromMetadata(message),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: OutlinedButton(
+                    onPressed: () => _applyMessage(context, message),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.menuText,
+                      side: BorderSide(color: AppColors.menuText),
+                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                      minimumSize: const Size(0, 28),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: const Text('Load'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -403,6 +416,39 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       const Color(0xFFef4444),
     ];
     return colors[layerIndex % colors.length];
+  }
+
+  Widget _buildMessagePreviewFromMetadata(Message message) {
+    final meta = message.snapshotMetadata ?? const {};
+    final loops = (meta['sections_loops_num'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
+    final layers = (meta['layers'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
+    if (loops.isEmpty || layers.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final len = loops.length < layers.length ? loops.length : layers.length;
+    final loopsTrimmed = loops.sublist(0, len);
+    final layersTrimmed = layers.sublist(0, len);
+
+    return Container(
+      height: 80,
+      decoration: BoxDecoration(
+        color: AppColors.menuBorder.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(2),
+        border: Border.all(
+          color: AppColors.menuBorder,
+          width: 0.5,
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: SectionsChainSquares(
+          loopsPerSection: loopsTrimmed,
+          layersPerSection: layersTrimmed,
+          squareSize: 18,
+          connectorWidth: 8,
+        ),
+      ),
+    );
   }
 
   PreferredSizeWidget _buildHeader(BuildContext context) {

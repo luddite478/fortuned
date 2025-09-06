@@ -138,15 +138,19 @@ class ThreadsState extends ChangeNotifier {
 
   Future<void> sendMessageFromSequencer({
     required String threadId,
-    Map<String, dynamic>? metadata,
   }) async {
     final snapshotService = SnapshotService(
       tableState: _tableState,
       playbackState: _playbackState,
       sampleBankState: _sampleBankState,
     );
-    final jsonString = snapshotService.exportToJson(name: metadata?['name'] ?? 'Snapshot');
+    final jsonString = snapshotService.exportToJson(name: 'Snapshot');
     final Map<String, dynamic> snapshotMap = json.decode(jsonString) as Map<String, dynamic>;
+    final snapshotMetadata = <String, dynamic>{
+      'sections_loops_num': _playbackState.getSectionsLoopsNum(),
+      'layers': _tableState.getLayersLengthPerSection(),
+      'renders': <dynamic>[],
+    };
 
     final tempId = 'local_${DateTime.now().microsecondsSinceEpoch}';
     final pending = Message(
@@ -155,8 +159,8 @@ class ThreadsState extends ChangeNotifier {
       timestamp: DateTime.now(),
       userId: _currentUserId ?? 'unknown',
       parentThread: threadId,
-      metadata: metadata ?? <String, dynamic>{},
       snapshot: snapshotMap,
+      snapshotMetadata: snapshotMetadata,
       localTempId: tempId,
       sendStatus: SendStatus.sending,
     );
@@ -169,7 +173,7 @@ class ThreadsState extends ChangeNotifier {
         threadId: threadId,
         userId: _currentUserId ?? 'unknown',
         snapshot: snapshotMap,
-        metadata: metadata,
+        snapshotMetadata: snapshotMetadata,
         timestamp: pending.timestamp,
       );
 
@@ -219,7 +223,7 @@ class ThreadsState extends ChangeNotifier {
         threadId: threadId,
         userId: _currentUserId ?? 'unknown',
         snapshot: pending.snapshot,
-        metadata: pending.metadata,
+        snapshotMetadata: pending.snapshotMetadata,
         timestamp: pending.timestamp,
       );
       final refreshed = _messagesByThread[threadId] ?? [];

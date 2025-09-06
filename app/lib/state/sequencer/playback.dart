@@ -351,6 +351,20 @@ class PlaybackState extends ChangeNotifier {
   int get currentSectionLoop => _currentSectionLoop;
   int get currentSectionLoopsNum => _currentSectionLoopsNum;
   bool get initialized => _initialized;
+
+  /// Get loops count for all sections as a list (length = sectionsCount)
+  List<int> getSectionsLoopsNum() {
+    final List<int> result = [];
+    try {
+      final ptr = _playback_ffi.playbackGetStatePtr();
+      if (ptr.address == 0) return result;
+      final count = _tableState.sectionsCount;
+      for (int i = 0; i < count; i++) {
+        result.add(ptr.ref.sections_loops_num.elementAt(i).value);
+      }
+    } catch (_) {}
+    return result;
+  }
   
   @override
   void dispose() {

@@ -6,8 +6,8 @@ class Message {
   final DateTime timestamp;
   final String userId;
   final String? parentThread;
-  final Map<String, dynamic> metadata;
   final Map<String, dynamic> snapshot;
+  final Map<String, dynamic>? snapshotMetadata;
 
   // Client-only
   final String? localTempId;
@@ -19,8 +19,8 @@ class Message {
     required this.timestamp,
     required this.userId,
     required this.parentThread,
-    required this.metadata,
     required this.snapshot,
+    this.snapshotMetadata,
     this.localTempId,
     this.sendStatus,
   });
@@ -32,8 +32,8 @@ class Message {
       timestamp: DateTime.parse(json['timestamp'] ?? DateTime.now().toIso8601String()),
       userId: json['user_id'] ?? '',
       parentThread: json['parent_thread'],
-      metadata: Map<String, dynamic>.from(json['metadata'] ?? {}),
       snapshot: Map<String, dynamic>.from(json['snapshot'] ?? {}),
+      snapshotMetadata: json['snapshot_metadata'] == null ? null : Map<String, dynamic>.from(json['snapshot_metadata'] as Map<String, dynamic>),
     );
   }
 
@@ -43,8 +43,8 @@ class Message {
         'timestamp': timestamp.toIso8601String(),
         'user_id': userId,
         'parent_thread': parentThread,
-        'metadata': metadata,
         'snapshot': snapshot,
+        if (snapshotMetadata != null) 'snapshot_metadata': snapshotMetadata,
       };
 
   Message copyWith({
@@ -53,8 +53,8 @@ class Message {
     DateTime? timestamp,
     String? userId,
     String? parentThread,
-    Map<String, dynamic>? metadata,
     Map<String, dynamic>? snapshot,
+    Map<String, dynamic>? snapshotMetadata,
     String? localTempId,
     SendStatus? sendStatus,
   }) {
@@ -64,8 +64,8 @@ class Message {
       timestamp: timestamp ?? this.timestamp,
       userId: userId ?? this.userId,
       parentThread: parentThread ?? this.parentThread,
-      metadata: metadata ?? this.metadata,
       snapshot: snapshot ?? this.snapshot,
+      snapshotMetadata: snapshotMetadata ?? this.snapshotMetadata,
       localTempId: localTempId ?? this.localTempId,
       sendStatus: sendStatus ?? this.sendStatus,
     );

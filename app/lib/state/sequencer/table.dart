@@ -387,6 +387,14 @@ class TableState extends ChangeNotifier {
   int get uiSelectedSection => _uiSelectedSection;
   int get uiSelectedLayer => _uiSelectedLayer;
   bool get initialized => _initialized;
+
+  /// Get layers-per-section count including empty layers (length = sectionsCount)
+  List<int> getLayersLengthPerSection() {
+    final count = sectionsCount;
+    if (count <= 0) return const <int>[];
+    // All sections expose the same maxLayersPerSection, include empty ones
+    return List<int>.filled(count, maxLayersPerSection);
+  }
   
   // Get section-specific data using direct sections access
   int getSectionStepCount([int? sectionIndex]) {

@@ -255,7 +255,8 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
         thread_id = message_data.get("parent_thread")
         user_id = message_data.get("user_id")
         snapshot = message_data.get("snapshot")
-        metadata = message_data.get("metadata", {})
+        # Explicitly supported optional: snapshot_metadata
+        snapshot_metadata = message_data.get("snapshot_metadata")
         timestamp = message_data.get("timestamp") or datetime.utcnow().isoformat() + "Z"
         if not thread_id or not user_id or snapshot is None:
             raise HTTPException(status_code=400, detail="parent_thread, user_id and snapshot are required")
@@ -273,8 +274,8 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
             "timestamp": timestamp,
             "user_id": user_id,
             "parent_thread": thread_id,
-            "metadata": metadata,
             "snapshot": snapshot,
+            **({"snapshot_metadata": snapshot_metadata} if snapshot_metadata is not None else {}),
         }
         db.messages.insert_one(doc)
         # update thread messages array and updated_at

@@ -24,12 +24,12 @@ class SnapshotImporter {
       debugPrint('📥 [SNAPSHOT_IMPORT] Starting import from JSON');
 
       final dynamic jsonData = json.decode(jsonString);
-      if (jsonData is! Map<String, dynamic> || !jsonData.containsKey('snapshot')) {
+      if (jsonData is! Map<String, dynamic>) {
         debugPrint('❌ [SNAPSHOT_IMPORT] Invalid JSON structure');
         return false;
       }
 
-      final snapshot = jsonData['snapshot'] as Map<String, dynamic>;
+      final snapshot = jsonData;
       final source = snapshot['source'] as Map<String, dynamic>;
 
       // Import in order: sample_bank -> table -> playback
@@ -219,13 +219,10 @@ class SnapshotImporter {
       final dynamic jsonData = json.decode(jsonString);
       if (jsonData is! Map<String, dynamic>) return false;
 
-      final snapshot = jsonData['snapshot'];
-      if (snapshot is! Map<String, dynamic>) return false;
-
-      final schemaVersion = snapshot['schema_version'];
+      final schemaVersion = jsonData['schema_version'];
       if (schemaVersion != 1) return false;
 
-      final source = snapshot['source'];
+      final source = jsonData['source'];
       if (source is! Map<String, dynamic>) return false;
 
       // Basic validation - check required fields exist
@@ -251,13 +248,12 @@ class SnapshotImporter {
       final dynamic jsonData = json.decode(jsonString);
       if (jsonData is! Map<String, dynamic>) return null;
 
-      final snapshot = jsonData['snapshot'] as Map<String, dynamic>;
+      final snapshot = jsonData;
       return {
         'id': snapshot['id'],
         'name': snapshot['name'],
         'description': snapshot['description'],
         'created_at': snapshot['created_at'],
-        'version': snapshot['version'],
         'schema_version': snapshot['schema_version'],
       };
 

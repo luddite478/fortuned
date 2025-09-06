@@ -38,8 +38,13 @@
         { "type": "null" }
       ]
     },
-    "metadata": {
+    "snapshot_metadata": {
       "type": "object",
+      "properties": {
+        "sections_loops_num": { "type": "array", "items": { "type": "integer" } },
+        "layers": { "type": "array", "items": { "type": "integer" } },
+        "renders": { "type": "array", "items": { "type": "object" } }
+      },
       "additionalProperties": true
     },
     "snapshot": {

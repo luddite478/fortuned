@@ -3,65 +3,57 @@
     "title": "Sequencer Snapshot Schema",
     "type": "object",
     "properties": {
-        "snapshot": {
+        "schema_version": {
+            "type": "integer",
+            "enum": [1]
+        },
+        "id": {
+            "type": "string",
+            "pattern": "^[a-fA-F0-9]{24}$",
+            "minLength": 24,
+            "maxLength": 24
+        },
+        "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+        },
+        "created_at": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "source": {
             "type": "object",
             "properties": {
-                "schema_version": {
-                    "type": "integer",
-                    "enum": [1]
-                },
-                "id": {
-                    "type": "string",
-                    "pattern": "^[a-fA-F0-9]{24}$",
-                    "minLength": 24,
-                    "maxLength": 24
-                },
-                "name": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 200
-                },
-                "created_at": {
-                    "type": "string",
-                    "format": "date-time"
-                },
-                "source": {
+                "table": {
                     "type": "object",
-                    "properties": {
-                        "table": {
-                            "type": "object",
-                            "additionalProperties": true
-                        },
-                        "playback": {
-                            "type": "object",
-                            "additionalProperties": true
-                        },
-                        "sample_bank": {
-                            "type": "object",
-                            "additionalProperties": true
-                        }
-                    },
-                    "additionalProperties": false
+                    "additionalProperties": true
                 },
-                "renders": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": true
-                    }
+                "playback": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "sample_bank": {
+                    "type": "object",
+                    "additionalProperties": true
                 }
             },
-            "required": [
-                "schema_version",
-                "id",
-                "name",
-                "created_at",
-                "version",
-                "source"
-            ],
             "additionalProperties": false
+        },
+        "renders": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "additionalProperties": true
+            }
         }
     },
-    "required": ["snapshot"],
+    "required": [
+        "schema_version",
+        "id",
+        "name",
+        "created_at",
+        "source"
+    ],
     "additionalProperties": false
 }

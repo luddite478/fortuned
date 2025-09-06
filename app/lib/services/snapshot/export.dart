@@ -27,20 +27,17 @@ class SnapshotExporter {
     String? description,
   }) {
     final snapshot = {
-      'snapshot': {
-        'schema_version': 1,
-        'id': id ?? _generateSnapshotId(),
-        'name': name,
-        'description': description,
-        'created_at': DateTime.now().toUtc().toIso8601String(),
-        'version': '0.0.1',
-        'source': {
-          'table': _exportTableState(),
-          'playback': _exportPlaybackState(),
-          'sample_bank': _exportSampleBankState(),
-        },
-        'renders': [], // Empty for now, can be extended later
-      }
+      'schema_version': 1,
+      'id': id ?? _generateSnapshotId(),
+      'name': name,
+      'description': description,
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'source': {
+        'table': _exportTableState(),
+        'playback': _exportPlaybackState(),
+        'sample_bank': _exportSampleBankState(),
+      },
+      'renders': [], // Empty for now, can be extended later
     };
 
     return JsonEncoder.withIndent('  ').convert(snapshot);
