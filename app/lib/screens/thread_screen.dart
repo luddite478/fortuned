@@ -342,7 +342,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     }
 
     return Container(
-      height: 80,
+      height: 100,
       decoration: BoxDecoration(
         color: AppColors.menuBorder.withOpacity(0.3),
         borderRadius: BorderRadius.circular(2),
@@ -444,8 +444,6 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         child: SectionsChainSquares(
           loopsPerSection: loopsTrimmed,
           layersPerSection: layersTrimmed,
-          squareSize: 18,
-          connectorWidth: 8,
         ),
       ),
     );
@@ -514,19 +512,6 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     if (!mounted) return;
     if (ok) {
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Applied message successfully', style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500)),
-          backgroundColor: AppColors.menuOnlineIndicator,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Failed to apply message'),
-          backgroundColor: Colors.red,
-        ),
-      );
     }
   }
 

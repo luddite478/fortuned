@@ -277,9 +277,11 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
             "snapshot": snapshot,
             **({"snapshot_metadata": snapshot_metadata} if snapshot_metadata is not None else {}),
         }
-        db.messages.insert_one(doc)
+        # Insert a shallow copy so the original doc isn't mutated with Mongo's _id
+        db.messages.insert_one({**doc})
         # update thread messages array and updated_at
         db.threads.update_one({"id": thread_id}, {"$push": {"messages": message_id}, "$set": {"updated_at": created_at}})
+        # Return the original doc (contains only strings), avoiding ObjectId in response
         return doc
     except Exception as e:
         if isinstance(e, HTTPException): raise e
