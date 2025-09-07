@@ -20,12 +20,10 @@ class AuthService extends ChangeNotifier {
   bool get isLoading => _isLoading;
 
   AuthService() {
-    print('🐛 [AUTH] AuthService constructor called');
     _loadAuthState();
   }
 
   Future<void> _loadAuthState() async {
-    print('🐛 [AUTH] Starting _loadAuthState()');
     _isLoading = true;
     notifyListeners();
 
@@ -35,40 +33,32 @@ class AuthService extends ChangeNotifier {
       final userJson = prefs.getString(_userKey);
       final loginTime = prefs.getInt(_loginTimeKey);
       
-      print('🐛 [AUTH] Loaded from storage:');
-      print('🐛   - token: ${_token != null ? 'EXISTS' : 'null'}');
-      print('🐛   - userJson: ${userJson != null ? 'EXISTS' : 'null'}');
-      print('🐛   - loginTime: $loginTime');
-
       if (_token != null && userJson != null && loginTime != null) {
         // Check if login is still valid (7 days)
         final loginDate = DateTime.fromMillisecondsSinceEpoch(loginTime);
         final daysSinceLogin = DateTime.now().difference(loginDate).inDays;
         
-        print('🐛 [AUTH] Login age: $daysSinceLogin days');
-        
         if (daysSinceLogin < 7) {
-          _currentUser = UserProfile.fromJson(json.decode(userJson));
-          _isAuthenticated = true;
-          print('🐛 [AUTH] ✅ User authenticated from storage: ${_currentUser?.id}');
+          final candidate = UserProfile.fromJson(json.decode(userJson));
+          final isHex24 = RegExp(r'^[0-9a-fA-F]{24}$').hasMatch(candidate.id);
+          if (isHex24) {
+            _currentUser = candidate;
+            _isAuthenticated = true;
+            print('🐛 [AUTH] ✅ User authenticated from storage: ${_currentUser?.id}');
+          } else {
+            await clearAuthState();
+          }
         } else {
           // Login expired, clear stored data
-          print('🐛 [AUTH] ❌ Login expired, clearing stored data');
           await clearAuthState();
         }
       } else {
-        print('🐛 [AUTH] ❌ No valid stored auth data found');
       }
     } catch (e) {
-      print('🐛 [AUTH] ❌ Error loading auth state: $e');
       await clearAuthState();
     }
 
     _isLoading = false;
-    print('🐛 [AUTH] _loadAuthState() completed:');
-    print('🐛   - _isLoading: $_isLoading');
-    print('🐛   - _isAuthenticated: $_isAuthenticated');
-    print('🐛   - _currentUser: ${_currentUser?.id ?? 'null'}');
     notifyListeners();
   }
 

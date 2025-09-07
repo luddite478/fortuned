@@ -20,15 +20,11 @@ import 'state/sequencer/sample_bank.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  print('Loaded .env file');
-  print('API_TOKEN: "${dotenv.env['API_TOKEN']}"');
-  print('All env keys: ${dotenv.env.keys.toList()}');
   
   // Apply DevHttpOverrides for stage environment to trust self-signed certificates
   final env = dotenv.env['ENV'] ?? '';
   if (env == 'stage') {
     HttpOverrides.global = DevHttpOverrides();
-    print('Applied DevHttpOverrides for stage environment');
   }
   
   runApp(const App());
@@ -100,41 +96,28 @@ class _MainPageState extends State<MainPage> {
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     final threadsService = Provider.of<ThreadsService>(context, listen: false);
     
-    print('🔍 Attempting to sync current user...');
-    print('🔍 AuthService currentUser: ${authService.currentUser?.id} (${authService.currentUser?.name})');
-    print('🔍 ThreadsState currentUserId: ${threadsState.currentUserId}');
-    
-    // Note: Removed SequencerState integration since we're using new sequencer implementation
-    print('🔗 Using new sequencer implementation - no SequencerState integration needed');
-    
     if (authService.currentUser != null) {
       threadsState.setCurrentUser(
         authService.currentUser!.id,
         authService.currentUser!.name,
       );
-      print('🔗 Synced current user to ThreadsState: ${authService.currentUser!.id} (${authService.currentUser!.name})');
       
       // Initialize single WebSocket connection for this user
       _initializeThreadsService(threadsService, authService.currentUser!.id, context);
     } else {
-      print('❌ No current user found in AuthService');
     }
   }
 
   void _initializeThreadsService(ThreadsService threadsService, String userId, BuildContext context) async {
     try {
-      print('📡 Initializing global ThreadsService for user: $userId');
       final success = await threadsService.connectRealtime(userId);
       if (success) {
-        print('📡 ✅ Global ThreadsService connected successfully');
         // Get UsersService and request online users
         final usersService = Provider.of<UsersService>(context, listen: false);
         usersService.requestOnlineUsers();
       } else {
-        print('📡 ❌ Failed to connect global ThreadsService');
       }
     } catch (e) {
-      print('📡 ❌ Error connecting global ThreadsService: $e');
     }
   }
 
@@ -143,18 +126,10 @@ class _MainPageState extends State<MainPage> {
     // Show users screen as the initial view
     return Consumer2<AuthService, ThreadsService>(
       builder: (context, authService, threadsService, child) {
-        // 🐛 DEBUG: Log authentication state
-        print('🐛 [DEBUG] AuthService state:');
-        print('🐛   - isLoading: ${authService.isLoading}');
-        print('🐛   - isAuthenticated: ${authService.isAuthenticated}');
-        print('🐛   - currentUser: ${authService.currentUser?.id ?? 'null'}');
-        print('🐛   - _hasInitializedUser: $_hasInitializedUser');
-        
         // 🔧 FIX: Sync current user when AuthService finishes loading and user is authenticated
         if (!authService.isLoading && authService.isAuthenticated && authService.currentUser != null && !_hasInitializedUser) {
           _hasInitializedUser = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
-            print('🔧 [FIX] Syncing current user after authentication completed');
             _syncCurrentUser();
           });
         }
@@ -168,12 +143,10 @@ class _MainPageState extends State<MainPage> {
         if (!authService.isAuthenticated && threadsService.isConnected) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             threadsService.dispose();
-            print('📡 Disconnected ThreadsService due to logout');
           });
         }
         
         if (authService.isLoading) {
-          print('🐛 [DEBUG] Showing loading screen');
           return const Scaffold(
             backgroundColor: Colors.black,
             body: Center(
@@ -185,11 +158,9 @@ class _MainPageState extends State<MainPage> {
         }
 
         if (!authService.isAuthenticated) {
-          print('🐛 [DEBUG] User not authenticated, showing LoginScreen');
           return const LoginScreen();
         }
 
-        print('🐛 [DEBUG] User authenticated, showing MainNavigationScreen');
         return const MainNavigationScreen();
       },
     );

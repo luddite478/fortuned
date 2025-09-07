@@ -9,6 +9,8 @@ import os
 from pymongo import MongoClient
 from pydantic import BaseModel
 from db.connection import get_database
+from bson import ObjectId
+from bson import ObjectId
 
 # Initialize database connection
 db = get_database()
@@ -70,6 +72,8 @@ async def login_handler(request: Request, login_data: LoginRequest):
         if not user.get('is_active', True):
             raise HTTPException(status_code=403, detail="Account is deactivated")
         
+        # IDs are now seeded as Mongo 24-hex in init; no migration at login
+
         # Update last login
         db.users.update_one(
             {"id": user['id']},
@@ -106,8 +110,8 @@ async def register_handler(request: Request, register_data: RegisterRequest):
         # Hash password
         password_hash, salt = hash_password(register_data.password)
         
-        # Create new user
-        user_id = str(uuid.uuid4())
+        # Create new user (Mongo-style 24-hex ID)
+        user_id = str(ObjectId())
         new_user = {
             "id": user_id,
             "username": register_data.username,

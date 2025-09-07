@@ -9,7 +9,7 @@
         },
         "id": {
             "type": "string",
-            "format": "uuid"
+            "pattern": "^[a-fA-F0-9]{24}$"
         },
         "username": {
             "type": "string",

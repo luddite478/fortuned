@@ -25,7 +25,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadProjects();
+    // Defer to next frame to avoid setState during build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadProjects();
+      }
+    });
   }
 
   Future<void> _loadProjects() async {

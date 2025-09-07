@@ -20,7 +20,9 @@ class WebSocketClient {
   static String get serverUrl {
     final host = dotenv.env['WEBSOCKET_HOST'] ?? '';
     final port = dotenv.env['WEBSOCKET_PORT'] ?? '8765';
-    final protocol = 'wss';
+    // Use wss for 443 or when explicitly configured; otherwise ws
+    final isSecure = (dotenv.env['WEBSOCKET_SECURE'] ?? '').toLowerCase() == 'true' || port == '443';
+    final protocol = isSecure ? 'wss' : 'ws';
     final portSuffix = port == '443' ? '' : ':$port';
     return '$protocol://$host$portSuffix';
   }
@@ -80,6 +82,14 @@ class WebSocketClient {
         onDone: _handleDisconnect,
       );
       
+      // Ensure we surface server error messages
+      registerMessageHandler('error', (msg) {
+        final m = msg['message'] ?? 'unknown error';
+        if (!_errorController.isClosed) {
+          _errorController.add('Server error: $m');
+        }
+      });
+      
       // Wait for server confirmation (with timeout)
       try {
         await _connectionController.stream.firstWhere(
@@ -100,6 +110,8 @@ class WebSocketClient {
       return false;
     }
   }
+
+  // No normalization: caller must provide 24-hex clientId.
   
   void _handleMessage(dynamic data) {
     try {

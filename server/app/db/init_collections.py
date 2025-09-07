@@ -105,7 +105,7 @@ SAMPLE_DATA_TEMPLATES = {
     "users": [
         {
             "schema_version": 1,
-            "id": "550e8400-e29b-41d4-a716-446655440001",
+            "id": "64c0a6f4e5b1a2c3d4e5f601",
             "username": "dj_vegan",
             "name": "dj_vegan",
             "email": "dj_vegan@test.com",
@@ -120,7 +120,7 @@ SAMPLE_DATA_TEMPLATES = {
         },
         {
             "schema_version": 1,
-            "id": "550e8400-e29b-41d4-a716-446655440002",
+            "id": "64c0a6f4e5b1a2c3d4e5f602",
             "username": "dj_rodry",
             "name": "dj_rodry",
             "email": "dj_rodry@test.com",
