@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../widgets/sequencer/v2/sample_banks_widget.dart' as v1;
 import '../widgets/sequencer/v2/edit_buttons_widget.dart' as v1;
@@ -8,6 +9,7 @@ import '../widgets/sequencer/v2/sequencer_body.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/threads_state.dart';
 import '../services/threads_service.dart';
+import '../services/snapshot/snapshot_service.dart';
 import '../utils/app_colors.dart';
 import '../models/thread/thread_user.dart';
 // New state imports for migration
@@ -25,7 +27,9 @@ import '../state/sequencer/slider_overlay.dart';
 import '../state/sequencer/undo_redo.dart';
 
 class SequencerScreenV2 extends StatefulWidget {
-  const SequencerScreenV2({super.key});
+  final Map<String, dynamic>? initialSnapshot;
+
+  const SequencerScreenV2({super.key, this.initialSnapshot});
 
   @override
   State<SequencerScreenV2> createState() => _SequencerScreenV2State();
@@ -48,18 +52,20 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
   late final SliderOverlayState _sliderOverlayState;
   late final UndoRedoState _undoRedoState;
   
+  bool _isInitialLoading = false;
+  
   
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    // Initialize new state system
+    // Initialize new state system (reuse Provider-managed states)
     debugPrint('🎵 [SEQUENCER_V2] Initializing new state system');
     _undoRedoState = UndoRedoState();
-    _tableState = TableState();
-    _playbackState = PlaybackState(_tableState);
-    _sampleBankState = SampleBankState();
+    _tableState = Provider.of<TableState>(context, listen: false);
+    _playbackState = Provider.of<PlaybackState>(context, listen: false);
+    _sampleBankState = Provider.of<SampleBankState>(context, listen: false);
     _sampleBrowserState = SampleBrowserState();
     _multitaskPanelState = MultitaskPanelState();
     _soundSettingsState = SoundSettingsState();
@@ -82,9 +88,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     
     // Start new state system and ensure active thread
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _timerState.start();
-      _sampleBrowserState.initialize();
-      _ensureActiveThread();
+      _bootstrapInitialLoad();
     });
   }
 
@@ -108,7 +112,23 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     debugPrint('📡 Using global ThreadsService connection in sequencer V2');
   }
 
-  void _ensureActiveThread() async {
+  Future<void> _importInitialSnapshotIfAny() async {
+    final snapshot = widget.initialSnapshot;
+    if (snapshot == null) return;
+    try {
+      final service = SnapshotService(
+        tableState: _tableState,
+        playbackState: _playbackState,
+        sampleBankState: _sampleBankState,
+      );
+      await service.importFromJson(json.encode(snapshot));
+      debugPrint('✅ Imported initial snapshot into Sequencer V2');
+    } catch (e) {
+      debugPrint('❌ Failed to import initial snapshot: $e');
+    }
+  }
+
+  Future<void> _ensureActiveThread() async {
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     
     // If there's no active thread, create one (no collaboration logic)
@@ -144,14 +164,34 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     }
   }
 
+  Future<void> _bootstrapInitialLoad() async {
+    if (mounted) {
+      setState(() {
+        _isInitialLoading = true;
+      });
+    }
+    try {
+      _timerState.start();
+      _sampleBrowserState.initialize();
+      await _ensureActiveThread();
+      await _importInitialSnapshotIfAny();
+    } catch (e) {
+      debugPrint('❌ Initial sequencer bootstrap failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isInitialLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   void dispose() {
     debugPrint('🧹 [SEQUENCER_V2] Disposing new state system');
     
     _timerState.dispose();
-    _tableState.dispose();
-    _playbackState.dispose();
-    _sampleBankState.dispose();
+    // Do not dispose Provider-managed states here
     _sampleBrowserState.dispose();
     _multitaskPanelState.dispose();
     _soundSettingsState.dispose();
@@ -200,49 +240,63 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
           onBack: () => Navigator.of(context).pop(),
           threadsService: _threadsService,
         ),
-        body: SafeArea(
-        child: Column(
+        body: Stack(
           children: [
-            Expanded(
-              flex: 7,
-              child: RepaintBoundary(
-                child: const v1.SampleBanksWidget(),
+            SafeArea(
+              child: Column(
+                children: [
+                  Expanded(
+                    flex: 7,
+                    child: RepaintBoundary(
+                      child: const v1.SampleBanksWidget(),
+                    ),
+                  ),
+                  // 🎯 PERFORMANCE: Body element with switching capability between sound grid and sample browser
+                  Expanded(
+                    flex: 50, // Reduced from 60 to make space for message bar
+                    child: const SequencerBody(),
+                  ),
+
+                  // 🎯 PERFORMANCE: Edit buttons only rebuild when selection or mode changes
+                  Expanded(
+                    flex: 8,
+                    child: RepaintBoundary(
+                      child: const v1.EditButtonsWidget(),
+                    ),
+                  ),
+
+                  // 🎯 PERFORMANCE: Sample banks only rebuild when file names or loading state changes
+
+
+                  // 🎯 PERFORMANCE: Multitask panel only rebuilds when panel mode changes
+                  Expanded(
+                    flex: 15, // Reduced from 18 to make space for message bar
+                    child: RepaintBoundary(
+                      child: const v1.MultitaskPanelWidget(),
+                    ),
+                  ),
+
+                  // V2 Specific: Message bar at the bottom
+                  const SizedBox(
+                    height: 44, // Smaller height for message bar
+                    child: MessageBarWidget(),
+                  ),
+                ],
               ),
             ),
-            // 🎯 PERFORMANCE: Body element with switching capability between sound grid and sample browser
-            Expanded(
-              flex: 50, // Reduced from 60 to make space for message bar
-              child: const SequencerBody(),
-            ),
-
-            // 🎯 PERFORMANCE: Edit buttons only rebuild when selection or mode changes
-            Expanded(
-              flex: 8,
-              child: RepaintBoundary(
-                child: const v1.EditButtonsWidget(),
+            if (_isInitialLoading)
+              Positioned.fill(
+                child: Container
+                (
+                  color: AppColors.sequencerPageBackground.withOpacity(0.8),
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.menuPrimaryButton),
+                  ),
+                ),
               ),
-            ),
-
-            // 🎯 PERFORMANCE: Sample banks only rebuild when file names or loading state changes
-
-
-            // 🎯 PERFORMANCE: Multitask panel only rebuilds when panel mode changes
-            Expanded(
-              flex: 15, // Reduced from 18 to make space for message bar
-              child: RepaintBoundary(
-                child: const v1.MultitaskPanelWidget(),
-              ),
-            ),
-
-            // V2 Specific: Message bar at the bottom
-            const SizedBox(
-              height: 44, // Smaller height for message bar
-              child: MessageBarWidget(),
-            ),
           ],
         ),
       ),
-    ),
     );
   }
 } 

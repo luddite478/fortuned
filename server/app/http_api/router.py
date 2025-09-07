@@ -18,6 +18,7 @@ from http_api.threads import (
     manage_invitation_handler,
     get_messages_handler,
     create_message_handler,
+    delete_message_handler,
 )
 from typing import Dict, Any
 import json
@@ -96,3 +97,8 @@ async def get_messages(request: Request, thread_id: str = Query(...), token: str
 async def create_message(request: Request, message_data: Dict[str, Any] = Body(...)):
     """Create a message (snapshot) for a thread"""
     return await create_message_handler(request, message_data)
+
+@router.delete("/messages/{message_id}")
+async def delete_message(request: Request, message_id: str, token: str = Query(...)):
+    """Delete a message by ID"""
+    return await delete_message_handler(request, message_id, token)

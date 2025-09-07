@@ -5,17 +5,18 @@ import 'package:google_fonts/google_fonts.dart';
 class SectionsChainSquares extends StatelessWidget {
   final List<int> loopsPerSection;
   final List<int> layersPerSection;
+  final List<int>? stepsPerSection;
   final double? squareSize;
   final double? connectorWidth;
   
   // Percent-based sizing controls (relative to parent height or square size)
   // Increase square size vs message bar while keeping look consistent
-  static const double squareSizePercentOfHeight = 1; // 90% of container height
+  static const double squareSizePercentOfHeight = 0.75; // ~75% of container height
   static const double squareBorderRadiusPx = 2; // match message_bar look
   static const double squareBorderWidthPx = 1; // match message_bar look
   static const double squareHorizontalMarginPercent = 0.08; // 8% of square side on each side
   
-  static const double connectorWidthPercentOfSquare = 0.7; // 70% of square side
+  static const double connectorWidthPercentOfSquare = 0.35; // 35% of square side (shorter dash)
   static const double connectorHeightPercentOfSquare = 0.16; // 16% of square side
   static const double connectorHorizontalMarginPercent = 0.06; // 6% of square side on each side
   
@@ -29,6 +30,7 @@ class SectionsChainSquares extends StatelessWidget {
     super.key,
     required this.loopsPerSection,
     required this.layersPerSection,
+    this.stepsPerSection,
     this.squareSize,
     this.connectorWidth,
   });
@@ -43,26 +45,34 @@ class SectionsChainSquares extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final h = constraints.maxHeight <= 0 ? 24.0 : constraints.maxHeight;
+        // final w = constraints.maxWidth;
         // Normalize percent: if >1, treat as 0-100%
         final rawPercent = squareSizePercentOfHeight;
         final normalizedPercent = rawPercent > 1.0
             ? (rawPercent > 100.0 ? 1.0 : rawPercent / 100.0)
             : rawPercent;
-        final s = squareSize ?? (h * normalizedPercent).clamp(12.0, h);
+        double s = squareSize ?? (h * normalizedPercent).clamp(12.0, h);
         final connPercent = connectorWidthPercentOfSquare > 1.0
             ? (connectorWidthPercentOfSquare > 100.0 ? 1.0 : connectorWidthPercentOfSquare / 100.0)
             : connectorWidthPercentOfSquare;
+        
+        // Do not auto-fit to width; rely on horizontal scrolling
+
         final c = connectorWidth ?? (s * connPercent);
 
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: List.generate(count * 2 - 1, (i) {
               if (i.isEven) {
                 final idx = i ~/ 2;
                 final loops = loopsPerSection[idx];
                 final layers = idx < layersPerSection.length ? layersPerSection[idx] : 0;
-                return _buildSquare(context, loops, layers, s);
+                final steps = stepsPerSection != null && idx < (stepsPerSection!.length)
+                    ? stepsPerSection![idx]
+                    : null;
+                return _buildSquare(context, loops, layers, s, steps: steps);
               } else {
                 return _buildConnector(c, s);
               }
@@ -73,11 +83,10 @@ class SectionsChainSquares extends StatelessWidget {
     );
   }
 
-  Widget _buildSquare(BuildContext context, int loops, int layers, double s) {
+  Widget _buildSquare(BuildContext context, int loops, int layers, double s, {int? steps}) {
     final int layerCount = (layers <= 0 ? 1 : layers).clamp(1, maxVisualLayers);
     final double stepX = (s * stackHorizontalOffsetPercentOfSquare).clamp(1.0, s * 0.25);
     final double stepY = (s * stackVerticalOffsetPercentOfSquare).clamp(1.0, s * 0.25);
-    final Color baseColor = const Color(0xFF5A6F72);
 
     final double containerWidth = s + (layerCount - 1) * stepX;
     return Container(
@@ -105,7 +114,7 @@ class SectionsChainSquares extends StatelessWidget {
                 ),
               ),
             ),
-          // Loops number centered on the front (first) card
+          // Text (steps above loops) centered on the front (first) card
           Positioned(
             left: 0,
             top: (layerCount - 1) * stepY,
@@ -113,15 +122,30 @@ class SectionsChainSquares extends StatelessWidget {
               width: s,
               height: s,
               child: Center(
-                child: Text(
-                  '$loops',
-                  textAlign: TextAlign.center,
-                  style: GoogleFonts.sourceSans3(
-                    color: Colors.white,
-                    fontSize: (s * 0.35).clamp(7, 12),
-                    fontWeight: FontWeight.w700,
-                    height: 1.0,
-                  ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (steps != null) Text(
+                      'steps: $steps',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.sourceSans3(
+                        color: Colors.white,
+                        fontSize: (s * 0.22).clamp(6, 10),
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      'loops: $loops',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.sourceSans3(
+                        color: Colors.white,
+                        fontSize: (s * 0.22).clamp(6, 10),
+                        fontWeight: FontWeight.w700,
+                        height: 1.1,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

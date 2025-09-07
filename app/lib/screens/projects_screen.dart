@@ -21,6 +21,7 @@ class ProjectsScreen extends StatefulWidget {
 class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _isLoading = true;
   String? _error;
+  bool _isOpeningProject = false;
 
   @override
   void initState() {
@@ -58,7 +59,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.menuPageBackground,
-      body: SafeArea(
+      body: Stack(
+        children: [
+          SafeArea(
         child: Column(
           children: [
             // User indicator at the top
@@ -165,6 +168,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             ], 
           ], // Close the main children array
         ),
+      ),
+          if (_isOpeningProject)
+            Positioned.fill(
+              child: Container(
+                color: AppColors.menuPageBackground.withOpacity(0.8),
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.menuPrimaryButton),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -513,35 +527,40 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Future<void> _loadProjectInSequencer(Thread project) async {
     try {
-      // Show loading indicator
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Loading project...'),
-            backgroundColor: AppColors.menuText,
-            duration: Duration(seconds: 2),
-          ),
-        );
+        setState(() {
+          _isOpeningProject = true;
+        });
+      }
+
+      // Load thread details and latest message, prepare snapshot for sequencer
+      final threadsState = context.read<ThreadsState>();
+      await threadsState.loadThread(project.id);
+      Map<String, dynamic>? initialSnapshot;
+      final messages = threadsState.activeThreadMessages;
+      if (messages.isNotEmpty) {
+        initialSnapshot = messages.last.snapshot;
       }
 
       // Navigate to V2 sequencer screen
       if (mounted) {
+        setState(() {
+          _isOpeningProject = false;
+        });
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => const SequencerScreenV2(),
+            builder: (context) => SequencerScreenV2(initialSnapshot: initialSnapshot),
           ),
         );
       }
     } catch (e) {
+      debugPrint('❌ Failed to open project: $e');
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $e'),
-            backgroundColor: AppColors.menuErrorColor,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+        setState(() {
+          _isOpeningProject = false;
+        });
       }
     }
   }

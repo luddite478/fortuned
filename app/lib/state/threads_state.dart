@@ -147,6 +147,8 @@ class ThreadsState extends ChangeNotifier {
     final jsonString = snapshotService.exportToJson(name: 'Snapshot');
     final Map<String, dynamic> snapshotMap = json.decode(jsonString) as Map<String, dynamic>;
     final snapshotMetadata = <String, dynamic>{
+      'sections_count': _tableState.sectionsCount,
+      'sections_steps': List<int>.generate(_tableState.sectionsCount, (i) => _tableState.getSectionStepCount(i)),
       'sections_loops_num': _playbackState.getSectionsLoopsNum(),
       'layers': _tableState.getLayersLengthPerSection(),
       'renders': <dynamic>[],
@@ -202,6 +204,19 @@ class ThreadsState extends ChangeNotifier {
         _messagesByThread[threadId] = List<Message>.from(list);
         notifyListeners();
       }
+    }
+  }
+
+  Future<bool> deleteMessage(String threadId, String messageId) async {
+    try {
+      await ThreadsApi.deleteMessage(messageId);
+      final list = _messagesByThread[threadId] ?? [];
+      _messagesByThread[threadId] = list.where((m) => m.id != messageId).toList();
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _setError('Failed to delete message: $e');
+      return false;
     }
   }
 

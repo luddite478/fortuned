@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -28,6 +29,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   final ScrollController _scrollController = ScrollController();
   AnimationController? _colorAnimationController;
   Animation<Color?>? _colorAnimation;
+  Timer? _timestampRefreshTimer;
 
   @override
   void initState() {
@@ -62,6 +64,11 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       final threadsState = context.read<ThreadsState>();
       await threadsState.loadThread(widget.threadId);
       _scrollToBottom();
+    });
+
+    // Periodically refresh timestamps like "Just now" / "2m ago"
+    _timestampRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) setState(() {});
     });
   }
 
@@ -180,7 +187,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       orElse: () => ThreadUser(id: message.userId, name: 'User ${message.userId.substring(0, 6)}', joinedAt: DateTime.now()),
     ).name;
 
-    return Container(
+    final bubble = Container(
       margin: const EdgeInsets.only(bottom: 8),
       child: Container(
         width: double.infinity,
@@ -246,6 +253,35 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         ),
       ),
     );
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onSecondaryTapDown: (details) => _showMessageContextMenu(context, message, details.globalPosition),
+      onLongPressStart: (details) => _showMessageContextMenu(context, message, details.globalPosition),
+      child: bubble,
+    );
+  }
+
+  void _showMessageContextMenu(BuildContext context, Message message, Offset globalPos) async {
+    final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
+    final selected = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromRect(
+        Rect.fromLTWH(globalPos.dx, globalPos.dy, 0, 0),
+        Offset.zero & overlay.size,
+      ),
+      items: const [
+        PopupMenuItem<String>(value: 'delete', child: Text('Delete')),
+      ],
+    );
+    if (selected == 'delete') {
+      final threadsState = context.read<ThreadsState>();
+      final ok = await threadsState.deleteMessage(message.parentThread ?? '', message.id);
+      if (!ok && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete message'), backgroundColor: Colors.red, duration: Duration(seconds: 2)),
+        );
+      }
+    }
   }
 
   Widget _buildMediaBar(Message message) {
@@ -419,15 +455,24 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   }
 
   Widget _buildMessagePreviewFromMetadata(Message message) {
+    // Simplified: rely only on snapshotMetadata
     final meta = message.snapshotMetadata ?? const {};
-    final loops = (meta['sections_loops_num'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
-    final layers = (meta['layers'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
-    if (loops.isEmpty || layers.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final len = loops.length < layers.length ? loops.length : layers.length;
-    final loopsTrimmed = loops.sublist(0, len);
-    final layersTrimmed = layers.sublist(0, len);
+    final sectionsCount = (meta['sections_count'] as num?)?.toInt() ?? 0;
+    final stepsPerSectionMeta = (meta['sections_steps'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
+    final loopsMeta = (meta['sections_loops_num'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
+    final layersMeta = (meta['layers'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
+
+    // Normalize lengths to exactly sectionsCount
+    final loopsTrimmed = loopsMeta.length >= sectionsCount
+        ? loopsMeta.take(sectionsCount).toList()
+        : List<int>.from(loopsMeta)..addAll(List<int>.filled(sectionsCount - loopsMeta.length, loopsMeta.isNotEmpty ? loopsMeta.last : 4));
+
+    final int defaultLayersPerSection = (layersMeta.isNotEmpty ? layersMeta.first : 4);
+    final layersTrimmed = layersMeta.length >= sectionsCount
+        ? layersMeta.take(sectionsCount).toList()
+        : List<int>.from(layersMeta)..addAll(List<int>.filled(sectionsCount - layersMeta.length, defaultLayersPerSection));
+
+    // (Optional) We could later show steps per section under each stack using stepsPerSectionMeta.take(sectionsCount)
 
     return Container(
       height: 80,
@@ -444,6 +489,15 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         child: SectionsChainSquares(
           loopsPerSection: loopsTrimmed,
           layersPerSection: layersTrimmed,
+          stepsPerSection: () {
+            if (stepsPerSectionMeta.isEmpty) return null;
+            if (stepsPerSectionMeta.length >= sectionsCount) {
+              return stepsPerSectionMeta.take(sectionsCount).toList();
+            }
+            final list = List<int>.from(stepsPerSectionMeta);
+            list.addAll(List<int>.filled(sectionsCount - stepsPerSectionMeta.length, stepsPerSectionMeta.last));
+            return list;
+          }(),
         ),
       ),
     );
@@ -531,6 +585,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   void dispose() {
     _scrollController.dispose();
     _colorAnimationController?.dispose();
+    _timestampRefreshTimer?.cancel();
     super.dispose();
   }
 }

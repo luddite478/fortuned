@@ -129,19 +129,23 @@ class SnapshotImporter {
         return false;
       }
 
-      // Import sections
+      // Reconcile sections count first to avoid accidental appends
+      final currentCount = _tableState.sectionsCount;
+      if (currentCount > sectionsCount) {
+        for (int i = currentCount - 1; i >= sectionsCount; i--) {
+          _tableState.deleteSection(i, undoRecord: false);
+        }
+      } else if (currentCount < sectionsCount) {
+        for (int i = currentCount; i < sectionsCount; i++) {
+          _tableState.appendSection(undoRecord: false);
+        }
+      }
+
+      // Apply per-section step counts
       for (int i = 0; i < sections.length; i++) {
         final sectionData = sections[i] as Map<String, dynamic>;
         final numSteps = sectionData['num_steps'] as int;
-
-        if (i == 0) {
-          // First section - set step count
-          _tableState.setSectionStepCount(0, numSteps, undoRecord: false);
-        } else {
-          // Additional sections - append them
-          _tableState.appendSection(undoRecord: false);
-          _tableState.setSectionStepCount(i, numSteps, undoRecord: false);
-        }
+        _tableState.setSectionStepCount(i, numSteps, undoRecord: false);
       }
 
       // Import layers using bulk update

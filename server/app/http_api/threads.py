@@ -287,6 +287,25 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+async def delete_message_handler(request: Request, message_id: str, token: str = Query(...)):
+    verify_token(token)
+    try:
+        db = get_db()
+        # Find message
+        message = db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail=f"Message not found: {message_id}")
+        thread_id = message.get("parent_thread")
+        # Delete message document
+        db.messages.delete_one({"id": message_id})
+        # Remove reference from thread and update timestamp
+        if thread_id:
+            db.threads.update_one({"id": thread_id}, {"$pull": {"messages": message_id}, "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}})
+        return {"status": "deleted", "id": message_id}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 async def manage_invitation_handler(request: Request, thread_id: str, user_id: str, action_data: Dict[str, Any] = Body(...)):
     verify_token(action_data.get("token", ""))
     try:

@@ -81,6 +81,13 @@ class ThreadsApi {
     return Message.fromJson(data);
   }
 
+  static Future<void> deleteMessage(String messageId) async {
+    final http.Response res = await ApiHttpClient.delete('/messages/$messageId');
+    if (res.statusCode != 200) {
+      throw Exception('Failed to delete message: ${res.statusCode} ${res.body}');
+    }
+  }
+
   // Invites
   static Future<void> sendInvite({
     required String threadId,
