@@ -133,9 +133,11 @@ static preprocessed_sample_t* find_pre(int source_slot, float ratio) {
         preprocessed_sample_t* e = &g_pre_cache[i];
         if (e->in_use && e->source_slot == source_slot && e->pitch_hash == h) {
             e->last_accessed = ++g_pre_cache_access_counter;
+            prnt("📦 [PITCH] Cache hit (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu)", source_slot, ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size);
             return e;
         }
     }
+    prnt("📭 [PITCH] Cache miss (slot=%d, ratio=%.3f)", source_slot, ratio);
     return NULL;
 }
 
@@ -148,6 +150,7 @@ static void evict_oldest(void) {
     }
     if (idx >= 0) {
         preprocessed_sample_t* e = &g_pre_cache[idx];
+        prnt("🧹 [PITCH] Evicting cache entry (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu)", e->source_slot, e->pitch_ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size);
         if (e->processed_data) {
             g_pre_cache_total_bytes -= e->processed_size;
             free(e->processed_data);
@@ -157,19 +160,33 @@ static void evict_oldest(void) {
 }
 
 static int preprocess_sync(int source_slot, float ratio) {
-    if (fabs(ratio - 1.0f) < 0.001f) return 0;
-    if (find_pre(source_slot, ratio)) return 0;
+    if (fabs(ratio - 1.0f) < 0.001f) {
+        prnt("⏭️ [PITCH] Skip preprocessing (ratio≈1.0)");
+        return 0;
+    }
+    if (find_pre(source_slot, ratio)) {
+        prnt("✅ [PITCH] Preprocess already available (slot=%d, ratio=%.3f)", source_slot, ratio);
+        return 0;
+    }
 
     // Prepare decoder
     ma_decoder tmp;
     ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
     const char* file_path = sample_bank_get_file_path(source_slot);
-    if (!file_path) return -1;
+    if (!file_path) {
+        prnt_err("❌ [PITCH] preprocess_sync: no file path for slot=%d", source_slot);
+        return -1;
+    }
+    prnt("⚙️ [PITCH] Preprocess start (slot=%d, ratio=%.3f, file=%s)", source_slot, ratio, file_path);
     ma_result mr = ma_decoder_init_file(file_path, &cfg, &tmp);
-    if (mr != MA_SUCCESS) return -1;
+    if (mr != MA_SUCCESS) {
+        prnt_err("❌ [PITCH] ma_decoder_init_file failed: %d", mr);
+        return -1;
+    }
 
     ma_uint64 total_frames = 0;
     ma_decoder_get_length_in_pcm_frames(&tmp, &total_frames);
+    prnt("ℹ️ [PITCH] Source length: %llu frames", (unsigned long long)total_frames);
 
     SoundTouch st;
     st.setSampleRate(48000);
@@ -184,7 +201,7 @@ static int preprocess_sync(int source_slot, float ratio) {
     ma_uint64 est = total_frames + (total_frames / 2);
     size_t out_bytes = est * 2 * sizeof(float);
     float* out = (float*)malloc(out_bytes);
-    if (!out) { ma_decoder_uninit(&tmp); return -1; }
+    if (!out) { ma_decoder_uninit(&tmp); prnt_err("❌ [PITCH] malloc failed (bytes=%zu)", out_bytes); return -1; }
 
     const ma_uint64 CHUNK = 4096;
     float buf[CHUNK * 2];
@@ -209,12 +226,12 @@ static int preprocess_sync(int source_slot, float ratio) {
     }
 
     ma_decoder_uninit(&tmp);
-    if (written == 0) { free(out); return -1; }
+    if (written == 0) { free(out); prnt_err("❌ [PITCH] SoundTouch produced 0 frames"); return -1; }
 
     int slot = -1;
     for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) if (!g_pre_cache[i].in_use) { slot = i; break; }
     if (slot == -1) { evict_oldest(); for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) if (!g_pre_cache[i].in_use) { slot = i; break; } }
-    if (slot == -1) { free(out); return -1; }
+    if (slot == -1) { free(out); prnt_err("❌ [PITCH] No cache slot available after eviction"); return -1; }
 
     preprocessed_sample_t* e = &g_pre_cache[slot];
     e->source_slot = source_slot;
@@ -227,11 +244,14 @@ static int preprocess_sync(int source_slot, float ratio) {
     e->last_accessed = ++g_pre_cache_access_counter;
     e->creation_time = g_pre_cache_access_counter;
     g_pre_cache_total_bytes += e->processed_size;
+    prnt("✅ [PITCH] Preprocess done (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu, cache_total=%llu)",
+         source_slot, ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size, (unsigned long long)g_pre_cache_total_bytes);
     return 0;
 }
 
 static void async_worker(int job_index, int source_slot, float ratio) {
     (void)job_index; // not strictly needed beyond cleanup; keep for parity
+    prnt("🚀 [PITCH] Async job start (job=%d, slot=%d, ratio=%.3f)", job_index, source_slot, ratio);
     int result = preprocess_sync(source_slot, ratio);
     (void)result;
     {
@@ -241,6 +261,7 @@ static void async_worker(int job_index, int source_slot, float ratio) {
         }
         memset(&g_async_jobs[job_index], 0, sizeof(async_preprocess_job_t));
     }
+    prnt("🏁 [PITCH] Async job finished (job=%d, slot=%d, ratio=%.3f, res=%d)", job_index, source_slot, ratio, result);
 }
 
 // -----------------------------------------------------------------------------
@@ -353,6 +374,9 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
     p->sample_rate = sampleRate;
     p->approach = g_pitch_method;
     p->sample_slot = sample_slot;
+    prnt("🔧 [PITCH] ds_init(approach=%s, slot=%d, ratio=%.3f, ch=%u, sr=%u)",
+         (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING ? "PREPROCESS" : (p->approach == PITCH_METHOD_MINIAUDIO ? "MINIAUDIO" : "UNKNOWN")),
+         sample_slot, ratio, (unsigned)p->channels, (unsigned)p->sample_rate);
 
     // Resampler setup (MINIAUDIO only)
     p->resampler_initialized = 0;
@@ -364,7 +388,12 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
         if (p->target_sample_rate > 192000) p->target_sample_rate = 192000;
         ma_resampler_config rc = ma_resampler_config_init(ma_format_f32, channels, sampleRate, p->target_sample_rate, ma_resample_algorithm_linear);
         mr = ma_resampler_init(&rc, NULL, &p->resampler);
-        if (mr == MA_SUCCESS) p->resampler_initialized = 1;
+        if (mr == MA_SUCCESS) {
+            p->resampler_initialized = 1;
+            prnt("🎚️ [PITCH] Resampler init ok (target_sr=%u)", (unsigned)p->target_sample_rate);
+        } else {
+            prnt_err("❌ [PITCH] Resampler init failed: %d", mr);
+        }
     }
 
     // Preprocessing: if cached exists, create audio buffer from memory
@@ -376,9 +405,13 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
             if (mr == MA_SUCCESS) {
                 p->preprocessed_buffer_initialized = 1;
                 p->uses_preprocessed_data = 1;
+                prnt("🔗 [PITCH] Bound preprocessed buffer (frames=%llu, bytes=%zu)", (unsigned long long)e->processed_frames, (size_t)e->processed_size);
+            } else {
+                prnt_err("❌ [PITCH] ma_audio_buffer_init failed: %d", mr);
             }
         } else {
             // No cached data yet; caller may kick async preprocessing. We'll play unpitched until cache exists.
+            prnt("⏳ [PITCH] No cached data yet for slot=%d, ratio=%.3f", sample_slot, ratio);
         }
     }
     return MA_SUCCESS;
@@ -387,6 +420,7 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
 ma_result pitch_ds_set_pitch(ma_pitch_data_source* p, float ratio) {
     if (!p) return MA_INVALID_ARGS;
     if (fabs(p->pitch_ratio - ratio) < 0.001f) return MA_SUCCESS;
+    prnt("🎛️ [PITCH] ds_set_pitch: %.3f → %.3f (approach=%d)", p->pitch_ratio, ratio, p->approach);
     p->pitch_ratio = ratio;
     if (p->approach != PITCH_METHOD_MINIAUDIO) {
         // For preprocessing: live change is not applied; caller should rebuild or wait for next trigger
@@ -400,7 +434,7 @@ ma_result pitch_ds_set_pitch(ma_pitch_data_source* p, float ratio) {
     if (p->target_sample_rate > 192000) p->target_sample_rate = 192000;
     ma_resampler_config rc = ma_resampler_config_init(ma_format_f32, p->channels, p->sample_rate, p->target_sample_rate, ma_resample_algorithm_linear);
     ma_result mr = ma_resampler_init(&rc, NULL, &p->resampler);
-    if (mr == MA_SUCCESS) p->resampler_initialized = 1;
+    if (mr == MA_SUCCESS) { p->resampler_initialized = 1; prnt("🎚️ [PITCH] Resampler reinit ok (target_sr=%u)", (unsigned)p->target_sample_rate); }
     return mr;
 }
 
@@ -421,10 +455,12 @@ ma_pitch_data_source* pitch_ds_create(ma_data_source* original,
 void pitch_ds_uninit(ma_pitch_data_source* p) {
     if (!p) return;
     if (p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        prnt("🧯 [PITCH] Uninit preprocessed buffer");
         ma_audio_buffer_uninit(&p->preprocessed_buffer);
         p->preprocessed_buffer_initialized = 0;
     }
     if (p->resampler_initialized) {
+        prnt("🧯 [PITCH] Uninit resampler");
         ma_resampler_uninit(&p->resampler, NULL);
         p->resampler_initialized = 0;
     }
@@ -438,6 +474,7 @@ ma_data_source* pitch_ds_as_data_source(ma_pitch_data_source* p) {
 
 ma_result pitch_ds_seek_to_start(ma_pitch_data_source* p) {
     if (!p) return MA_INVALID_ARGS;
+    prnt("⏮️ [PITCH] Seek to start (approach=%d, using_pre=%d)", p->approach, pitch_ds_uses_preprocessed(p));
     if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
         return ma_data_source_seek_to_pcm_frame((ma_data_source*)&p->preprocessed_buffer, 0);
     }
@@ -474,12 +511,13 @@ int pitch_preprocess_sample_sync(int source_slot, float ratio) {
 
 int pitch_start_async_preprocessing(int source_slot, float ratio) {
     // If already cached, nothing to do
-    if (find_pre(source_slot, ratio)) return 0;
+    if (find_pre(source_slot, ratio)) { prnt("✅ [PITCH] Async skip, already cached (slot=%d, ratio=%.3f)", source_slot, ratio); return 0; }
 
     std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
     // Avoid duplicate jobs
     for (int i = 0; i < MAX_ASYNC_JOBS; i++) {
         if (g_async_jobs[i].in_progress && g_async_jobs[i].source_slot == source_slot && fabs(g_async_jobs[i].pitch_ratio - ratio) < 0.001f) {
+            prnt("⏳ [PITCH] Async already in progress (slot=%d, ratio=%.3f)", source_slot, ratio);
             return 0;
         }
     }
@@ -488,6 +526,7 @@ int pitch_start_async_preprocessing(int source_slot, float ratio) {
     for (int i = 0; i < MAX_ASYNC_JOBS; i++) { if (!g_async_jobs[i].in_progress) { job_index = i; break; } }
     if (job_index == -1) {
         // No free slot; caller may try again later
+        prnt_err("❌ [PITCH] No free async job slot");
         return -1;
     }
     g_async_jobs[job_index].source_slot = source_slot;
@@ -496,28 +535,40 @@ int pitch_start_async_preprocessing(int source_slot, float ratio) {
     try {
         g_async_jobs[job_index].worker_thread = new std::thread(async_worker, job_index, source_slot, ratio);
         g_async_jobs[job_index].worker_thread->detach();
+        prnt("📥 [PITCH] Async job queued (job=%d, slot=%d, ratio=%.3f)", job_index, source_slot, ratio);
         return 0;
     } catch (...) {
         memset(&g_async_jobs[job_index], 0, sizeof(async_preprocess_job_t));
+        prnt_err("❌ [PITCH] Failed to start async thread");
         return -1;
     }
 }
 
 int pitch_make_decoder_from_cache(int source_slot, float ratio, ma_decoder* outDecoder) {
     preprocessed_sample_t* e = find_pre(source_slot, ratio);
-    if (!e) return 0;
+    if (!e) { prnt("📭 [PITCH] No cached decoder data (slot=%d, ratio=%.3f)", source_slot, ratio); return 0; }
     ma_decoder_config dc = ma_decoder_config_init(ma_format_f32, 2, 48000);
     ma_result mr = ma_decoder_init_memory(e->processed_data, e->processed_size, &dc, outDecoder);
-    return (mr == MA_SUCCESS) ? 1 : -1;
+    if (mr == MA_SUCCESS) {
+        prnt("🎚️ [PITCH] Decoder created from cache (frames=%llu, bytes=%zu)", (unsigned long long)e->processed_frames, (size_t)e->processed_size);
+        return 1;
+    } else {
+        prnt_err("❌ [PITCH] ma_decoder_init_memory failed: %d", mr);
+        return -1;
+    }
 }
 
 void pitch_clear_preprocessed_cache(void) {
+    ma_uint64 before = g_pre_cache_total_bytes;
+    int cleared = 0;
     for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
         if (g_pre_cache[i].in_use && g_pre_cache[i].processed_data) free(g_pre_cache[i].processed_data);
+        if (g_pre_cache[i].in_use) cleared++;
     }
     memset(g_pre_cache, 0, sizeof(g_pre_cache));
     g_pre_cache_total_bytes = 0;
     g_pre_cache_access_counter = 0;
+    prnt("🧹 [PITCH] Cleared cache (entries=%d, bytes=%llu)", cleared, (unsigned long long)before);
 }
 
 int pitch_get_preprocessed_cache_count(void) {

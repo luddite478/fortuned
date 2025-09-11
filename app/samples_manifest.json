@@ -1,3209 +1,1201 @@
 {
-  "scan_timestamp": 1757608256,
-  "total_files": 801,
+  "scan_timestamp": 1757611104,
+  "total_files": 299,
   "samples": {
-    "f218baf42f52": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/BEL_Tibetan_1.wav",
+    "7db254aa2a8a": {
+      "path": "samples/drums/Kick/Kick Ghost.wav",
       "built_in": true
     },
-    "05928b093e92": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/BEL_TibetBowl_1.wav",
+    "eefe32928bf9": {
+      "path": "samples/drums/Kick/Kick 5.wav",
       "built_in": true
     },
-    "506d3b0a35c6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/BEL_TibetBowl_2.wav",
+    "9f8efe160c11": {
+      "path": "samples/drums/Kick/Kick 4.wav",
       "built_in": true
     },
-    "8595e214eb8c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/BEL_TibetBowl_3.wav",
+    "fbd6e574b3c7": {
+      "path": "samples/drums/Kick/Kick 6.wav",
       "built_in": true
     },
-    "750b74014264": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/BEL_Tingsha.wav",
+    "26dda5340a69": {
+      "path": "samples/drums/Kick/Kick 3.wav",
       "built_in": true
     },
-    "bcf58f0559e6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/CYM_Crash36cm.wav",
+    "1ed0605aef68": {
+      "path": "samples/drums/Kick/Kick 2.wav",
       "built_in": true
     },
-    "346c8f681d34": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/CYM_Crash41cm.wav",
+    "adf729ed6de6": {
+      "path": "samples/drums/Kick/Kick 1.wav",
       "built_in": true
     },
-    "443f62add8ac": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/CYM_Ride51cm_1.wav",
+    "ff7c2035e9fc": {
+      "path": "samples/drums/Tom Mid/Tom Mid Flam.wav",
       "built_in": true
     },
-    "0467eacb47a5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/CYM_Ride51cm_2.wav",
+    "bc8e277b4b3e": {
+      "path": "samples/drums/Tom Mid/Tom Mid 4.wav",
       "built_in": true
     },
-    "fde0942cce1d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/CYM_Ride51cm_3.wav",
+    "48dfa9d9798d": {
+      "path": "samples/drums/Tom Mid/Tom Mid 5.wav",
       "built_in": true
     },
-    "d18a36d844b2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/CYM_Ride51cm_4.wav",
+    "51da08c9377a": {
+      "path": "samples/drums/Tom Mid/Tom Mid 7.wav",
       "built_in": true
     },
-    "4fe5cc203eb4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustCL_1.wav",
+    "2a794e392215": {
+      "path": "samples/drums/Tom Mid/Tom Mid 6.wav",
       "built_in": true
     },
-    "eee1541c2cb3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustCL_2.wav",
+    "58d0d90a850f": {
+      "path": "samples/drums/Tom Mid/Tom Mid 2.wav",
       "built_in": true
     },
-    "ca3aadea21b1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustCL_3.wav",
+    "18bf89177ed0": {
+      "path": "samples/drums/Tom Mid/Tom Mid 3.wav",
       "built_in": true
     },
-    "0061f6795973": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustCL_4.wav",
+    "d3c3bf5bde1e": {
+      "path": "samples/drums/Tom Mid/Tom Mid 1.wav",
       "built_in": true
     },
-    "fdeda1c174af": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustCL_5.wav",
+    "2045c2f58065": {
+      "path": "samples/drums/Tom Mid/Tom Mid 8.wav",
       "built_in": true
     },
-    "12b6b5e9eab1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustOP_1.wav",
+    "1cd750884411": {
+      "path": "samples/drums/Splash/Splash Mute 1.wav",
       "built_in": true
     },
-    "626d72dbecc2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustOP_2.wav",
+    "0bff1fb5789d": {
+      "path": "samples/drums/Splash/Splash Mute 2.wav",
       "built_in": true
     },
-    "d4d0769b9aa6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustPDL_1.wav",
+    "324accad909e": {
+      "path": "samples/drums/Splash/Splash 2.wav",
       "built_in": true
     },
-    "51b6edef540d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/HAT_AcoustPDL_2.wav",
+    "6adf2592e30c": {
+      "path": "samples/drums/Splash/Splash 1.wav",
       "built_in": true
     },
-    "a9058f66541b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/KCK_Acoust56cm_1.wav",
+    "e0006e219b45": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal 5.wav",
       "built_in": true
     },
-    "729f4ab60c0d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/KCK_Acoust56cm_2.wav",
+    "a23f4fd08df9": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal 4.wav",
       "built_in": true
     },
-    "2565b38a1b30": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/KCK_Acoust56cm_3.wav",
+    "0025a5310dda": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal 1.wav",
       "built_in": true
     },
-    "e371336c0a1c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Agogo_1.wav",
+    "45928200bc6a": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal 3.wav",
       "built_in": true
     },
-    "b45b2ca351cd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Agogo_2.wav",
+    "e4a2415101ba": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal 2.wav",
       "built_in": true
     },
-    "a6227f000f65": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Bongo_1.wav",
+    "913ba417be05": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal Bell Mute.wav",
       "built_in": true
     },
-    "5fb58471e6ae": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Bongo_2.wav",
+    "472370307e02": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal Bell 2.wav",
       "built_in": true
     },
-    "54de89ea257d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Bongo_3.wav",
+    "142f20683d5f": {
+      "path": "samples/drums/Ride Cymbal/Ride Cymbal Bell 1.wav",
       "built_in": true
     },
-    "f490bf3f5738": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Cabasa.wav",
+    "3eae9c764fc5": {
+      "path": "samples/drums/Snare Off/Snare Off 4.wav",
       "built_in": true
     },
-    "23249e6fe5c9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Clave.wav",
+    "b45ee6a142f2": {
+      "path": "samples/drums/Snare Off/Snare Off 5.wav",
       "built_in": true
     },
-    "6c60637873d9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Conga_1.wav",
+    "20c8ea14f4bf": {
+      "path": "samples/drums/Snare Off/Snare Off 7.wav",
       "built_in": true
     },
-    "ca17b28bf335": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Conga_2.wav",
+    "2a3ee8488c33": {
+      "path": "samples/drums/Snare Off/Snare Off 6.wav",
       "built_in": true
     },
-    "a686ae0b60db": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Conga_3.wav",
+    "8ca63fc4836e": {
+      "path": "samples/drums/Snare Off/Snare Off 2.wav",
       "built_in": true
     },
-    "807dce3e0fb2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Conga_4.wav",
+    "2a6bbbc71882": {
+      "path": "samples/drums/Snare Off/Snare Off 3.wav",
       "built_in": true
     },
-    "8fb3751cd274": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Conga_5.wav",
+    "d6aec31f5117": {
+      "path": "samples/drums/Snare Off/Snare Off 1.wav",
       "built_in": true
     },
-    "6a6bcd4e5e62": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Conga_6.wav",
+    "63c5a820c78e": {
+      "path": "samples/drums/Crash C/Crash C 4.wav",
       "built_in": true
     },
-    "4190474750a9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Damaru.wav",
+    "ae68106aba1c": {
+      "path": "samples/drums/Crash C/Crash C 3.wav",
       "built_in": true
     },
-    "6c27083c296a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Guiro.wav",
+    "0c985d7bf1e5": {
+      "path": "samples/drums/Crash C/Crash C 2.wav",
       "built_in": true
     },
-    "f8c9fd85e3ae": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_1.wav",
+    "886236337f90": {
+      "path": "samples/drums/Crash C/Crash C 1.wav",
       "built_in": true
     },
-    "16fc23d7cf72": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_2.wav",
+    "c343f366359a": {
+      "path": "samples/drums/Crash C/Crash C Mute.wav",
       "built_in": true
     },
-    "5d71c0c11e23": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_3.wav",
+    "c818fc7a16f1": {
+      "path": "samples/drums/Crash B/Crash B 1.wav",
       "built_in": true
     },
-    "290c778710a9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_4.wav",
+    "0379097a5836": {
+      "path": "samples/drums/Crash B/Crash B 3.wav",
       "built_in": true
     },
-    "09590ae6c4d8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_5.wav",
+    "f9ec8692ccd0": {
+      "path": "samples/drums/Crash B/Crash B 2.wav",
       "built_in": true
     },
-    "b7f305b7b5d8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_6.wav",
+    "9435748880e1": {
+      "path": "samples/drums/Crash B/Crash B Mute.wav",
       "built_in": true
     },
-    "cf412b205d51": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Madal_7.wav",
+    "44cb2c912d58": {
+      "path": "samples/drums/Snare On/Snare 1.wav",
       "built_in": true
     },
-    "5e3aeba11fe7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Maraca.wav",
+    "e41cd58b12dc": {
+      "path": "samples/drums/Snare On/Snare 3.wav",
       "built_in": true
     },
-    "8a7ad6ffb019": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_1.wav",
+    "f8a6db159980": {
+      "path": "samples/drums/Snare On/Snare 2.wav",
       "built_in": true
     },
-    "de0801dce5c5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_10.wav",
+    "06a784b4e050": {
+      "path": "samples/drums/Snare On/Snare 6.wav",
       "built_in": true
     },
-    "9a6f3cdb534c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_2.wav",
+    "d0f4c80fc4bf": {
+      "path": "samples/drums/Snare On/Snare 10.wav",
       "built_in": true
     },
-    "6c361941b167": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_3.wav",
+    "ba7b1d11821a": {
+      "path": "samples/drums/Snare On/Snare 11.wav",
       "built_in": true
     },
-    "293d89294bb8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_4.wav",
+    "567d0d241196": {
+      "path": "samples/drums/Snare On/Snare 7.wav",
       "built_in": true
     },
-    "9935ff100d19": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_5.wav",
+    "d02a25a5ece5": {
+      "path": "samples/drums/Snare On/Snare 5.wav",
       "built_in": true
     },
-    "353139aa0b91": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_6.wav",
+    "a02b483d5821": {
+      "path": "samples/drums/Snare On/Snare 4.wav",
       "built_in": true
     },
-    "11a8cbdff942": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_7.wav",
+    "d13fe5fbab0f": {
+      "path": "samples/drums/Snare On/Snare 9.wav",
       "built_in": true
     },
-    "b358e9ddeff4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_8.wav",
+    "b19ca9113602": {
+      "path": "samples/drums/Snare On/Snare Flam 1.wav",
       "built_in": true
     },
-    "15348df93ee9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Tabla_9.wav",
+    "0ba280da39c4": {
+      "path": "samples/drums/Snare On/Snare 8.wav",
       "built_in": true
     },
-    "e44d6f17c7c0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_TibetGong.wav",
+    "e14b75a8d2a9": {
+      "path": "samples/drums/Snare On/Snare Flam 2.wav",
       "built_in": true
     },
-    "d2920a7f009d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/PRC_Triangle.wav",
+    "faa47f71a84a": {
+      "path": "samples/drums/Tom High/Tom High 1.wav",
       "built_in": true
     },
-    "71602353a32a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_Acoust_1.wav",
+    "7665938a1fe1": {
+      "path": "samples/drums/Tom High/Tom High 3.wav",
       "built_in": true
     },
-    "e4001be26f56": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_Acoust_2.wav",
+    "83ff1619d108": {
+      "path": "samples/drums/Tom High/Tom High 2.wav",
       "built_in": true
     },
-    "061c9a1fbf9e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_Acoust_3.wav",
+    "455e33d4fd33": {
+      "path": "samples/drums/Tom High/Tom High 6.wav",
       "built_in": true
     },
-    "b57080e2449a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_1.wav",
+    "ced6f08cb8fc": {
+      "path": "samples/drums/Tom High/Tom High 7.wav",
       "built_in": true
     },
-    "655c496adcbc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_2.wav",
+    "b7b5f564522d": {
+      "path": "samples/drums/Tom High/Tom High 5.wav",
       "built_in": true
     },
-    "ca8a6d170cd0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_3.wav",
+    "5ba08d893764": {
+      "path": "samples/drums/Tom High/Tom High 4.wav",
       "built_in": true
     },
-    "850c411dc405": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_4.wav",
+    "d7ab73fe68e1": {
+      "path": "samples/drums/Tom High/Tom High Flam.wav",
       "built_in": true
     },
-    "c00b843b4a74": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_5.wav",
+    "3cf8ac832248": {
+      "path": "samples/drums/Tom Floor/Tom Floor 6.wav",
       "built_in": true
     },
-    "d30170f8e1f7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_6.wav",
+    "5992eeb36169": {
+      "path": "samples/drums/Tom Floor/Tom Floor 5.wav",
       "built_in": true
     },
-    "697f81603cc7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_7.wav",
+    "b520c409f153": {
+      "path": "samples/drums/Tom Floor/Tom Floor 4.wav",
       "built_in": true
     },
-    "c1ce956d87d1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_H910_8.wav",
+    "73b8f8514bc6": {
+      "path": "samples/drums/Tom Floor/Tom Floor 1.wav",
       "built_in": true
     },
-    "0bac26d5d639": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_Side_1.wav",
+    "64e184e3b7f1": {
+      "path": "samples/drums/Tom Floor/Tom Floor 3.wav",
       "built_in": true
     },
-    "dfdcac0877fc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_Side_2.wav",
+    "c5a2aa508437": {
+      "path": "samples/drums/Tom Floor/Tom Floor 2.wav",
       "built_in": true
     },
-    "8008f3e4fdb5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/SNR_Side_3.wav",
+    "c479813c160f": {
+      "path": "samples/drums/Tom Floor/Tom Floor Flam 2.wav",
       "built_in": true
     },
-    "d3d08ba304e0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/TOM_Floor_1.wav",
+    "ce1a3fb33ab4": {
+      "path": "samples/drums/Tom Floor/Tom Floor Flam 1.wav",
       "built_in": true
     },
-    "17fd57aab743": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/TOM_Floor_2.wav",
+    "3ec39880de87": {
+      "path": "samples/drums/China/China Mute 1.wav",
       "built_in": true
     },
-    "f666a75e710e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/TOM_Rack30cm_1.wav",
+    "a67ebaa64fe9": {
+      "path": "samples/drums/China/China Mute 3.wav",
       "built_in": true
     },
-    "2124acd8b14e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/TOM_Rack30cm_2.wav",
+    "3724519f4675": {
+      "path": "samples/drums/China/China Mute 2.wav",
       "built_in": true
     },
-    "1099b3613f69": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/TOM_Rack33cm_1.wav",
+    "3fc868990b29": {
+      "path": "samples/drums/China/China Bell.wav",
       "built_in": true
     },
-    "4aff5a40dfdc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Drums/TOM_Rack33cm_2.wav",
+    "db43b35b8765": {
+      "path": "samples/drums/China/China 4.wav",
       "built_in": true
     },
-    "609235ebe691": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELFNG_F1.wav",
+    "008305cda93e": {
+      "path": "samples/drums/China/China 3.wav",
       "built_in": true
     },
-    "b56492344622": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELFNG_F2.wav",
+    "64cc0e989258": {
+      "path": "samples/drums/China/China 2.wav",
       "built_in": true
     },
-    "06c43fe0908d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELFNG_F3.wav",
+    "b39e9ad93c63": {
+      "path": "samples/drums/China/China 1.wav",
       "built_in": true
     },
-    "d530daeeb142": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELFNG_F4.wav",
+    "bff0cad235b7": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open 5.wav",
       "built_in": true
     },
-    "9b075d5f661f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELPCK_F1.wav",
+    "c54d82ac9b64": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open 4.wav",
       "built_in": true
     },
-    "87f7a474e539": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELPCK_F2.wav",
+    "91368b1661fa": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open 3.wav",
       "built_in": true
     },
-    "84d4b7e9a20e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELPCK_F3.wav",
+    "2da026dbf5e2": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open 2.wav",
       "built_in": true
     },
-    "edf2e142a97d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELPCK_F4.wav",
+    "6477f491b886": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open 1.wav",
       "built_in": true
     },
-    "7586f5bd7b5d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELSLP_F1.wav",
+    "f5512b8e0001": {
+      "path": "samples/drums/Hi Hat/Hi Hat 15.wav",
       "built_in": true
     },
-    "6b78e68a170b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELSLP_F2.wav",
+    "b52528ca6281": {
+      "path": "samples/drums/Hi Hat/Hi Hat Flam.wav",
       "built_in": true
     },
-    "31f2ae27fe0b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELSNP_F1.wav",
+    "893e74ee6a30": {
+      "path": "samples/drums/Hi Hat/Hi Hat 14.wav",
       "built_in": true
     },
-    "25eda7a03438": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Electric Bass/BAS_ELSNP_F2.wav",
+    "8653dcd291dc": {
+      "path": "samples/drums/Hi Hat/Hi Hat 8.wav",
       "built_in": true
     },
-    "7dcd7df25afb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Keys/ORG_OldHam_1_C3.wav",
+    "a5d1fc6f913f": {
+      "path": "samples/drums/Hi Hat/Hi Hat 9.wav",
       "built_in": true
     },
-    "6da56d15a09c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Keys/ORG_OldHam_2_C3.wav",
+    "dfb07fd7af72": {
+      "path": "samples/drums/Hi Hat/Hi Hat 13.wav",
       "built_in": true
     },
-    "309696d5bc21": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Keys/ORG_OldHam_3_C3.wav",
+    "21d01cb6fa1a": {
+      "path": "samples/drums/Hi Hat/Hi Hat 12.wav",
       "built_in": true
     },
-    "fffc6d869901": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Keys/ORG_PedalBass_F2.wav",
+    "971c261bcc0c": {
+      "path": "samples/drums/Hi Hat/Hi Hat 10.wav",
       "built_in": true
     },
-    "8ad2bfbbc72a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Keys/PNO_OldG_C5.wav",
+    "65be2a6e4a9f": {
+      "path": "samples/drums/Hi Hat/Hi Hat 11.wav",
       "built_in": true
     },
-    "f2bfc4663d1f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_A2.wav",
+    "bbbb6771ef24": {
+      "path": "samples/drums/Hi Hat/Hi Hat 2.wav",
       "built_in": true
     },
-    "e102450803c5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_B3.wav",
+    "9ed9494b1cd4": {
+      "path": "samples/drums/Hi Hat/Hi Hat 3.wav",
       "built_in": true
     },
-    "2cd8f1b28465": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_D3.wav",
+    "a6fce3a8e1b6": {
+      "path": "samples/drums/Hi Hat/Hi Hat 1.wav",
       "built_in": true
     },
-    "9e57679bf786": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_E2.wav",
+    "864c2254f211": {
+      "path": "samples/drums/Hi Hat/Hi Hat 4.wav",
       "built_in": true
     },
-    "f54e28087cf6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_E4.wav",
+    "0fe7e1b0e9f8": {
+      "path": "samples/drums/Hi Hat/Hi Hat Bell 1.wav",
       "built_in": true
     },
-    "189448d0f7cf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_E5.wav",
+    "e873ee9f3eab": {
+      "path": "samples/drums/Hi Hat/Hi Hat 5.wav",
       "built_in": true
     },
-    "5e2c9e072979": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_12STR_G3.wav",
+    "66e7951ef0d8": {
+      "path": "samples/drums/Hi Hat/Hi Hat 7.wav",
       "built_in": true
     },
-    "1f4d67ff6198": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_A2.wav",
+    "fd1e3827e955": {
+      "path": "samples/drums/Hi Hat/Hi Hat Bell 2.wav",
       "built_in": true
     },
-    "09931a5bbee1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_B3.wav",
+    "d8dc2680ec66": {
+      "path": "samples/drums/Hi Hat/Hi Hat 6.wav",
       "built_in": true
     },
-    "be24fa9c8d2c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_D3.wav",
+    "d808fe1b1be2": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 4.wav",
       "built_in": true
     },
-    "56943fb3b0ad": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_E2.wav",
+    "01a01d68d313": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 5.wav",
       "built_in": true
     },
-    "10fd9f8199b7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_E4.wav",
+    "ed0d7abb3115": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 7.wav",
       "built_in": true
     },
-    "9adf1975ee9c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_E5.wav",
+    "dc8267fb56cd": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 6.wav",
       "built_in": true
     },
-    "dbcbc0b5d14b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_DIST_G3.wav",
+    "16b1a6b2a62a": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 2.wav",
       "built_in": true
     },
-    "f014ba35d7f4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_A2.wav",
+    "1c9bb672b24d": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 3.wav",
       "built_in": true
     },
-    "02624b120d8d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_B3.wav",
+    "f654c5bf0c35": {
+      "path": "samples/drums/Hi Hat/Hi Hat Open Close 1.wav",
       "built_in": true
     },
-    "248f6ec74b1a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_D3.wav",
+    "65319028da63": {
+      "path": "samples/drums/Crash A/Crash A 4.wav",
       "built_in": true
     },
-    "89b89bda1cb5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_E2.wav",
+    "57d2634e47e1": {
+      "path": "samples/drums/Crash A/Crash A 5.wav",
       "built_in": true
     },
-    "8c5551bff756": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_E4.wav",
+    "6b2528f2ff14": {
+      "path": "samples/drums/Crash A/Crash A 1.wav",
       "built_in": true
     },
-    "9a9d5d13fc37": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_E5.wav",
+    "259bb8002bca": {
+      "path": "samples/drums/Crash A/Crash A 2.wav",
       "built_in": true
     },
-    "935d7166c155": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EGUIT_G3.wav",
+    "82d18714d25a": {
+      "path": "samples/drums/Crash A/Crash A 3.wav",
       "built_in": true
     },
-    "951d126bb5a1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EMAJ_1.wav",
+    "57febbcf5f77": {
+      "path": "samples/drums/Crash A/Crash A Mute.wav",
       "built_in": true
     },
-    "ef9e45e99779": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_EMAJ_2.wav",
+    "6444a2769cd9": {
+      "path": "samples/drums/Crash A/Crash A Bell.wav",
       "built_in": true
     },
-    "2062d1864314": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_ESitar_C4.wav",
+    "021228d91eb8": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc09.wav",
       "built_in": true
     },
-    "bd2869f21ccb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_ESitar_C5.wav",
+    "b660bd2a1a23": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc08.wav",
       "built_in": true
     },
-    "054024a6fc1b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_KrvkLyre_A4.wav",
+    "3bdfe61972d0": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc12.wav",
       "built_in": true
     },
-    "a952b0d0dca6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_KrvkLyre_C4.wav",
+    "1baa76f0e3ed": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc06.wav",
       "built_in": true
     },
-    "25f7c2c7c9bd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_KrvkLyre_D4.wav",
+    "003bd7f2d732": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc07.wav",
       "built_in": true
     },
-    "8138b3b1ce8f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_KrvkLyre_E4.wav",
+    "9cc4232751d9": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc13.wav",
       "built_in": true
     },
-    "ece29218e7ab": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_KrvkLyre_F4.wav",
+    "60c786e963a0": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc05.wav",
       "built_in": true
     },
-    "c335a7af46ab": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_KrvkLyre_G4.wav",
+    "0a6ad719ff67": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc11.wav",
       "built_in": true
     },
-    "4bc26b7e0340": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_A3.wav",
+    "eb870e696671": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc10.wav",
       "built_in": true
     },
-    "c62acd7407c5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_C3.wav",
+    "b082b825b824": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc04.wav",
       "built_in": true
     },
-    "e6f68426f5ff": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_C5.wav",
+    "ad7063b85ae8": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc01.wav",
       "built_in": true
     },
-    "24148806ceaa": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_D2.wav",
+    "79e8b8075e4d": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc03.wav",
       "built_in": true
     },
-    "850ed45a0e9d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_D4.wav",
+    "d4ceaea87451": {
+      "path": "samples/wavparty-braids-vol-1/perc/perc02.wav",
       "built_in": true
     },
-    "11c7b09be196": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_F2.wav",
+    "b397f3cb02eb": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats09.wav",
       "built_in": true
     },
-    "a5ebcab9c9c2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_F3.wav",
+    "938801cf2a4f": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats08.wav",
       "built_in": true
     },
-    "b84670fba2ce": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Lute_G4.wav",
+    "0c8a575d2c87": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats06.wav",
       "built_in": true
     },
-    "331a968d1333": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Sitar_C4.wav",
+    "10f7f699af4c": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats12.wav",
       "built_in": true
     },
-    "6461f70f714c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_Sitar_C5.wav",
+    "b81e48663318": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats07.wav",
       "built_in": true
     },
-    "7cbf2fd6608f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_A2.wav",
+    "df90f021b843": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats11.wav",
       "built_in": true
     },
-    "88a50b855a25": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_B3.wav",
+    "235511ab03c7": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats05.wav",
       "built_in": true
     },
-    "9881a6f91e45": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_D3.wav",
+    "2677a1efc6d9": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats04.wav",
       "built_in": true
     },
-    "f337000c6236": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_E2.wav",
+    "451742bde759": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats10.wav",
       "built_in": true
     },
-    "3af3777e582e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_E4.wav",
+    "38a4cb7bf9aa": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats01.wav",
       "built_in": true
     },
-    "ebe85c9dda65": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_E5.wav",
+    "09f10e2ae6dd": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats03.wav",
       "built_in": true
     },
-    "107730c5c825": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Plucked/PLK_STLSTR_G3.wav",
+    "f90abd7f8703": {
+      "path": "samples/wavparty-braids-vol-1/hats/hats02.wav",
       "built_in": true
     },
-    "96da911fbf3e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_1.wav",
+    "f9a487e39b49": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC25.wav",
       "built_in": true
     },
-    "add7eb845b73": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_2.wav",
+    "d68f65467c78": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC31.wav",
       "built_in": true
     },
-    "c57fb66e1a29": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_3.wav",
+    "cb7801363657": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC19.wav",
       "built_in": true
     },
-    "c815a65f89f6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_4.wav",
+    "8af3416c1f74": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC18.wav",
       "built_in": true
     },
-    "70444a7b1e11": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_5.wav",
+    "59d20e2d53e2": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC30.wav",
       "built_in": true
     },
-    "11c9013e75d1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_6.wav",
+    "f46c6f5f2ba7": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC24.wav",
       "built_in": true
     },
-    "d6b4b2444084": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_7.wav",
+    "f611c2e840b9": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC32.wav",
       "built_in": true
     },
-    "6c52ef3ca820": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_BamXyl_8.wav",
+    "345245fbd8bc": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC26.wav",
       "built_in": true
     },
-    "c4efe5edc5e8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_DULC_A3.wav",
+    "bdc48be67399": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC27.wav",
       "built_in": true
     },
-    "f8a002642c48": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_DULC_A4.wav",
+    "22722f92aee5": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC33.wav",
       "built_in": true
     },
-    "18480a8ab68d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_DULC_A5.wav",
+    "d2c3d42aa892": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC37.wav",
       "built_in": true
     },
-    "343227635c84": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_DULC_C6.wav",
+    "3524b1e716ee": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC23.wav",
       "built_in": true
     },
-    "42860c76f431": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_DULC_E4.wav",
+    "52ffd8b51fd2": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC22.wav",
       "built_in": true
     },
-    "c680f39ca256": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Tuned Percussion/TUN_DULC_E5.wav",
+    "77f875dfb974": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC36.wav",
       "built_in": true
     },
-    "10408b352da9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Winds/WND_Bamboo_A5.wav",
+    "22349a8fddad": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC08.wav",
       "built_in": true
     },
-    "c521225ef696": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Winds/WND_OCRNA_B5.wav",
+    "a90fd5ef1084": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC20.wav",
       "built_in": true
     },
-    "3c1f4dad7727": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Winds/WND_RkangDung_A4.wav",
+    "e60e7831a071": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC34.wav",
       "built_in": true
     },
-    "dcc475709d76": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Acoustic and Electric/Winds/WND_ZangsDung_A3.wav",
+    "88f99f518490": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC35.wav",
       "built_in": true
     },
-    "3be459a86f51": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_10_F1.wav",
+    "dc2a5ceb758d": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC21.wav",
       "built_in": true
     },
-    "30b7f63451f9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_11_F1.wav",
+    "a3d65f4735c6": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC09.wav",
       "built_in": true
     },
-    "fbc651a6134a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_12_F1.wav",
+    "95f2ea29bc11": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC46.wav",
       "built_in": true
     },
-    "587f418a91d1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_13_F1.wav",
+    "2462d37c0862": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC52.wav",
       "built_in": true
     },
-    "fb09c02039bc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_14_F1.wav",
+    "59c50b2a43ac": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC53.wav",
       "built_in": true
     },
-    "354229ab3e42": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_15_F1.wav",
+    "f569334c167f": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC47.wav",
       "built_in": true
     },
-    "bcfe35dd2cde": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_16_F1.wav",
+    "611a7c80160b": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC51.wav",
       "built_in": true
     },
-    "f9576444c9c2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_17_F1.wav",
+    "9db27eed3f76": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC45.wav",
       "built_in": true
     },
-    "70b867fd5d07": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_18_F1.wav",
+    "83c62bc51637": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC44.wav",
       "built_in": true
     },
-    "681b7dc507d3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_19_F1.wav",
+    "243a03061f2c": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC50.wav",
       "built_in": true
     },
-    "650455fe30ce": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_1_F1.wav",
+    "33939ada9c5d": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC54.wav",
       "built_in": true
     },
-    "bea19f46846c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_20_F1.wav",
+    "ac6813ec64ef": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC40.wav",
       "built_in": true
     },
-    "cc65769cc04b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_21_F1.wav",
+    "5e09263140f4": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC41.wav",
       "built_in": true
     },
-    "c93f3b3c1e32": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_2_F1.wav",
+    "16740166b423": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC55.wav",
       "built_in": true
     },
-    "181843d23737": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_3_F1.wav",
+    "45a1be66dd29": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC43.wav",
       "built_in": true
     },
-    "80f4a2533785": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_4_F1.wav",
+    "bba936d42276": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC57.wav",
       "built_in": true
     },
-    "1e76c1148457": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_5_F1.wav",
+    "5547637b9030": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC56.wav",
       "built_in": true
     },
-    "976dbe2091b6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_6_F1.wav",
+    "5ce20c3fa0a9": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC42.wav",
       "built_in": true
     },
-    "f23f29811af9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_7_F1.wav",
+    "a2249e326e5d": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC64.wav",
       "built_in": true
     },
-    "95bf9e8fc7ee": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_8_F1.wav",
+    "8e15ab2519aa": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC58.wav",
       "built_in": true
     },
-    "633b15991ba3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Bass/BAS_MODU_9_F1.wav",
+    "da8e3ab054df": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC59.wav",
       "built_in": true
     },
-    "370285b290c4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/KCK_MODU_1.wav",
+    "f9ccf94d8493": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC49.wav",
       "built_in": true
     },
-    "d49fb9df4f80": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/KCK_MODU_2.wav",
+    "5e10f5b4d8dd": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC61.wav",
       "built_in": true
     },
-    "5dc3c9a8d2b0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/KCK_MODU_3.wav",
+    "669e122a6f74": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC60.wav",
       "built_in": true
     },
-    "1ba69a73214b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/KCK_MODU_4.wav",
+    "c4cf1ffee092": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC48.wav",
       "built_in": true
     },
-    "cf02cbc206d7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/TOM_MODU_1.wav",
+    "9a34e83e3ccc": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC62.wav",
       "built_in": true
     },
-    "d13470e7be8f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/TOM_MODU_2.wav",
+    "7de5649f34be": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC63.wav",
       "built_in": true
     },
-    "48879de781de": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Drums/TOM_MODU_3.wav",
+    "2cdca3112656": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC04.wav",
       "built_in": true
     },
-    "2c24ab875610": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/FX_MODU_1.wav",
+    "9cc472a70faa": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC10.wav",
       "built_in": true
     },
-    "b0e3f441f911": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/FX_MODU_2.wav",
+    "67fc3b0021c7": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC38.wav",
       "built_in": true
     },
-    "27db9e66b1c4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/FX_MODU_3.wav",
+    "041e60454a21": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC39.wav",
       "built_in": true
     },
-    "44b97ab46059": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/FX_MODU_4.wav",
+    "c78020b30410": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC11.wav",
       "built_in": true
     },
-    "740a832af522": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/FX_MODU_5.wav",
+    "13e6d273d1f4": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC05.wav",
       "built_in": true
     },
-    "0a9bbb459fc4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/FX/FX_MODU_6.wav",
+    "68c2a2a024b7": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC13.wav",
       "built_in": true
     },
-    "03cc1bc6240d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/LED_MODU_1_C3.wav",
+    "f6e7e30bbc1f": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC07.wav",
       "built_in": true
     },
-    "bfdf5e449079": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/LED_MODU_2_C3.wav",
+    "b6e971bc023d": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC06.wav",
       "built_in": true
     },
-    "93085a2d9c6b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/PLK_MODU_1_C3.wav",
+    "9db707e2b9d9": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC12.wav",
       "built_in": true
     },
-    "6824379754b5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/PLK_MODU_2_C4.wav",
+    "8eb4ac68962a": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC16.wav",
       "built_in": true
     },
-    "8298eac97899": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/PLK_MODU_3_C3.wav",
+    "5e90bc18ad07": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC02.wav",
       "built_in": true
     },
-    "c76d1f5fb834": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/PLK_MODU_4_C4.wav",
+    "7ba2425dbc61": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC03.wav",
       "built_in": true
     },
-    "77a52fe20b8e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Leads and Keys/PLK_MODU_5_C3.wav",
+    "c76e8cb3729b": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC17.wav",
       "built_in": true
     },
-    "9e1ad496416e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_10_C1.wav",
+    "76ba717a26de": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC29.wav",
       "built_in": true
     },
-    "06fca378d898": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_1_C2.wav",
+    "19180e62266f": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC01.wav",
       "built_in": true
     },
-    "cd21f2ae5053": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_2_C2.wav",
+    "fdebd5470fec": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC15.wav",
       "built_in": true
     },
-    "cd3cf51de3eb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_3_C1.wav",
+    "092ae6a297f0": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC14.wav",
       "built_in": true
     },
-    "49577c6f0ae1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_4_C2.wav",
+    "10b2c503135f": {
+      "path": "samples/wavparty-braids-vol-1/synth-tunedC/synth-tunedC28.wav",
       "built_in": true
     },
-    "a1188d3b72e3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_5_C8.wav",
+    "698cc6f1cf5f": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares09.wav",
       "built_in": true
     },
-    "6d24dbeeb52f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_6_C2.wav",
+    "9b683e5bbf55": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares08.wav",
       "built_in": true
     },
-    "e39307afe25d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_7_C2.wav",
+    "6f73d07cd667": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares12.wav",
       "built_in": true
     },
-    "0527b31f262a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_8_C3.wav",
+    "6a9a40b9bf88": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares06.wav",
       "built_in": true
     },
-    "d67422d86bdf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/5U Modular/Pads/PAD_MODU_9_C2.wav",
+    "ae12b6d6e0b0": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares07.wav",
       "built_in": true
     },
-    "187ad903646c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_10_F1.wav",
+    "f6dac1421f80": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares13.wav",
       "built_in": true
     },
-    "99ea6fd22de9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_11_F1.wav",
+    "f06750b2d725": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares05.wav",
       "built_in": true
     },
-    "5a325d9295ff": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_12_F1.wav",
+    "80e2ae99ede4": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares11.wav",
       "built_in": true
     },
-    "e761462ce219": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_13_F1.wav",
+    "6ccc98a8362d": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares10.wav",
       "built_in": true
     },
-    "3949effddb41": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_14_F1.wav",
+    "789cca1caaf3": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares04.wav",
       "built_in": true
     },
-    "59197c1bf515": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_15_F2.wav",
+    "860a45511971": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares14.wav",
       "built_in": true
     },
-    "f9b157b36942": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_16_F0.wav",
+    "07badb5ee90b": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares15.wav",
       "built_in": true
     },
-    "5106ec849c82": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_17_F0.wav",
+    "130dbe0aa8ba": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares01.wav",
       "built_in": true
     },
-    "d0536cc690e3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_18_F1.wav",
+    "0eb00be1e4a6": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares17.wav",
       "built_in": true
     },
-    "fd60a236be6d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_19_F2.wav",
+    "078dabda7a86": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares03.wav",
       "built_in": true
     },
-    "fd663604c3e1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_1_F1.wav",
+    "a7af77af50a2": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares02.wav",
       "built_in": true
     },
-    "a5c73aa38d15": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_20_F2.wav",
+    "4b1b55033339": {
+      "path": "samples/wavparty-braids-vol-1/snares/snares16.wav",
       "built_in": true
     },
-    "15b30e55c948": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_21_F2.wav",
+    "9fa42f012de7": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC01.wav",
       "built_in": true
     },
-    "5012b69a1bc0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_2_F1.wav",
+    "c917950f9c81": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC03.wav",
       "built_in": true
     },
-    "5a0fa7181c4e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_3_F1.wav",
+    "5fea0279eb60": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC02.wav",
       "built_in": true
     },
-    "04379c418aee": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_4_F2.wav",
+    "7d6cc774602b": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC06.wav",
       "built_in": true
     },
-    "9eb7a08e3fb6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_5_F1.wav",
+    "1d9108f5ea2a": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC07.wav",
       "built_in": true
     },
-    "182cfad0136c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_6_F1.wav",
+    "96bdc66a54fc": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC05.wav",
       "built_in": true
     },
-    "853942fb0476": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_7_F1.wav",
+    "9a461db74e2b": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC04.wav",
       "built_in": true
     },
-    "04d4eb9ddfa7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_8_F1.wav",
+    "e92cf43d42be": {
+      "path": "samples/wavparty-braids-vol-1/chords-tunedC/chords-tunedC08.wav",
       "built_in": true
     },
-    "2add0879bc3d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Bass/BAS_2600_9_F1.wav",
+    "8c7113b5a3f2": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks08.wav",
       "built_in": true
     },
-    "07f082e88549": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_1.wav",
+    "45fa21ce7cae": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks09.wav",
       "built_in": true
     },
-    "2e4dc0abe6f7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_10.wav",
+    "574327347202": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks18.wav",
       "built_in": true
     },
-    "6800ca22b3d9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_2.wav",
+    "2bd22d168fb6": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks15.wav",
       "built_in": true
     },
-    "e5946df88d26": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_3.wav",
+    "8307ebe93c7d": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks01.wav",
       "built_in": true
     },
-    "d21bb175f368": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_4.wav",
+    "ab9d12789ae1": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks14.wav",
       "built_in": true
     },
-    "165601dd67df": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_5.wav",
+    "32c423bfa8ef": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks02.wav",
       "built_in": true
     },
-    "1e9d167120a6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_6.wav",
+    "d032b081a94b": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks16.wav",
       "built_in": true
     },
-    "007da378f668": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_7.wav",
+    "6fbf6d34790e": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks17.wav",
       "built_in": true
     },
-    "fdd872981eb8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_8.wav",
+    "f82b9f77b981": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks03.wav",
       "built_in": true
     },
-    "3ef222fdc10f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Drums/KCK_2600_9.wav",
+    "8dc1bd7aefc7": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks07.wav",
       "built_in": true
     },
-    "3b81254bcaaf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/FX/FX_2600_1.wav",
+    "5b47b285ecbe": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks13.wav",
       "built_in": true
     },
-    "dfaf2248d291": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/FX/FX_2600_2.wav",
+    "8fec200cc555": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks12.wav",
       "built_in": true
     },
-    "3733916a4df1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/FX/FX_2600_3.wav",
+    "57b3e73f80b3": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks06.wav",
       "built_in": true
     },
-    "3608e93a9dd6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/FX/FX_2600_4.wav",
+    "f2934b5f8dbe": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks10.wav",
       "built_in": true
     },
-    "3c7dd35e7b1f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/FX/FX_2600_5.wav",
+    "a94d0850baea": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks04.wav",
       "built_in": true
     },
-    "79174ce4f59b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/BRS_2600_1_C4.wav",
+    "8a13542cb3bd": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks05.wav",
       "built_in": true
     },
-    "4df9328067bf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/BRS_2600_2_C4.wav",
+    "a34163502889": {
+      "path": "samples/wavparty-braids-vol-1/kicks/kicks11.wav",
       "built_in": true
     },
-    "85bf3e90af1d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/BRS_2600_3_C5.wav",
+    "362c1e56bdc7": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC12.wav",
       "built_in": true
     },
-    "306c415231ea": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/LED_2600_1_C4.wav",
+    "3373d1ddadd4": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC06.wav",
       "built_in": true
     },
-    "fb151cc57757": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/LED_2600_2_C4.wav",
+    "84e00021e5e4": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC07.wav",
       "built_in": true
     },
-    "ddff6c1d538b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/LED_2600_3_C4.wav",
+    "2d0c09cca57f": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC13.wav",
       "built_in": true
     },
-    "9d0f8a68f9a2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/LED_2600_4_C3.wav",
+    "afdbc805d9f8": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC05.wav",
       "built_in": true
     },
-    "02d8c5e15068": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/PLK_2600_1_C4.wav",
+    "8fbec0900a3f": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC11.wav",
       "built_in": true
     },
-    "c38f2a7d6dc1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Keys/PLK_2600_3_C.wav",
+    "18c4db2e013b": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC10.wav",
       "built_in": true
     },
-    "2a3503d40412": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Pads/PAD_2600_1_C2.wav",
+    "060155dc3a47": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC04.wav",
       "built_in": true
     },
-    "258455e13b5e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Pads/PAD_2600_2_C2.wav",
+    "40fef0bf6c19": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC14.wav",
       "built_in": true
     },
-    "f1e35301338a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Pads/PAD_2600_3_C2.wav",
+    "e2995c38dbd7": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC15.wav",
       "built_in": true
     },
-    "fd6193713c76": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Pads/PAD_2600_4_C2.wav",
+    "1cb62f7ba635": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC01.wav",
       "built_in": true
     },
-    "7aebaf3edc4d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP 2600/Pads/STR_2600_1_C3.wav",
+    "41723a3e99ea": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC17.wav",
       "built_in": true
     },
-    "1e2419cc8a7b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_10_F1.wav",
+    "4da2ea738213": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC03.wav",
       "built_in": true
     },
-    "6c7798cadb51": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_11_F1.wav",
+    "76623fa0abf4": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC02.wav",
       "built_in": true
     },
-    "1bdcc718e107": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_12_F2.wav",
+    "0a07ef7f1bb2": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC16.wav",
       "built_in": true
     },
-    "e5e1cf3d7347": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_13_F1.wav",
+    "8729284237bc": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC09.wav",
       "built_in": true
     },
-    "f3053934f174": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_14_F2.wav",
-      "built_in": true
-    },
-    "81cc68f53b39": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_15_F1.wav",
-      "built_in": true
-    },
-    "6ff9d0454ab2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_16_F1.wav",
-      "built_in": true
-    },
-    "8eebd61317d1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_17_F1.wav",
-      "built_in": true
-    },
-    "c54450d1056f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_18_F1.wav",
-      "built_in": true
-    },
-    "e62bfbc27948": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_19_F1.wav",
-      "built_in": true
-    },
-    "d1a4ad9e2964": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_1_F1.wav",
-      "built_in": true
-    },
-    "439e7370c613": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_2_F1.wav",
-      "built_in": true
-    },
-    "0aa279021802": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_3_F1.wav",
-      "built_in": true
-    },
-    "aa267c5796e3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_4_F1.wav",
-      "built_in": true
-    },
-    "98c0d45370a4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_5_F1.wav",
-      "built_in": true
-    },
-    "8fb27870e5e0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_6_F1.wav",
-      "built_in": true
-    },
-    "d81771190c66": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_7_F1.wav",
-      "built_in": true
-    },
-    "83e1716b5da8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_8_F1.wav",
-      "built_in": true
-    },
-    "d46d36f882ab": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Bass/BAS_ODDY_9_F1.wav",
-      "built_in": true
-    },
-    "caf08ae4316b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/KCK_ODDY_1.wav",
-      "built_in": true
-    },
-    "484d2f8cbeb8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/KCK_ODDY_2.wav",
-      "built_in": true
-    },
-    "4d889f430e9c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/KCK_ODDY_3.wav",
-      "built_in": true
-    },
-    "052702236acf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/KCK_ODDY_4.wav",
-      "built_in": true
-    },
-    "d7a4b01b8440": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/KCK_ODDY_5.wav",
-      "built_in": true
-    },
-    "f8afe4e8cb2c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/PRC_ODDY_1.wav",
-      "built_in": true
-    },
-    "f40d94fce3eb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/PRC_ODDY_2.wav",
-      "built_in": true
-    },
-    "16edf9290be9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/PRC_ODDY_3.wav",
-      "built_in": true
-    },
-    "68419c20de8b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/PRC_ODDY_4.wav",
-      "built_in": true
-    },
-    "8d44e4187716": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/SNR_ODDY_1.wav",
-      "built_in": true
-    },
-    "ee5365995e7c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/SNR_ODDY_2.wav",
-      "built_in": true
-    },
-    "e03915d3be8b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Drums/SNR_ODDY_3.wav",
-      "built_in": true
-    },
-    "3c4fccda16d8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_1.wav",
-      "built_in": true
-    },
-    "296c7202907d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_2.wav",
-      "built_in": true
-    },
-    "ca227e067bc9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_3.wav",
-      "built_in": true
-    },
-    "96f7cc4001ef": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_4.wav",
-      "built_in": true
-    },
-    "ec60452762ea": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_5.wav",
-      "built_in": true
-    },
-    "c615685ffee5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_6.wav",
-      "built_in": true
-    },
-    "d80430a51265": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_7.wav",
-      "built_in": true
-    },
-    "dc5b43622dcb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/FX/FX_ODDY_8.wav",
-      "built_in": true
-    },
-    "f80685b88186": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/LED_ODDY_1_C3.wav",
-      "built_in": true
-    },
-    "7977c1db5dfd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/LED_ODDY_2_C4.wav",
-      "built_in": true
-    },
-    "d2d5f4300fc7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/LED_ODDY_3_C4.wav",
-      "built_in": true
-    },
-    "e35333a1bab0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/LED_ODDY_4_C3.wav",
-      "built_in": true
-    },
-    "2faeca9cf40c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/LED_ODDY_5_C6.wav",
-      "built_in": true
-    },
-    "3bd2ad1646e2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/PLK_ODDY_1_C4.wav",
-      "built_in": true
-    },
-    "25e29022921f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/PLK_ODDY_2_C4.wav",
-      "built_in": true
-    },
-    "bb37150487d7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Keys/PLK_ODDY_3_C6.wav",
-      "built_in": true
-    },
-    "5d58ca7ca9bf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Pads/PAD_ODDY_1_C3.wav",
-      "built_in": true
-    },
-    "69415bf6182e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Pads/PAD_ODDY_2_C3.wav",
-      "built_in": true
-    },
-    "554bd64c0397": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/ARP Odyssey/Pads/PAD_ODDY_3_C3.wav",
-      "built_in": true
-    },
-    "c34d3cbb6709": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_1_F2.wav",
-      "built_in": true
-    },
-    "3b5238fbd171": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_2_F1.wav",
-      "built_in": true
-    },
-    "2391e0a8ffae": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_3_F1.wav",
-      "built_in": true
-    },
-    "bdd570fec926": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_4_F2.wav",
-      "built_in": true
-    },
-    "74132b05c5ae": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_5_F1.wav",
-      "built_in": true
-    },
-    "03fa7acc3ae1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_6_F1.wav",
-      "built_in": true
-    },
-    "0a3169166ca2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Bass/BAS_VZ10M_7_F1.wav",
-      "built_in": true
-    },
-    "01efff0d1336": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/BNG_VZ10M_3.wav",
-      "built_in": true
-    },
-    "fbb36b1388a2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/CNG_VZ10M_1.wav",
-      "built_in": true
-    },
-    "594e5a0b461f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/CNG_VZ10M_2.wav",
-      "built_in": true
-    },
-    "1d429fc6e276": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/KCK_VZ10M_1.wav",
-      "built_in": true
-    },
-    "8d5927edb4b0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/KCK_VZ10M_2.wav",
-      "built_in": true
-    },
-    "09fde51433b8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/SNR_VZ10M_1.wav",
-      "built_in": true
-    },
-    "c617f6aea4be": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/SNR_VZ10M_2.wav",
-      "built_in": true
-    },
-    "d9cb99fb84e3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/TOM_VZ10M_1.wav",
-      "built_in": true
-    },
-    "a0f0552f78aa": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/TOM_VZ10M_2.wav",
-      "built_in": true
-    },
-    "ee07ebdec402": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Drums/TOM_VZ10M_3.wav",
-      "built_in": true
-    },
-    "08335799591b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/FX/FX_VZ10M_1.wav",
-      "built_in": true
-    },
-    "245c69397d6e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Leads and Keys/BEL_VZ10M_1_C7.wav",
-      "built_in": true
-    },
-    "15f2d35eb5bb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Leads and Keys/LED_VZ10M_1_C4.wav",
-      "built_in": true
-    },
-    "93dfdeea03cf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Leads and Keys/LED_VZ10M_2_C6.wav",
-      "built_in": true
-    },
-    "561fd4fde2fc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Casio VZ10M/Leads and Keys/PLK_VZ10M_1_C4.wav",
-      "built_in": true
-    },
-    "e1189c30026f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_10_F1.wav",
-      "built_in": true
-    },
-    "210cc596a6db": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_11_F1.wav",
-      "built_in": true
-    },
-    "52a46af7ffa9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_1_F1.wav",
-      "built_in": true
-    },
-    "1abe3b82d55d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_2_F2.wav",
-      "built_in": true
-    },
-    "9e7a14899147": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_3_F1.wav",
-      "built_in": true
-    },
-    "4d40a4b3839f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_4_F1.wav",
-      "built_in": true
-    },
-    "0db00e84983f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_5_F1.wav",
-      "built_in": true
-    },
-    "b5bc78a12ecf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_6_F1.wav",
-      "built_in": true
-    },
-    "6f84f3134058": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_7_F1.wav",
-      "built_in": true
-    },
-    "e689bf698b20": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_8_F1.wav",
-      "built_in": true
-    },
-    "6aadca1cdca3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Bass/BAS_VCS3_9_F1.wav",
-      "built_in": true
-    },
-    "55c6ab639fd8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Drums/HAT_VCS3_1.wav",
-      "built_in": true
-    },
-    "849413603fa8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Drums/HAT_VCS3_2.wav",
-      "built_in": true
-    },
-    "423b32ec600b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Drums/KCK_VCS3_1.wav",
-      "built_in": true
-    },
-    "ea93b8239f09": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Drums/SNR_VCS3_1.wav",
-      "built_in": true
-    },
-    "46557dcb13dd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Drums/SNR_VCS3_2.wav",
-      "built_in": true
-    },
-    "5baec8e2710b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_1.wav",
-      "built_in": true
-    },
-    "8d580f760fdd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_10.wav",
-      "built_in": true
-    },
-    "5a52ac7176a7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_11.wav",
-      "built_in": true
-    },
-    "2abc747cd266": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_12.wav",
-      "built_in": true
-    },
-    "a6d68ec7b04a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_13.wav",
-      "built_in": true
-    },
-    "eb46a850ff86": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_14.wav",
-      "built_in": true
-    },
-    "72dd11f8239d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_15.wav",
-      "built_in": true
-    },
-    "51f0122b550a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_16.wav",
-      "built_in": true
-    },
-    "b51b0b8d928e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_17.wav",
-      "built_in": true
-    },
-    "0c3376421dc6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_18.wav",
-      "built_in": true
-    },
-    "333563ee42d5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_19.wav",
-      "built_in": true
-    },
-    "52d581694996": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_3.wav",
-      "built_in": true
-    },
-    "a995c0e1ad72": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_4.wav",
-      "built_in": true
-    },
-    "8b1341efc216": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_5.wav",
-      "built_in": true
-    },
-    "def1b603dd72": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_6.wav",
-      "built_in": true
-    },
-    "c44999af14b8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_7.wav",
-      "built_in": true
-    },
-    "2f4d8fab9d2c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_8.wav",
-      "built_in": true
-    },
-    "c73410d18488": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/FX/FX_VCS3_9.wav",
-      "built_in": true
-    },
-    "5be10aad9014": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/LED_VCS3_1_C4.wav",
-      "built_in": true
-    },
-    "cf7ddd642fd1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/LED_VCS3_2_C4.wav",
-      "built_in": true
-    },
-    "331f22dfea46": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/LED_VCS3_3_C4.wav",
-      "built_in": true
-    },
-    "559fa298df6a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/LED_VCS3_4_C4.wav",
-      "built_in": true
-    },
-    "ec6af859db74": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/LED_VCS3_5_C4.wav",
-      "built_in": true
-    },
-    "525bafe9a7fe": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/PLK_VCS3_1_C4.wav",
-      "built_in": true
-    },
-    "664c4291fc62": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Leads and Keys/PLK_VCS3_2_C4.wav",
-      "built_in": true
-    },
-    "2e1a59c2157d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Pads/PAD_VCS3_1_C2.wav",
-      "built_in": true
-    },
-    "7f718bf74680": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/EMS VCS3/Pads/PAD_VCS3_2_C2.wav",
-      "built_in": true
-    },
-    "10e0e588a45c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_10_F1.wav",
-      "built_in": true
-    },
-    "624e726a2cd8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_11_F1.wav",
-      "built_in": true
-    },
-    "b838f1c84736": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_12_F1.wav",
-      "built_in": true
-    },
-    "6d6d7c389081": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_13_F1.wav",
-      "built_in": true
-    },
-    "99e30666c5c8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_14_F1.wav",
-      "built_in": true
-    },
-    "664ba710a5b7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_15_F2.wav",
-      "built_in": true
-    },
-    "04ddf934e65c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_16_F2.wav",
-      "built_in": true
-    },
-    "b8b78b1da229": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_1_F1.wav",
-      "built_in": true
-    },
-    "31e5866eb0d8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_2_F1.wav",
-      "built_in": true
-    },
-    "b29eb0cb8657": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_3_F1.wav",
-      "built_in": true
-    },
-    "b7be275dc446": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_4_F2.wav",
-      "built_in": true
-    },
-    "a0ac80e037ee": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_5_F1.wav",
-      "built_in": true
-    },
-    "18cbeb6ebf75": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_6_F1.wav",
-      "built_in": true
-    },
-    "f7b5f50f7e64": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_7_F1.wav",
-      "built_in": true
-    },
-    "f11c30fbbb3c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_8_F1.wav",
-      "built_in": true
-    },
-    "41f6b195681c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Bass/BAS_MS20_9_F1.wav",
-      "built_in": true
-    },
-    "9d7f256af7eb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/CYM_MS20_1.wav",
-      "built_in": true
-    },
-    "fa458fa74ad4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/CYM_MS20_2.wav",
-      "built_in": true
-    },
-    "7ab5e7df9ead": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/HAT_MS20_1.wav",
-      "built_in": true
-    },
-    "b1ebda4901ac": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/HAT_MS20_2.wav",
-      "built_in": true
-    },
-    "84181c376248": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/KCK_MS20_1.wav",
-      "built_in": true
-    },
-    "f406b16650e3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/KCK_MS20_2.wav",
-      "built_in": true
-    },
-    "11170bef6213": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Drums/SNR_MS20_1.wav",
-      "built_in": true
-    },
-    "eb38c167d358": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_1.wav",
-      "built_in": true
-    },
-    "ebc7e6f8c0b2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_10.wav",
-      "built_in": true
-    },
-    "b0685c711173": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_11.wav",
-      "built_in": true
-    },
-    "ed6a8d983e08": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_12.wav",
-      "built_in": true
-    },
-    "bf1a690d9e42": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_13.wav",
-      "built_in": true
-    },
-    "5270fd3e7577": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_14.wav",
-      "built_in": true
-    },
-    "bb75168e09e7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_15.wav",
-      "built_in": true
-    },
-    "d45fab29f34c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_2.wav",
-      "built_in": true
-    },
-    "54307b3c184a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_3.wav",
-      "built_in": true
-    },
-    "a51755f8b1c4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_4.wav",
-      "built_in": true
-    },
-    "f181abb27303": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_5.wav",
-      "built_in": true
-    },
-    "b4a0de62669b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_6.wav",
-      "built_in": true
-    },
-    "a5924acdb42a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_7.wav",
-      "built_in": true
-    },
-    "2e7d11459a5e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_8.wav",
-      "built_in": true
-    },
-    "64bcccadcf61": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/FX/FX_MS20_9.wav",
-      "built_in": true
-    },
-    "f11c0483a39a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_1_C4.wav",
-      "built_in": true
-    },
-    "b3e1e40955d4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_2_C4.wav",
-      "built_in": true
-    },
-    "ad1c03a45892": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_3_C3.wav",
-      "built_in": true
-    },
-    "f5b9d43b51ba": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_4_C3.wav",
-      "built_in": true
-    },
-    "f6a9579031f3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_5_C3.wav",
-      "built_in": true
-    },
-    "02131c2e852f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_6_C3.wav",
+    "622cec9e823a": {
+      "path": "samples/wavparty-braids-vol-1/vox-tunedC/vox-tunedC08.wav",
       "built_in": true
     },
     "0ad132a34968": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/LED_MS20_7_C3.wav",
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_7_C3.wav",
+      "built_in": true
+    },
+    "f6a9579031f3": {
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_5_C3.wav",
+      "built_in": true
+    },
+    "f11c0483a39a": {
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_1_C4.wav",
+      "built_in": true
+    },
+    "ad1c03a45892": {
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_3_C3.wav",
+      "built_in": true
+    },
+    "02131c2e852f": {
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_6_C3.wav",
       "built_in": true
     },
     "92535417ff6b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Leads and Keys/PLK_MS20_1_C4.wav",
+      "path": "samples/synth/Korg MS-20/Leads and Keys/PLK_MS20_1_C4.wav",
       "built_in": true
     },
-    "78fc4c4382d3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Pads/PAD_MS20_1_C3.wav",
+    "f5b9d43b51ba": {
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_4_C3.wav",
       "built_in": true
     },
-    "d726afcd8816": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Pads/PAD_MS20_2_C3.wav",
+    "b3e1e40955d4": {
+      "path": "samples/synth/Korg MS-20/Leads and Keys/LED_MS20_2_C4.wav",
       "built_in": true
     },
-    "685ca5c2f38d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Pads/PAD_MS20_3_C2.wav",
+    "6d6d7c389081": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_13_F1.wav",
       "built_in": true
     },
-    "25f3ac724030": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Pads/PAD_MS20_4_C2.wav",
+    "b8b78b1da229": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_1_F1.wav",
       "built_in": true
     },
-    "90ccfe121cb9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Korg MS-20/Pads/PAD_MS20_5_C2.wav",
+    "b29eb0cb8657": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_3_F1.wav",
       "built_in": true
     },
-    "a380c8d4f760": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_10_F1.wav",
+    "624e726a2cd8": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_11_F1.wav",
       "built_in": true
     },
-    "aba456cfbecd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_11_F1.wav",
+    "664ba710a5b7": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_15_F2.wav",
       "built_in": true
     },
-    "b18a00fce9da": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_12_F2.wav",
+    "f7b5f50f7e64": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_7_F1.wav",
       "built_in": true
     },
-    "a9dc6c55c7cb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_13_F2.wav",
+    "a0ac80e037ee": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_5_F1.wav",
       "built_in": true
     },
-    "3e9aef0879e7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_1_F1.wav",
+    "41f6b195681c": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_9_F1.wav",
       "built_in": true
     },
-    "2f1adcd624c6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_2_F1.wav",
+    "b838f1c84736": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_12_F1.wav",
       "built_in": true
     },
-    "72a06e932728": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_3_F1.wav",
+    "10e0e588a45c": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_10_F1.wav",
       "built_in": true
     },
-    "146756ca15bd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_4_F1.wav",
+    "31e5866eb0d8": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_2_F1.wav",
       "built_in": true
     },
-    "845bb1e41ab9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_5_F1.wav",
+    "99e30666c5c8": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_14_F1.wav",
       "built_in": true
     },
-    "12ccf15abea1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_6_F1.wav",
+    "18cbeb6ebf75": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_6_F1.wav",
       "built_in": true
     },
-    "0da1aea92f37": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_7_F1.wav",
+    "04ddf934e65c": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_16_F2.wav",
       "built_in": true
     },
-    "b72084673a58": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_8_F1.wav",
+    "f11c30fbbb3c": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_8_F1.wav",
       "built_in": true
     },
-    "d53cb6998b58": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Bass/BAS_Mini_9_F1.wav",
-      "built_in": true
-    },
-    "a6aa49d82925": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/CYM_Mini_1.wav",
-      "built_in": true
-    },
-    "4e1d367e5ae9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/CYM_Mini_2.wav",
-      "built_in": true
-    },
-    "b6ac1a7a9df0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/HAT_Mini_1.wav",
-      "built_in": true
-    },
-    "afc82c7689a1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/HAT_Mini_2.wav",
-      "built_in": true
-    },
-    "769434373381": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/HAT_Mini_3.wav",
-      "built_in": true
-    },
-    "a38d8260865a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/KCK_Mini_1.wav",
-      "built_in": true
-    },
-    "cdbd53dc048b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/KCK_Mini_2.wav",
-      "built_in": true
-    },
-    "a190bdb867c8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/KCK_Mini_3.wav",
-      "built_in": true
-    },
-    "64c709cac056": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/KCK_Mini_4.wav",
-      "built_in": true
-    },
-    "5c32ceac1f1a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/KCK_Mini_5.wav",
-      "built_in": true
-    },
-    "66c6f17c18ea": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/SNR_Mini_1.wav",
-      "built_in": true
-    },
-    "60763c6126b5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/SNR_Mini_2.wav",
-      "built_in": true
-    },
-    "3da5f02a0b9f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/SNR_Mini_3.wav",
-      "built_in": true
-    },
-    "06fb1ccb250a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Drums/SNR_Mini_4.wav",
-      "built_in": true
-    },
-    "54ed7522c369": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/FX/FX_Mini_1.wav",
-      "built_in": true
-    },
-    "54fb74951b11": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/FX/FX_Mini_2.wav",
-      "built_in": true
-    },
-    "02bfa7ab7457": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/FX/FX_Mini_3.wav",
-      "built_in": true
-    },
-    "a0eebe861754": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/FX/FX_Mini_4.wav",
-      "built_in": true
-    },
-    "d4153752651e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/LED_Mini_1_C5.wav",
-      "built_in": true
-    },
-    "d65c0bf68548": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/LED_Mini_2_C4.wav",
-      "built_in": true
-    },
-    "a12c33c946cb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/LED_Mini_3_C5.wav",
-      "built_in": true
-    },
-    "3798f3e91365": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/LED_Mini_5_C3.wav",
-      "built_in": true
-    },
-    "99834aae2e48": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/LED_Mini_6_C5.wav",
-      "built_in": true
-    },
-    "0dae71a6e8a8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/PLK_Mini_1_C2.wav",
-      "built_in": true
-    },
-    "0a3f83529662": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/PLK_Mini_2_C4.wav",
-      "built_in": true
-    },
-    "c23b11901645": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/PLK_Mini_3_C3.wav",
-      "built_in": true
-    },
-    "a13ee31a993f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Leads and Keys/PLK_Mini_4_C4.wav",
-      "built_in": true
-    },
-    "f49efc87f0d1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_10_C2.wav",
-      "built_in": true
-    },
-    "6ec56dfd6075": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_1_C3.wav",
-      "built_in": true
-    },
-    "809c5e6e1b7b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_2_C2.wav",
-      "built_in": true
-    },
-    "073fc656d076": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_3_C2.wav",
-      "built_in": true
-    },
-    "4a1aec5e3233": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_4_C2.wav",
-      "built_in": true
-    },
-    "619f6965621e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_5_C1.wav",
-      "built_in": true
-    },
-    "0223a304abe1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_6_C2.wav",
-      "built_in": true
-    },
-    "2ddaa4f112ec": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_7_C2.wav",
-      "built_in": true
-    },
-    "6a8d91cebdcd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_8_C1.wav",
-      "built_in": true
-    },
-    "2a7c939143b5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Moog Minimoog/Pads/PAD_Mini_9_C1.wav",
-      "built_in": true
-    },
-    "80b7a1a7f7bb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_1_F1.wav",
-      "built_in": true
-    },
-    "c8fb38a09d52": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_2_F1.wav",
-      "built_in": true
-    },
-    "3a977bc9473e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_3_F1.wav",
-      "built_in": true
-    },
-    "83deab976ffc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_4_F1.wav",
-      "built_in": true
-    },
-    "c7db36eea1aa": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_5_F1.wav",
-      "built_in": true
-    },
-    "edcd0614087b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_6_F1.wav",
-      "built_in": true
-    },
-    "4911a90c8026": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_7_F1.wav",
-      "built_in": true
-    },
-    "4bc5bf1c64ce": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Bass/BAS_OBXA_8_F2.wav",
-      "built_in": true
-    },
-    "212c635c6b41": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/BNG_OBXA_1.wav",
-      "built_in": true
-    },
-    "af2cb2fe859c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/BNG_OBXA_2.wav",
-      "built_in": true
-    },
-    "c408f4dedeb2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/BNG_OBXA_3.wav",
-      "built_in": true
-    },
-    "31e2febeb740": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/CNG_OBXA_1.wav",
-      "built_in": true
-    },
-    "32be35504a37": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/CNG_OBXA_2.wav",
-      "built_in": true
-    },
-    "2501165851b6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/CNG_OBXA_3.wav",
-      "built_in": true
-    },
-    "bf444c2f6007": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/KCK_OBXA_1.wav",
-      "built_in": true
-    },
-    "49f3505822b6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/PRC_OBXA_1.wav",
-      "built_in": true
-    },
-    "2598d200f051": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Drums/PRC_OBXA_2.wav",
-      "built_in": true
-    },
-    "ff82249d8d0b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/HNS_OBXA_1_C5.wav",
-      "built_in": true
-    },
-    "91ade8118eb4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/KEY_OBXA_1_C4.wav",
-      "built_in": true
-    },
-    "965dd864bb8b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/KEY_OBXA_2_C5.wav",
-      "built_in": true
-    },
-    "77fc3f7270b4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/KEY_OBXA_3_C4.wav",
-      "built_in": true
-    },
-    "efbe748cba71": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/KEY_OBXA_4_C6.wav",
-      "built_in": true
-    },
-    "08905f0c3b3e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/KEY_OBXA_5_C4.wav",
-      "built_in": true
-    },
-    "7535ea53517c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/LED_OBXA_1_C6.wav",
-      "built_in": true
-    },
-    "31b96ab361e6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/LED_OBXA_2_C2.wav",
-      "built_in": true
-    },
-    "5a3d0a160b9f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/PLK_OBXA_1_C4.wav",
-      "built_in": true
-    },
-    "2895103cc35c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/PLK_OBXA_2_C5.wav",
-      "built_in": true
-    },
-    "f760d9209bbd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/PLK_OBXA_3_C4.wav",
-      "built_in": true
-    },
-    "6d841bce74f8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/PLK_OBXA_4_C6.wav",
-      "built_in": true
-    },
-    "36a8e1532da6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/PLK_OBXA_5_C4.wav",
-      "built_in": true
-    },
-    "8a31e165de3a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/PLK_OBXA_6_C4.wav",
-      "built_in": true
-    },
-    "e6d78b0e5328": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_1_C2.wav",
-      "built_in": true
-    },
-    "93b4cacec8a8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_2_C2.wav",
-      "built_in": true
-    },
-    "fc7924189af2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_3_C2.wav",
-      "built_in": true
-    },
-    "39877891b4c1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_4_C5.wav",
-      "built_in": true
-    },
-    "ed1846f44a0b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_5_C3.wav",
-      "built_in": true
-    },
-    "64177ab38bcd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_6_C2.wav",
-      "built_in": true
-    },
-    "e785c63883af": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Keys/STB_OBXA_7_C4.wav",
-      "built_in": true
-    },
-    "bf9d588e93bd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/CHO_OBXA_1_C4.wav",
-      "built_in": true
-    },
-    "cf02b13bc951": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/CHO_OBXA_2_C3.wav",
-      "built_in": true
-    },
-    "c1482ef26d0f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/PAD_OBXA_1_C2.wav",
-      "built_in": true
-    },
-    "9a22e3e5efe0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/PAD_OBXA_2_C2.wav",
-      "built_in": true
-    },
-    "7c715b98ab74": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/PAD_OBXA_3_C2.wav",
-      "built_in": true
-    },
-    "ee13ff528a61": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/PAD_OBXA_4_C3.wav",
-      "built_in": true
-    },
-    "2ea5a5b6c098": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/PAD_OBXA_5_C2.wav",
-      "built_in": true
-    },
-    "8fccb33164a5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/PAD_OBXA_6_C2.wav",
-      "built_in": true
-    },
-    "23c81eefb5dd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/STR_OBXA_1_C2.wav",
-      "built_in": true
-    },
-    "17db176860b7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/STR_OBXA_2_C2.wav",
-      "built_in": true
-    },
-    "c0fe2aae6d56": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/STR_OBXA_3_C2.wav",
-      "built_in": true
-    },
-    "017971347afa": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Oberheim OB-Xa/Pads/STR_OBXA_4_C4.wav",
-      "built_in": true
-    },
-    "bd6f571ad4b9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_1_F1.wav",
-      "built_in": true
-    },
-    "cbddaa72c846": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_2_F1.wav",
-      "built_in": true
-    },
-    "76fbe6514844": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_3_F1.wav",
-      "built_in": true
-    },
-    "ba0617368320": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_4_F1.wav",
-      "built_in": true
-    },
-    "6e77b3557517": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_5_F1.wav",
-      "built_in": true
-    },
-    "f0992d429cb6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_6_F1.wav",
-      "built_in": true
-    },
-    "b5187ea26bc8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Bass/BAS_PPG_7_F1.wav",
-      "built_in": true
-    },
-    "49bfd74f9e67": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Leads and Keys/BEL_PPG_1_C6.wav",
-      "built_in": true
-    },
-    "998795be5924": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Leads and Keys/KEY_PPG_1_C5.wav",
-      "built_in": true
-    },
-    "78ce54368173": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Leads and Keys/KEY_PPG_2_C6.wav",
-      "built_in": true
-    },
-    "1eccf2c47f2f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Leads and Keys/KEY_PPG_3_C4.wav",
-      "built_in": true
-    },
-    "c1ba82ae6b08": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Leads and Keys/KEY_PPG_4_C5.wav",
-      "built_in": true
-    },
-    "80bd1f11a328": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_10_C3.wav",
-      "built_in": true
-    },
-    "c3a47a6f5834": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_11_C3.wav",
-      "built_in": true
-    },
-    "5d73935fa59d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_12_C4.wav",
-      "built_in": true
-    },
-    "272d8ae6697b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_13_C1.wav",
-      "built_in": true
-    },
-    "d6cf604ab716": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_14_C2.wav",
-      "built_in": true
-    },
-    "24861b942681": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_15_C2.wav",
-      "built_in": true
-    },
-    "8ffd80ddf646": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_16_C2.wav",
-      "built_in": true
-    },
-    "2bfc2ac0e8e5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_1_C2.wav",
-      "built_in": true
-    },
-    "811bce411ab5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_2_C3.wav",
-      "built_in": true
-    },
-    "75ead7ea0504": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_3_C2.wav",
-      "built_in": true
-    },
-    "7230bb4fb5fb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_4_C4.wav",
-      "built_in": true
-    },
-    "62fd3e2a4a90": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_5_C2.wav",
-      "built_in": true
-    },
-    "bc338686ef98": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_6_C3.wav",
-      "built_in": true
-    },
-    "0770be2676d5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_7_C2.wav",
-      "built_in": true
-    },
-    "fd75a5051257": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_8_C2.wav",
-      "built_in": true
-    },
-    "228175433e98": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/PAD_PPG_9_C4.wav",
-      "built_in": true
-    },
-    "2c4a5ba27b12": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/PPG Wave 2_2/Pads/STR_PPG_1_C2.wav",
-      "built_in": true
-    },
-    "06e4d7989689": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_10_F1.wav",
-      "built_in": true
-    },
-    "f99bdcda695f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_11_F1.wav",
-      "built_in": true
-    },
-    "4d6131a246a7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_12_F1.wav",
-      "built_in": true
-    },
-    "c1b8e6da6c69": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_1_F1.wav",
-      "built_in": true
-    },
-    "eb1c7b5af72b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_2_F1.wav",
-      "built_in": true
-    },
-    "63196c868fbb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_3_F1.wav",
-      "built_in": true
-    },
-    "175d9853c7d1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_4_F1.wav",
-      "built_in": true
-    },
-    "1d6c053c551f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_5_F1.wav",
-      "built_in": true
-    },
-    "70840e5bcd18": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_6_F1.wav",
-      "built_in": true
-    },
-    "0d567b9582f1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_7_F1.wav",
-      "built_in": true
-    },
-    "416a8e5d9a6f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_8_F1.wav",
-      "built_in": true
-    },
-    "c8abd24e9024": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Bass/BAS_MKS80_9_F1.wav",
-      "built_in": true
-    },
-    "bcfe171be635": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/HAT_MKS80_1.wav",
-      "built_in": true
-    },
-    "fa761bfc82df": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/HAT_MKS80_2.wav",
-      "built_in": true
-    },
-    "d72df4add078": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/KCK_MKS80_1.wav",
-      "built_in": true
-    },
-    "96a572698080": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/KCK_MKS80_2.wav",
-      "built_in": true
-    },
-    "af92a287af10": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/KCK_MKS80_3.wav",
-      "built_in": true
-    },
-    "ecd8f0e52279": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/PRC_MKS80_1.wav",
-      "built_in": true
-    },
-    "e412379c8b2c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/PRC_MKS80_2.wav",
-      "built_in": true
-    },
-    "81d6b10394ce": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/SNR_MKS80_1.wav",
-      "built_in": true
-    },
-    "6feca7bf869f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/SNR_MKS80_2.wav",
-      "built_in": true
-    },
-    "e287f69561d7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/TOM_MKS80_1.wav",
-      "built_in": true
-    },
-    "7d11164b643a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/TOM_MKS80_2.wav",
-      "built_in": true
-    },
-    "b9a1f5ccc87d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Drums/TOM_MKS80_3.wav",
-      "built_in": true
-    },
-    "debfd13e74a6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/FX/FX_MKS80_1.wav",
-      "built_in": true
-    },
-    "bf443a400a2d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/FX/FX_MKS80_2.wav",
-      "built_in": true
-    },
-    "b81a5cc6abdd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/FX/FX_MKS80_3.wav",
-      "built_in": true
-    },
-    "e620e1c1dd0d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/GLX_MKS80_1_C7.wav",
-      "built_in": true
-    },
-    "820b94d8a62e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/LED_MKS80_1_C5.wav",
-      "built_in": true
-    },
-    "19574f723e6b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/LED_MKS80_2_C4.wav",
-      "built_in": true
-    },
-    "61d15bbf967b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PLK_MKS80_1_C6.wav",
-      "built_in": true
-    },
-    "b7812058187b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PLK_MKS80_2_C3.wav",
-      "built_in": true
-    },
-    "30d33584764b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PLK_MKS80_3_C5.wav",
-      "built_in": true
-    },
-    "11e77b5f5282": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PLK_MKS80_4_C5.wav",
-      "built_in": true
-    },
-    "c8cda6e35797": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PNO_MKS80_1_C3.wav",
-      "built_in": true
-    },
-    "e1bd91eabd54": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PNO_MKS80_1_C4.wav",
-      "built_in": true
-    },
-    "9de5ad6a6269": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PNO_MKS80_1_C5.wav",
-      "built_in": true
-    },
-    "c2ff2144f256": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/PNO_MKS80_1_C6.wav",
-      "built_in": true
-    },
-    "a129332d8ef7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Leads and Keys/STB_MKS80_1_C2.wav",
-      "built_in": true
-    },
-    "5c7cc225c56c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/BRS_MKS80_1_C4.wav",
-      "built_in": true
-    },
-    "650f53453083": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/BRS_MKS80_2_C2.wav",
-      "built_in": true
-    },
-    "fd269d4a3f7f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/PAD_MKS80_1_C2.wav",
-      "built_in": true
-    },
-    "bb93d5968908": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/PAD_MKS80_2_C2.wav",
-      "built_in": true
-    },
-    "3944ec4d16db": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/PAD_MKS80_3_C1.wav",
-      "built_in": true
-    },
-    "9e3d0fa3bc8d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/PAD_MKS80_4_C2.wav",
-      "built_in": true
-    },
-    "c872adf81f6c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/PAD_MKS80_5_C2.wav",
-      "built_in": true
-    },
-    "00a87971c8b8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/STR_MKS80_1_C3.wav",
-      "built_in": true
-    },
-    "f79e8e37f6ab": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/STR_MKS80_2_C2.wav",
-      "built_in": true
-    },
-    "adc75552d2a5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/STR_MKS80_3_C2.wav",
-      "built_in": true
-    },
-    "3e420f6a13bb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland MKS-80/Pads/STR_MKS80_4_C2.wav",
-      "built_in": true
-    },
-    "42b1a209d0cf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_10_F1.wav",
-      "built_in": true
-    },
-    "c01fff1e75c5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_11_F0.wav",
-      "built_in": true
-    },
-    "9d6bb272e7ee": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_12_F0.wav",
-      "built_in": true
-    },
-    "9983ca13bb52": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_13_F0.wav",
-      "built_in": true
-    },
-    "21695cdc8dbc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_14_F0.wav",
-      "built_in": true
-    },
-    "48c1c0178158": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_15_F0.wav",
-      "built_in": true
-    },
-    "e4f7e1bf31cc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_16_F0.wav",
-      "built_in": true
-    },
-    "532783262249": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_17_F0.wav",
-      "built_in": true
-    },
-    "c63b06430225": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_18_F0.wav",
-      "built_in": true
-    },
-    "0fce590adeeb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_19_F0.wav",
-      "built_in": true
-    },
-    "6aba4a995405": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_1_F0.wav",
-      "built_in": true
-    },
-    "ad86979ea239": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_20_F0.wav",
-      "built_in": true
-    },
-    "990f842bd4c4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_21_F1.wav",
-      "built_in": true
-    },
-    "f3164b140317": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_22_F1.wav",
-      "built_in": true
-    },
-    "91957e2c0f69": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_23_F1.wav",
-      "built_in": true
-    },
-    "ca7aad8fa790": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_24_F1.wav",
-      "built_in": true
-    },
-    "f457b41a8038": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_2_F0.wav",
-      "built_in": true
-    },
-    "90e5e2c5bc26": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_3_F0.wav",
-      "built_in": true
-    },
-    "dd2229ee13f1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_4_F0.wav",
-      "built_in": true
-    },
-    "8c8bd2cc8342": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_5_F0.wav",
-      "built_in": true
-    },
-    "b76e842566b3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_6_F1.wav",
-      "built_in": true
-    },
-    "6e142b399cab": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_7_F1.wav",
-      "built_in": true
-    },
-    "a7c538e140fd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_8_F1.wav",
-      "built_in": true
-    },
-    "9436a5fc31de": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Bass/BAS_SH09_9_F1.wav",
-      "built_in": true
-    },
-    "8e821e12f8cd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/HAT_SH09_1.wav",
-      "built_in": true
-    },
-    "f146d51aa9c5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/HAT_SH09_2.wav",
-      "built_in": true
-    },
-    "c74dbe63d23a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_1.wav",
-      "built_in": true
-    },
-    "9b390d29d9f1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_10.wav",
-      "built_in": true
-    },
-    "e3397d4de3e3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_11.wav",
-      "built_in": true
-    },
-    "dfb2ab3634e1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_12.wav",
-      "built_in": true
-    },
-    "9695aa4f628d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_2.wav",
-      "built_in": true
-    },
-    "eb673fd35dee": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_3.wav",
-      "built_in": true
-    },
-    "3ef3d44f5279": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_4.wav",
-      "built_in": true
-    },
-    "0960eae831cb": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_5.wav",
-      "built_in": true
-    },
-    "003b06a429e0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_6.wav",
-      "built_in": true
-    },
-    "fba9b46be64b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_7.wav",
-      "built_in": true
-    },
-    "c3478b381311": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_8.wav",
-      "built_in": true
-    },
-    "77221db893b4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/KCK_SH09_9.wav",
-      "built_in": true
-    },
-    "d4be41e9251d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/SNR_SH09_1.wav",
-      "built_in": true
-    },
-    "05236821b056": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Drums/SNR_SH09_2.wav",
-      "built_in": true
-    },
-    "b284e431a99f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/LED_SH09_1_C4.wav",
-      "built_in": true
-    },
-    "cf8ca4882f29": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/LED_SH09_2_C5.wav",
-      "built_in": true
-    },
-    "f41888b43262": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_1_C4.wav",
-      "built_in": true
-    },
-    "5613ed348835": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_2_C5.wav",
-      "built_in": true
-    },
-    "2469600ec95c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_3_C4.wav",
-      "built_in": true
-    },
-    "fff422466117": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_4_C4.wav",
-      "built_in": true
-    },
-    "c9a533b9a51f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_5_C4.wav",
-      "built_in": true
-    },
-    "cac8e40d1b67": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_6_C6.wav",
-      "built_in": true
-    },
-    "d7fd0f77582e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_7_C4.wav",
-      "built_in": true
-    },
-    "e2b3fda1b830": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Roland SH-09/Leads and Keys/PLK_SH09_8_C6.wav",
-      "built_in": true
-    },
-    "3bb39e6d9fa4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_10_F1.wav",
-      "built_in": true
-    },
-    "ee0518d084af": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_1_F!.wav",
-      "built_in": true
-    },
-    "4b13ffba0f8c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_2_F1.wav",
-      "built_in": true
-    },
-    "660d1e98709a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_3_F1.wav",
-      "built_in": true
-    },
-    "4bc1d5dee63d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_4_F1.wav",
-      "built_in": true
-    },
-    "8df1ece393e7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_5_F1.wav",
-      "built_in": true
-    },
-    "9b5ab682c035": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_6_F1.wav",
-      "built_in": true
-    },
-    "96183fcb37e0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_7_F1.wav",
-      "built_in": true
-    },
-    "8c1e77c3d3c4": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_8_F1.wav",
-      "built_in": true
-    },
-    "a11e7db84a3e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Bass/BAS_PROPH5_9_F1.wav",
-      "built_in": true
-    },
-    "3444f7532a1a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/HAT_PROPH5_1.wav",
-      "built_in": true
-    },
-    "e20066ec08ba": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/HAT_PROPH5_2.wav",
-      "built_in": true
-    },
-    "12a7bc66ad5a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/KCK_PROPH5_1.wav",
-      "built_in": true
-    },
-    "418f0eefcbf9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/KCK_PROPH5_2.wav",
-      "built_in": true
-    },
-    "979f3673ce63": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/SNR_PROPH5_1.wav",
-      "built_in": true
-    },
-    "e3ecafd0ff7f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/SNR_PROPH5_2.wav",
-      "built_in": true
-    },
-    "951565c29242": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Drums/SNR_PROPH5_3.wav",
-      "built_in": true
-    },
-    "94f85ef8a5d8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_1.wav",
-      "built_in": true
-    },
-    "abd8831117d7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_2.wav",
-      "built_in": true
-    },
-    "fa8c5137211d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_3.wav",
-      "built_in": true
-    },
-    "6debc56f8218": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_4.wav",
-      "built_in": true
-    },
-    "65f408393df5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_5.wav",
-      "built_in": true
-    },
-    "55f2c50995ac": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_6.wav",
-      "built_in": true
-    },
-    "e1e84e15f039": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_7.wav",
-      "built_in": true
-    },
-    "997f414ff341": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/BEL_PROPH5_8.wav",
-      "built_in": true
-    },
-    "8dd2d7d502ba": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/FX_PROPH5_1.wav",
-      "built_in": true
-    },
-    "5f2cdb779bd2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/FX_PROPH5_2.wav",
-      "built_in": true
-    },
-    "7c85c8982fa0": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/FX_PROPH5_3.wav",
-      "built_in": true
-    },
-    "e8723104d635": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/FX_PROPH5_4.wav",
-      "built_in": true
-    },
-    "015d957f74a3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/FX/FX_PROPH5_5.wav",
-      "built_in": true
-    },
-    "79c71f6aacbc": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/KEY_PROPH5_1_C4.wav",
-      "built_in": true
-    },
-    "1a2d72a23a23": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/LED_PROPH5_1_C5.wav",
-      "built_in": true
-    },
-    "900b96fcd744": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/LED_PROPH5_2_C4.wav",
-      "built_in": true
-    },
-    "e82d62cdb5aa": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/PLK_PROPH5_1_C5.wav",
-      "built_in": true
-    },
-    "59072c4bbce3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/PLK_PROPH5_2_C4.wav",
-      "built_in": true
-    },
-    "4ca5bab358f6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/PLK_PROPH5_3_C3.wav",
-      "built_in": true
-    },
-    "bb7665fb0ac7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/PLK_PROPH5_4_C4.wav",
-      "built_in": true
-    },
-    "ee59df0e3451": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/PLK_PROPH5_6_C4.wav",
-      "built_in": true
-    },
-    "59e921c4af1f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Keys/PLK_PROPH5_7_C3.wav",
-      "built_in": true
-    },
-    "d170f469a6ef": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_1_C2.wav",
-      "built_in": true
-    },
-    "8e8a627dccd5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_2_C2.wav",
-      "built_in": true
-    },
-    "a08a22b3e17a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_3_C2.wav",
-      "built_in": true
-    },
-    "a658548a8e0a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_4_C3.wav",
-      "built_in": true
-    },
-    "0ed2608940d2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_5_C2.wav",
-      "built_in": true
-    },
-    "818c807b95c6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_6_C2.wav",
-      "built_in": true
-    },
-    "8c88a6cf6a3c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_7_C2.wav",
-      "built_in": true
-    },
-    "6e7de0a682e7": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_8_C2.wav",
-      "built_in": true
-    },
-    "6285c5b9786b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/PAD_PROPH5_9_C3.wav",
-      "built_in": true
-    },
-    "f13f0396f905": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/STR_PROPH5_1_C3.wav",
-      "built_in": true
-    },
-    "c069705d6574": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/SCI Prophet-5/Pads/STR_PROPH5_2_C2.wav",
-      "built_in": true
-    },
-    "6e2988025bae": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/BAS_CS40M_1_F1.wav",
-      "built_in": true
-    },
-    "e70400c60861": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/BAS_CS40M_2_F2.wav",
-      "built_in": true
-    },
-    "a2211a142441": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/BAS_CS40M_3_F1.wav",
-      "built_in": true
-    },
-    "3da1e8c42067": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/BAS_CS40M_4_F1.wav",
-      "built_in": true
-    },
-    "de2bf052d934": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/BAS_CS40M_5_F2.wav",
+    "b7be275dc446": {
+      "path": "samples/synth/Korg MS-20/Bass/BAS_MS20_4_F2.wav",
       "built_in": true
     },
     "35cc7c884dbd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Bass/BAS_CS40M_6_F2.wav",
+      "path": "samples/synth/Yamaha CS40M/Bass/BAS_CS40M_6_F2.wav",
       "built_in": true
     },
-    "6d9c41f2b3da": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/FX/FX_CS40M_1.wav",
+    "3da1e8c42067": {
+      "path": "samples/synth/Yamaha CS40M/Bass/BAS_CS40M_4_F1.wav",
       "built_in": true
     },
-    "3e3932975262": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/FX/FX_CS40M_2.wav",
+    "e70400c60861": {
+      "path": "samples/synth/Yamaha CS40M/Bass/BAS_CS40M_2_F2.wav",
       "built_in": true
     },
-    "e084329e0215": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/FX/FX_CS40M_3.wav",
+    "de2bf052d934": {
+      "path": "samples/synth/Yamaha CS40M/Bass/BAS_CS40M_5_F2.wav",
       "built_in": true
     },
-    "1296cf62f1d8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/FX/FX_CS40M_4_F.wav",
+    "6e2988025bae": {
+      "path": "samples/synth/Yamaha CS40M/Bass/BAS_CS40M_1_F1.wav",
       "built_in": true
     },
-    "3616092e3029": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Leads and Keys/PLK_CS40M_1_C6.wav",
+    "a2211a142441": {
+      "path": "samples/synth/Yamaha CS40M/Bass/BAS_CS40M_3_F1.wav",
       "built_in": true
     },
     "c24493219f25": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Leads and Keys/PLK_CS40M_2_C4.wav",
+      "path": "samples/synth/Yamaha CS40M/Keys/PLK_CS40M_2_C4.wav",
       "built_in": true
     },
-    "390c8c341481": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Pads/PAD_CS40M_1_C4.wav",
-      "built_in": true
-    },
-    "08d0b53660c2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha CS40M/Pads/PAD_CS40M_2_C4.wav",
-      "built_in": true
-    },
-    "e354819dfa6f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_1_F1.wav",
-      "built_in": true
-    },
-    "d7606ecbc17d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_2_F1.wav",
-      "built_in": true
-    },
-    "2688ecbc42bf": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_3_F1.wav",
-      "built_in": true
-    },
-    "a80bd1f3eec9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_4_F1.wav",
-      "built_in": true
-    },
-    "315ae8beb631": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_5_F1.wav",
-      "built_in": true
-    },
-    "60f1937f380c": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_6_F1.wav",
-      "built_in": true
-    },
-    "0dc6f03e37b1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_7_F1.wav",
-      "built_in": true
-    },
-    "3068066b1eb9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_8_F1.wav",
-      "built_in": true
-    },
-    "7cfbd4ed5c25": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_81Z_9_F1.wav",
-      "built_in": true
-    },
-    "14ee56d163d6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_TX7_1_F1.wav",
-      "built_in": true
-    },
-    "0984230a73b3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Bass/BAS_TX7_2_F1.wav",
-      "built_in": true
-    },
-    "8e72789b969e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/HAT_81Z_1.wav",
-      "built_in": true
-    },
-    "381cc5797df9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/HAT_81Z_2.wav",
-      "built_in": true
-    },
-    "3a47d8e20807": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_1.wav",
-      "built_in": true
-    },
-    "fbcd9e4ef5b5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_2.wav",
-      "built_in": true
-    },
-    "d12a38e19a6f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_3.wav",
-      "built_in": true
-    },
-    "5e22db46c21a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_4.wav",
-      "built_in": true
-    },
-    "0634cca4429e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_5.wav",
-      "built_in": true
-    },
-    "0ea1439c2808": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_6.wav",
-      "built_in": true
-    },
-    "c4221b357fe8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/KCK_81Z_7.wav",
-      "built_in": true
-    },
-    "ec0df7e49ae1": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/PRC_81Z_1.wav",
-      "built_in": true
-    },
-    "78402125fe18": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/PRC_TX7_1.wav",
-      "built_in": true
-    },
-    "6fad0ab3c126": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/PRC_TX7_2.wav",
-      "built_in": true
-    },
-    "d5ae11ef26d9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/PRC_TX7_3.wav",
-      "built_in": true
-    },
-    "41109f5a32c5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/PRC_TX7_4.wav",
-      "built_in": true
-    },
-    "93876c9e07ec": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/SNR_TX7_1.wav",
-      "built_in": true
-    },
-    "fba2f8a18c1a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/SNR_TX7_2.wav",
-      "built_in": true
-    },
-    "d13939f7eb52": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/TOM_TX7_1.wav",
-      "built_in": true
-    },
-    "b4a2a914357b": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/TOM_TX7_2.wav",
-      "built_in": true
-    },
-    "04a478d393c2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Drums/TOM_TX7_3.wav",
-      "built_in": true
-    },
-    "9fca5ae555b8": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/BEL_TX7_1_C6.wav",
-      "built_in": true
-    },
-    "adc3bdbae954": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/LED_TX7_1_C4.wav",
-      "built_in": true
-    },
-    "915ac58ff34e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/LED_TX7_2_C4.wav",
-      "built_in": true
-    },
-    "45de1e14d8d5": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/LED_TX7_3_C5.wav",
-      "built_in": true
-    },
-    "7720ce6ac394": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/LED_TX7_5_C4.wav",
-      "built_in": true
-    },
-    "e724d06325d6": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/PLK_81Z_1_C4.wav",
-      "built_in": true
-    },
-    "e91d24dc26f3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/PLK_81Z_2_C5.wav",
-      "built_in": true
-    },
-    "8ec1a9934d99": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Keys/PNO_TX7_1_C5.wav",
-      "built_in": true
-    },
-    "2a952b8bc222": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/STR_81Z_1_C1.wav",
-      "built_in": true
-    },
-    "9b332ef3d02d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/STR_81Z_2_C3.wav",
-      "built_in": true
-    },
-    "55f3466a66fd": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/STR_TX7_1_C2.wav",
-      "built_in": true
-    },
-    "447914ff9b59": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/STR_TX7_2_C4.wav",
-      "built_in": true
-    },
-    "5d4b4d34ca3a": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/STR_TX7_3_C5.wav",
-      "built_in": true
-    },
-    "31ffbb89a63f": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Pads/STR_TX7_4_C2.wav",
-      "built_in": true
-    },
-    "53a34c4d9ac2": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/TUN_81Z_1_C4.wav",
-      "built_in": true
-    },
-    "46927c9e76d3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/TUN_TX7_1_C5.wav",
-      "built_in": true
-    },
-    "feb38e2234a9": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/TUN_TX7_2_C2.wav",
-      "built_in": true
-    },
-    "4a70c129ef5e": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/TUN_TX7_2_C4.wav",
-      "built_in": true
-    },
-    "c551c10120a3": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/TUN_TX7_3_C3.wav",
-      "built_in": true
-    },
-    "1a6b1b616c9d": {
-      "path": "samples/Simulacrum Sounds/1 Shots/Synths/Yamaha TX7_TX81Z/Tuned Perc/TUN_TX7_4_C3.wav",
-      "built_in": true
-    },
-    "f800a6013f78": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_10_C.wav",
-      "built_in": true
-    },
-    "f2713f1f5c3c": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_1_C.wav",
-      "built_in": true
-    },
-    "70a6b9e9eb2a": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_2_C.wav",
-      "built_in": true
-    },
-    "b50899a872a1": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_3_C.wav",
-      "built_in": true
-    },
-    "dedc1b77edd4": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_4_C.wav",
-      "built_in": true
-    },
-    "b7d71a824521": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_5_C.wav",
-      "built_in": true
-    },
-    "72c79fe5ac72": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_6_C.wav",
-      "built_in": true
-    },
-    "043b6a2cfdaa": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_7_C.wav",
-      "built_in": true
-    },
-    "82980506a86c": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_8_C.wav",
-      "built_in": true
-    },
-    "de73973ba8cc": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/110_MODU_9_C.wav",
-      "built_in": true
-    },
-    "633474735450": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODGUIT_1_E.wav",
-      "built_in": true
-    },
-    "8c644e7051c2": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODGUIT_2_E.wav",
-      "built_in": true
-    },
-    "386029111afb": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODGUIT_3_E.wav",
-      "built_in": true
-    },
-    "1167393f5a73": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODGUIT_4_E.wav",
-      "built_in": true
-    },
-    "12fba5d324f2": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODGUIT_5_E.wav",
-      "built_in": true
-    },
-    "0f75ffdbebc6": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODURM_1.wav",
-      "built_in": true
-    },
-    "b80c09c226d2": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODURM_2.wav",
-      "built_in": true
-    },
-    "770ea6063a74": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODURM_3.wav",
-      "built_in": true
-    },
-    "d44c4212201a": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODU_1_C.wav",
-      "built_in": true
-    },
-    "3e220407d298": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/120_MODU_2_C.wav",
-      "built_in": true
-    },
-    "e0b959c522c0": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODUORG_1_C.wav",
-      "built_in": true
-    },
-    "71e18b258481": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODUORG_2_C.wav",
-      "built_in": true
-    },
-    "5095f31e74d7": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODUORG_3_C.wav",
-      "built_in": true
-    },
-    "41bdb705d93f": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODUORG_4_C.wav",
-      "built_in": true
-    },
-    "9ba02817cefe": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODU_1_C.wav",
-      "built_in": true
-    },
-    "8b9ce81e14dd": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODU_2_C.wav",
-      "built_in": true
-    },
-    "ec53471566d7": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODU_3_C.wav",
-      "built_in": true
-    },
-    "1cfd8f2133fa": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODU_4_C.wav",
-      "built_in": true
-    },
-    "6d7e97671e0b": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODU_5_Cm.wav",
-      "built_in": true
-    },
-    "67468d5d6669": {
-      "path": "samples/Simulacrum Sounds/Modular Synth Loops/130_MODU_6_Cm.wav",
+    "3616092e3029": {
+      "path": "samples/synth/Yamaha CS40M/Keys/PLK_CS40M_1_C6.wav",
       "built_in": true
     }
   }
