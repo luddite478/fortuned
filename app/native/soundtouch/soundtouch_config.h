@@ -16,7 +16,8 @@
 // Enable threading support
 #define SOUNDTOUCH_USE_MULTI_THREAD 1
 
-// Disable x86-specific optimizations
+// x86 optimizations are enabled from build system when targeting x86/x86_64
+// Keep them undefined here by default to avoid forcing on ARM builds.
 #undef SOUNDTOUCH_ALLOW_X86_OPTIMIZATIONS
 #undef SOUNDTOUCH_ALLOW_MMX
 #undef SOUNDTOUCH_ALLOW_SSE

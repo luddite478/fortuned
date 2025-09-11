@@ -8,9 +8,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # SoundTouch configuration - default ON to support preprocessing in pitch module
 option(USE_SOUNDTOUCH_PITCH "Use SoundTouch for high-quality pitch shifting" ON)
 
-# SoundTouch source files (mobile-optimized, excluding x86-specific files)
-set(SOUNDTOUCH_SOURCES
-  soundtouch/cpu_detect_arm.cpp
+# SoundTouch source files (common)
+set(SOUNDTOUCH_COMMON_SOURCES
   soundtouch/SoundTouch.cpp
   soundtouch/TDStretch.cpp
   soundtouch/RateTransposer.cpp
@@ -22,11 +21,30 @@ set(SOUNDTOUCH_SOURCES
   soundtouch/InterpolateShannon.cpp
   soundtouch/PeakFinder.cpp
   soundtouch/BPMDetect.cpp
-  # Exclude x86-specific files for mobile ARM performance:
-  # - cpu_detect_x86.cpp (x86 only) - replaced with cpu_detect_arm.cpp
-  # - mmx_optimized.cpp (x86 MMX)  
-  # - sse_optimized.cpp (x86 SSE)
 )
+
+# Select SoundTouch CPU detection and SIMD sources per-ABI
+set(SOUNDTOUCH_SOURCES ${SOUNDTOUCH_COMMON_SOURCES})
+
+if(ANDROID)
+  if(ANDROID_ABI STREQUAL "x86" OR ANDROID_ABI STREQUAL "x86_64")
+    # Use x86 CPU detection and SSE optimizations for floating-point build
+    list(APPEND SOUNDTOUCH_SOURCES
+      soundtouch/cpu_detect_x86.cpp
+      soundtouch/sse_optimized.cpp
+    )
+    add_definitions(-DSOUNDTOUCH_ALLOW_X86_OPTIMIZATIONS=1)
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-msse2>)
+  else()
+    # ARM ABIs use ARM CPU detection; NEON handled via generic code paths
+    list(APPEND SOUNDTOUCH_SOURCES
+      soundtouch/cpu_detect_arm.cpp
+    )
+  endif()
+else()
+  # Non-Android builds: prefer x86 detection on desktop
+  list(APPEND SOUNDTOUCH_SOURCES soundtouch/cpu_detect_x86.cpp)
+endif()
 
 # LAME source files (shared between libraries)
 set(LAME_SOURCES
@@ -53,8 +71,10 @@ set(LAME_SOURCES
 
 # Sequencer library sources (includes conversion functionality)
 set(SEQUENCER_SOURCES
-  sequencer.mm
   conversion.mm
+  table.mm
+  playback.mm
+  miniaudio_impl.mm
   sample_bank.mm
   pitch.mm
   undo_redo.mm
@@ -69,9 +89,12 @@ else()
 endif()
 
 set_source_files_properties(
-  sequencer.mm
   conversion.mm
+  table.mm
+  playback.mm
+  miniaudio_impl.mm
   sample_bank.mm
+  pitch.mm
   undo_redo.mm
   PROPERTIES
   LANGUAGE CXX

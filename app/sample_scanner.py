@@ -61,7 +61,8 @@ def scan_samples_directory(samples_dir: str = "samples") -> Dict[str, Any]:
                 continue
                 
             sample_id = f"{file_hash[:12]}"
-            relative_file_path = str(file_path)
+            # Convert to forward slashes for cross-platform compatibility
+            relative_file_path = str(file_path).replace('\\', '/')
             
             sample_entry = {
                 "path": relative_file_path,

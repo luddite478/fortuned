@@ -108,3 +108,10 @@ app/samples-old/
 .DS_Store
 app/ios/Runner.xcodeproj/project.pbxproj.backup
 app/ios/ThirdParty/
+
+.idea/
+.dart_tool/
+.flutter-plugins-dependencies
+.metadata
+niyya.iml
+build
