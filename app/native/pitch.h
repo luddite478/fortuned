@@ -21,6 +21,10 @@ typedef struct ma_pitch_data_source ma_pitch_data_source;
 __attribute__((visibility("default"))) __attribute__((used))
 int pitch_set_method(int method);
 
+// Get current global pitch method
+__attribute__((visibility("default"))) __attribute__((used))
+int pitch_get_method(void);
+
 // Initialize pitch data source.
 // - original: required, will be wrapped
 // - pitch_ratio: 0.03125 .. 32.0, 1.0 = unity
@@ -58,6 +62,15 @@ void pitch_ds_destroy(ma_pitch_data_source* p);
 // Returned pointer is valid while the pitch data source is initialized.
 __attribute__((visibility("default"))) __attribute__((used))
 ma_data_source* pitch_ds_as_data_source(ma_pitch_data_source* p);
+
+// Seek pitch data source (handles decoder or preprocessed buffer)
+__attribute__((visibility("default"))) __attribute__((used))
+ma_result pitch_ds_seek_to_start(ma_pitch_data_source* p);
+
+// Decide whether a node should be rebuilt when pitch changes under current method
+// Returns 1 if rebuild is required (preprocessing and pitch changed or not yet using preprocessed), 0 otherwise
+__attribute__((visibility("default"))) __attribute__((used))
+int pitch_should_rebuild_for_change(ma_pitch_data_source* p, float previous_pitch, float new_pitch);
 
 // Query if this pitch data source is using preprocessed audio (only meaningful for preprocessing method)
 __attribute__((visibility("default"))) __attribute__((used))

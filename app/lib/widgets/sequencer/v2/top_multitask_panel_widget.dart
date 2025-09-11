@@ -70,15 +70,8 @@ class MultitaskPanelWidget extends StatelessWidget {
             return const RecordingWidget();
           
           case MultitaskPanelMode.placeholder:
-            // Show recording widget if there's a recent recording, otherwise placeholder
-            return Consumer<RecordingState>(
-              builder: (context, rec, _) {
-                if (rec.currentRecordingPath != null) {
-                  return const RecordingWidget();
-                }
-                return _buildPlaceholder();
-              },
-            );
+            // Always show placeholder; recording overlay is rendered above grid, not here
+            return _buildPlaceholder();
         }
       },
     );

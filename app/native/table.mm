@@ -37,7 +37,7 @@ static inline void table_set_cell_defaults(Cell* cell) {
     if (!cell) return;
     cell->sample_slot = -1;
     cell->settings.volume = 1.0f;
-    cell->settings.pitch = 1.0f;
+    cell->settings.pitch = DEFAULT_CELL_PITCH;
 }
 
 // Initialize table with default values
@@ -96,9 +96,11 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
         prnt_err("❌ [TABLE] Invalid volume: %f", volume);
         return;
     }
-    if (pitch < 0.25f || pitch > 4.0f) {
-        prnt_err("❌ [TABLE] Invalid pitch: %f", pitch);
-        return;
+    if (pitch != DEFAULT_CELL_PITCH) {
+        if (pitch < PITCH_MIN_RATIO || pitch > PITCH_MAX_RATIO) {
+            prnt_err("❌ [TABLE] Invalid pitch: %f", pitch);
+            return;
+        }
     }
     
     // Update cell
@@ -124,9 +126,11 @@ void table_set_cell_settings(int step, int col, float volume, float pitch, int u
         prnt_err("❌ [TABLE] Invalid volume: %f", volume);
         return;
     }
-    if (pitch < 0.25f || pitch > 4.0f) {
-        prnt_err("❌ [TABLE] Invalid pitch: %f", pitch);
-        return;
+    if (pitch != DEFAULT_CELL_PITCH) {
+        if (pitch < PITCH_MIN_RATIO || pitch > PITCH_MAX_RATIO) {
+            prnt_err("❌ [TABLE] Invalid pitch: %f", pitch);
+            return;
+        }
     }
 
     cell->settings.volume = volume;

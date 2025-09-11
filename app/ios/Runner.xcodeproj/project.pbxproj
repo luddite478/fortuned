@@ -671,7 +671,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
-					"$(SRCROOT)/../native/nlohmann-json",
+					
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -876,7 +876,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
-					"$(SRCROOT)/../native/nlohmann-json",
+					
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -920,7 +920,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
-					"$(SRCROOT)/../native/nlohmann-json",
+					
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

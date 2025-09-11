@@ -117,7 +117,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No messages yet',
+                    'No checkpoints yet',
                     style: GoogleFonts.sourceSans3(
                       color: AppColors.menuText,
                       fontSize: 18,
@@ -126,7 +126,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Save your progress to create messages',
+                    'Press send button in the bottom right of sequencer\nto save checkpoint',
                     style: GoogleFonts.sourceSans3(
                       color: AppColors.menuLightText,
                       fontSize: 14,
@@ -192,7 +192,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       child: Container(
         width: double.infinity,
         decoration: BoxDecoration(
-          color: highlightColor ?? (isCurrentUser ? AppColors.menuCurrentUserCheckpoint : AppColors.menuCheckpointBackground),
+          color: highlightColor ?? AppColors.menuEntryBackground,
           borderRadius: BorderRadius.circular(2),
           border: Border.all(
             color: AppColors.menuBorder,

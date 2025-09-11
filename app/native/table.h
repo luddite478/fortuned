@@ -17,10 +17,17 @@ extern "C" {
 #define MAX_LAYERS_PER_SECTION 4
 #define MAX_COLS_PER_LAYER 4
 
+// Pitch configuration
+// Special default value indicating "inherit from sample bank"
+#define DEFAULT_CELL_PITCH -1.0f
+// Supported pitch ratio range (C0..C10)
+#define PITCH_MIN_RATIO 0.03125f
+#define PITCH_MAX_RATIO 32.0f
+
 // Cell audio settings
 typedef struct {
     float volume;               // 0.0 to 1.0
-    float pitch;                // 0.25 to 4.0 (2 octaves down/up)
+    float pitch;                // PITCH_MIN_RATIO..PITCH_MAX_RATIO, or DEFAULT_CELL_PITCH to inherit sample bank
 } CellSettings;
 
 // Core cell data structure

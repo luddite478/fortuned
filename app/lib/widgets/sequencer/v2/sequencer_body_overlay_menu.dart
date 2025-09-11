@@ -4,6 +4,7 @@ import '../../../utils/app_colors.dart';
 enum SequencerBodyOverlayMenuType {
   sectionSettings,
   sectionCreation,
+  recording,
 }
 
 class SequencerBodyOverlayMenu extends StatelessWidget {
@@ -21,6 +22,7 @@ class SequencerBodyOverlayMenu extends StatelessWidget {
     final Color backgroundColor = switch (type) {
       SequencerBodyOverlayMenuType.sectionSettings => AppColors.sequencerPageBackground.withOpacity(0.7),
       SequencerBodyOverlayMenuType.sectionCreation => AppColors.sequencerPageBackground,
+      SequencerBodyOverlayMenuType.recording => AppColors.sequencerPageBackground.withOpacity(0.7),
     };
 
     return Container(

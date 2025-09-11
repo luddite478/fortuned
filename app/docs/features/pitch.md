@@ -44,7 +44,7 @@ typedef struct {
 ## Pitch Data Source Implementation
 
 ### Core Structure
-The pitch layer is implemented as a custom `ma_data_source` that wraps the original decoder. In preprocessing mode, it swaps in a memory-backed decoder for preprocessed audio when available.
+The pitch layer is implemented as a custom `ma_data_source` that wraps the original decoder. In preprocessing mode, it swaps in a memory-backed audio buffer (`ma_audio_buffer`) for preprocessed PCM when available.
 
 ### Optional Method: Miniaudio Resampler (explicit)
 If the pitch method is explicitly set to resampler, the pitch layer applies real-time resampling using an inverted sample-rate calculation:
@@ -169,29 +169,14 @@ int setup_column_node(int column, int node_index, int sample_slot, float volume,
 }
 ```
 
-### 2. Real-time Pitch Updates
+### 2. Pitch Change Policy
 ```c
-// Update pitch for existing column nodes when settings change
-static void update_existing_column_nodes_for_cell(int step, int column, int sample_slot) {
-    if (column < 0 || column >= g_columns) return;
-    column_nodes_t* col_nodes = &g_column_nodes[column];
-    
-    // Update active node if it's playing this sample
-    if (col_nodes->active_node >= 0) {
-        column_node_t* active_node = &col_nodes->nodes[col_nodes->active_node];
-        if (active_node->sample_slot == sample_slot) {
-            float resolved_pitch = resolve_cell_pitch(step, column, sample_slot);
-            update_column_node_pitch(active_node, resolved_pitch);
-        }
-    }
-}
+// Preprocessing (default):
+//  - If pitch changed, or not yet bound to preprocessed data → rebuild node to bind correct cache
+//  - If same pitch and already preprocessed → reuse by seeking to start
 
-// Real-time pitch change for column node
-static void update_column_node_pitch(column_node_t* node, float new_pitch) {
-    if (!node || !node->pitch_ds_initialized) return;
-    node->pitch = new_pitch;
-    ma_pitch_data_source_set_pitch(&node->pitch_ds, new_pitch);
-}
+// Miniaudio resampler (optional):
+//  - Update pitch in-place via data source and seek to start for immediate changes
 ```
 
 ### 3. Sample Bank Playback
@@ -217,9 +202,9 @@ This ensures proper pitch data source initialization for each pitch value.
 
 ### Pitch Data Source Read Behavior
 - **Preprocessing (default)**:
-  - If cache exists: read from the preprocessed memory-backed decoder.
-  - If cache missing: read unpitched from the original decoder while background job runs; subsequent triggers will use cache.
-- **Resampler (optional)**: read from original decoder and resample in real-time.
+  - If cache exists: read from the preprocessed `ma_audio_buffer` (PCM in RAM).
+  - If cache missing: read unpitched from the original decoder while a background job renders and caches the requested pitch; subsequent triggers use the cache.
+- **Resampler (optional)**: read from original decoder and resample in real-time (only when explicitly selected).
 
 ## UI Integration
 

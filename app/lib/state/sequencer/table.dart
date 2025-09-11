@@ -180,7 +180,7 @@ class TableState extends ChangeNotifier {
     if (cellPtr.address == 0) return;
     final current = cellPtr.ref;
     final double nextVolume = (volume ?? current.settings.volume).clamp(0.0, 1.0);
-    final double nextPitch = (pitch ?? current.settings.pitch).clamp(0.25, 4.0);
+    final double nextPitch = (pitch ?? current.settings.pitch).clamp(0.03125, 32.0);
     _table_ffi.tableSetCell(step, col, current.sample_slot, nextVolume, nextPitch, undoRecord ? 1 : 0);
     debugPrint('🎚️ [TABLE_STATE] Set cell settings [$step, $col]: vol=${nextVolume.toStringAsFixed(2)}, pitch=${nextPitch.toStringAsFixed(2)}');
   }

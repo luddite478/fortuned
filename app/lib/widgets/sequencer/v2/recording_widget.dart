@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:path/path.dart' as path;
+import 'package:share_plus/share_plus.dart';
+import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/recording.dart';
 
 class RecordingWidget extends StatelessWidget {
@@ -22,8 +24,24 @@ class RecordingWidget extends StatelessWidget {
             
             return Container(
               decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(borderRadius),
+                color: AppColors.sequencerSurfaceBase,
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(
+                  color: AppColors.sequencerBorder,
+                  width: 1,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.sequencerShadow,
+                    blurRadius: 3,
+                    offset: const Offset(0, 2),
+                  ),
+                  BoxShadow(
+                    color: AppColors.sequencerSurfaceRaised,
+                    blurRadius: 1,
+                    offset: const Offset(0, -1),
+                  ),
+                ],
               ),
               child: recording.currentRecordingPath != null 
                   ? _buildRecordingMenu(context, recording, panelHeight, panelWidth, padding, borderRadius)
@@ -69,15 +87,14 @@ class RecordingWidget extends StatelessWidget {
     // Calculate available height after minimal spacing
     final availableHeight = panelHeight - (verticalSpacing * 2); // Top and bottom spacing
     
-    // Responsive sizing calculations from available height (not total height)
-    final titleHeight = availableHeight * 0.25; // 25% of available height
-    final buttonAreaHeight = availableHeight * 0.55; // 55% of available height
-    final statusHeight = availableHeight * 0.20; // 20% of available height
+    // Single recording layout: compact header and buttons, no list
+    final titleHeight = availableHeight * 0.20;
+    final buttonAreaHeight = availableHeight * 0.55;
     
-    final titleFontSize = (titleHeight * 0.4).clamp(8.0, double.infinity);
-    final buttonSize = (buttonAreaHeight * 0.6).clamp(20.0, double.infinity);
-    final iconSize = (buttonSize * 0.5).clamp(10.0, double.infinity);
-    final statusFontSize = (statusHeight * 0.3).clamp(8.0, double.infinity);
+    final titleFontSize = (titleHeight * 0.24).clamp(10.0, 20.0);
+    final buttonSize = (buttonAreaHeight * 0.4).clamp(28.0, 56.0);
+    final iconSize = (buttonSize * 0.4).clamp(12.0, 24.0);
+    // final statusFontSize = (availableHeight * 0.14).clamp(8.0, 14.0);
     
     return Container(
       padding: EdgeInsets.symmetric(
@@ -86,211 +103,106 @@ class RecordingWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // File name section
+          // File name row (left title, right close)
           Container(
             height: titleHeight,
-            child: Center(
-              child: Text(
-                fileName,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: titleFontSize,
-                  fontWeight: FontWeight.bold,
-                ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-          
-          // Buttons section
-          Container(
-            height: buttonAreaHeight,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            child: Stack(
               children: [
-                // Play button
-                _buildActionButton(
-                  icon: Icons.play_arrow,
-                  color: Colors.greenAccent,
-                  size: buttonSize,
-                  iconSize: iconSize,
-                  onTap: () => _playRecording(recording),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    fileName,
+                    style: TextStyle(
+                      color: AppColors.sequencerText,
+                      fontSize: titleFontSize,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                  ),
                 ),
-                
-                // Delete button  
-                _buildActionButton(
-                  icon: Icons.delete,
-                  color: Colors.redAccent,
-                  size: buttonSize,
-                  iconSize: iconSize,
-                  onTap: () => _showDeleteConfirmation(context, recording),
-                ),
-                
-                // Share button
-                _buildActionButton(
-                  icon: Icons.share,
-                  color: Colors.cyanAccent,
-                  size: buttonSize,
-                  iconSize: iconSize,
-                  onTap: () => _shareRecording(recording.currentRecordingPath),
-                ),
-                
-                // Convert to MP3 button
-                // Convert button not available in new state yet
-                _buildActionButton(
-                  icon: Icons.audiotrack,
-                  color: Colors.grey,
-                  size: buttonSize,
-                  iconSize: iconSize,
-                  onTap: null,
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Consumer<RecordingState>(
+                    builder: (context, rec, _) => GestureDetector(
+                      onTap: rec.hideOverlay,
+                      child: Container(
+                        width: titleHeight * 0.6,
+                        height: titleHeight * 0.6,
+                        decoration: BoxDecoration(
+                          color: AppColors.sequencerSurfacePressed,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.sequencerAccent.withOpacity(0.8), width: 1),
+                        ),
+                        child: Icon(
+                          Icons.close,
+                          color: AppColors.sequencerAccent,
+                          size: iconSize,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
           ),
           
-          // Status section
+          // Buttons section (4 compact buttons centered) for new take
           Container(
-            height: statusHeight,
-            child: _buildStatusArea(recording, statusFontSize, iconSize, horizontalPadding),
+            height: buttonAreaHeight,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildSequencerButton(icon: Icons.play_arrow, onTap: () => _playRecording(recording), iconColor: Colors.greenAccent),
+                SizedBox(width: horizontalPadding * 0.5),
+                _buildSequencerButton(icon: Icons.delete, onTap: () => _showDeleteConfirmation(context, recording), iconColor: Colors.redAccent),
+                SizedBox(width: horizontalPadding * 0.5),
+                _buildSequencerButton(icon: Icons.share, onTap: () => _shareRecording(recording.currentRecordingPath), iconColor: Colors.cyanAccent),
+                SizedBox(width: horizontalPadding * 0.5),
+                _buildSequencerButton(icon: Icons.audiotrack, onTap: null, iconColor: Colors.grey),
+              ],
+            ),
           ),
+          // Optional footer space to avoid cramped look
+          SizedBox(height: verticalSpacing),
         ],
       ),
     );
   }
 
-  Widget _buildActionButton({
+  Widget _buildSequencerButton({
     required IconData icon,
-    required Color color,
-    required double size,
-    required double iconSize,
-    VoidCallback? onTap,
+    required VoidCallback? onTap,
+    required Color iconColor,
   }) {
-    final isDisabled = onTap == null;
-    final effectiveColor = isDisabled ? Colors.grey : color;
-    
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: size,
-        height: size,
+        width: 44,
+        height: 44,
         decoration: BoxDecoration(
-          color: effectiveColor.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(size * 0.2),
-          border: Border.all(
-            color: effectiveColor.withOpacity(0.6),
-            width: 1.5,
-          ),
+          color: AppColors.sequencerSurfacePressed,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.sequencerBorder, width: 1),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sequencerShadow,
+              blurRadius: 2,
+              offset: const Offset(0, 1),
+            ),
+          ],
         ),
         child: Center(
-          child: Icon(
-            icon,
-            color: effectiveColor,
-            size: iconSize,
-          ),
+          child: Icon(icon, color: onTap == null ? Colors.grey : iconColor, size: 20),
         ),
       ),
     );
   }
 
-  Widget _buildStatusArea(RecordingState recording, double fontSize, double iconSize, double horizontalPadding) {
-    // Conversion status not implemented in new state yet
-    if (false) {
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
-        decoration: BoxDecoration(
-          color: Colors.red.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(horizontalPadding * 0.5),
-          border: Border.all(color: Colors.red.withOpacity(0.5), width: 1),
-        ),
-        child: Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error, color: Colors.red, size: iconSize),
-              SizedBox(width: horizontalPadding * 0.3),
-              Flexible(
-                child: Text(
-                  'Conversion failed',
-                  style: TextStyle(color: Colors.red, fontSize: fontSize),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    } 
-    
-    if (false) {
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
-        decoration: BoxDecoration(
-          color: Colors.orange.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(horizontalPadding * 0.5),
-          border: Border.all(color: Colors.orange.withOpacity(0.5), width: 1),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Progress bar
-            Expanded(
-              flex: 3,
-              child: Container(
-                width: double.infinity,
-                child: LinearProgressIndicator(
-                  value: 0.0,
-                  backgroundColor: Colors.orange.withOpacity(0.2),
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                  minHeight: iconSize * 0.3,
-                ),
-              ),
-            ),
-            
-            SizedBox(height: horizontalPadding * 0.2),
-            
-            // Progress text
-            Expanded(
-              flex: 2,
-              child: Text(
-                'Converting: 0%',
-                style: TextStyle(color: Colors.orange, fontSize: fontSize),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    if (false) {
-      return Container(
-        padding: EdgeInsets.symmetric(horizontal: horizontalPadding * 0.5, vertical: horizontalPadding * 0.3),
-        decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.15),
-          borderRadius: BorderRadius.circular(horizontalPadding * 0.5),
-          border: Border.all(color: Colors.green.withOpacity(0.5), width: 1),
-        ),
-        child: Center(
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle, color: Colors.green, size: iconSize),
-              SizedBox(width: horizontalPadding * 0.3),
-              Text(
-                'MP3 Ready',
-                style: TextStyle(color: Colors.green, fontSize: fontSize),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
-    // Empty status area
-    return Container();
-  }
+  // Removed old action button in favor of sequencer-styled button
+
+  // Removed status area (not used)
 
   void _playRecording(RecordingState recording) {
     // TODO: Implement audio playback functionality
@@ -340,11 +252,13 @@ class RecordingWidget extends StatelessWidget {
   }
 
   void _shareRecording(String? filePath) async {
-    // TODO: Move to a shared service; kept minimal here
     try {
       if (filePath == null) return;
-      // No dependency here to Share; widget may not import share_plus
-      debugPrint('Share recording: $filePath');
+      await Share.shareXFiles(
+        [XFile(filePath)],
+        text: 'Check out my track created with NIYYA!',
+        subject: 'NIYYA Track',
+      );
     } catch (e) {
       debugPrint('Failed to share recording: $e');
     }

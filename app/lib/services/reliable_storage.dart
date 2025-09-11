@@ -12,7 +12,7 @@ class ReliableStorage {
     if (Platform.isAndroid) {
       return await _getAndroidAppDataPath();
     } else if (Platform.isIOS) {
-      return '/var/mobile/Containers/Data/Application/Documents';
+      return await _getIOSDocumentsPath();
     } else if (Platform.isWindows) {
       return '${Platform.environment['USERPROFILE']}\\Documents\\niyya';
     } else if (Platform.isMacOS) {
@@ -44,11 +44,36 @@ class ReliableStorage {
       return '/storage/emulated/0/Download/niyya_data';
     }
   }
+
+  /// Get a safe iOS documents path using DocMan fallbacks
+  static Future<String> _getIOSDocumentsPath() async {
+    try {
+      // Prefer internal app files directory (sandboxed, always writable)
+      final filesDir = await DocMan.dir.files();
+      if (filesDir != null) {
+        return filesDir.path;
+      }
+
+      final cacheDir = await DocMan.dir.cache();
+      if (cacheDir != null) {
+        return cacheDir.path;
+      }
+
+      return '/tmp/niyya';
+    } catch (e) {
+      print('⚠️ DocMan iOS failed, using /tmp fallback: $e');
+      return '/tmp/niyya';
+    }
+  }
   
   static Future<File> get _prefsFile async {
     final docPath = await _documentsPath;
-    return File(path.join(docPath, 'niyya_prefs.json'));
+    final file = File(path.join(docPath, 'niyya_prefs.json'));
+    await file.parent.create(recursive: true);
+    return file;
   }
+
+  // Recording helpers removed; now handled in RecordingState
   
   static Future<Map<String, dynamic>> _loadPrefs() async {
     try {

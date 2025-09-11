@@ -77,6 +77,14 @@ class PlaybackBindings {
 
     _switchToSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>>('switch_to_section');
     switchToSection = _switchToSectionPtr.asFunction<void Function(int)>();
+
+    // Recording
+    _recordingStartPtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<ffi.Char>)>>('recording_start');
+    recordingStart = _recordingStartPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
+    _recordingStopPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('recording_stop');
+    recordingStop = _recordingStopPtr.asFunction<void Function()>();
+    _recordingIsActivePtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function()>>('recording_is_active');
+    recordingIsActive = _recordingIsActivePtr.asFunction<int Function()>();
   }
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _playbackInitPtr;
@@ -109,6 +117,14 @@ class PlaybackBindings {
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>> _switchToSectionPtr;
   late final void Function(int) switchToSection;
+
+  // Recording
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<ffi.Char>)>> _recordingStartPtr;
+  late final int Function(ffi.Pointer<ffi.Char>) recordingStart;
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _recordingStopPtr;
+  late final void Function() recordingStop;
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _recordingIsActivePtr;
+  late final int Function() recordingIsActive;
 }
 
 

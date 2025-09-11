@@ -19,7 +19,7 @@
       "minLength": 24,
       "maxLength": 24
     },
-    "author_id": {
+    "user_id": {
       "type": "string",
       "pattern": "^[a-fA-F0-9]{24}$",
       "minLength": 24,
@@ -101,7 +101,7 @@
   "required": [
     "schema_version",
     "id",
-    "author_id",
+    "user_id",
     "duration",
     "created_at",
     "url"

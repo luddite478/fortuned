@@ -161,8 +161,7 @@ endif()
 
 include_directories(miniaudio)
 
-# nlohmann/json (header-only)
-include_directories(nlohmann-json)
+ 
 
 # Add SoundTouch include directory if enabled
 if(USE_SOUNDTOUCH_PITCH)

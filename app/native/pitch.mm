@@ -14,6 +14,21 @@
 #include "soundtouch/SoundTouch.h"
 using namespace soundtouch;
 
+// Platform-specific logging
+#ifdef __APPLE__
+    #include "log.h"
+    #undef LOG_TAG
+    #define LOG_TAG "PITCH"
+#elif defined(__ANDROID__)
+    #include "log.h"
+    #undef LOG_TAG
+    #define LOG_TAG "PITCH"
+#else
+    #include "log.h"
+    #undef LOG_TAG
+    #define LOG_TAG "PITCH"
+#endif
+
 // -----------------------------------------------------------------------------
 // Internal structures
 // -----------------------------------------------------------------------------
@@ -74,10 +89,13 @@ struct ma_pitch_data_source {
     float* temp_input_buffer;
     size_t temp_input_buffer_size;
 
-    // Preprocessing
+    // Preprocessing (use ma_audio_buffer for PCM cache)
     int sample_slot;
-    ma_decoder* preprocessed_decoder;
+    ma_audio_buffer preprocessed_buffer;
+    int preprocessed_buffer_initialized;
     int uses_preprocessed_data;
+
+    // (no debug flags)
 };
 
 // Utility macros (match playback.mm)
@@ -255,36 +273,36 @@ static ma_result pitch_read_resampler(ma_pitch_data_source* p, void* out, ma_uin
 
 static ma_result pitch_read(ma_data_source* ds, void* out, ma_uint64 frames, ma_uint64* got) {
     ma_pitch_data_source* p = (ma_pitch_data_source*)ds;
-    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_decoder) {
-        return ma_data_source_read_pcm_frames((ma_data_source*)p->preprocessed_decoder, out, frames, got);
+    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        return ma_data_source_read_pcm_frames((ma_data_source*)&p->preprocessed_buffer, out, frames, got);
     }
     if (p->approach == PITCH_METHOD_MINIAUDIO) {
         return pitch_read_resampler(p, out, frames, got);
     }
-    // Preprocessing selected but cache not ready: play unpitched
+    // For preprocessing approach without cache: use fallback resampler if initialized; otherwise play unpitched
     return ma_data_source_read_pcm_frames(p->original, out, frames, got);
 }
 
 static ma_result pitch_seek(ma_data_source* ds, ma_uint64 frameIndex) {
     ma_pitch_data_source* p = (ma_pitch_data_source*)ds;
-    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_decoder) {
-        return ma_data_source_seek_to_pcm_frame((ma_data_source*)p->preprocessed_decoder, frameIndex);
+    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        return ma_data_source_seek_to_pcm_frame((ma_data_source*)&p->preprocessed_buffer, frameIndex);
     }
     return ma_data_source_seek_to_pcm_frame(p->original, frameIndex);
 }
 
 static ma_result pitch_get_data_format(ma_data_source* ds, ma_format* fmt, ma_uint32* ch, ma_uint32* sr, ma_channel* map, size_t cap) {
     ma_pitch_data_source* p = (ma_pitch_data_source*)ds;
-    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_decoder) {
-        return ma_data_source_get_data_format((ma_data_source*)p->preprocessed_decoder, fmt, ch, sr, map, cap);
+    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        return ma_data_source_get_data_format((ma_data_source*)&p->preprocessed_buffer, fmt, ch, sr, map, cap);
     }
     return ma_data_source_get_data_format(p->original, fmt, ch, sr, map, cap);
 }
 
 static ma_result pitch_get_cursor(ma_data_source* ds, ma_uint64* cur) {
     ma_pitch_data_source* p = (ma_pitch_data_source*)ds;
-    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_decoder) {
-        return ma_data_source_get_cursor_in_pcm_frames((ma_data_source*)p->preprocessed_decoder, cur);
+    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        return ma_data_source_get_cursor_in_pcm_frames((ma_data_source*)&p->preprocessed_buffer, cur);
     }
     return ma_data_source_get_cursor_in_pcm_frames(p->original, cur);
 }
@@ -292,8 +310,8 @@ static ma_result pitch_get_cursor(ma_data_source* ds, ma_uint64* cur) {
 static ma_result pitch_get_length(ma_data_source* ds, ma_uint64* len) {
     ma_pitch_data_source* p = (ma_pitch_data_source*)ds;
     ma_result mr;
-    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_decoder) {
-        mr = ma_data_source_get_length_in_pcm_frames((ma_data_source*)p->preprocessed_decoder, len);
+    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        mr = ma_data_source_get_length_in_pcm_frames((ma_data_source*)&p->preprocessed_buffer, len);
         return mr;
     }
     mr = ma_data_source_get_length_in_pcm_frames(p->original, len);
@@ -311,6 +329,10 @@ int pitch_set_method(int method) {
     int prev = g_pitch_method;
     g_pitch_method = method;
     return prev;
+}
+
+int pitch_get_method(void) {
+    return g_pitch_method;
 }
 
 ma_result pitch_ds_init(ma_pitch_data_source* p,
@@ -332,7 +354,7 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
     p->approach = g_pitch_method;
     p->sample_slot = sample_slot;
 
-    // Resampler setup (only if method is explicitly set to MINIAUDIO)
+    // Resampler setup (MINIAUDIO only)
     p->resampler_initialized = 0;
     p->temp_input_buffer = NULL;
     p->temp_input_buffer_size = 0;
@@ -345,15 +367,16 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
         if (mr == MA_SUCCESS) p->resampler_initialized = 1;
     }
 
-    // Preprocessing: if cached exists, create decoder from memory
+    // Preprocessing: if cached exists, create audio buffer from memory
     if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && sample_slot >= 0) {
         preprocessed_sample_t* e = find_pre(sample_slot, ratio);
         if (e) {
-            p->preprocessed_decoder = (ma_decoder*)malloc(sizeof(ma_decoder));
-            if (!p->preprocessed_decoder) return MA_OUT_OF_MEMORY;
-            ma_decoder_config dc = ma_decoder_config_init(ma_format_f32, channels, sampleRate);
-            mr = ma_decoder_init_memory(e->processed_data, e->processed_size, &dc, p->preprocessed_decoder);
-            if (mr == MA_SUCCESS) p->uses_preprocessed_data = 1; else { free(p->preprocessed_decoder); p->preprocessed_decoder = NULL; }
+            ma_audio_buffer_config bufCfg = ma_audio_buffer_config_init(ma_format_f32, channels, e->processed_frames, (const float*)e->processed_data, NULL);
+            mr = ma_audio_buffer_init(&bufCfg, &p->preprocessed_buffer);
+            if (mr == MA_SUCCESS) {
+                p->preprocessed_buffer_initialized = 1;
+                p->uses_preprocessed_data = 1;
+            }
         } else {
             // No cached data yet; caller may kick async preprocessing. We'll play unpitched until cache exists.
         }
@@ -397,10 +420,9 @@ ma_pitch_data_source* pitch_ds_create(ma_data_source* original,
 
 void pitch_ds_uninit(ma_pitch_data_source* p) {
     if (!p) return;
-    if (p->uses_preprocessed_data && p->preprocessed_decoder) {
-        ma_decoder_uninit(p->preprocessed_decoder);
-        free(p->preprocessed_decoder);
-        p->preprocessed_decoder = NULL;
+    if (p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        ma_audio_buffer_uninit(&p->preprocessed_buffer);
+        p->preprocessed_buffer_initialized = 0;
     }
     if (p->resampler_initialized) {
         ma_resampler_uninit(&p->resampler, NULL);
@@ -414,6 +436,27 @@ ma_data_source* pitch_ds_as_data_source(ma_pitch_data_source* p) {
     return (ma_data_source*)p;
 }
 
+ma_result pitch_ds_seek_to_start(ma_pitch_data_source* p) {
+    if (!p) return MA_INVALID_ARGS;
+    if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) {
+        return ma_data_source_seek_to_pcm_frame((ma_data_source*)&p->preprocessed_buffer, 0);
+    }
+    return ma_data_source_seek_to_pcm_frame((ma_data_source*)p->original, 0);
+}
+
+int pitch_should_rebuild_for_change(ma_pitch_data_source* p, float previous_pitch, float new_pitch) {
+    if (!p) return 1;
+    int method = pitch_get_method();
+    if (method == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING) {
+        int using_pre = pitch_ds_uses_preprocessed(p);
+        if (fabsf(previous_pitch - new_pitch) >= 0.001f) return 1; // pitch changed → rebuild
+        return using_pre ? 0 : 1; // same pitch but not bound to preprocessed yet → rebuild
+    }
+    return 0;
+}
+
+// (removed) pitch_maybe_request_preprocessing; playback triggers preprocessing explicitly
+
 void pitch_ds_destroy(ma_pitch_data_source* p) {
     if (!p) return;
     pitch_ds_uninit(p);
@@ -422,7 +465,7 @@ void pitch_ds_destroy(ma_pitch_data_source* p) {
 
 int pitch_ds_uses_preprocessed(ma_pitch_data_source* p) {
     if (!p) return 0;
-    return (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_decoder) ? 1 : 0;
+    return (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) ? 1 : 0;
 }
 
 int pitch_preprocess_sample_sync(int source_slot, float ratio) {

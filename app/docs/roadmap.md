@@ -10,6 +10,11 @@
 - 2 A/B ma nodes per column - done
 - slide to next section - done
 
+- undo many
+- remove default 0 renders for message
+- rename messages count project to checkpints
+- server schema validation
+
 
 - pitch reimplment
 - unify ui sound settings into one structure

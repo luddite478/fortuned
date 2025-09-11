@@ -70,6 +70,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     _multitaskPanelState = MultitaskPanelState();
     _soundSettingsState = SoundSettingsState();
     _recordingState = RecordingState();
+    _recordingState.attachPanelState(_multitaskPanelState);
     _editState = EditState(_tableState);
     _sectionSettingsState = SectionSettingsState();
     _sliderOverlayState = SliderOverlayState();

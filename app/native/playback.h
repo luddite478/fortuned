@@ -135,6 +135,16 @@ int sample_bank_is_loaded(int slot);
 __attribute__((visibility("default"))) __attribute__((used))
 const char* sample_bank_get_file_path(int slot);
 
+// Output recording (WAV) control
+__attribute__((visibility("default"))) __attribute__((used))
+int recording_start(const char* file_path);
+
+__attribute__((visibility("default"))) __attribute__((used))
+void recording_stop(void);
+
+__attribute__((visibility("default"))) __attribute__((used))
+int recording_is_active(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -29,7 +29,9 @@ Key globals in `app/native/playback.mm`:
 - Each node owns its own decoder and `ma_data_source_node`, attached to the graph endpoint
 
 When setting up a node for a step:
-- If the node is already initialized with the same sample, the decoder is rewound to frame 0, the node is started, and exponential volume smoothing is re-primed for a clean fade-in
+- If the node is already initialized with the same sample, pitch policy applies:
+  - With preprocessing (default): if pitch changed or not yet bound to preprocessed cache, rebuild the node; if same pitch and cache is bound, seek to start and reuse
+  - With realtime resampler (optional): update pitch in-place and seek to start
 - Otherwise, the previous node is torn down and a new decoder/node pair is created and attached to the endpoint
 
 ### Volume Smoothing (Exponential)

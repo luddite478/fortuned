@@ -86,6 +86,11 @@ static inline void state_update_prefix() {
     g_playback_state.sections_loops_num = &g_playback_state.sections_loops_num_storage[0];
 }
 
+// Output recording globals
+static int g_is_output_recording = 0;
+static int g_output_encoder_initialized = 0;
+static ma_encoder g_output_encoder;
+
 // Forward declarations
 static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput, ma_uint32 frameCount);
 static void run_sequencer(ma_uint32 frameCount);
@@ -226,6 +231,12 @@ void playback_cleanup(void) {
                     free(node->decoder);
                     node->decoder = NULL;
                 }
+                if (node->pitch_ds_initialized && node->pitch_ds) {
+                    pitch_ds_uninit((ma_pitch_data_source*)node->pitch_ds);
+                    free(node->pitch_ds);
+                    node->pitch_ds = NULL;
+                    node->pitch_ds_initialized = 0;
+                }
                 node->node_initialized = 0;
             }
         }
@@ -233,6 +244,14 @@ void playback_cleanup(void) {
     
     // Stop and cleanup device
     ma_device_stop(&g_device);
+    // Stop recording if active
+    if (g_is_output_recording) {
+        g_is_output_recording = 0;
+    }
+    if (g_output_encoder_initialized) {
+        ma_encoder_uninit(&g_output_encoder);
+        g_output_encoder_initialized = 0;
+    }
     ma_device_uninit(&g_device);
     ma_node_graph_uninit(&g_nodeGraph, NULL);
     
@@ -467,18 +486,25 @@ static void setup_column_node(int column, int node_index, int sample_slot, float
     
     MAColumnNode* node = &g_ma_column_nodes[column].nodes[node_index];
     
-    // If this node is already initialized with the same sample, restart it instead of rebuilding.
-    // This enables proper A/B alternation across loops for repeated samples.
+    // If this node is already initialized with the same sample, handle according to pitch method.
     if (node->node_initialized && node->sample_slot == sample_slot) {
-        // Rewind decoder to start and ensure node is started
-        ma_decoder_seek_to_pcm_frame((ma_decoder*)node->decoder, 0);
-        ma_node_set_state((ma_node_base*)node->node, ma_node_state_started);
-
-        // Reset smoothing to fade in cleanly
-        node->user_volume = volume;
-        node->current_volume = 0.0f;   // start silent, smoothing will ramp up
-        node->target_volume = volume;
-        return;
+        int must_rebuild = 1;
+        if (node->pitch_ds_initialized && node->pitch_ds) {
+            must_rebuild = pitch_should_rebuild_for_change((ma_pitch_data_source*)node->pitch_ds, node->pitch, pitch);
+        }
+        if (!must_rebuild) {
+            if (node->pitch_ds_initialized && node->pitch_ds) {
+                pitch_ds_seek_to_start((ma_pitch_data_source*)node->pitch_ds);
+            } else if (node->decoder) {
+                ma_decoder_seek_to_pcm_frame((ma_decoder*)node->decoder, 0);
+            }
+            ma_node_set_state((ma_node_base*)node->node, ma_node_state_started);
+            node->user_volume = volume;
+            node->current_volume = 0.0f;
+            node->target_volume = volume;
+            return;
+        }
+        // Fallthrough to rebuild below to pick up cache/new pitch
     }
     
     // Cleanup previous node if needed
@@ -548,9 +574,10 @@ static void setup_column_node(int column, int node_index, int sample_slot, float
     }
     node->pitch_ds_initialized = 1;
 
-    // If preprocessing is default and pitch != 1.0, start async preprocessing
-    if (fabs(pitch - 1.0f) > 0.001f) {
+    // Start async preprocessing if method is preprocessing and pitch != 1.0
+    if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
         pitch_start_async_preprocessing(sample_slot, pitch);
+        prnt("⚙️ [PLAYBACK] Preprocess requested (slot=%d, pitch=%.3f)", sample_slot, pitch);
     }
 
     // Allocate data source node
@@ -568,7 +595,7 @@ static void setup_column_node(int column, int node_index, int sample_slot, float
         return;
     }
     
-    // Initialize data source node using pitch data source
+    // Initialize data source node using pitch data source (wraps either decoder or preprocessed buffer)
     ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(
         (ma_data_source*)pitch_ds_as_data_source((ma_pitch_data_source*)node->pitch_ds)
     );
@@ -625,9 +652,13 @@ static void play_samples_for_step(int step) {
             active->target_volume = 0.0f; // Fade out
         }
         
-        // Setup next node
+        // Setup next node with resolved pitch (cell override or sample bank default)
         int next_node = column_nodes->next_node;
-        setup_column_node(col, next_node, cell->sample_slot, cell->settings.volume, cell->settings.pitch);
+        float resolved_pitch = cell->settings.pitch;
+        if (resolved_pitch == DEFAULT_CELL_PITCH) {
+            resolved_pitch = sample_bank_get_sample(cell->sample_slot)->settings.pitch;
+        }
+        setup_column_node(col, next_node, cell->sample_slot, cell->settings.volume, resolved_pitch);
         
         // Switch active node
         column_nodes->active_node = next_node;
@@ -673,7 +704,12 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
     (void)pDevice; // Unused
     run_sequencer(frameCount);
     update_volume_smoothing();
+    // Render mixed output
     ma_node_graph_read_pcm_frames(&g_nodeGraph, pOutput, frameCount, NULL);
+    // Optional: record rendered output (float32 interleaved)
+    if (g_is_output_recording && g_output_encoder_initialized) {
+        ma_encoder_write_pcm_frames(&g_output_encoder, pOutput, frameCount, NULL);
+    }
 }
 
 // Expose pointer to playback state snapshot
@@ -695,6 +731,43 @@ void playback_apply_state(const PlaybackState* state) {
     g_frames_per_step = (SAMPLE_RATE * 60) / (g_playback_state.bpm * 4);
     state_update_prefix();
     state_write_end();
+}
+
+// Start/stop/isActive output recording (WAV)
+int recording_start(const char* file_path) {
+    if (!g_initialized) {
+        prnt_err("❌ [RECORDING] Not initialized");
+        return -1;
+    }
+    if (g_is_output_recording) {
+        prnt_err("❌ [RECORDING] Already active");
+        return -2;
+    }
+    ma_result res;
+    ma_encoder_config cfg = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, CHANNELS, SAMPLE_RATE);
+    res = ma_encoder_init_file(file_path, &cfg, &g_output_encoder);
+    if (res != MA_SUCCESS) {
+        prnt_err("❌ [RECORDING] Failed to init encoder: %d", res);
+        return -3;
+    }
+    g_output_encoder_initialized = 1;
+    g_is_output_recording = 1;
+    prnt("🎙️ [RECORDING] Started → %s", file_path);
+    return 0;
+}
+
+void recording_stop(void) {
+    if (!g_is_output_recording) return;
+    g_is_output_recording = 0;
+    if (g_output_encoder_initialized) {
+        ma_encoder_uninit(&g_output_encoder);
+        g_output_encoder_initialized = 0;
+    }
+    prnt("⏹️ [RECORDING] Stopped");
+}
+
+int recording_is_active(void) {
+    return g_is_output_recording;
 }
 
 
