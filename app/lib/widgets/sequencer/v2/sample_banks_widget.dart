@@ -293,7 +293,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
   Color _getButtonColorForBank(int bank, SampleBankState sampleBankState) {
     final colors = sampleBankState.uiBankColors;
     final originalColor = bank < colors.length ? colors[bank] : colors[0];
-    return Color.lerp(originalColor, AppColors.sequencerSurfaceRaised, 0.7) ?? AppColors.sequencerSurfaceRaised;
+    return Color.lerp(originalColor, AppColors.sequencerCellFilled, 0.3) ?? AppColors.sequencerCellFilled;
   }
 
   Color _getBorderColor(bool isSelected, bool isActive) {

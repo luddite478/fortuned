@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:ffi' as ffi;
 // removed unused json ffi imports
 import '../../ffi/table_bindings.dart';
+import '../../ffi/pitch_bindings.dart';
 import '../../ffi/playback_bindings.dart';
 // uses Cell/CellData types from table_bindings.dart
 
@@ -81,6 +82,8 @@ class _NativeTableState {
 /// 
 /// This file maintains references/pointers to native table data and provides
 /// efficient change tracking using ValueNotifiers for UI updates.
+enum SoundGridViewMode { stack, flat }
+
 class TableState extends ChangeNotifier {
   static const int maxNotifiersRows = 256;
   static const int maxNotifiersCols = 16;
@@ -90,6 +93,7 @@ class TableState extends ChangeNotifier {
   static const int maxSections = 64;
   
   final TableBindings _table_ffi;
+  final PitchBindings _pitch_ffi;
   final PlaybackBindings _playback_ffi;
   
   // 2D array of ValueNotifiers for efficient cell updates (more efficient than string keys)
@@ -111,13 +115,16 @@ class TableState extends ChangeNotifier {
   int _uiSelectedSection = 0;  // Which section UI is currently viewing
   int _uiSelectedLayer = 0;    // Which layer UI is currently viewing
   
+  // UI: sound grid view mode (stacked cards vs flat tabs)
+  SoundGridViewMode _uiSoundGridViewMode = SoundGridViewMode.stack;
+  
   // Sound grid stack (multiple grids)
   int _uiCurrentSoundGridIndex = 0;
   final List<int> _uiSoundGridOrder = [0];
 
   int _activeSectionStepCount = defaultSectionSteps;
 
-  TableState() : _table_ffi = TableBindings(), _playback_ffi = PlaybackBindings() {
+  TableState() : _table_ffi = TableBindings(), _playback_ffi = PlaybackBindings(), _pitch_ffi = PitchBindings() {
     _initializeTable();
   }
   
@@ -151,6 +158,14 @@ class TableState extends ChangeNotifier {
     }
   }
 
+  /// Set UI view mode for sound grids (stack vs flat)
+  void setUiSoundGridViewMode(SoundGridViewMode mode) {
+    if (_uiSoundGridViewMode == mode) return;
+    _uiSoundGridViewMode = mode;
+    notifyListeners();
+    debugPrint('🎛️ [TABLE_STATE] Set UI sound grid view mode to $mode');
+  }
+
   // Removed: setUiColsPerLayer; using native layers config
   
   /// Get pointer to native cell (direct memory access)
@@ -167,6 +182,7 @@ class TableState extends ChangeNotifier {
   void setCell(int step, int col, int sampleSlot, double volume, double pitch, {bool undoRecord = true}) {
     _table_ffi.tableSetCell(step, col, sampleSlot, volume, pitch, undoRecord ? 1 : 0);
     debugPrint('✏️ [TABLE_STATE] Set cell [$step, $col]: slot=$sampleSlot, vol=${volume.toStringAsFixed(2)}');
+    _maybeKickPitchPreprocessing(step, col, sampleSlot, pitch);
   }
   
   void clearCell(int step, int col, {bool undoRecord = true}) {
@@ -179,10 +195,34 @@ class TableState extends ChangeNotifier {
     final cellPtr = getCellPointer(step, col);
     if (cellPtr.address == 0) return;
     final current = cellPtr.ref;
-    final double nextVolume = (volume ?? current.settings.volume).clamp(0.0, 1.0);
-    final double nextPitch = (pitch ?? current.settings.pitch).clamp(0.03125, 32.0);
+    // Preserve sentinel (-1.0) for volume if not explicitly set
+    double nextVolume = volume ?? current.settings.volume;
+    if (nextVolume >= 0.0) nextVolume = nextVolume.clamp(0.0, 1.0);
+
+    // For pitch, keep sentinel when not explicitly set; otherwise clamp to valid range
+    double nextPitch = pitch ?? current.settings.pitch;
+    if (nextPitch >= 0.0) nextPitch = nextPitch.clamp(0.03125, 32.0);
+    
     _table_ffi.tableSetCell(step, col, current.sample_slot, nextVolume, nextPitch, undoRecord ? 1 : 0);
     debugPrint('🎚️ [TABLE_STATE] Set cell settings [$step, $col]: vol=${nextVolume.toStringAsFixed(2)}, pitch=${nextPitch.toStringAsFixed(2)}');
+    _maybeKickPitchPreprocessing(step, col, current.sample_slot, nextPitch);
+  }
+
+  // If using preprocessing method and inputs are valid, trigger async preprocessing now.
+  void _maybeKickPitchPreprocessing(int step, int col, int sampleSlot, double pitch) {
+    if (sampleSlot < 0) return;
+    // Only for preprocessing method and meaningful pitch offsets
+    final method = _pitch_ffi.pitchGetMethod();
+    if (method != 2 /* PITCH_METHOD_SOUNDTOUCH_PREPROCESSING */) return;
+    // If cell uses default sentinel, let native playback handle preprocessing when needed
+    if (pitch <= 0.0 || pitch == -1.0) return;
+    if ((pitch - 1.0).abs() <= 0.001) return;
+    final res = _pitch_ffi.pitchStartAsyncPreprocessing(sampleSlot, pitch);
+    if (res == 0) {
+      debugPrint('⚙️ [TABLE_STATE] Preprocess queued for slot=$sampleSlot pitch=${pitch.toStringAsFixed(3)} at cell [$step,$col]');
+    } else if (res < 0) {
+      debugPrint('❌ [TABLE_STATE] Failed to queue preprocess for slot=$sampleSlot pitch=${pitch.toStringAsFixed(3)}');
+    }
   }
   
   void insertStep(int sectionIndex, int atStep, {bool undoRecord = true}) {
@@ -387,6 +427,7 @@ class TableState extends ChangeNotifier {
   int get uiSelectedSection => _uiSelectedSection;
   int get uiSelectedLayer => _uiSelectedLayer;
   bool get initialized => _initialized;
+  SoundGridViewMode get uiSoundGridViewMode => _uiSoundGridViewMode;
 
   /// Get layers-per-section count including empty layers (length = sectionsCount)
   List<int> getLayersLengthPerSection() {
@@ -510,7 +551,8 @@ class TableState extends ChangeNotifier {
     final step = row + getSectionStartStep(_uiSelectedSection);
     
     if (col < _maxCols && step < _maxSteps) {
-      setCell(step, col, sampleSlot, 1.0, 1.0);
+      // Use sentinel defaults so volume/pitch inherit from sample bank until overridden
+      setCell(step, col, sampleSlot, -1.0, -1.0);
     }
   }
   

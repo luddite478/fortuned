@@ -218,7 +218,9 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     final actualRowSpacing = baseRowHeight * (rowSpacingPercent / 100.0);
     final rowBlock = actualRowHeight + actualRowSpacing;
     if (rowBlock <= 0) return null;
-    final rowIndex = (localPosition.dy / rowBlock).floor();
+    // Account for vertical scroll offset so row index corresponds to absolute row
+    final scrollOffset = _scrollController.hasClients ? _scrollController.offset : 0.0;
+    final rowIndex = ((scrollOffset + localPosition.dy) / rowBlock).floor();
     if (rowIndex < 0) return null;
     
     final gridCols = context.read<TableState>().getVisibleCols().length;
@@ -233,7 +235,9 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     final actualCellWidth = fullCellWidth * (cellWidthPercent / 100.0);
     final cellBlock = actualCellWidth + actualCellSpacing;
     if (cellBlock <= 0) return null;
-    int colIndex = (xInGrid / cellBlock).floor();
+    // Align hit testing with symmetric margins used in layout (s/2 on both sides)
+    final xAdjusted = xInGrid - (actualCellSpacing / 2);
+    int colIndex = (xAdjusted / cellBlock).floor();
     if (colIndex < 0) return null;
     if (colIndex >= gridCols) colIndex = gridCols - 1;
     return rowIndex * gridCols + colIndex;
@@ -269,6 +273,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         
         // Get TableState for reading cell data from the new table system (already provided)
         
+        final bool isFlat = tableState.uiSoundGridViewMode == SoundGridViewMode.flat;
         return Container(
           margin: const EdgeInsets.only(top: 0, bottom: 0), // Move entire sound grid structure
           decoration: BoxDecoration(
@@ -286,7 +291,9 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               ),
             ],
           ),
-          child: StackedCardsWidget(
+          child: isFlat
+              ? _buildFlatTabs(tableState)
+              : StackedCardsWidget(
             numCards: numSoundGrids,
             cardWidthFactor: 0.98,
             cardHeightFactor: 0.98,
@@ -393,9 +400,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
         
         // 🎯 PERFORMANCE: Light bulb-bluish-white highlight for current step
         Color cellColor;
+        // ignore: dead_code
         if (isActivePad) {
           cellColor = AppColors.sequencerAccent.withOpacity(0.6);
-                 } else if (isCurrentStep) {
+        } else if (isCurrentStep) {
            // Light bulb-bluish-white highlight for current step
            cellColor = hasPlacedSample 
                ? _getSampleColorForGrid(placedSample, context).withOpacity(0.9)
@@ -424,8 +432,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             final layerStartCol = tableState.getLayerStartCol();
             final absoluteCol = layerStartCol + col;
             
-            // Use the new table system instead of legacy sequencer
-            tableState.setCell(absoluteStep, absoluteCol, sampleSlot, 1.0, 1.0);
+            // Use the new table system with inheritance sentinels
+            tableState.setCell(absoluteStep, absoluteCol, sampleSlot, -1.0, -1.0);
             debugPrint('🎵 [DRAG] Set cell [$absoluteStep, $absoluteCol] = sample $sampleSlot');
           },
           builder: (context, candidateData, rejectedData) {
@@ -535,8 +543,64 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     );
   }
 
+  Widget _buildFlatTabs(TableState tableState) {
+    final int numSoundGrids = tableState.totalLayers;
+    return Column(
+      children: [
+        SizedBox(
+          height: 34,
+          child: Row(
+            children: List.generate(numSoundGrids, (i) {
+              final isActive = tableState.uiSelectedLayer == i;
+              return Expanded(
+                child: GestureDetector(
+                  onTap: () {
+                    tableState.setUiSelectedLayer(i);
+                    tableState.uiBringGridToFront(i);
+                  },
+                  child: Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isActive ? AppColors.sequencerSurfaceRaised : AppColors.sequencerSurfaceBase,
+                      borderRadius: BorderRadius.circular(2),
+                      border: Border.all(
+                        color: isActive ? AppColors.sequencerAccent : AppColors.sequencerBorder,
+                        width: isActive ? 1.0 : 0.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.sequencerShadow,
+                          blurRadius: isActive ? 2 : 1,
+                          offset: Offset(0, isActive ? 1 : 0.5),
+                        ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        'L${i + 1}',
+                        style: GoogleFonts.sourceSans3(
+                          color: isActive ? AppColors.sequencerText : AppColors.sequencerLightText,
+                          fontSize: 12,
+                          fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                          letterSpacing: 1,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+        ),
+        Expanded(
+          child: _buildGridContent(tableState),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSampleCellContent(BuildContext context, TableState tableState, int index, int sampleSlot, bool isActivePad, bool isCurrentStep, bool isDragHovering) {
-    // Get volume and pitch values from new states
+    // Get volume and pitch values from states
     final sectionStart = tableState.getSectionStartStep(widget.sectionIndexOverride ?? tableState.uiSelectedSection);
     final gridCols = tableState.getVisibleCols().length;
     final row = index ~/ gridCols;
@@ -546,13 +610,28 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     final cellData = tableState.getCellNotifier(step, col).value;
     final cellVolume = cellData.volume;
     final cellPitch = cellData.pitch;
-    final sampleData = context.read<SampleBankState>().getSampleData(sampleSlot);
-    final sampleVolume = sampleData.volume;
-    final samplePitch = sampleData.pitch;
+
+    // Listen to sample bank defaults so UI updates when sample defaults change
+    final sampleBankState = context.read<SampleBankState>();
+    final volNotifier = sampleBankState.getSampleVolumeNotifier(sampleSlot);
+    final pitchNotifier = sampleBankState.getSamplePitchNotifier(sampleSlot);
+
+    return ValueListenableBuilder<double>(
+      valueListenable: volNotifier,
+      builder: (context, sampleVolume, _) {
+        return ValueListenableBuilder<double>(
+          valueListenable: pitchNotifier,
+          builder: (context, samplePitch, __) {
+            // Treat sentinel values (-1.0) as "inherit from sample bank"
+            final bool usesDefaultVolume = cellVolume < 0.0;
+            final bool usesDefaultPitch = cellPitch < 0.0;
+
+            final effectiveVolume = usesDefaultVolume ? sampleVolume : cellVolume;
+            final effectivePitch = usesDefaultPitch ? samplePitch : cellPitch;
     
     // Check if values are non-default (cell overrides)
-    final hasVolumeOverride = (cellVolume - sampleVolume).abs() > 0.001;
-    final hasPitchOverride = (cellPitch - samplePitch).abs() > 0.001;
+            final hasVolumeOverride = !usesDefaultVolume && (cellVolume - sampleVolume).abs() > 0.001;
+            final hasPitchOverride = !usesDefaultPitch && (cellPitch - samplePitch).abs() > 0.001;
     
     // Only show table if there are non-default values
     final showEffectsTable = hasVolumeOverride || hasPitchOverride;
@@ -591,7 +670,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               children: [
                 if (hasVolumeOverride) ...[
                   Text(
-                    'V${(cellVolume * 100).round()}',
+                    'V${(effectiveVolume * 100).round()}',
                     style: GoogleFonts.sourceSans3(
                       color: (isActivePad || isDragHovering)
                           ? AppColors.sequencerPageBackground
@@ -606,7 +685,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                 ],
                 if (hasPitchOverride) ...[
                   Text(
-                    _formatPitchDisplay(cellPitch),
+                    _formatPitchDisplay(effectivePitch),
                     style: GoogleFonts.sourceSans3(
                       color: (isActivePad || isDragHovering)
                           ? AppColors.sequencerPageBackground
@@ -624,6 +703,10 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           ),
         ],
       ],
+    );
+          },
+        );
+      },
     );
   }
 
@@ -703,7 +786,8 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
               // Grid cells
               Expanded(
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  // Use explicit margins for spacing; avoid additional distribution that breaks hit-testing math
+                  mainAxisAlignment: MainAxisAlignment.start,
                   children: List.generate(gridCols, (colIndex) {
                     final cellIndex = rowIndex * gridCols + colIndex;
                     return Container(
@@ -794,6 +878,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
   }
 
   // Unused helper retained for reference - can be deleted if not needed
+  // ignore: unused_element
   Widget _buildTabLabel({
     required int gridIndex,
     required Color cardColor,

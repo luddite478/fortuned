@@ -1,5 +1,6 @@
 #include "pitch.h"
 #include "sample_bank.h"
+#include "table.h"  // for DEFAULT_CELL_PITCH
 #include <math.h>
 #include <string.h>
 #include <stdlib.h>
@@ -52,6 +53,8 @@ static ma_uint64 g_pre_cache_total_bytes = 0;
 
 // Global method (default to preprocessing as requested)
 static int g_pitch_method = PITCH_METHOD_SOUNDTOUCH_PREPROCESSING;
+// Global pitch quality (0..4, best..worst)
+static int g_pitch_quality = 0;
 
 // Hash helper (quantize to 0.001)
 static unsigned int hash_pitch_ratio(float r) {
@@ -192,18 +195,52 @@ static int preprocess_sync(int source_slot, float ratio) {
     st.setSampleRate(48000);
     st.setChannels(2);
     st.setPitch(ratio);
-    st.setSetting(SETTING_USE_QUICKSEEK, 0);
-    st.setSetting(SETTING_USE_AA_FILTER, 1);
-    st.setSetting(SETTING_SEQUENCE_MS, 40);
-    st.setSetting(SETTING_SEEKWINDOW_MS, 15);
-    st.setSetting(SETTING_OVERLAP_MS, 8);
+    // Apply settings based on global pitch quality preset (0 best .. 4 worst)
+    // References: SoundTouch docs and community recommendations
+    switch (g_pitch_quality) {
+        case 0: // Best quality: larger sequence/seek, AA filter on
+            st.setSetting(SETTING_USE_QUICKSEEK, 0);
+            st.setSetting(SETTING_USE_AA_FILTER, 1);
+            st.setSetting(SETTING_SEQUENCE_MS, 82);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 28);
+            st.setSetting(SETTING_OVERLAP_MS, 12);
+            break;
+        case 1: // High: balanced quality/perf
+            st.setSetting(SETTING_USE_QUICKSEEK, 0);
+            st.setSetting(SETTING_USE_AA_FILTER, 1);
+            st.setSetting(SETTING_SEQUENCE_MS, 60);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 24);
+            st.setSetting(SETTING_OVERLAP_MS, 10);
+            break;
+        case 2: // Medium: faster, slight artifacts allowed
+            st.setSetting(SETTING_USE_QUICKSEEK, 1);
+            st.setSetting(SETTING_USE_AA_FILTER, 1);
+            st.setSetting(SETTING_SEQUENCE_MS, 40);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 15);
+            st.setSetting(SETTING_OVERLAP_MS, 8);
+            break;
+        case 3: // Low: faster, AA off
+            st.setSetting(SETTING_USE_QUICKSEEK, 1);
+            st.setSetting(SETTING_USE_AA_FILTER, 0);
+            st.setSetting(SETTING_SEQUENCE_MS, 30);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 12);
+            st.setSetting(SETTING_OVERLAP_MS, 8);
+            break;
+        default: // 4: Lowest: aggressive speed
+            st.setSetting(SETTING_USE_QUICKSEEK, 1);
+            st.setSetting(SETTING_USE_AA_FILTER, 0);
+            st.setSetting(SETTING_SEQUENCE_MS, 24);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 8);
+            st.setSetting(SETTING_OVERLAP_MS, 6);
+            break;
+    }
 
     ma_uint64 est = total_frames + (total_frames / 2);
     size_t out_bytes = est * 2 * sizeof(float);
     float* out = (float*)malloc(out_bytes);
     if (!out) { ma_decoder_uninit(&tmp); prnt_err("❌ [PITCH] malloc failed (bytes=%zu)", out_bytes); return -1; }
 
-    const ma_uint64 CHUNK = 4096;
+    const ma_uint64 CHUNK = 16384;
     float buf[CHUNK * 2];
     ma_uint64 written = 0; ma_uint64 rd = 0;
     ma_decoder_seek_to_pcm_frame(&tmp, 0);
@@ -579,4 +616,35 @@ ma_uint64 pitch_get_preprocessed_memory_usage(void) {
     return g_pre_cache_total_bytes;
 }
 
+int pitch_run_preprocessing(int sample_slot, float cell_pitch) {
+    if (sample_slot < 0 || sample_slot >= MAX_SAMPLE_SLOTS) return 1; // nothing to do
+    if (pitch_get_method() != PITCH_METHOD_SOUNDTOUCH_PREPROCESSING) return 1;
+    float resolved = cell_pitch;
+    if (resolved == DEFAULT_CELL_PITCH) {
+        Sample* s = sample_bank_get_sample(sample_slot);
+        if (s && s->loaded) {
+            resolved = s->settings.pitch;
+        } else {
+            // Sample not loaded yet; cannot resolve default safely
+            return 1;
+        }
+    }
+    // Guard invalid ratios and near-unity skips
+    if (resolved <= 0.0f) return 1; // guard against sentinel or invalid
+    if (resolved < PITCH_MIN_RATIO) resolved = PITCH_MIN_RATIO;
+    if (resolved > PITCH_MAX_RATIO) resolved = PITCH_MAX_RATIO;
+    if (fabsf(resolved - 1.0f) <= 0.001f) return 1;
+    return pitch_start_async_preprocessing(sample_slot, resolved);
+}
 
+int pitch_set_quality(int q) {
+    if (q < 0) q = 0; if (q > 4) q = 4;
+    int prev = g_pitch_quality;
+    g_pitch_quality = q;
+    prnt("🎚️ [PITCH] Quality set to %d", g_pitch_quality);
+    return prev;
+}
+
+int pitch_get_quality(void) {
+    return g_pitch_quality;
+}

@@ -460,6 +460,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                   onChanged: (value) => sampleBankState.setSampleSettings(index, volume: value),
                   height: height,
                   sliderOverlay: context.read<SliderOverlayState>(),
+                  contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
                 ),
               )
             : _buildCellVolumeSlider(tableState, index, height),
@@ -503,6 +504,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                   onChanged: (value) => sampleBankState.setSampleSettings(index, pitch: PitchConversion.uiValueToPitchRatio(value)),
                   height: height,
                   sliderOverlay: context.read<SliderOverlayState>(),
+                  contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
                 ),
               )
             : _buildCellPitchSlider(tableState, index, height),
@@ -705,7 +707,14 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return ValueListenableBuilder<CellData>(
       valueListenable: tableState.getCellNotifier(step, colAbs),
       builder: (context, cell, _) {
-        final double vol = cell.volume;
+        final sampleBank = context.read<SampleBankState>();
+        double defaultVol = 1.0;
+        if (cell.sampleSlot >= 0) {
+          final sd = sampleBank.getSampleData(cell.sampleSlot);
+          // Guard bad values; default should be 1.0 for display
+          defaultVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
+        }
+        final double vol = (cell.volume < 0.0) ? defaultVol : cell.volume;
         return GenericSlider(
           value: vol,
           min: 0.0,
@@ -719,6 +728,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           },
           height: height,
           sliderOverlay: context.read<SliderOverlayState>(),
+          contextLabel: 'Cell ${row + 1}:${col + 1}',
         );
       },
     );
@@ -733,7 +743,14 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return ValueListenableBuilder<CellData>(
       valueListenable: tableState.getCellNotifier(step, colAbs),
       builder: (context, cell, _) {
-        final uiPitch = PitchConversion.pitchRatioToUiValue(cell.pitch);
+        final sampleBank = context.read<SampleBankState>();
+        double defaultPitch = 1.0;
+        if (cell.sampleSlot >= 0) {
+          final sd = sampleBank.getSampleData(cell.sampleSlot);
+          defaultPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
+        }
+        final effectiveRatio = (cell.pitch < 0.0) ? defaultPitch : cell.pitch;
+        final uiPitch = PitchConversion.pitchRatioToUiValue(effectiveRatio);
         return GenericSlider(
           value: uiPitch,
           min: 0.0,
@@ -748,6 +765,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           },
           height: height,
           sliderOverlay: context.read<SliderOverlayState>(),
+          contextLabel: 'Cell ${row + 1}:${col + 1}',
         );
       },
     );
