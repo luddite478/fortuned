@@ -40,6 +40,7 @@ class SampleBankState extends ChangeNotifier {
   // Per-sample notifiers for UI bindings
   final Map<int, ValueNotifier<double>> _sampleVolumeNotifiers = {};
   final Map<int, ValueNotifier<double>> _samplePitchNotifiers = {};
+  final Map<int, ValueNotifier<bool>> _sampleProcessingNotifiers = {};
   
   // UI-only state (not synced from native)
   final List<String?> _slotNames = List.filled(maxSampleSlots, null);
@@ -230,7 +231,7 @@ class SampleBankState extends ChangeNotifier {
   SampleData getSampleData(int slot) {
     final ptr = getSamplePointer(slot);
     if (ptr.address == 0) {
-      return const SampleData(loaded: false, volume: 1.0, pitch: 1.0);
+      return const SampleData(loaded: false, volume: 1.0, pitch: 1.0, isProcessing: false);
     }
     return SampleData.fromPointer(ptr);
   }
@@ -295,6 +296,13 @@ class SampleBankState extends ChangeNotifier {
     return _samplePitchNotifiers.putIfAbsent(slot, () {
       final data = getSampleData(slot);
       return ValueNotifier<double>(data.pitch);
+    });
+  }
+
+  ValueNotifier<bool> getSampleProcessingNotifier(int slot) {
+    return _sampleProcessingNotifiers.putIfAbsent(slot, () {
+      final data = getSampleData(slot);
+      return ValueNotifier<bool>(data.isProcessing);
     });
   }
   
@@ -383,6 +391,7 @@ class SampleBankState extends ChangeNotifier {
       for (int i = 0; i < maxSampleSlots; i++) {
         final samplePtr = _samplesPtr + i;
         final bool isLoaded = samplePtr.ref.loaded != 0;
+        final bool isProcessing = samplePtr.ref.is_processing != 0;
         if (_slotsLoaded[i] != isLoaded) {
           _slotsLoaded[i] = isLoaded;
           slotsChanged = true;
@@ -393,6 +402,12 @@ class SampleBankState extends ChangeNotifier {
         final path = SampleData.fromPointer(samplePtr).filePath;
         _slotNames[i] = name;
         _slotPaths[i] = path;
+
+        // Update processing notifier if exists
+        final n = _sampleProcessingNotifiers[i];
+        if (n != null && n.value != isProcessing) {
+          n.value = isProcessing;
+        }
       }
     }
     

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../state/sequencer/slider_overlay.dart';
 // musical note formatting handled externally if needed
@@ -93,7 +94,7 @@ class ValueDisplayThumbShape extends SliderComponentShape {
   }
 }
 
-class GenericSlider extends StatelessWidget {
+class GenericSlider extends StatefulWidget {
   final double value;
   final double min;
   final double max;
@@ -103,6 +104,7 @@ class GenericSlider extends StatelessWidget {
   final double height;
   final SliderOverlayState? sliderOverlay; // optional overlay state
   final String? contextLabel;
+  final ValueListenable<bool>? processingSource;
 
   const GenericSlider({
     super.key,
@@ -115,10 +117,18 @@ class GenericSlider extends StatelessWidget {
     required this.height,
     required this.sliderOverlay,
     this.contextLabel,
+    this.processingSource,
   });
 
+  @override
+  State<GenericSlider> createState() => _GenericSliderState();
+}
+
+class _GenericSliderState extends State<GenericSlider> {
+  double? _transientValue;
+
   String _getSettingName() {
-    switch (type) {
+    switch (widget.type) {
       case SliderType.volume:
         return 'VOLUME';
       case SliderType.pitch:
@@ -129,7 +139,7 @@ class GenericSlider extends StatelessWidget {
   }
 
   String _formatValue(double value) {
-    switch (type) {
+    switch (widget.type) {
       case SliderType.volume:
         final volumePercent = (value * 100).round();
         return '$volumePercent';
@@ -144,45 +154,83 @@ class GenericSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final thumbRadius = (height * 0.15).clamp(20.0, 40.0); // Much larger thumb
-    final currentValueText = _formatValue(value);
+    final thumbRadius = (widget.height * 0.15).clamp(20.0, 40.0); // Much larger thumb
+    final double displayedValue = _transientValue ?? widget.value;
+    final currentValueText = _formatValue(displayedValue);
     
-    return SliderTheme(
-      data: SliderTheme.of(context).copyWith(
-        activeTrackColor: const Color(0xFF8B7355), // AppColors.sequencerAccent
-        inactiveTrackColor: const Color(0xFF5A5A57), // AppColors.sequencerBorder
-        thumbColor: const Color(0xFF8B7355), // AppColors.sequencerAccent
-        trackHeight: (height * 0.04).clamp(2.0, 8.0),
-        thumbShape: ValueDisplayThumbShape(
-          value: currentValueText,
-          thumbRadius: thumbRadius,
-        ),
+    final sliderTheme = SliderTheme.of(context).copyWith(
+      activeTrackColor: const Color(0xFF8B7355),
+      inactiveTrackColor: const Color(0xFF5A5A57),
+      thumbColor: const Color(0xFF8B7355),
+      trackHeight: (widget.height * 0.04).clamp(2.0, 8.0),
+      thumbShape: ValueDisplayThumbShape(
+        value: currentValueText,
+        thumbRadius: thumbRadius,
       ),
-      child: Slider(
-        value: value,
-        onChanged: (newValue) {
-          onChanged(newValue);
-          if (sliderOverlay != null) {
-            sliderOverlay!.updateValue(_formatValue(newValue));
-          }
-        },
-        onChangeStart: (newValue) {
-          if (sliderOverlay != null) {
-            sliderOverlay!.startInteraction(
+    );
+
+    // legacy buildSlider removed
+
+    // Always allow moving the slider instantly; processing is handled by debounced commit
+    final sliderWidget = Slider(
+      value: displayedValue,
+      onChanged: (newValue) {
+        setState(() {
+          _transientValue = newValue;
+        });
+        widget.onChanged(newValue);
+        if (widget.sliderOverlay != null) {
+          widget.sliderOverlay!.updateValue(_formatValue(newValue));
+        }
+      },
+      onChangeStart: (newValue) {
+        setState(() {
+          _transientValue = newValue;
+        });
+        if (widget.sliderOverlay != null) {
+          // Bind processing source for this interaction
+          widget.sliderOverlay!.setProcessingSource(widget.processingSource);
+          widget.sliderOverlay!.startInteraction(
+            _getSettingName(),
+            _formatValue(newValue),
+            contextLabel: widget.contextLabel ?? '',
+          );
+        }
+      },
+      onChangeEnd: (newValue) {
+        setState(() {
+          _transientValue = null; // return control to external value
+        });
+        if (widget.sliderOverlay != null) {
+          widget.sliderOverlay!.stopInteraction();
+        }
+      },
+      min: widget.min,
+      max: widget.max,
+      divisions: widget.divisions,
+    );
+
+    return SliderTheme(
+      data: sliderTheme,
+      child: Listener(
+        onPointerDown: (_) {
+          if (widget.sliderOverlay != null) {
+            // Ensure overlay opens even if onChangeStart doesn't fire yet
+            widget.sliderOverlay!.setProcessingSource(widget.processingSource);
+            widget.sliderOverlay!.startInteraction(
               _getSettingName(),
-              _formatValue(newValue),
-              contextLabel: contextLabel ?? '',
+              _formatValue(displayedValue),
+              contextLabel: widget.contextLabel ?? '',
             );
+            // Slider overlay processing source is set by parent builders in sound_settings.dart
           }
         },
-        onChangeEnd: (newValue) {
-          if (sliderOverlay != null) {
-            sliderOverlay!.stopInteraction();
+        onPointerUp: (_) {
+          if (widget.sliderOverlay != null) {
+            widget.sliderOverlay!.stopInteraction();
           }
         },
-        min: min,
-        max: max,
-        divisions: divisions,
+        child: sliderWidget,
       ),
     );
   }

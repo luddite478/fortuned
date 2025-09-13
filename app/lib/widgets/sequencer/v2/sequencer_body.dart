@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'sound_grid_widget.dart';
 import 'sample_selection_widget.dart';
 import 'sound_grid_side_control_widget.dart';
-import 'value_control_overlay.dart';
 import 'section_control_overlay.dart';
 import 'section_creation_overlay.dart';
 import 'sequencer_body_overlay_menu.dart';
@@ -139,8 +138,7 @@ class _SequencerBodyState extends State<SequencerBody> {
                 ),
               ),
 
-            // Value control overlay (appears on top when slider is being used)
-            const ValueControlOverlay(),
+            // Value control overlay handled at screen level (to optionally include edit buttons)
           ],
         );
       },

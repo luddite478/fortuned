@@ -197,8 +197,8 @@ class EditState extends ChangeNotifier {
         final colAbs = layerStart + targetCol;
         if (rowAbs >= _tableState.maxSteps || colAbs >= maxCols) continue;
         final cell = (clipData.sampleSlot != null)
-            ? CellData(sampleSlot: clipData.sampleSlot!, volume: clipData.volume, pitch: clipData.pitch)
-            : const CellData(sampleSlot: -1, volume: 1.0, pitch: 1.0);
+            ? CellData(sampleSlot: clipData.sampleSlot!, volume: clipData.volume, pitch: clipData.pitch, isProcessing: false)
+            : const CellData(sampleSlot: -1, volume: 1.0, pitch: 1.0, isProcessing: false);
         rowColToCell.putIfAbsent(rowAbs, () => <int, CellData>{})[colAbs] = cell;
       }
       for (final rowAbs in rowColToCell.keys.toList()..sort()) {

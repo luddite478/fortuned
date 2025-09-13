@@ -1,10 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="short vertical bar with chevron pointing into it">
-  <!-- shorter vertical bar -->
-  <line x1="12" y1="20" x2="12" y2="44"
+  <!-- vertical bar -->
+  <line x1="18" y1="18" x2="18" y2="48"
         stroke="#000" stroke-width="4" stroke-linecap="butt" fill="none"/>
   <!-- chevron -->
-  <line x1="44" y1="22" x2="12" y2="32"
+  <line x1="46" y1="22" x2="22" y2="32"
         stroke="#000" stroke-width="4" stroke-linecap="butt" fill="none"/>
-  <line x1="44" y1="42" x2="12" y2="32"
+  <line x1="46" y1="42" x2="22" y2="32"
         stroke="#000" stroke-width="4" stroke-linecap="butt" fill="none"/>
 </svg>

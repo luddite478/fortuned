@@ -6,6 +6,7 @@ import '../widgets/sequencer/v2/edit_buttons_widget.dart' as v1;
 import '../widgets/sequencer/v2/top_multitask_panel_widget.dart' as v1;
 import '../widgets/sequencer/v2/message_bar_widget.dart';
 import '../widgets/sequencer/v2/sequencer_body.dart';
+import '../widgets/sequencer/v2/value_control_overlay.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/threads_state.dart';
 import '../services/threads_service.dart';
@@ -265,10 +266,6 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
                       child: const v1.EditButtonsWidget(),
                     ),
                   ),
-
-                  // 🎯 PERFORMANCE: Sample banks only rebuild when file names or loading state changes
-
-
                   // 🎯 PERFORMANCE: Multitask panel only rebuilds when panel mode changes
                   Expanded(
                     flex: 15, // Reduced from 18 to make space for message bar
@@ -283,6 +280,24 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
                     child: MessageBarWidget(),
                   ),
                 ],
+              ),
+            ),
+            // Value overlay covers SequencerBody (flex 50) + EditButtons (flex 8), excludes SampleBanks, Multitask, and MessageBar
+            Positioned.fill(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final h = constraints.maxHeight;
+                  const double messageBar = 44.0;
+                  // Column flex breakdown: 7 (SampleBanks), 50 (Body), 8 (EditButtons), 15 (Multitask), then 44 px (MessageBar)
+                  const int flexTotal = 7 + 50 + 8 + 15; // = 80
+                  final double flexRegion = h - messageBar;
+                  final double topInset = flexRegion * (7.0 / flexTotal);
+                  final double bottomInset = (flexRegion * (15.0 / flexTotal)) + messageBar; // multitask + message bar
+                  return Padding(
+                    padding: EdgeInsets.only(top: topInset, bottom: bottomInset),
+                    child: const ValueControlOverlay(),
+                  );
+                },
               ),
             ),
             if (_isInitialLoading)

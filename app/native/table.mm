@@ -40,6 +40,7 @@ static inline void table_set_cell_defaults(Cell* cell) {
     cell->sample_slot = -1;
     cell->settings.volume = DEFAULT_CELL_VOLUME;
     cell->settings.pitch = DEFAULT_CELL_PITCH;
+    cell->is_processing = 0;
 }
 
 // Initialize table with default values
@@ -99,6 +100,7 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
     cell->sample_slot = sample_slot;
     cell->settings.volume = volume;
     cell->settings.pitch = pitch;
+    cell->is_processing = 0;
     
     prnt("🎵 [TABLE] Set cell [%d, %d]: slot=%d, vol=%.2f, pitch=%.2f", 
          step, col, sample_slot, volume, pitch);
@@ -120,7 +122,6 @@ void table_set_cell_settings(int step, int col, float volume, float pitch, int u
     cell->settings.pitch = pitch;
     prnt("🎚️ [TABLE] Set settings [%d, %d]: vol=%.2f, pitch=%.2f", step, col, volume, pitch);
 
-    // Single-line pitch preprocessing trigger (logic inside pitch module)
     pitch_run_preprocessing(cell->sample_slot, pitch);
     if (undo_record) {
         UndoRedoManager_record();

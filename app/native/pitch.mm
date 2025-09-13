@@ -137,6 +137,7 @@ static preprocessed_sample_t* find_pre(int source_slot, float ratio) {
         if (e->in_use && e->source_slot == source_slot && e->pitch_hash == h) {
             e->last_accessed = ++g_pre_cache_access_counter;
             prnt("📦 [PITCH] Cache hit (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu)", source_slot, ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size);
+            // Clear cell processing flags for any cells using this sample? Handled at per-cell level.
             return e;
         }
     }
@@ -289,6 +290,9 @@ static int preprocess_sync(int source_slot, float ratio) {
 static void async_worker(int job_index, int source_slot, float ratio) {
     (void)job_index; // not strictly needed beyond cleanup; keep for parity
     prnt("🚀 [PITCH] Async job start (job=%d, slot=%d, ratio=%.3f)", job_index, source_slot, ratio);
+    // Mark sample as processing (if sample bank present)
+    extern void sample_bank_set_processing(int slot, int processing);
+    sample_bank_set_processing(source_slot, 1);
     int result = preprocess_sync(source_slot, ratio);
     (void)result;
     {
@@ -299,6 +303,7 @@ static void async_worker(int job_index, int source_slot, float ratio) {
         memset(&g_async_jobs[job_index], 0, sizeof(async_preprocess_job_t));
     }
     prnt("🏁 [PITCH] Async job finished (job=%d, slot=%d, ratio=%.3f, res=%d)", job_index, source_slot, ratio, result);
+    sample_bank_set_processing(source_slot, 0);
 }
 
 // -----------------------------------------------------------------------------
@@ -548,7 +553,12 @@ int pitch_preprocess_sample_sync(int source_slot, float ratio) {
 
 int pitch_start_async_preprocessing(int source_slot, float ratio) {
     // If already cached, nothing to do
-    if (find_pre(source_slot, ratio)) { prnt("✅ [PITCH] Async skip, already cached (slot=%d, ratio=%.3f)", source_slot, ratio); return 0; }
+    if (find_pre(source_slot, ratio)) {
+        prnt("✅ [PITCH] Async skip, already cached (slot=%d, ratio=%.3f)", source_slot, ratio);
+        extern void sample_bank_set_processing(int slot, int processing);
+        sample_bank_set_processing(source_slot, 0);
+        return 0;
+    }
 
     std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
     // Avoid duplicate jobs
@@ -570,6 +580,9 @@ int pitch_start_async_preprocessing(int source_slot, float ratio) {
     g_async_jobs[job_index].pitch_ratio = ratio;
     g_async_jobs[job_index].in_progress = 1;
     try {
+        // Mark processing started
+        extern void sample_bank_set_processing(int slot, int processing);
+        sample_bank_set_processing(source_slot, 1);
         g_async_jobs[job_index].worker_thread = new std::thread(async_worker, job_index, source_slot, ratio);
         g_async_jobs[job_index].worker_thread->detach();
         prnt("📥 [PITCH] Async job queued (job=%d, slot=%d, ratio=%.3f)", job_index, source_slot, ratio);

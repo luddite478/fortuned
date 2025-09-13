@@ -297,6 +297,12 @@ class TableState extends ChangeNotifier {
     
     return _cellNotifiers[step][col]!;
   }
+
+  // Convenience: read a single cell snapshot (no notifier) using direct pointer
+  CellData readCell(int step, int col) {
+    final ptr = getCellPointer(step, col);
+    return CellData.fromPointer(ptr);
+  }
   
   /// Sync table state from native using seqlock pattern (called by timer each frame)
   void syncTableState() {

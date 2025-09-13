@@ -4,7 +4,6 @@ environment:
 version: 1.0.0+1
 flutter:
   assets:
-    - icons/
     - samples/acoustic/
     - samples/drums/
     - samples/drums/China/
