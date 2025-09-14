@@ -34,7 +34,7 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
     _loadUserProfile();
   }
 
@@ -125,7 +125,6 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
                   : TabBarView(
                       controller: _tabController,
                       children: [
-                        _buildProjectsTab(),
                         _buildPlaylistsTab(),
                         _buildSamplesTab(),
                       ],
@@ -151,7 +150,6 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
       child: TabBar(
         controller: _tabController,
         tabs: const [
-          Tab(text: 'PROJECTS'),
           Tab(text: 'PLAYLISTS'),
           Tab(text: 'SAMPLES'),
         ],
@@ -170,35 +168,6 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
         indicatorColor: AppColors.menuText,
         indicatorWeight: 2,
       ),
-    );
-  }
-
-  Widget _buildProjectsTab() {
-    if (_userThreads.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.folder_outlined, color: AppColors.menuLightText, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              'No projects yet',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.menuLightText,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: _userThreads.length,
-      itemBuilder: (context, index) {
-        return _buildProjectTile(_userThreads[index]);
-      },
     );
   }
 

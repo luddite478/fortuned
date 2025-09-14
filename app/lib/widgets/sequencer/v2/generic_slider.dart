@@ -24,6 +24,7 @@ enum SliderType {
   volume,
   pitch,
   bpm,
+  steps,
 }
 
 // Custom thumb shape that displays the current value
@@ -135,6 +136,8 @@ class _GenericSliderState extends State<GenericSlider> {
         return 'PITCH';
       case SliderType.bpm:
         return 'BPM';
+      case SliderType.steps:
+        return 'JUMP';
     }
   }
 
@@ -148,6 +151,8 @@ class _GenericSliderState extends State<GenericSlider> {
         final noteInfo = MusicalNotes.getNoteInfo(semitones);
         return '${noteInfo['note']}';
       case SliderType.bpm:
+        return '${value.round()}';
+      case SliderType.steps:
         return '${value.round()}';
     }
   }

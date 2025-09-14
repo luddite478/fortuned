@@ -3,6 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../../state/sequencer/multitask_panel.dart';
 import '../../../state/sequencer/recording.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/edit.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../ffi/table_bindings.dart' show CellData;
 import 'recording_widget.dart';
 import 'sample_selection_widget.dart';
 import 'share_widget.dart';
@@ -17,11 +21,20 @@ class MultitaskPanelWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<MultitaskPanelState, RecordingState>(
       builder: (context, panelState, recordingState, child) {
+        // Also watch states that determine whether data exists for sound settings
+        final tableState = context.watch<TableState>();
+        final editState = context.watch<EditState>();
+        final sampleBankState = context.watch<SampleBankState>();
         switch (panelState.currentMode) {
           case MultitaskPanelMode.sampleSelection:
             return const SampleSelectionWidget();
           
           case MultitaskPanelMode.cellSettings:
+            // If no selected cell with data, show placeholder (no VOL/KEY header)
+            final bool hasCellData = _hasSelectedCellWithData(tableState, editState);
+            if (!hasCellData) {
+              return _buildPlaceholder();
+            }
             final cellSettings = SoundSettingsWidget.forCell();
             return SoundSettingsWidget(
               type: cellSettings.type,
@@ -35,6 +48,11 @@ class MultitaskPanelWidget extends StatelessWidget {
             );
           
           case MultitaskPanelMode.sampleSettings:
+            // If active sample slot is empty, show placeholder
+            final bool hasSampleData = _hasActiveSampleData(sampleBankState);
+            if (!hasSampleData) {
+              return _buildPlaceholder();
+            }
             final sampleSettings = SoundSettingsWidget.forSample();
             return SoundSettingsWidget(
               type: sampleSettings.type,
@@ -101,5 +119,25 @@ class MultitaskPanelWidget extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  bool _hasSelectedCellWithData(TableState tableState, EditState editState) {
+    if (editState.selectedCells.isEmpty) return false;
+    final first = editState.selectedCells.first;
+    final visibleCols = tableState.getVisibleCols().length;
+    if (visibleCols <= 0) return false;
+    final row = first ~/ visibleCols;
+    final col = first % visibleCols;
+    final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
+    final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+    final cellPtr = tableState.getCellPointer(step, colAbs);
+    if (cellPtr.address == 0) return false;
+    final cellData = CellData.fromPointer(cellPtr);
+    return cellData.isNotEmpty;
+  }
+
+  bool _hasActiveSampleData(SampleBankState sampleBankState) {
+    final idx = sampleBankState.activeSlot;
+    return sampleBankState.isSlotLoaded(idx) || sampleBankState.getSlotName(idx) != null;
   }
 } 

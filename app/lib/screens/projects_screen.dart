@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../models/thread/thread.dart';
+import '../services/threads_api.dart';
 
 import '../utils/app_colors.dart';
 import 'sequencer_screen_v2.dart';
@@ -124,7 +125,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                             )
                           : Consumer<ThreadsState>(
                                 builder: (context, threadsState, child) {
-                                  final projects = threadsState.threads;
+                                  final projects = [...threadsState.threads]
+                                    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
                                   
                                   if (projects.isEmpty) {
                                     return const SizedBox.shrink(); // Show nothing when no projects
@@ -192,7 +194,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     
     return Consumer<ThreadsState>(
       builder: (context, threadsState, child) {
-        final projects = threadsState.threads;
+        final projects = [...threadsState.threads]
+          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
         final mostRecentProject = projects.isNotEmpty ? projects.first : null;
         
         // If no projects, show full-width NEW button
@@ -262,16 +265,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           );
         }
         
-        // If projects exist, show CONTINUE + NEW buttons
-        return Row(
+        // If projects exist, show CONTINUE + NEW buttons (vertical stack)
+        return Column(
           children: [
-            // Continue button (70% width) - LEFT
-            Expanded(
-              flex: 7,
-              child: Container(
-                height: 100,
-                margin: const EdgeInsets.only(right: 4),
-                decoration: BoxDecoration(
+            // Continue button - TOP (full width, slightly smaller height)
+            Container(
+              width: double.infinity,
+              height: 84,
+              margin: const EdgeInsets.only(bottom: 6),
+              decoration: BoxDecoration(
                   color: AppColors.menuPrimaryButton, // Dark primary button
                   borderRadius: BorderRadius.circular(12), // More rounded corners
                   border: Border.all(
@@ -286,117 +288,109 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                   ],
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () async {
-                      // Load project into sequencer and navigate
-                      await _loadProjectInSequencer(mostRecentProject);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Stack(
-                        children: [
-                          // Centered CONTINUE text
-                          Center(
-                            child: Text(
-                              'CONTINUE',
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuPrimaryButtonText, // White text on dark button
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 1.2,
-                              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    // Load project into sequencer and navigate
+                    await _loadProjectInSequencer(mostRecentProject);
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Stack(
+                      children: [
+                        // Centered CONTINUE text
+                        Center(
+                          child: Text(
+                            'CONTINUE',
+                            style: GoogleFonts.sourceSans3(
+                              color: AppColors.menuPrimaryButtonText, // White text on dark button
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 1.2,
                             ),
                           ),
-                          
-                          // Bottom row with project info
-                          // Project name - bottom left
-                          Positioned(
-                            bottom: 0,
-                            left: 0,
-                            child: Text(
-                              'Project ${mostRecentProject.id.substring(0, 8)}',
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuPrimaryButtonText, // White text on dark button
-                                fontSize: 9,
-                                fontWeight: FontWeight.w400,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                        ),
+                        // Bottom row with project info
+                        Positioned(
+                          bottom: 0,
+                          left: 0,
+                          child: Text(
+                            'Project ${mostRecentProject.id.substring(0, 8)}',
+                            style: GoogleFonts.sourceSans3(
+                              color: AppColors.menuPrimaryButtonText, // White text on dark button
+                              fontSize: 9,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Text(
+                            _formatProjectTimestamp(mostRecentProject.updatedAt),
+                            style: GoogleFonts.sourceSans3(
+                              color: AppColors.menuPrimaryButtonText.withOpacity(0.8), // Dimmed white text
+                              fontSize: 9,
+                              fontWeight: FontWeight.w400,
                             ),
                           ),
-                          
-                          // Last edited time - bottom right
-                          Positioned(
-                            bottom: 0,
-                            right: 0,
-                            child: Text(
-                              _formatProjectTimestamp(mostRecentProject.updatedAt),
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuPrimaryButtonText.withOpacity(0.8), // Dimmed white text
-                                fontSize: 9,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
             ),
-            
-            // New button (30% width) - RIGHT
-            Expanded(
-              flex: 3,
-              child: Container(
-                height: 100,
-                margin: const EdgeInsets.only(left: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.menuSecondaryButton, // White secondary button
-                  borderRadius: BorderRadius.circular(12), // More rounded corners
-                  border: Border.all(
-                    color: AppColors.menuSecondaryButtonBorder, // Dark border
-                    width: 2,
-                  ),
+
+            // New button - BOTTOM (full width, slightly smaller height)
+            Container(
+              width: double.infinity,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.menuSecondaryButton, // White secondary button
+                borderRadius: BorderRadius.circular(12), // More rounded corners
+                border: Border.all(
+                  color: AppColors.menuSecondaryButtonBorder, // Dark border
+                  width: 2,
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () async {
-                      // Clear active thread context for new project
-                      context.read<ThreadsState>().setActiveThread(null);
-                      // Initialize native subsystems (idempotent: init performs cleanup)
-                      try {
-                        TableBindings().tableInit();
-                        PlaybackBindings().playbackInit();
-                        SampleBankBindings().sampleBankInit();
-                      } catch (e) {
-                        debugPrint('❌ Failed to init native subsystems: $e');
-                      }
-                      // Navigate to V2 sequencer implementation
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SequencerScreenV2(),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8),
-                      child: Center(
-                        child: Text(
-                          'NEW',
-                          style: GoogleFonts.sourceSans3(
-                            color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.5,
-                          ),
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () async {
+                    // Clear active thread context for new project
+                    context.read<ThreadsState>().setActiveThread(null);
+                    // Initialize native subsystems (idempotent: init performs cleanup)
+                    try {
+                      TableBindings().tableInit();
+                      PlaybackBindings().playbackInit();
+                      SampleBankBindings().sampleBankInit();
+                    } catch (e) {
+                      debugPrint('❌ Failed to init native subsystems: $e');
+                    }
+                    // Navigate to V2 sequencer implementation
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const SequencerScreenV2(),
+                      ),
+                    );
+                  },
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: Center(
+                      child: Text(
+                        'NEW',
+                        style: GoogleFonts.sourceSans3(
+                          color: AppColors.menuSecondaryButtonText, // Dark text on light button
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.5,
                         ),
                       ),
                     ),
@@ -427,23 +421,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _openProject(project),
+          onLongPress: () => _showDeleteDialog(project),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                // Project icon
+                // Small black square instead of folder icon
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 10,
+                  height: 10,
                   decoration: BoxDecoration(
-                    color: AppColors.menuButtonBackground,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(color: AppColors.menuBorder, width: 1),
-                  ),
-                  child: Icon(
-                    Icons.folder,
-                    color: AppColors.menuText,
-                    size: 16,
+                    color: Colors.black,
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 
@@ -456,16 +445,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        'Project ${project.id.substring(0, 10)}',
+                        _formatDateYmd(project.createdAt),
                         style: GoogleFonts.sourceSans3(
                           color: AppColors.menuText,
-                          fontSize: 14,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
+                          letterSpacing: 1.0,
                         ),
                       ),
                       Text(
-                        '${project.messageIds.length} messages',
+                        '${project.messageIds.length} checkpoints',
                         style: GoogleFonts.sourceSans3(
                           color: AppColors.menuLightText,
                           fontSize: 11,
@@ -521,6 +510,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
 
+  String _formatDateYmd(DateTime date) {
+    final y = date.year.toString().padLeft(4, '0');
+    final m = date.month.toString().padLeft(2, '0');
+    final d = date.day.toString().padLeft(2, '0');
+    return '$y-$m-$d';
+  }
+
   Future<void> _openProject(Thread project) async {
     await _loadProjectInSequencer(project);
   }
@@ -561,6 +557,126 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         setState(() {
           _isOpeningProject = false;
         });
+      }
+    }
+  }
+
+  void _showDeleteDialog(Thread project) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.menuPageBackground,
+          title: Text(
+            'Delete Project',
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.menuText,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to delete this project? This will delete it for all participants.',
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.menuLightText,
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.sourceSans3(
+                  color: AppColors.menuLightText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _deleteProject(project);
+              },
+              child: Text(
+                'Delete',
+                style: GoogleFonts.sourceSans3(
+                  color: Colors.red,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _deleteProject(Thread project) async {
+    try {
+      // Show loading indicator
+      if (mounted) {
+        setState(() {
+          _isOpeningProject = true;
+        });
+      }
+
+      // Delete the thread via API
+      await ThreadsApi.deleteThread(project.id);
+
+      // Refresh the projects list
+      final threadsState = context.read<ThreadsState>();
+      await threadsState.loadThreads();
+
+      if (mounted) {
+        setState(() {
+          _isOpeningProject = false;
+        });
+      }
+
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Project deleted successfully',
+              style: GoogleFonts.sourceSans3(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to delete project: $e');
+      
+      if (mounted) {
+        setState(() {
+          _isOpeningProject = false;
+        });
+        
+        // Show error message
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Failed to delete project: $e',
+              style: GoogleFonts.sourceSans3(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
       }
     }
   }

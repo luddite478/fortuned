@@ -38,6 +38,7 @@ flutter:
     - samples/wavparty-braids-vol-1/vox-tunedC/
     - .env
     - samples_manifest.json
+    - icons/
   uses-material-design: true
 name: niyya
 dev_dependencies:

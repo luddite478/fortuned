@@ -14,6 +14,7 @@ from http_api.threads import (
     get_threads_handler,
     get_thread_handler,
     update_thread_handler,
+    delete_thread_handler,
     send_invitation_handler,
     manage_invitation_handler,
     get_messages_handler,
@@ -76,6 +77,11 @@ async def join_thread(request: Request, thread_id: str, user_data: Dict[str, Any
 @router.put("/threads/{thread_id}")
 async def update_thread(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
     return await update_thread_handler(request, thread_id, update_data)
+
+@router.delete("/threads/{thread_id}")
+async def delete_thread(request: Request, thread_id: str, token: str = Query(...)):
+    """Delete a thread by ID"""
+    return await delete_thread_handler(request, thread_id, token)
 
 @router.post("/threads/{thread_id}/invites")
 async def send_invitation(request: Request, thread_id: str, invitation_data: Dict[str, Any] = Body(...)):

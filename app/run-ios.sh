@@ -49,6 +49,7 @@ done < "$TEMP_ASSETS"
 # Step 5: Add .env file to assets if it exists
 yq eval '.flutter.assets += [".env"]' -i pubspec.yaml
 
+yq eval '.flutter.assets += ["icons/"]' -i pubspec.yaml
 # Step 6: Add samples_manifest.json to assets
 yq eval '.flutter.assets += ["samples_manifest.json"]' -i pubspec.yaml
 

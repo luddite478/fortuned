@@ -53,6 +53,13 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
               _buildLayoutSelection(),
               
               const SizedBox(height: 24),
+
+              // Edit Buttons Layout Section
+              _buildSectionHeader('Edit Buttons Layout'),
+              const SizedBox(height: 16),
+              _buildEditButtonsLayoutSelection(),
+              
+              const SizedBox(height: 24),
               
               // Pitch Quality
               _buildSectionHeader('Pitch Quality'),
@@ -152,6 +159,82 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
             dense: true,
             title: Text(
               'Flat',
+              style: GoogleFonts.sourceSans3(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.sequencerText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEditButtonsLayoutSelection() {
+    final tableState = context.watch<TableState>();
+    final current = tableState.uiEditButtonsLayoutMode;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceBase,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.tune,
+                color: AppColors.sequencerAccent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Buttons layout',
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.sequencerText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          RadioListTile<EditButtonsLayoutMode>(
+            value: EditButtonsLayoutMode.v1,
+            groupValue: current,
+            onChanged: (v) {
+              if (v == null) return;
+              context.read<TableState>().setUiEditButtonsLayoutMode(v);
+            },
+            activeColor: AppColors.sequencerAccent,
+            dense: true,
+            title: Text(
+              'V1 (classic icons, centered)',
+              style: GoogleFonts.sourceSans3(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.sequencerText,
+              ),
+            ),
+          ),
+          RadioListTile<EditButtonsLayoutMode>(
+            value: EditButtonsLayoutMode.v2,
+            groupValue: current,
+            onChanged: (v) {
+              if (v == null) return;
+              context.read<TableState>().setUiEditButtonsLayoutMode(v);
+            },
+            activeColor: AppColors.sequencerAccent,
+            dense: true,
+            title: Text(
+              'V2 (text, bigger, right-aligned)',
               style: GoogleFonts.sourceSans3(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
