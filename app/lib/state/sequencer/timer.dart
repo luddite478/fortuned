@@ -59,9 +59,9 @@ class TimerState {
       undoRedoState.syncFromNative();
       
       // Debug logging every 60 frames (~1 second at 60fps)
-      if (_frameCount % 60 == 0) {
-        debugPrint('⏰ [TIMER_STATE] Frame $_frameCount');
-      }
+      // if (_frameCount % 60 == 0) {
+      //   debugPrint('⏰ [TIMER_STATE] Frame $_frameCount');
+      // }
     } catch (e) {
       debugPrint('❌ [TIMER_STATE] Error in tick: $e');
     }

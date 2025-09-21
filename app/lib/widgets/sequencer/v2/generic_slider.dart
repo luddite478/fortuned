@@ -102,6 +102,7 @@ class GenericSlider extends StatelessWidget {
   final Function(double) onChanged;
   final double height;
   final SliderOverlayState? sliderOverlay; // optional overlay state
+  final String? contextLabel;
 
   const GenericSlider({
     super.key,
@@ -113,6 +114,7 @@ class GenericSlider extends StatelessWidget {
     required this.onChanged,
     required this.height,
     required this.sliderOverlay,
+    this.contextLabel,
   });
 
   String _getSettingName() {
@@ -166,7 +168,11 @@ class GenericSlider extends StatelessWidget {
         },
         onChangeStart: (newValue) {
           if (sliderOverlay != null) {
-            sliderOverlay!.startInteraction(_getSettingName(), _formatValue(newValue));
+            sliderOverlay!.startInteraction(
+              _getSettingName(),
+              _formatValue(newValue),
+              contextLabel: contextLabel ?? '',
+            );
           }
         },
         onChangeEnd: (newValue) {

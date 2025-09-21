@@ -10,6 +10,7 @@ The pitch system provides pitch processing for all audio playback through a dedi
 - ✅ **Per-cell pitch control** - Each grid cell can have independent pitch
 - ✅ **Sample bank pitch** - Global pitch per sample slot  
 - ✅ **Default: SoundTouch preprocessing** - High-quality offline pitch with async caching
+- ✅ **Pitch Quality presets (Best→Lowest, 5 levels)** - Selects tuned SoundTouch settings
 - ✅ **Optional: Miniaudio resampler** - Real-time resampling when explicitly selected
 - ✅ **10-octave range** - C0 to C10 (pitch ratios 0.03125 to 32.0)
 - ✅ **Node-graph integration** - Seamless with A/B column node architecture
@@ -45,6 +46,23 @@ typedef struct {
 
 ### Core Structure
 The pitch layer is implemented as a custom `ma_data_source` that wraps the original decoder. In preprocessing mode, it swaps in a memory-backed audio buffer (`ma_audio_buffer`) for preprocessed PCM when available.
+
+### Pitch Quality (Best → Lowest)
+Pitch quality is a global preset (0..4) that configures SoundTouch for different fidelity/performance trade-offs. All levels use SoundTouch preprocessing; the preset only changes SoundTouch parameters.
+
+Preset mappings used in preprocessing:
+
+```
+Quality 0 (Best):    QUICKSEEK=0, AA_FILTER=1, SEQUENCE_MS=82, SEEKWINDOW_MS=28, OVERLAP_MS=12
+Quality 1 (High):    QUICKSEEK=0, AA_FILTER=1, SEQUENCE_MS=60, SEEKWINDOW_MS=24, OVERLAP_MS=10
+Quality 2 (Medium):  QUICKSEEK=1, AA_FILTER=1, SEQUENCE_MS=40, SEEKWINDOW_MS=15, OVERLAP_MS=8
+Quality 3 (Low):     QUICKSEEK=1, AA_FILTER=0, SEQUENCE_MS=30, SEEKWINDOW_MS=12, OVERLAP_MS=8
+Quality 4 (Lowest):  QUICKSEEK=1, AA_FILTER=0, SEQUENCE_MS=24, SEEKWINDOW_MS=8,  OVERLAP_MS=6
+```
+
+Notes:
+- Best/High prioritize fidelity (AA filter on, longer analysis windows). Lowest prioritizes speed.
+- Settings are applied inside preprocessing; no runtime cost when using cached audio.
 
 ### Optional Method: Miniaudio Resampler (explicit)
 If the pitch method is explicitly set to resampler, the pitch layer applies real-time resampling using an inverted sample-rate calculation:
@@ -206,6 +224,16 @@ This ensures proper pitch data source initialization for each pitch value.
   - If cache missing: read unpitched from the original decoder while a background job renders and caches the requested pitch; subsequent triggers use the cache.
 - **Resampler (optional)**: read from original decoder and resample in real-time (only when explicitly selected).
 
+### Immediate Native Triggering
+- On any change to cell settings or cell assignment, native code requests preprocessing immediately for the resolved pitch.
+- Trigger points: `table_set_cell()` and `table_set_cell_settings()` call a single native entry:
+
+```
+int pitch_run_preprocessing(int sample_slot, float cell_pitch);
+```
+
+- This resolves `DEFAULT_CELL_PITCH` via sample bank, checks method/ratio, and queues async preprocessing.
+
 ## UI Integration
 
 ### Musical Notes Mapping
@@ -267,23 +295,6 @@ if (!preprocessed && fabs(pitch - 1.0f) > 0.001f) {
 - **Seamless Triggers**: Plays original pitch immediately; caches target pitch for next trigger
 - **Future Performance**: Subsequent uses get cached high-quality version
 
-### Native Call Debouncing (Dart Layer)
-```dart
-// 50ms debouncing prevents performance issues from rapid UI changes
-_debouncedNativePitchCall('sample_$sampleIndex', pitch, () {
-  _sequencerLibrary.setSampleBankPitch(sampleIndex, pitch);
-  _previewSampleWithNewPitch(sampleIndex, pitch);
-});
-
-// UI updates immediately, native calls are throttled
-_samplePitchNotifiers[sampleIndex]?.value = pitch; // ← Instant UI feedback
-```
-
-**Benefits:**
-- **Smooth Sliders**: UI responds instantly without lag
-- **Reduced Native Load**: Max 1 call per 50ms instead of dozens
-- **Smart Batching**: Only latest value sent to native code
-
 ## Performance Characteristics
 
 - **Default algorithm**: SoundTouch offline preprocessing (high quality)
@@ -292,6 +303,23 @@ _samplePitchNotifiers[sampleIndex]?.value = pitch; // ← Instant UI feedback
 - **Latency**: Immediate playback starts at original pitch if cache is not ready; no blocking on UI thread
 - **Concurrent**: Each cell/node is independent; up to 4 preprocessing jobs run concurrently
 - **Real-time updates**: Preprocessing method rebuilds on next trigger; resampler method updates instantly
-- **Debouncing**: Native calls can be throttled on the Dart side to reduce churn
+- **Storage**: Input is decoded from disk; preprocessed output is kept in RAM only with LRU eviction
+
+## Native API Summary
+
+```c
+// Quality presets
+int pitch_set_quality(int qualityLevel);     // 0..4 (Best..Lowest)
+int pitch_get_quality(void);
+
+// Preprocessing control
+int pitch_run_preprocessing(int sample_slot, float cell_pitch);
+int pitch_start_async_preprocessing(int source_slot, float pitch_ratio);
+
+// Cache
+void     pitch_clear_preprocessed_cache(void);
+int      pitch_get_preprocessed_cache_count(void);
+uint64_t pitch_get_preprocessed_memory_usage(void);
+```
 
 This implementation provides seamless pitch shifting integrated with the per-cell node architecture, enabling independent pitch control for every playing audio instance with optimal performance and UI responsiveness. 

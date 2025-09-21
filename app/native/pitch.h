@@ -97,6 +97,20 @@ int pitch_get_preprocessed_cache_count(void);
 __attribute__((visibility("default"))) __attribute__((used))
 ma_uint64 pitch_get_preprocessed_memory_usage(void);
 
+// Convenience: central entry to decide and kick preprocessing for a cell change
+// - Resolves DEFAULT_CELL_PITCH via sample bank
+// - Checks current method and unity ratio
+// Returns same semantics as pitch_start_async_preprocessing: 0 ok queued/already, <0 error, >0 otherwise
+__attribute__((visibility("default"))) __attribute__((used))
+int pitch_run_preprocessing(int sample_slot, float cell_pitch);
+
+// Pitch quality (0..4, best..worst)
+__attribute__((visibility("default"))) __attribute__((used))
+int pitch_set_quality(int qualityLevel);
+
+__attribute__((visibility("default"))) __attribute__((used))
+int pitch_get_quality(void);
+
 #ifdef __cplusplus
 }
 #endif

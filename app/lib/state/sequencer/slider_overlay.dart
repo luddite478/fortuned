@@ -5,10 +5,12 @@ class SliderOverlayState extends ChangeNotifier {
   final ValueNotifier<bool> isInteractingNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<String> settingNameNotifier = ValueNotifier<String>('');
   final ValueNotifier<String> valueNotifier = ValueNotifier<String>('');
+  final ValueNotifier<String> contextNotifier = ValueNotifier<String>('');
 
-  void startInteraction(String settingName, String value) {
+  void startInteraction(String settingName, String value, {String contextLabel = ''}) {
     settingNameNotifier.value = settingName;
     valueNotifier.value = value;
+    contextNotifier.value = contextLabel;
     isInteractingNotifier.value = true;
     notifyListeners();
   }
@@ -22,6 +24,7 @@ class SliderOverlayState extends ChangeNotifier {
     isInteractingNotifier.value = false;
     settingNameNotifier.value = '';
     valueNotifier.value = '';
+    contextNotifier.value = '';
     notifyListeners();
   }
 
@@ -30,6 +33,7 @@ class SliderOverlayState extends ChangeNotifier {
     isInteractingNotifier.dispose();
     settingNameNotifier.dispose();
     valueNotifier.dispose();
+    contextNotifier.dispose();
     super.dispose();
   }
 }

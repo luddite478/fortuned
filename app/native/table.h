@@ -18,8 +18,9 @@ extern "C" {
 #define MAX_COLS_PER_LAYER 4
 
 // Pitch configuration
-// Special default value indicating "inherit from sample bank"
-#define DEFAULT_CELL_PITCH -1.0f
+// Special default values indicating "inherit from sample bank"
+#define DEFAULT_CELL_PITCH  -1.0f
+#define DEFAULT_CELL_VOLUME -1.0f
 // Supported pitch ratio range (C0..C10)
 #define PITCH_MIN_RATIO 0.03125f
 #define PITCH_MAX_RATIO 32.0f
@@ -144,6 +145,7 @@ const TableState* table_state_get_ptr(void);
 // Apply a full table state (used by Undo/Redo and imports)
 __attribute__((visibility("default"))) __attribute__((used))
 void table_apply_state(const TableState* state);
+
 
 #ifdef __cplusplus
 }

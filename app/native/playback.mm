@@ -113,6 +113,8 @@ int playback_init(void) {
     
     // Initialize sample bank (will internally cleanup)
     sample_bank_init();
+    // Clear any preprocessed pitch cache to avoid stale data across restarts
+    pitch_clear_preprocessed_cache();
 
     // Reset core playback state
     g_sequencer_playing = 0;
@@ -652,13 +654,18 @@ static void play_samples_for_step(int step) {
             active->target_volume = 0.0f; // Fade out
         }
         
-        // Setup next node with resolved pitch (cell override or sample bank default)
+        // Setup next node with resolved settings (inherit from sample bank if defaults)
         int next_node = column_nodes->next_node;
         float resolved_pitch = cell->settings.pitch;
         if (resolved_pitch == DEFAULT_CELL_PITCH) {
-            resolved_pitch = sample_bank_get_sample(cell->sample_slot)->settings.pitch;
+            Sample* s = sample_bank_get_sample(cell->sample_slot);
+            resolved_pitch = (s && s->loaded) ? s->settings.pitch : 1.0f;
         }
-        setup_column_node(col, next_node, cell->sample_slot, cell->settings.volume, resolved_pitch);
+        float resolved_volume = cell->settings.volume;
+        if (resolved_volume == DEFAULT_CELL_VOLUME) {
+            resolved_volume = sample_bank_get_sample(cell->sample_slot)->settings.volume;
+        }
+        setup_column_node(col, next_node, cell->sample_slot, resolved_volume, resolved_pitch);
         
         // Switch active node
         column_nodes->active_node = next_node;

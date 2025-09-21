@@ -59,6 +59,25 @@ class ValueControlOverlay extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          // Context (Sample/Cell)
+                          ValueListenableBuilder<String>(
+                            valueListenable: sliderOverlay.contextNotifier,
+                            builder: (context, ctx, child) {
+                              if (ctx.isEmpty) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 8.0),
+                                child: Text(
+                                  ctx,
+                                  style: GoogleFonts.sourceSans3(
+                                    color: AppColors.sequencerLightText.withOpacity(0.9),
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
                           // Setting name
                           ValueListenableBuilder<String>(
                             valueListenable: sliderOverlay.settingNameNotifier,

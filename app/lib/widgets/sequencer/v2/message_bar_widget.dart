@@ -5,6 +5,7 @@ import '../../../state/sequencer/playback.dart';
 import '../../../state/threads_state.dart';
 import '../../../state/sequencer/table.dart';
 import '../../../screens/thread_screen.dart';
+import '../../../utils/app_icons.dart';
 
 class MessageBarWidget extends StatelessWidget {
   // Configuration variables for easy control
@@ -176,7 +177,7 @@ class MessageBarWidget extends StatelessWidget {
                                 width: rightButtonSize,
                                 height: rightButtonSize,
                                 decoration: BoxDecoration(
-                                  color: const Color.fromARGB(255, 90, 111, 114),
+                                  color: const Color.fromARGB(255, 88, 88, 88),
                                   borderRadius: BorderRadius.circular(rightBorderRadius),
                                   boxShadow: [
                                     BoxShadow(
@@ -192,9 +193,9 @@ class MessageBarWidget extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(rightBorderRadius),
                                     onTap: () => _sendMessageAndNavigate(context, threadsState),
                                     child: Center(
-                                      child: CustomPaint(
-                                        size: Size(rightButtonSize * 0.4, rightButtonSize * 0.4),
-                                        painter: TrianglePainter(),
+                                      child: AppIcons.buildSendIcon(
+                                        size: rightButtonSize,
+                                        color: const Color.fromARGB(255, 234, 237, 237),
                                       ),
                                     ),
                                   ),
@@ -226,7 +227,7 @@ class MessageBarWidget extends StatelessWidget {
             height: 12,
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 90, 111, 114),
+              color: const Color.fromARGB(255, 121, 121, 121),
               borderRadius: BorderRadius.circular(2),
               border: Border.all(
                 color: AppColors.sequencerBorder,
@@ -315,34 +316,3 @@ class MessageBarWidget extends StatelessWidget {
     }
   }
 }
-
-// Custom painter for outlined triangle pointing downward
-class TrianglePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color.fromARGB(255, 209, 246, 245)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final path = Path();
-    
-    // path.moveTo(size.width * 0.0, size.height * 0.2);
-    // path.lineTo(size.width * 0.8, size.height * 1); 
-    // path.lineTo(size.width * 0.8, size.height * 0.0); 
-    
-    // path.moveTo(size.width * 0.2, size.height * 0.2); 
-    // path.lineTo(size.width * 0.5, size.height * 0.8); 
-    // path.lineTo(size.width * 0.8, size.height * 0.2); 
-
-    path.moveTo(size.width * 0.0, size.height * 0.0); // Top-left
-    path.lineTo(size.width * 1, size.height * 0.5); // Middle-right (point)
-    path.lineTo(size.width * 0.0, size.height * 1); // Bottom-left
-
-    
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-} 

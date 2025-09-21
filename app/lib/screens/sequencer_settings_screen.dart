@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../widgets/app_header_widget.dart';
-import '../sequencer_library.dart';
+// Removed performance test integration
+import '../ffi/pitch_bindings.dart';
 import '../utils/app_colors.dart';
+import 'package:provider/provider.dart';
+import '../state/sequencer/table.dart';
 class SequencerSettingsScreen extends StatefulWidget {
   const SequencerSettingsScreen({super.key});
 
@@ -11,52 +14,18 @@ class SequencerSettingsScreen extends StatefulWidget {
 }
 
 class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
-  int _currentPerfTestMode = 0;
-  bool _showAdvancedSettings = false;
+  final _pitchFFI = PitchBindings();
+  int _pitchQuality = 0; // 0..4 (best..worst)
 
   @override
   void initState() {
     super.initState();
-  }
-
-  void _updatePerfTestMode(int mode) {
-    setState(() {
-      _currentPerfTestMode = mode;
-    });
-    
     try {
-      // Use the existing SequencerLibrary instance
-      SequencerLibrary.instance.setPerformanceTestMode(mode);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_getPerfTestModeDescription(mode)),
-          backgroundColor: Colors.green,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    } catch (e) {
-      debugPrint('❌ Error setting performance test mode: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error: $e'),
-          backgroundColor: Colors.red,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-    }
+      _pitchQuality = _pitchFFI.pitchGetQuality();
+    } catch (_) {}
   }
 
-  String _getPerfTestModeDescription(int mode) {
-    switch (mode) {
-      case 0: return '🧪 Normal mode (all operations enabled)';
-      case 1: return '🧪 Skip SoundTouch processing';
-      case 2: return '🧪 Skip cell monitoring';
-      case 3: return '🧪 Skip volume smoothing';
-      case 4: return '🧪 Silence all nodes (test mixing overhead)';
-      case 5: return '🧪 Skip mixing entirely';
-      default: return '🧪 Unknown test mode';
-    }
-  }
+  // Removed performance test utilities
 
 
 
@@ -85,32 +54,12 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
               
               const SizedBox(height: 24),
               
-              // Debug Settings Section
-              _buildSectionHeader('Debug Settings'),
+              // Pitch Quality
+              _buildSectionHeader('Pitch Quality'),
               const SizedBox(height: 16),
-              
-              // Performance Test Mode
-              _buildPerformanceTestSection(),
+              _buildPitchQualitySection(),
               
               const SizedBox(height: 16),
-              
-              // Advanced Settings Toggle
-              _buildSettingItem(
-                'Advanced Settings',
-                _showAdvancedSettings ? 'Hide' : 'Show',
-                Icons.settings_applications,
-                () {
-                  setState(() {
-                    _showAdvancedSettings = !_showAdvancedSettings;
-                  });
-                },
-              ),
-              
-              // Advanced Settings (conditionally shown)
-              if (_showAdvancedSettings) ...[
-                const SizedBox(height: 16),
-                _buildAdvancedSettings(),
-              ],
               
               const SizedBox(height: 32),
               
@@ -137,83 +86,11 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     );
   }
 
-  Widget _buildSettingItem(String title, String subtitle, IconData icon, VoidCallback onTap) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceBase,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.sequencerBorder,
-          width: 1,
-        ),
-      ),
-      child: ListTile(
-        leading: Icon(
-          icon,
-          color: AppColors.sequencerAccent,
-          size: 20,
-        ),
-        title: Text(
-          title,
-          style: GoogleFonts.sourceSans3(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.sequencerText,
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          style: GoogleFonts.sourceSans3(
-            fontSize: 12,
-            color: AppColors.sequencerLightText,
-          ),
-        ),
-        trailing: Icon(
-          Icons.chevron_right,
-          color: AppColors.sequencerLightText,
-          size: 16,
-        ),
-        onTap: onTap,
-      ),
-    );
-  }
+  // Setting item helper removed (unused)
 
   Widget _buildLayoutSelection() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceBase,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: AppColors.sequencerBorder,
-          width: 1,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            Icons.dashboard,
-            color: AppColors.sequencerAccent,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              'Layout selection unified in Sequencer V2',
-              style: GoogleFonts.sourceSans3(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.sequencerText,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPerformanceTestSection() {
+    final tableState = context.watch<TableState>();
+    final current = tableState.uiSoundGridViewMode;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -230,84 +107,71 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
           Row(
             children: [
               Icon(
-                Icons.science,
+                Icons.view_column,
                 color: AppColors.sequencerAccent,
                 size: 20,
               ),
               const SizedBox(width: 8),
               Text(
-                'Performance Test Mode',
+                'Table view',
                 style: GoogleFonts.sourceSans3(
-                  fontSize: 14,
+                  fontSize: 13,
                   fontWeight: FontWeight.w600,
                   color: AppColors.sequencerText,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          
-          Text(
-            'Use these modes to isolate audio performance bottlenecks:',
-            style: GoogleFonts.sourceSans3(
-              fontSize: 12,
-              color: AppColors.sequencerLightText,
+          const SizedBox(height: 8),
+          RadioListTile<SoundGridViewMode>(
+            value: SoundGridViewMode.stack,
+            groupValue: current,
+            onChanged: (v) {
+              if (v == null) return;
+              context.read<TableState>().setUiSoundGridViewMode(v);
+            },
+            activeColor: AppColors.sequencerAccent,
+            dense: true,
+            title: Text(
+              'Stack',
+              style: GoogleFonts.sourceSans3(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.sequencerText,
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          
-          // Performance test mode options
-          ..._buildPerfTestModeOptions(),
+          RadioListTile<SoundGridViewMode>(
+            value: SoundGridViewMode.flat,
+            groupValue: current,
+            onChanged: (v) {
+              if (v == null) return;
+              context.read<TableState>().setUiSoundGridViewMode(v);
+            },
+            activeColor: AppColors.sequencerAccent,
+            dense: true,
+            title: Text(
+              'Flat',
+              style: GoogleFonts.sourceSans3(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.sequencerText,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  List<Widget> _buildPerfTestModeOptions() {
+  Widget _buildPitchQualitySection() {
     final options = [
-      (0, 'Normal', 'All operations enabled'),
-      (1, 'Skip SoundTouch', 'Test without pitch processing'),
-      (2, 'Skip Monitoring', 'Test without cell monitoring'),
-      (3, 'Skip Smoothing', 'Test without volume smoothing'),
-      (4, 'Silent Nodes', 'Test mixing overhead only'),
-      (5, 'Skip Mixing', 'Test callback overhead only'),
+      (0, 'Best'),
+      (1, 'High'),
+      (2, 'Medium'),
+      (3, 'Low'),
+      (4, 'Lowest'),
     ];
-
-    return options.map((option) {
-      final (mode, title, description) = option;
-      return Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: RadioListTile<int>(
-          value: mode,
-          groupValue: _currentPerfTestMode,
-          onChanged: (value) {
-            if (value != null) {
-              _updatePerfTestMode(value);
-            }
-          },
-          title: Text(
-            title,
-            style: GoogleFonts.sourceSans3(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: AppColors.sequencerText,
-            ),
-          ),
-          subtitle: Text(
-            description,
-            style: GoogleFonts.sourceSans3(
-              fontSize: 11,
-              color: AppColors.sequencerLightText,
-            ),
-          ),
-          activeColor: AppColors.sequencerAccent,
-          dense: true,
-        ),
-      );
-    }).toList();
-  }
-
-  Widget _buildAdvancedSettings() {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -320,61 +184,55 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Advanced Debug Options',
-            style: GoogleFonts.sourceSans3(
-              fontSize: 14,
-              fontWeight: FontWeight.w600,
-              color: AppColors.sequencerText,
+        children: options.map((opt) {
+          final (value, title) = opt;
+          return Container(
+            margin: const EdgeInsets.only(bottom: 8),
+            child: RadioListTile<int>(
+              value: value,
+              groupValue: _pitchQuality,
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() { _pitchQuality = v; });
+                try {
+                  _pitchFFI.pitchSetQuality(v);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Pitch quality set to $title'),
+                      backgroundColor: Colors.green,
+                      duration: const Duration(seconds: 1),
+                    ),
+                  );
+                } catch (e) {
+                  debugPrint('❌ Failed to set pitch quality: $e');
+                }
+              },
+              title: Text(
+                title,
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.sequencerText,
+                ),
+              ),
+              activeColor: AppColors.sequencerAccent,
+              dense: true,
             ),
-          ),
-          const SizedBox(height: 12),
-          
-          _buildAdvancedOption('Enable Systrace', 'Requires Android 6+', false),
-          _buildAdvancedOption('Detailed Logging', 'Verbose performance logs', false),
-          _buildAdvancedOption('Memory Profiling', 'Track memory usage', false),
-        ],
+          );
+        }).toList(),
       ),
     );
   }
 
-  Widget _buildAdvancedOption(String title, String description, bool value) {
-    return SwitchListTile(
-      title: Text(
-        title,
-        style: GoogleFonts.sourceSans3(
-          fontSize: 13,
-          fontWeight: FontWeight.w600,
-          color: AppColors.sequencerText,
-        ),
-      ),
-      subtitle: Text(
-        description,
-        style: GoogleFonts.sourceSans3(
-          fontSize: 11,
-          color: AppColors.sequencerLightText,
-        ),
-      ),
-      value: value,
-      onChanged: (newValue) {
-        // TODO: Implement advanced options
-        _showNotImplementedDialog(title);
-      },
-      activeColor: AppColors.sequencerAccent,
-      dense: true,
-    );
-  }
+  // Removed advanced/debug settings section entirely
 
   Widget _buildResetButton() {
     return SizedBox(
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
-          _updatePerfTestMode(0); // Reset to normal mode
-          setState(() {
-            _showAdvancedSettings = false;
-          });
+          setState(() { _pitchQuality = 0; });
+          try { _pitchFFI.pitchSetQuality(0); } catch (_) {}
           
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -406,37 +264,5 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     );
   }
 
-  void _showNotImplementedDialog(String feature) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.sequencerSurfaceBase,
-        title: Text(
-          'Coming Soon',
-          style: GoogleFonts.sourceSans3(
-            color: AppColors.sequencerText,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        content: Text(
-          '$feature is not implemented yet.',
-          style: GoogleFonts.sourceSans3(
-            color: AppColors.sequencerLightText,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(
-              'OK',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerAccent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  // Removed not-implemented dialog helper (unused)
 } 

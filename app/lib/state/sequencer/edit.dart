@@ -7,6 +7,8 @@ import '../../ffi/table_bindings.dart' show CellData;
 class EditState extends ChangeNotifier {
   final TableState _tableState;
   final Set<int> _selectedCells = <int>{};
+  // Capture grid width at selection time to decode indices consistently
+  int _selectionTableCols = 0;
   
   // Selection state
   bool _isInSelectionMode = false;
@@ -63,6 +65,8 @@ class EditState extends ChangeNotifier {
     if (anchor != null) {
       _lastSelectedCell = anchor;
     }
+    // Record the grid width used during this selection change
+    _selectionTableCols = _tableState.getVisibleCols().length;
     selectedCellsNotifier.value = Set.from(_selectedCells);
     notifyListeners();
   }
@@ -107,6 +111,7 @@ class EditState extends ChangeNotifier {
   
   void clearSelection() {
     _lastSelectedCell = null;
+    _selectionTableCols = 0;
     _applySelection({});
     debugPrint('✂️ [EDIT] Cleared selection');
   }
@@ -127,8 +132,11 @@ class EditState extends ChangeNotifier {
     _clipboardData.clear();
     final sectionStart = _tableState.getSectionStartStep(_tableState.uiSelectedSection);
     final layerStart = _tableState.getLayerStartCol(_tableState.uiSelectedLayer);
-    final tableCols = _tableState.getVisibleCols().length;
-    
+    final tableCols = _selectionTableCols > 0 ? _selectionTableCols : _tableState.getVisibleCols().length;
+    // Normalize copied coordinates to the top-left of the current selection
+    final minRow = _selectedCells.map((i) => i ~/ tableCols).reduce((a, b) => a < b ? a : b);
+    final minCol = _selectedCells.map((i) => i % tableCols).reduce((a, b) => a < b ? a : b);
+
     for (final cellIndex in _selectedCells) {
       final row = cellIndex ~/ tableCols;
       final colInSlice = cellIndex % tableCols;
@@ -139,8 +147,8 @@ class EditState extends ChangeNotifier {
       if (cellPtr.address != 0) {
         final cellData = CellData.fromPointer(cellPtr);
         _clipboardData.add(CellClipboardData(
-          relativeRow: row,
-          relativeCol: colInSlice,
+          relativeRow: row - minRow,
+          relativeCol: colInSlice - minCol,
           sampleSlot: cellData.isNotEmpty ? cellData.sampleSlot : null,
           volume: cellData.volume,
           pitch: cellData.pitch,
@@ -159,16 +167,23 @@ class EditState extends ChangeNotifier {
     
     final sectionStart = _tableState.getSectionStartStep(_tableState.uiSelectedSection);
     final layerStart = _tableState.getLayerStartCol(_tableState.uiSelectedLayer);
+    final tableColsSel = _selectionTableCols > 0 ? _selectionTableCols : _tableState.getVisibleCols().length;
     
     // Find the top-left corner of the selection or use first selected cell
     int baseRow = 0;
     int baseCol = 0;
     if (_selectedCells.isNotEmpty) {
-      final tableCols = _tableState.getVisibleCols().length;
-      final rows = _selectedCells.map((i) => i ~/ tableCols);
-      final cols = _selectedCells.map((i) => i % tableCols);
-      baseRow = rows.reduce((a, b) => a < b ? a : b);
-      baseCol = cols.reduce((a, b) => a < b ? a : b);
+      if (_clipboardData.length == 1 && _lastSelectedCell != null) {
+        // For single-cell paste, target exactly the anchor (visually selected cell)
+        baseRow = _lastSelectedCell! ~/ tableColsSel;
+        baseCol = _lastSelectedCell! % tableColsSel;
+      } else {
+        // For multi-cell paste, use top-left of the rectangle
+        final rows = _selectedCells.map((i) => i ~/ tableColsSel);
+        final cols = _selectedCells.map((i) => i % tableColsSel);
+        baseRow = rows.reduce((a, b) => a < b ? a : b);
+        baseCol = cols.reduce((a, b) => a < b ? a : b);
+      }
     }
     
     if (_clipboardData.length > 1) {
@@ -235,7 +250,7 @@ class EditState extends ChangeNotifier {
     
     final sectionStart = _tableState.getSectionStartStep(_tableState.uiSelectedSection);
     final layerStart = _tableState.getLayerStartCol(_tableState.uiSelectedLayer);
-    final tableCols = _tableState.getVisibleCols().length;
+    final tableCols = _selectionTableCols > 0 ? _selectionTableCols : _tableState.getVisibleCols().length;
     
     for (final cellIndex in _selectedCells) {
       final row = cellIndex ~/ tableCols;

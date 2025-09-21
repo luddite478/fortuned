@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 // Platform-specific logging
 #ifdef __APPLE__
@@ -21,6 +22,7 @@
 // Only include miniaudio as a header here (implementation lives elsewhere)
 #include "miniaudio/miniaudio.h"
 #include "undo_redo.h"
+#include "pitch.h"
 
 // Unified state (authoritative) and decoders
 static SampleBankState g_sample_bank_state;   // single source of truth
@@ -259,6 +261,10 @@ void sample_bank_set_sample_pitch(int slot, float pitch) {
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
+    // Kick preprocessing for new default pitch so next triggers hit cache
+    if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
+        pitch_start_async_preprocessing(slot, pitch);
+    }
     UndoRedoManager_record();
 }
 
@@ -299,6 +305,9 @@ void sample_bank_set_sample_settings(int slot, float volume, float pitch) {
     g_sample_bank_state.samples[slot].settings.volume = volume;
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
+    if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
+        pitch_start_async_preprocessing(slot, pitch);
+    }
     UndoRedoManager_record();
 }
 

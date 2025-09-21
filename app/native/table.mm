@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
+#include <math.h>
+#include "pitch.h"
 
 // Platform-specific logging
 #ifdef __APPLE__
@@ -36,7 +38,7 @@ static inline void state_write_end() {
 static inline void table_set_cell_defaults(Cell* cell) {
     if (!cell) return;
     cell->sample_slot = -1;
-    cell->settings.volume = 1.0f;
+    cell->settings.volume = DEFAULT_CELL_VOLUME;
     cell->settings.pitch = DEFAULT_CELL_PITCH;
 }
 
@@ -92,16 +94,6 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
         prnt_err("❌ [TABLE] Invalid sample_slot: %d", sample_slot);
         return;
     }
-    if (volume < 0.0f || volume > 1.0f) {
-        prnt_err("❌ [TABLE] Invalid volume: %f", volume);
-        return;
-    }
-    if (pitch != DEFAULT_CELL_PITCH) {
-        if (pitch < PITCH_MIN_RATIO || pitch > PITCH_MAX_RATIO) {
-            prnt_err("❌ [TABLE] Invalid pitch: %f", pitch);
-            return;
-        }
-    }
     
     // Update cell
     cell->sample_slot = sample_slot;
@@ -111,7 +103,8 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
     prnt("🎵 [TABLE] Set cell [%d, %d]: slot=%d, vol=%.2f, pitch=%.2f", 
          step, col, sample_slot, volume, pitch);
 
-    
+    pitch_run_preprocessing(sample_slot, pitch);
+
     if (undo_record) {
         UndoRedoManager_record();
     }
@@ -122,20 +115,13 @@ void table_set_cell_settings(int step, int col, float volume, float pitch, int u
     Cell* cell = table_get_cell(step, col);
     if (!cell) return;
 
-    if (volume < 0.0f || volume > 1.0f) {
-        prnt_err("❌ [TABLE] Invalid volume: %f", volume);
-        return;
-    }
-    if (pitch != DEFAULT_CELL_PITCH) {
-        if (pitch < PITCH_MIN_RATIO || pitch > PITCH_MAX_RATIO) {
-            prnt_err("❌ [TABLE] Invalid pitch: %f", pitch);
-            return;
-        }
-    }
 
     cell->settings.volume = volume;
     cell->settings.pitch = pitch;
     prnt("🎚️ [TABLE] Set settings [%d, %d]: vol=%.2f, pitch=%.2f", step, col, volume, pitch);
+
+    // Single-line pitch preprocessing trigger (logic inside pitch module)
+    pitch_run_preprocessing(cell->sample_slot, pitch);
     if (undo_record) {
         UndoRedoManager_record();
     }
