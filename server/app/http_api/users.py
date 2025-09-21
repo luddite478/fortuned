@@ -204,13 +204,13 @@ async def get_users_handler(request: Request, token: str = Query(...), limit: in
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get users: {str(e)}")
 
-async def follow_user_handler(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+async def follow_user_handler(request: Request, follow_data: Dict[str, Any]):
     """Follow a user"""
     try:
-        verify_token(token)
+        verify_token(follow_data.get("token", ""))
         
-        user_id = follow_data.user_id
-        target_user_id = follow_data.target_user_id
+        user_id = follow_data.get("user_id")
+        target_user_id = follow_data.get("target_user_id")
         
         # Check if both users exist
         user = db.users.find_one({"id": user_id})
@@ -244,13 +244,13 @@ async def follow_user_handler(request: Request, follow_data: FollowRequest, toke
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to follow user: {str(e)}")
 
-async def unfollow_user_handler(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+async def unfollow_user_handler(request: Request, follow_data: Dict[str, Any]):
     """Unfollow a user"""
     try:
-        verify_token(token)
+        verify_token(follow_data.get("token", ""))
         
-        user_id = follow_data.user_id
-        target_user_id = follow_data.target_user_id
+        user_id = follow_data.get("user_id")
+        target_user_id = follow_data.get("target_user_id")
         
         # Check if user exists
         user = db.users.find_one({"id": user_id})

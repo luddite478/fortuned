@@ -10,8 +10,7 @@ from http_api.users import (
     search_users_handler,
     get_followed_users_handler,
     LoginRequest,
-    RegisterRequest,
-    FollowRequest
+    RegisterRequest
 )
 from http_api.threads import (
     create_thread_handler,
@@ -60,14 +59,14 @@ async def get_users(request: Request, token: str = Query(...), limit: int = Quer
     return await get_users_handler(request, token, limit, offset)
 
 @router.post("/users/follow")
-async def follow_user(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+async def follow_user(request: Request, follow_data: Dict[str, Any] = Body(...)):
     """Follow a user"""
-    return await follow_user_handler(request, follow_data, token)
+    return await follow_user_handler(request, follow_data)
 
 @router.post("/users/unfollow")
-async def unfollow_user(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+async def unfollow_user(request: Request, follow_data: Dict[str, Any] = Body(...)):
     """Unfollow a user"""
-    return await unfollow_user_handler(request, follow_data, token)
+    return await unfollow_user_handler(request, follow_data)
 
 @router.get("/users/search")
 async def search_users(request: Request, token: str = Query(...), query: str = Query(...), limit: int = Query(20)):
