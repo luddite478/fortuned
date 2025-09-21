@@ -23,7 +23,9 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
   List<String> _onlineUserIds = [];
   List<UserProfile> _userProfiles = [];
   List<UserProfile> _filteredUserProfiles = [];
+  List<UserProfile> _followedUsers = [];
   bool _isLoading = true;
+  bool _isSearching = false;
   String? _error;
   
   final TextEditingController _searchController = TextEditingController();
@@ -61,21 +63,44 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
 
   void _setupSearchListener() {
     _searchController.addListener(() {
-      _filterUsers(_searchController.text);
+      _handleSearch(_searchController.text);
     });
   }
 
-  void _filterUsers(String query) {
+  void _handleSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _filteredUserProfiles = [];
+      });
+      return;
+    }
+
     setState(() {
-      if (query.isEmpty) {
-        _filteredUserProfiles = _userProfiles;
-      } else {
-        _filteredUserProfiles = _userProfiles.where((profile) {
-          return profile.name.toLowerCase().contains(query.toLowerCase()) ||
-                 (profile.info?.toLowerCase().contains(query.toLowerCase()) ?? false);
-        }).toList();
-      }
+      _isSearching = true;
+      _isLoading = true;
     });
+
+    try {
+      final searchResults = await UsersService.searchUsers(query, limit: 50);
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUserId = authService.currentUser?.id;
+      
+      // Filter out current user from search results
+      final filteredResults = searchResults.users
+          .where((profile) => profile.id != currentUserId)
+          .toList();
+
+      setState(() {
+        _filteredUserProfiles = filteredResults;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Search failed: $e';
+        _isLoading = false;
+      });
+    }
   }
 
 
@@ -148,11 +173,41 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
       }
     });
 
-    // Load user profiles from API
-    await _loadUserProfiles();
+    // Load followed users first (priority)
+    await _loadFollowedUsers();
     
     // Load threads to check for pending invitations
     await _loadThreadsAndCheckInvitations();
+  }
+
+  Future<void> _loadFollowedUsers() async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final currentUserId = authService.currentUser?.id;
+      
+      if (currentUserId == null) {
+        setState(() {
+          _error = 'Please log in to view followed users';
+          _isLoading = false;
+        });
+        return;
+      }
+
+      final response = await UsersService.getFollowedUsers(currentUserId);
+      setState(() {
+        _followedUsers = response.users;
+        _isLoading = false;
+        _error = null;
+      });
+    } catch (e) {
+      // If loading followed users fails, show empty state but don't show error
+      setState(() {
+        _followedUsers = [];
+        _isLoading = false;
+        _error = null;
+      });
+      print('Failed to load followed users: $e');
+    }
   }
 
   Future<void> _loadUserProfiles() async {
@@ -160,7 +215,6 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
       final response = await UsersService.getUserProfiles(limit: 50);
       setState(() {
         _userProfiles = response.profiles;
-        _filteredUserProfiles = response.profiles;
         _isLoading = false;
         _error = null;
       });
@@ -222,8 +276,11 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
     final authService = Provider.of<AuthService>(context, listen: false);
     final currentUserId = authService.currentUser?.id;
     
+    // Determine which profiles to show based on whether we're searching
+    final profilesToShow = _isSearching ? _filteredUserProfiles : _followedUsers;
+    
     // Convert UserProfile from API to User for UI, excluding current user
-    for (final profile in _filteredUserProfiles) {
+    for (final profile in profilesToShow) {
       // Skip if this is the current user
       if (profile.id == currentUserId) continue;
       
@@ -283,7 +340,7 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
                                     _isLoading = true;
                                     _error = null;
                                   });
-                                  _loadUserProfiles();
+                                  _loadFollowedUsers();
                                 },
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.menuButtonBackground,
@@ -305,15 +362,33 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  Icon(Icons.search_off, color: AppColors.menuLightText, size: 48),
+                                  Icon(
+                                    _isSearching ? Icons.search_off : Icons.people_outline,
+                                    color: AppColors.menuLightText,
+                                    size: 48,
+                                  ),
                                   const SizedBox(height: 12),
                                   Text(
-                                    'No users found',
+                                    _isSearching 
+                                        ? 'No users found'
+                                        : 'No followed users yet',
                                     style: GoogleFonts.sourceSans3(
                                       color: AppColors.menuLightText,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
+                                  if (!_isSearching) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      'Search for users above to follow them',
+                                      style: GoogleFonts.sourceSans3(
+                                        color: AppColors.menuLightText,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w400,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
+                                  ],
                                 ],
                               ),
                             )
@@ -350,7 +425,7 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
           fontSize: 14,
         ),
         decoration: InputDecoration(
-          hintText: 'Search users...',
+          hintText: _isSearching ? 'Searching users...' : 'Search users...',
           hintStyle: GoogleFonts.sourceSans3(
             color: AppColors.menuLightText,
             fontSize: 14,
@@ -394,122 +469,161 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
   }
 
   Widget _buildUserBar(User user, bool isExpanded, bool hasThreads) {
-    return Container(
-      height: 48, // Compact like phone book entries
-      margin: const EdgeInsets.only(bottom: 2), // Tight spacing like phone book
-      decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
-        border: Border(
-          bottom: BorderSide(
-            color: AppColors.menuBorder,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Stack(
-        children: [
-          // Animated background for working users (simplified)
-          if (user.isWorking) _buildAnimatedBackground(),
-          
-          // Content layer
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              onTap: () => _startChat(user),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    // Name (main content)
-                    Expanded(
-                      child: Text(
-                        user.name,
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuText,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                    
-                    const SizedBox(width: 12),
-                    
-                    // Notification indicators
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Blue dot for pending invitations
-                        if (_usersWithPendingInvites.contains(user.id))
-                          Container(
-                            margin: const EdgeInsets.only(right: 4),
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF3B82F6), // Blue color for invitations
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        
-                        // Red dot for unread thread messages
-                        if (_usersWithNotifications.contains(user.id))
-                          Container(
-                            margin: const EdgeInsets.only(right: 4),
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFFEF4444), // Red color for notifications
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        
-                        // Add spacing if there are notifications
-                        if (_usersWithNotifications.contains(user.id) || _usersWithPendingInvites.contains(user.id))
-                          const SizedBox(width: 4),
-                      ],
-                    ),
-                    
-                    // Expand/collapse button (only show if user has threads)
-                    if (hasThreads)
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (isExpanded) {
-                              _expandedContacts.remove(user.id);
-                            } else {
-                              _expandedContacts.add(user.id);
-                            }
-                          });
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          margin: const EdgeInsets.only(right: 4),
-                          child: Icon(
-                            isExpanded ? Icons.expand_less : Icons.expand_more,
-                            color: AppColors.menuText,
-                            size: 16,
-                          ),
-                        ),
-                      ),
-                    
-                    // Online indicator - small dot like phone book annotations
-                    Container(
-                      width: 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: user.isOnline 
-                            ? AppColors.menuOnlineIndicator 
-                            : Colors.transparent,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ],
-                ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Get screen width for responsive calculations
+        final screenWidth = constraints.maxWidth;
+        
+        // Calculate responsive dimensions as percentages of screen width
+        final horizontalPadding = screenWidth * 0.04; // 4% of screen width
+        final verticalPadding = screenWidth * 0.02; // 2% of screen width
+        final nameSpacing = screenWidth * 0.03; // 3% spacing after name
+        final indicatorSize = screenWidth * 0.015; // 1.5% for indicator size
+        final expandButtonSize = screenWidth * 0.04; // 4% for expand button
+        final notificationSpacing = screenWidth * 0.01; // 1% spacing between notifications
+        
+        return Container(
+          height: 48, // Keep fixed height for consistency
+          margin: const EdgeInsets.only(bottom: 2),
+          decoration: BoxDecoration(
+            color: AppColors.menuEntryBackground,
+            border: Border(
+              bottom: BorderSide(
+                color: AppColors.menuBorder,
+                width: 0.5,
               ),
             ),
           ),
-        ],
-      ),
+          child: Stack(
+            children: [
+              // Animated background for working users
+              if (user.isWorking) _buildAnimatedBackground(),
+              
+              // Content layer
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _startChat(user),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: horizontalPadding,
+                      vertical: verticalPadding,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        // Name section - takes up available space
+                        Expanded(
+                          flex: 6, // 60% of available width for name
+                          child: Align(
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              user.name,
+                              style: GoogleFonts.sourceSans3(
+                                color: AppColors.menuText,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                        ),
+                        
+                        // Spacer
+                        SizedBox(width: nameSpacing),
+                        
+                        // Notifications and controls section - fixed width
+                        Expanded(
+                          flex: 4, // 40% of available width for controls
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Notification indicators container
+                              if (_usersWithPendingInvites.contains(user.id) || 
+                                  _usersWithNotifications.contains(user.id))
+                                Container(
+                                  constraints: BoxConstraints(
+                                    maxWidth: screenWidth * 0.1, // Max 10% width for notifications
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Blue dot for pending invitations
+                                      if (_usersWithPendingInvites.contains(user.id))
+                                        Container(
+                                          margin: EdgeInsets.only(right: notificationSpacing),
+                                          width: indicatorSize.clamp(4.0, 8.0),
+                                          height: indicatorSize.clamp(4.0, 8.0),
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFF3B82F6),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                      
+                                      // Red dot for unread thread messages
+                                      if (_usersWithNotifications.contains(user.id))
+                                        Container(
+                                          margin: EdgeInsets.only(right: notificationSpacing),
+                                          width: (indicatorSize * 1.2).clamp(5.0, 10.0),
+                                          height: (indicatorSize * 1.2).clamp(5.0, 10.0),
+                                          decoration: const BoxDecoration(
+                                            color: Color(0xFFEF4444),
+                                            shape: BoxShape.circle,
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              
+                              // Expand/collapse button
+                              if (hasThreads)
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      if (isExpanded) {
+                                        _expandedContacts.remove(user.id);
+                                      } else {
+                                        _expandedContacts.add(user.id);
+                                      }
+                                    });
+                                  },
+                                  child: Container(
+                                    padding: EdgeInsets.all(expandButtonSize * 0.2),
+                                    margin: EdgeInsets.only(right: notificationSpacing),
+                                    child: Icon(
+                                      isExpanded ? Icons.expand_less : Icons.expand_more,
+                                      color: AppColors.menuText,
+                                      size: expandButtonSize.clamp(12.0, 20.0),
+                                    ),
+                                  ),
+                                ),
+                              
+                              // Online indicator - always at the far right
+                              Container(
+                                width: indicatorSize.clamp(4.0, 8.0),
+                                height: indicatorSize.clamp(4.0, 8.0),
+                                decoration: BoxDecoration(
+                                  color: user.isOnline 
+                                      ? AppColors.menuOnlineIndicator 
+                                      : Colors.transparent,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

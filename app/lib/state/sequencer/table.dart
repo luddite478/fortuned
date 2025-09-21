@@ -192,7 +192,7 @@ class TableState extends ChangeNotifier {
   /// CRUD operations (delegate to native and update UI)
   void setCell(int step, int col, int sampleSlot, double volume, double pitch, {bool undoRecord = true}) {
     _table_ffi.tableSetCell(step, col, sampleSlot, volume, pitch, undoRecord ? 1 : 0);
-    debugPrint('✏️ [TABLE_STATE] Set cell [$step, $col]: slot=$sampleSlot, vol=${volume.toStringAsFixed(2)}');
+    // debugPrint('✏️ [TABLE_STATE] Set cell [$step, $col]: slot=$sampleSlot, vol=${volume.toStringAsFixed(2)}');
     _maybeKickPitchPreprocessing(step, col, sampleSlot, pitch);
   }
   

@@ -421,6 +421,135 @@ class UsersService {
     }
   }
 
+  static Future<Map<String, dynamic>> followUser(String userId, String targetUserId) async {
+    try {
+      final body = {
+        'user_id': userId,
+        'target_user_id': targetUserId,
+      };
+
+      print('Following user: $targetUserId');
+
+      final response = await ApiHttpClient.post('/users/follow', body: body);
+
+      print('Follow response status: ${response.statusCode}');
+      print('Follow response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        return jsonData;
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid API token');
+      } else {
+        throw Exception('Failed to follow user: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error following user: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  static Future<Map<String, dynamic>> unfollowUser(String userId, String targetUserId) async {
+    try {
+      final body = {
+        'user_id': userId,
+        'target_user_id': targetUserId,
+      };
+
+      print('Unfollowing user: $targetUserId');
+
+      final response = await ApiHttpClient.post('/users/unfollow', body: body);
+
+      print('Unfollow response status: ${response.statusCode}');
+      print('Unfollow response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        return jsonData;
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid API token');
+      } else {
+        throw Exception('Failed to unfollow user: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error unfollowing user: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  static Future<UsersResponse> searchUsers(String query, {int limit = 20}) async {
+    try {
+      final queryParams = {
+        'query': query,
+        'limit': limit.toString(),
+      };
+
+      print('Searching users with query: $query');
+
+      final response = await ApiHttpClient.get('/users/search', queryParams: queryParams);
+
+      print('Search response status: ${response.statusCode}');
+      print('Search response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        // Convert to UsersResponse format
+        return UsersResponse(
+          users: (jsonData['users'] as List<dynamic>)
+              .map((user) => UserProfile.fromJson(user))
+              .toList(),
+          total: jsonData['count'] ?? 0,
+          limit: limit,
+          offset: 0,
+          hasMore: false,
+        );
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid API token');
+      } else {
+        throw Exception('Failed to search users: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error searching users: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
+  static Future<UsersResponse> getFollowedUsers(String userId) async {
+    try {
+      final queryParams = {
+        'user_id': userId,
+      };
+
+      print('Getting followed users for: $userId');
+
+      final response = await ApiHttpClient.get('/users/following', queryParams: queryParams);
+
+      print('Following response status: ${response.statusCode}');
+      print('Following response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        // Convert to UsersResponse format
+        return UsersResponse(
+          users: (jsonData['users'] as List<dynamic>)
+              .map((user) => UserProfile.fromJson(user))
+              .toList(),
+          total: jsonData['count'] ?? 0,
+          limit: 20,
+          offset: 0,
+          hasMore: false,
+        );
+      } else if (response.statusCode == 401) {
+        throw Exception('Unauthorized: Invalid API token');
+      } else {
+        throw Exception('Failed to get followed users: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error getting followed users: $e');
+      throw Exception('Network error: $e');
+    }
+  }
+
   // Legacy methods for backward compatibility
   static Future<UsersResponse> getUserProfiles({int limit = 20, int offset = 0}) {
     return getUsers(limit: limit, offset: offset);

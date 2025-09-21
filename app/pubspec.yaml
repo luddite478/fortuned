@@ -1,25 +1,25 @@
-﻿description: A new Flutter project.
+description: A new Flutter project.
 environment:
   sdk: '>=3.4.4 <4.0.0'
 version: 1.0.0+1
 flutter:
   assets:
-  - samples/drums/
-  - samples/drums/Kick/
-  - samples/drums/Plates/
-  - samples/drums/Plates/China/
-  - samples/drums/Plates/Crash/
-  - samples/drums/Plates/Hi Hat/
-  - samples/drums/Plates/Ride Cymbal/
-  - samples/drums/Plates/Splash/
-  - samples/drums/Snare/
-  - samples/drums/Toms/
-  - samples/synth/
-  - samples/synth/Bass/
-  - samples/synth/Lead/
-  - .env
-  - icons/
-  - samples_manifest.json
+    - samples/drums/
+    - samples/drums/Kick/
+    - samples/drums/Plates/
+    - samples/drums/Plates/China/
+    - samples/drums/Plates/Crash/
+    - samples/drums/Plates/Hi Hat/
+    - samples/drums/Plates/Ride Cymbal/
+    - samples/drums/Plates/Splash/
+    - samples/drums/Snare/
+    - samples/drums/Toms/
+    - samples/synth/
+    - samples/synth/Bass/
+    - samples/synth/Lead/
+    - .env
+    - icons/
+    - samples_manifest.json
   uses-material-design: true
 dependencies:
   provider: ^6.1.1
@@ -44,4 +44,3 @@ dev_dependencies:
     sdk: flutter
   ffigen: ^13.0.0
   flutter_lints: ^3.0.0
-
