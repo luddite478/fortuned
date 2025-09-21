@@ -78,6 +78,14 @@
                 "additionalProperties": false
             }
         }
+        ,
+        "pending_invites_to_threads": {
+            "type": "array",
+            "items": {
+                "type": "string",
+                "pattern": "^[a-fA-F0-9]{24}$"
+            }
+        }
     },
     "required": [
         "id",

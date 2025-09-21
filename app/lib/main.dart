@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
@@ -8,6 +9,8 @@ import 'screens/login_screen.dart';
 import 'services/auth_service.dart';
 import 'services/threads_service.dart';
 import 'services/users_service.dart';
+import 'services/notifications.dart';
+import 'screens/thread_screen.dart';
 import 'services/http_client.dart';
 
 import 'state/threads_state.dart';
@@ -83,6 +86,8 @@ class MainPage extends StatefulWidget {
 
 class _MainPageState extends State<MainPage> {
   bool _hasInitializedUser = false;
+  StreamSubscription? _notifSub;
+  NotificationsService? _notificationsService;
   
   @override
   void initState() {
@@ -95,6 +100,7 @@ class _MainPageState extends State<MainPage> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     final threadsService = Provider.of<ThreadsService>(context, listen: false);
+    final wsClient = Provider.of<WebSocketClient>(context, listen: false);
     
     if (authService.currentUser != null) {
       threadsState.setCurrentUser(
@@ -104,6 +110,7 @@ class _MainPageState extends State<MainPage> {
       
       // Initialize single WebSocket connection for this user
       _initializeThreadsService(threadsService, authService.currentUser!.id, context);
+      _setupNotifications(wsClient);
     } else {
     }
   }
@@ -119,6 +126,51 @@ class _MainPageState extends State<MainPage> {
       }
     } catch (e) {
     }
+  }
+
+  void _setupNotifications(WebSocketClient wsClient) {
+    // Initialize lightweight notifications stream and show snackbars globally
+    _notificationsService?.dispose();
+    final notifications = NotificationsService(wsClient: wsClient);
+    _notificationsService = notifications;
+    _notifSub?.cancel();
+    _notifSub = notifications.stream.listen((event) {
+      // Do not show messageCreated banner if already on same thread screen
+      bool suppress = false;
+      if (event.type == AppNotificationType.messageCreated) {
+        try {
+          final threadsState = Provider.of<ThreadsState>(context, listen: false);
+          if (threadsState.activeThread?.id == event.threadId) {
+            suppress = true;
+          }
+        } catch (_) {}
+      }
+      if (!suppress) {
+        final snack = SnackBar(
+          content: Text('${event.title}: ${event.body}'),
+          action: (event.threadId != null)
+              ? SnackBarAction(
+                  label: 'Open',
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ThreadScreen(threadId: event.threadId!, highlightNewest: event.type == AppNotificationType.messageCreated),
+                      ),
+                    );
+                  },
+                )
+              : null,
+        );
+        ScaffoldMessenger.of(context).showSnackBar(snack);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifSub?.cancel();
+    _notificationsService?.dispose();
+    super.dispose();
   }
 
   @override

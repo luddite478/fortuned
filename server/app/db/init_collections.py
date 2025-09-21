@@ -117,7 +117,8 @@ SAMPLE_DATA_TEMPLATES = {
             "email_verified": True,
             "preferences": {"theme": "dark"},
             "threads": [],
-            "following": []
+            "following": [],
+            "pending_invites_to_threads": []
         },
         {
             "schema_version": 1,
@@ -133,7 +134,8 @@ SAMPLE_DATA_TEMPLATES = {
             "email_verified": True,
             "preferences": {"theme": "light"},
             "threads": [],
-            "following": []
+            "following": [],
+            "pending_invites_to_threads": []
         }
     ],
     "threads": [],

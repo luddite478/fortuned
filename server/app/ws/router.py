@@ -473,3 +473,59 @@ async def start_websocket_server():
         ping_timeout=10
     ):
         await asyncio.Future()
+
+# --- Out-of-band Notifications (used by HTTP API) ---
+
+async def send_message_created_notification(thread_id: str, message_doc: Dict[str, Any]) -> int:
+    """Broadcast a newly created message to all online members of the thread.
+    Returns number of recipients notified.
+    """
+    try:
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            return 0
+        recipients = [u.get("id") for u in thread.get("users", []) if isinstance(u, dict) and u.get("id")]
+        delivered = 0
+        for user_id in recipients:
+            ws = clients.get(user_id)
+            if ws:
+                try:
+                    payload = {"type": "message_created", **message_doc}
+                    await send_json(ws, payload)
+                    delivered += 1
+                except Exception:
+                    pass
+        return delivered
+    except Exception:
+        return 0
+
+async def send_invitation_accepted_notification(thread_id: str, accepted_user_id: str, accepted_user_name: str, invited_by: Optional[str]) -> int:
+    """Notify inviter and thread members that an invitation was accepted."""
+    try:
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            return 0
+        recipients = set()
+        for u in thread.get("users", []):
+            if isinstance(u, dict) and u.get("id"):
+                recipients.add(u["id"])
+        if invited_by:
+            recipients.add(invited_by)
+        delivered = 0
+        for user_id in recipients:
+            ws = clients.get(user_id)
+            if ws:
+                try:
+                    await send_json(ws, {
+                        "type": "invitation_accepted",
+                        "thread_id": thread_id,
+                        "user_id": accepted_user_id,
+                        "user_name": accepted_user_name,
+                        "timestamp": int(time.time())
+                    })
+                    delivered += 1
+                except Exception:
+                    pass
+        return delivered
+    except Exception:
+        return 0

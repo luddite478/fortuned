@@ -78,28 +78,50 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
 
     setState(() {
       _isSearching = true;
-      _isLoading = true;
+      _isLoading = false;
     });
 
-    try {
-      final searchResults = await UsersService.searchUsers(query, limit: 50);
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final currentUserId = authService.currentUser?.id;
-      
-      // Filter out current user from search results
-      final filteredResults = searchResults.users
-          .where((profile) => profile.id != currentUserId)
-          .toList();
+    // First, check followed users for immediate matches
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final currentUserId = authService.currentUser?.id;
+    
+    final followedMatches = _followedUsers
+        .where((user) => user.username.toLowerCase().contains(query.toLowerCase()))
+        .where((user) => user.id != currentUserId)
+        .toList();
 
+    setState(() {
+      _filteredUserProfiles = followedMatches;
+    });
+
+    // If query is 4+ characters, also search all users
+    if (query.length >= 4) {
       setState(() {
-        _filteredUserProfiles = filteredResults;
-        _isLoading = false;
+        _isLoading = true;
       });
-    } catch (e) {
-      setState(() {
-        _error = 'Search failed: $e';
-        _isLoading = false;
-      });
+
+      try {
+        final searchResults = await UsersService.searchUsers(query, limit: 50);
+        
+        // Combine followed matches with search results, avoiding duplicates
+        final allResults = <UserProfile>[...followedMatches];
+        for (final user in searchResults.users) {
+          if (user.id != currentUserId && 
+              !allResults.any((existing) => existing.id == user.id)) {
+            allResults.add(user);
+          }
+        }
+
+        setState(() {
+          _filteredUserProfiles = allResults;
+          _isLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = 'Search failed: $e';
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -358,40 +380,7 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
                           ),
                         )
                       : _users.isEmpty
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _isSearching ? Icons.search_off : Icons.people_outline,
-                                    color: AppColors.menuLightText,
-                                    size: 48,
-                                  ),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _isSearching 
-                                        ? 'No users found'
-                                        : 'No followed users yet',
-                                    style: GoogleFonts.sourceSans3(
-                                      color: AppColors.menuLightText,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  if (!_isSearching) ...[
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      'Search for users above to follow them',
-                                      style: GoogleFonts.sourceSans3(
-                                        color: AppColors.menuLightText,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                      textAlign: TextAlign.center,
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            )
+                          ? const SizedBox.shrink()
                           : ListView.builder(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               itemCount: _users.length,
@@ -425,16 +414,29 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
           fontSize: 14,
         ),
         decoration: InputDecoration(
-          hintText: _isSearching ? 'Searching users...' : 'Search users...',
+          hintText: 'Search',
           hintStyle: GoogleFonts.sourceSans3(
             color: AppColors.menuLightText,
             fontSize: 14,
           ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: AppColors.menuLightText,
-            size: 20,
-          ),
+          prefixIcon: _isSearching 
+              ? IconButton(
+                  icon: Icon(Icons.arrow_back, color: AppColors.menuText, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _isSearching = false;
+                      _filteredUserProfiles = [];
+                    });
+                    // Dismiss keyboard
+                    FocusScope.of(context).unfocus();
+                  },
+                )
+              : Icon(
+                  Icons.search,
+                  color: AppColors.menuLightText,
+                  size: 20,
+                ),
           filled: true,
           fillColor: AppColors.menuPageBackground,
           border: OutlineInputBorder(
@@ -874,16 +876,31 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
     debugPrint('👤 Opening profile for ${user.name}');
     final isUserOnline = _onlineUserIds.contains(user.id);
     
-    Navigator.push(
+    final wasSearching = _isSearching;
+    
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => UserProfileScreen(
           userId: user.id,
           userName: user.name,
           isOnline: isUserOnline,
+          onFollowStatusChanged: (isFollowing) {
+            // Refresh followed users when follow status changes
+            _loadFollowedUsers();
+          },
         ),
       ),
     );
+    
+    // If user was found via search, clear search when coming back
+    if (wasSearching) {
+      _searchController.clear();
+      setState(() {
+        _isSearching = false;
+        _filteredUserProfiles = [];
+      });
+    }
   }
 
   /// Get common threads between current user and target user

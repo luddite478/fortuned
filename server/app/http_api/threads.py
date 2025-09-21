@@ -6,7 +6,7 @@ from fastapi import Request, Query, HTTPException, Body
 from typing import Optional, Dict, Any, List
 import os
 from db.connection import get_database
-from ws.router import send_thread_invitation_notification
+from ws.router import send_thread_invitation_notification, send_message_created_notification, send_invitation_accepted_notification
 from bson import ObjectId
 
 # Initialize database connection
@@ -213,6 +213,15 @@ async def send_invitation_handler(request: Request, thread_id: str, invitation_d
             }
         )
         
+        # Add pending invite to the invited user's document
+        try:
+            db.users.update_one(
+                {"id": user_id},
+                {"$addToSet": {"pending_invites_to_threads": thread_id}}
+            )
+        except Exception:
+            pass
+
         # Send WebSocket notification to invited user
         try:
             # Get the name of the person who invited (for the notification)
@@ -281,6 +290,11 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
         db.messages.insert_one({**doc})
         # update thread messages array and updated_at
         db.threads.update_one({"id": thread_id}, {"$push": {"messages": message_id}, "$set": {"updated_at": created_at}})
+        # Broadcast realtime notification to thread members (fire-and-forget)
+        try:
+            asyncio.create_task(send_message_created_notification(thread_id, {**doc}))
+        except Exception:
+            pass
         # Return the original doc (contains only strings), avoiding ObjectId in response
         return doc
     except Exception as e:
@@ -351,6 +365,23 @@ async def manage_invitation_handler(request: Request, thread_id: str, user_id: s
                     "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
                 }
             )
+            # Update user doc: remove pending invite and add thread to user's threads
+            try:
+                db.users.update_one(
+                    {"id": user_id},
+                    {
+                        "$pull": {"pending_invites_to_threads": thread_id},
+                        "$addToSet": {"threads": thread_id}
+                    }
+                )
+            except Exception:
+                pass
+            # Notify inviter and members
+            try:
+                invited_by = invitation.get("invited_by")
+                asyncio.create_task(send_invitation_accepted_notification(thread_id, user_id, invitation["user_name"], invited_by))
+            except Exception:
+                pass
             return {"status": "invitation_accepted", "user_added": True}
         
         elif action == "decline":
@@ -362,6 +393,14 @@ async def manage_invitation_handler(request: Request, thread_id: str, user_id: s
                     "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
                 }
             )
+            # Remove pending invite from user doc
+            try:
+                db.users.update_one(
+                    {"id": user_id},
+                    {"$pull": {"pending_invites_to_threads": thread_id}}
+                )
+            except Exception:
+                pass
             return {"status": "invitation_declined"}
     
     except Exception as e:

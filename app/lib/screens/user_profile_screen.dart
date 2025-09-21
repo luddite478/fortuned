@@ -9,12 +9,14 @@ class UserProfileScreen extends StatefulWidget {
   final String userId;
   final String userName;
   final bool isOnline;
+  final Function(bool isFollowing)? onFollowStatusChanged;
 
   const UserProfileScreen({
     Key? key,
     required this.userId,
     required this.userName,
     this.isOnline = false,
+    this.onFollowStatusChanged,
   }) : super(key: key);
 
   @override
@@ -77,18 +79,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
       if (_isFollowing) {
         await UsersService.unfollowUser(currentUserId, widget.userId);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Unfollowed ${widget.userName}')),
-          );
-        }
       } else {
         await UsersService.followUser(currentUserId, widget.userId);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Following ${widget.userName}')),
-          );
-        }
       }
 
       if (mounted) {
@@ -96,6 +88,9 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           _isFollowing = !_isFollowing;
           _isLoading = false;
         });
+        
+        // Notify parent about follow status change
+        widget.onFollowStatusChanged?.call(_isFollowing);
       }
     } catch (e) {
       if (mounted) {

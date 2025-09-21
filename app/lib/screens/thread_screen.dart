@@ -598,34 +598,230 @@ class _InviteCollaboratorsModalBottomSheet extends StatefulWidget {
 }
 
 class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaboratorsModalBottomSheet> {
-  final Set<String> _selectedContacts = {};
-  List<UserProfile> _userProfiles = [];
+  final List<UserProfile> _selectedUsers = [];
+  final TextEditingController _searchController = TextEditingController();
+  List<UserProfile> _filteredUserProfiles = [];
+  List<UserProfile> _followedUsers = [];
   bool _isLoading = true;
+  bool _isSearching = false;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _loadUserProfiles();
+    _setupSearchListener();
+    _loadFollowedUsers();
   }
 
-  Future<void> _loadUserProfiles() async {
+  void _setupSearchListener() {
+    _searchController.addListener(() {
+      _handleSearch(_searchController.text);
+    });
+  }
+
+  void _handleSearch(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _isSearching = false;
+        _filteredUserProfiles = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _isSearching = true;
+      _isLoading = false;
+    });
+
+    // First, check followed users for immediate matches
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    final currentUserId = threadsState.currentUserId;
+    
+    final followedMatches = _followedUsers
+        .where((user) => user.username.toLowerCase().contains(query.toLowerCase()))
+        .where((user) => user.id != currentUserId)
+        .where((user) => !_selectedUsers.any((selected) => selected.id == user.id))
+        .toList();
+
+    setState(() {
+      _filteredUserProfiles = followedMatches;
+    });
+
+    // If query is 4+ characters, also search all users
+    if (query.length >= 4) {
+      setState(() {
+        _isLoading = true;
+      });
+
+      try {
+        final searchResults = await UsersService.searchUsers(query, limit: 50);
+        
+        // Combine followed matches with search results, avoiding duplicates
+        final allResults = <UserProfile>[...followedMatches];
+        for (final user in searchResults.users) {
+          if (user.id != currentUserId && 
+              !allResults.any((existing) => existing.id == user.id) &&
+              !_selectedUsers.any((selected) => selected.id == user.id)) {
+            allResults.add(user);
+          }
+        }
+
+        setState(() {
+          _filteredUserProfiles = allResults;
+          _isLoading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = 'Search failed: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadFollowedUsers() async {
     try {
-      final response = await UsersService.getUserProfiles(limit: 50);
       final threadsState = Provider.of<ThreadsState>(context, listen: false);
       final currentUserId = threadsState.currentUserId;
+      
+      if (currentUserId == null) {
+        setState(() {
+          _error = 'Please log in to view followed users';
+          _isLoading = false;
+        });
+        return;
+      }
 
+      final response = await UsersService.getFollowedUsers(currentUserId);
       setState(() {
-        _userProfiles = response.profiles.where((u) => u.id != currentUserId).toList();
+        _followedUsers = response.users;
         _isLoading = false;
         _error = null;
       });
     } catch (e) {
+      // If loading followed users fails, show empty state but don't show error
       setState(() {
-        _error = 'Failed to load users: $e';
+        _followedUsers = [];
         _isLoading = false;
+        _error = null;
       });
+      print('Failed to load followed users: $e');
     }
+  }
+
+  List<UserProfile> get _displayedUsers {
+    return _isSearching ? _filteredUserProfiles : _followedUsers;
+  }
+
+  Widget _buildSearchBarWithChips() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.menuPageBackground,
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: AppColors.menuBorder),
+      ),
+      child: Column(
+        children: [
+          // Selected users chips
+          if (_selectedUsers.isNotEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(8),
+              child: Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: _selectedUsers.map((user) => _buildUserChip(user)).toList(),
+              ),
+            ),
+          
+          // Search input
+          Row(
+            children: [
+              if (_isSearching)
+                IconButton(
+                  icon: Icon(Icons.arrow_back, color: AppColors.menuText, size: 20),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {
+                      _isSearching = false;
+                      _filteredUserProfiles = [];
+                    });
+                    // Dismiss keyboard
+                    FocusScope.of(context).unfocus();
+                  },
+                ),
+              
+              if (!_isSearching)
+                Padding(
+                  padding: const EdgeInsets.only(left: 12),
+                  child: Icon(Icons.search, color: AppColors.menuLightText, size: 20),
+                ),
+              
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  style: GoogleFonts.sourceSans3(
+                    color: AppColors.menuText,
+                    fontSize: 14,
+                  ),
+                  decoration: InputDecoration(
+                    hintText: 'Search',
+                    hintStyle: GoogleFonts.sourceSans3(
+                      color: AppColors.menuLightText,
+                      fontSize: 14,
+                    ),
+                    border: InputBorder.none,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUserChip(UserProfile user) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.menuEntryBackground,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.menuBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(width: 12),
+          Text(
+            user.username,
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.menuText,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _selectedUsers.removeWhere((selected) => selected.id == user.id);
+              });
+              // Refresh search results to show the user again
+              _handleSearch(_searchController.text);
+            },
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              child: Icon(
+                Icons.close,
+                size: 16,
+                color: AppColors.menuLightText,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -662,15 +858,9 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Select users to invite to this thread',
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.menuLightText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
+                  const SizedBox(height: 16),
+                  // Search bar with selected user chips
+                  _buildSearchBarWithChips(),
                 ],
               ),
             ),
@@ -709,7 +899,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                               ),
                               const SizedBox(height: 16),
                               ElevatedButton(
-                                onPressed: _loadUserProfiles,
+                                onPressed: _loadFollowedUsers,
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: AppColors.menuButtonBackground,
                                   side: BorderSide(color: AppColors.menuButtonBorder),
@@ -725,64 +915,64 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                             ],
                           ),
                         )
-                      : ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          itemCount: _userProfiles.length,
-                          itemBuilder: (context, index) {
-                            final user = _userProfiles[index];
-                            final isSelected = _selectedContacts.contains(user.id);
-                            final isOnline = user.isOnline;
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    if (isSelected) {
-                                      _selectedContacts.remove(user.id);
-                                    } else {
-                                      _selectedContacts.add(user.id);
-                                    }
-                                  });
-                                },
-                                child: Container(
-                                  padding: const EdgeInsets.all(16),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? AppColors.menuCurrentUserCheckpoint : AppColors.menuCheckpointBackground,
-                                    borderRadius: BorderRadius.circular(8),
-                                    border: Border.all(
-                                      color: isSelected ? AppColors.menuOnlineIndicator : AppColors.menuBorder,
-                                      width: isSelected ? 2 : 1,
-                                    ),
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          color: isOnline ? AppColors.menuOnlineIndicator : AppColors.menuLightText,
-                                          shape: BoxShape.circle,
+                      : _displayedUsers.isEmpty
+                          ? const SizedBox.shrink()
+                          : ListView.builder(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              itemCount: _displayedUsers.length,
+                              itemBuilder: (context, index) {
+                                final user = _displayedUsers[index];
+                                final isOnline = user.isOnline;
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 8),
+                                  child: GestureDetector(
+                                    onTap: () {
+                                      // Add user to selected chips
+                                      setState(() {
+                                        if (!_selectedUsers.any((selected) => selected.id == user.id)) {
+                                          _selectedUsers.add(user);
+                                        }
+                                      });
+                                      // Clear search and refresh results to hide selected user
+                                      _searchController.clear();
+                                      _handleSearch('');
+                                      // Dismiss keyboard
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.menuCheckpointBackground,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                          color: AppColors.menuBorder,
+                                          width: 1,
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          user.username,
-                                          style: GoogleFonts.sourceSans3(
-                                            color: AppColors.menuText,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w500,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            width: 12,
+                                            height: 12,
+                                            decoration: BoxDecoration(
+                                              color: isOnline ? AppColors.menuOnlineIndicator : AppColors.menuLightText,
+                                              shape: BoxShape.circle,
+                                            ),
                                           ),
-                                        ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              user.username,
+                                              style: GoogleFonts.sourceSans3(
+                                                color: AppColors.menuText,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
-                                      Icon(
-                                        isSelected ? Icons.check_circle : Icons.circle_outlined,
-                                        color: isSelected ? AppColors.menuOnlineIndicator : AppColors.menuLightText,
-                                        size: 20,
-                                      ),
-                                    ],
-                                  ),
-                                ),
+                                    ),
                               ),
                             );
                           },
@@ -793,7 +983,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
               child: Row(
                 children: [
                   Text(
-                    '${_selectedContacts.length} selected',
+                    '${_selectedUsers.length} selected',
                     style: GoogleFonts.sourceSans3(
                       color: AppColors.menuLightText,
                       fontSize: 12,
@@ -813,7 +1003,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
                   ),
                   const SizedBox(width: 12),
                   ElevatedButton(
-                    onPressed: _selectedContacts.isNotEmpty ? () => _inviteSelectedContacts() : null,
+                    onPressed: _selectedUsers.isNotEmpty ? () => _inviteSelectedContacts() : null,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.menuButtonBackground,
                       foregroundColor: AppColors.menuText,
@@ -838,7 +1028,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
 
   Future<void> _inviteSelectedContacts() async {
     Navigator.of(context).pop();
-    if (_selectedContacts.isEmpty) return;
+    if (_selectedUsers.isEmpty) return;
 
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     final currentThread = threadsState.activeThread;
@@ -855,25 +1045,16 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
       return;
     }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Sending ${_selectedContacts.length} invitation(s)...', style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500)),
-        backgroundColor: Colors.blue,
-        duration: const Duration(seconds: 2),
-      ),
-    );
 
     int successCount = 0;
     int failureCount = 0;
 
-    for (final contactId in _selectedContacts) {
+    for (final user in _selectedUsers) {
       try {
-        final userProfile = _userProfiles.where((p) => p.id == contactId).firstOrNull;
-        final userName = userProfile?.username ?? 'Unknown User';
         await threadsState.sendInvite(
           threadId: currentThread.id,
-          userId: contactId,
-          userName: userName,
+          userId: user.id,
+          userName: user.username,
         );
         successCount++;
       } catch (_) {
@@ -881,26 +1062,12 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
       }
     }
 
-    if (!mounted) return;
-    String message;
-    Color backgroundColor;
-    if (failureCount == 0) {
-      message = 'Successfully invited $successCount user(s)!';
-      backgroundColor = Colors.green;
-    } else if (successCount == 0) {
-      message = 'Failed to send all invitations';
-      backgroundColor = Colors.red;
-    } else {
-      message = 'Invited $successCount user(s), $failureCount failed';
-      backgroundColor = Colors.orange;
-    }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message, style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w500)),
-        backgroundColor: backgroundColor,
-        duration: const Duration(seconds: 3),
-      ),
-    );
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 }
 

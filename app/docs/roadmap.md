@@ -9,27 +9,23 @@
     - show key,vol,effects - done
 - 2 A/B ma nodes per column - done
 - slide to next section - done
+- pattern chain (song)
+    - send message bar icon pattern - done
+- contacts and all users search - done
 
 - undo many
 - remove default 0 renders for message
 - rename messages count project to checkpints
 - server schema validation
+- pass token in body/query param for all requests
 
 
-- pitch reimplment
-- unify ui sound settings into one structure
-
-
-- paste + jump 
 - smooth volume and pitch change ui
 - recording fix and ui change
 - mute/solo
     - layer
     - selection ?
-- pattern chain (song)
-    - send message bar icon pattern
-- contacts and all users search
+
 - comment(reply)-menu for chekpoints
 - pitch (optimize speed)
 - local project storage
-- pitch
