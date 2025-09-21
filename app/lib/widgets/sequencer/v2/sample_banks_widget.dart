@@ -7,6 +7,7 @@ import '../../../state/sequencer/sample_browser.dart';
 import '../../../state/sequencer/playback.dart';
 import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/multitask_panel.dart';
+import '../../../state/sequencer/ui_selection.dart';
 
 class SampleBanksWidget extends StatefulWidget {
   const SampleBanksWidget({super.key});
@@ -20,8 +21,8 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer4<SampleBankState, PlaybackState, SampleBrowserState, TableState>(
-      builder: (context, sampleBankState, playbackState, sampleBrowserState, tableState, child) {
+    return Consumer5<SampleBankState, PlaybackState, SampleBrowserState, TableState, UiSelectionState>(
+      builder: (context, sampleBankState, playbackState, sampleBrowserState, tableState, uiSelection, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
             final panelHeight = constraints.maxHeight;
@@ -165,7 +166,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
     required double letterSize,
   }) {
     final isActive = sampleBankState.activeSlot == bank;
-    final isSelected = sampleBankState.activeSlot == bank; // For now, same as active
+    final isSelected = context.read<UiSelectionState>().isSampleBank && sampleBankState.activeSlot == bank;
     final hasFile = sampleBankState.isSlotLoaded(bank);
 
     Widget sampleButton = Container(
@@ -176,8 +177,10 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
         color: _getButtonColor(isSelected, isActive, hasFile, bank, sampleBankState),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: _getBorderColor(isSelected, isActive),
-          width: _getBorderWidth(isSelected, isActive),
+          color: isSelected
+              ? AppColors.sequencerSelectionBorder
+              : _getButtonColor(isSelected, isActive, hasFile, bank, sampleBankState),
+          width: isSelected ? 2 : 0.5,
         ),
         boxShadow: _getBoxShadow(isSelected, isActive),
       ),
@@ -262,6 +265,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
             child: GestureDetector(
               onTap: () {
                 sampleBankState.uiHandleBankChange(bank);
+                context.read<UiSelectionState>().selectSampleBank(bank);
                 // Open sample settings for filled slot
                 Provider.of<MultitaskPanelState>(context, listen: false).showSampleSettings();
               },
@@ -272,6 +276,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
         : GestureDetector(
             onTap: () {
               sampleBankState.uiHandleBankChange(bank);
+              context.read<UiSelectionState>().selectSampleBank(bank);
               // If the slot is empty, open sample browser
               if (!sampleBankState.isSlotLoaded(bank)) {
                 sampleBrowserState.showForSlot(bank);
@@ -297,31 +302,16 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
   }
 
   Color _getBorderColor(bool isSelected, bool isActive) {
-    if (isSelected) {
-      return AppColors.sequencerAccent;
-    } else {
-      return AppColors.sequencerBorder;
-    }
+    return AppColors.sequencerBorder;
   }
 
   double _getBorderWidth(bool isSelected, bool isActive) {
-    if (isSelected) {
-      return 1.5;
-    } else {
-      return 0.5;
-    }
+    return 0.5;
   }
 
   List<BoxShadow>? _getBoxShadow(bool isSelected, bool isActive) {
     if (isSelected) {
-      return [
-        BoxShadow(
-          color: AppColors.sequencerAccent.withOpacity(0.4),
-          blurRadius: 3,
-          spreadRadius: 0,
-          offset: const Offset(0, 1),
-        )
-      ];
+      return null;
     } else {
       return [
         BoxShadow(

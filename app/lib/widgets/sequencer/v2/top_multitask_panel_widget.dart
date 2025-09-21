@@ -6,6 +6,7 @@ import '../../../state/sequencer/recording.dart';
 import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/ui_selection.dart';
 import '../../../ffi/table_bindings.dart' show CellData;
 import 'recording_widget.dart';
 import 'sample_selection_widget.dart';
@@ -19,8 +20,8 @@ class MultitaskPanelWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<MultitaskPanelState, RecordingState>(
-      builder: (context, panelState, recordingState, child) {
+    return Consumer3<MultitaskPanelState, RecordingState, UiSelectionState>(
+      builder: (context, panelState, recordingState, uiSelection, child) {
         // Also watch states that determine whether data exists for sound settings
         final tableState = context.watch<TableState>();
         final editState = context.watch<EditState>();
@@ -43,7 +44,7 @@ class MultitaskPanelWidget extends StatelessWidget {
               closeAction: () => context.read<MultitaskPanelState>().showPlaceholder(),
               noDataMessage: cellSettings.noDataMessage,
               noDataIcon: cellSettings.noDataIcon,
-              showDeleteButton: cellSettings.showDeleteButton,
+              showDeleteButton: false,
               showCloseButton: cellSettings.showCloseButton,
             );
           
@@ -61,7 +62,7 @@ class MultitaskPanelWidget extends StatelessWidget {
               closeAction: () => context.read<MultitaskPanelState>().showPlaceholder(),
               noDataMessage: sampleSettings.noDataMessage,
               noDataIcon: sampleSettings.noDataIcon,
-              showDeleteButton: sampleSettings.showDeleteButton,
+              showDeleteButton: false,
               showCloseButton: sampleSettings.showCloseButton,
             );
           

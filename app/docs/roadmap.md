@@ -32,3 +32,4 @@
 - comment(reply)-menu for chekpoints
 - pitch (optimize speed)
 - local project storage
+- pitch

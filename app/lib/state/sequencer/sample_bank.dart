@@ -8,6 +8,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:path_provider/path_provider.dart';
 import '../../ffi/sample_bank_bindings.dart';
+import 'ui_selection.dart';
 
 /// Simple data class to hold native sample bank state snapshot
 class _NativeSampleBankState {
@@ -52,7 +53,11 @@ class SampleBankState extends ChangeNotifier {
   final ValueNotifier<List<bool>> slotsLoadedNotifier = ValueNotifier<List<bool>>(List.filled(maxSampleSlots, false));
   final ValueNotifier<int> activeSlotNotifier = ValueNotifier<int>(0);
   
-  SampleBankState() : _sample_bank_ffi = SampleBankBindings() {
+  final UiSelectionState? _uiSelection; // optional injection
+
+  SampleBankState({UiSelectionState? uiSelection})
+      : _sample_bank_ffi = SampleBankBindings(),
+        _uiSelection = uiSelection {
     _initializeSampleBank();
   }
   
@@ -199,6 +204,8 @@ class SampleBankState extends ChangeNotifier {
       activeSlotNotifier.value = slot;
       notifyListeners();
       debugPrint('🎯 [SAMPLE_BANK_STATE] Set active slot to $slot');
+      // If unified selection is available, mark sample bank as active selection
+      _uiSelection?.selectSampleBank(slot);
     }
   }
   

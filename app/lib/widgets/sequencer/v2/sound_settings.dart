@@ -8,6 +8,7 @@ import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/sample_bank.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/playback.dart';
+import '../../../ffi/playback_bindings.dart';
 import '../../../ffi/table_bindings.dart' show CellData;
 // musical notes handled elsewhere if needed
 import 'generic_slider.dart';
@@ -57,7 +58,7 @@ class SoundSettingsWidget extends StatefulWidget {
     required this.closeAction,
     required this.noDataMessage,
     required this.noDataIcon,
-    this.showDeleteButton = true,
+    this.showDeleteButton = false,
     this.showCloseButton = true,
   });
 
@@ -245,6 +246,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          // Preview button (speaker) for cell/sample settings, placed left of VOL
+          if (widget.type != SettingsType.master)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: SizedBox(
+                width: 48,
+                child: _buildPreviewButton(headerHeight * 0.7, tableState, sampleBankState, editState, currentIndex),
+              ),
+            ),
           // Header buttons from the configuration
           ...widget.headerButtons.map((buttonName) {
             return Padding(
@@ -271,20 +281,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
             const SizedBox(width: 16.0),
           
           // DEL button (if enabled)
-          if (widget.showDeleteButton)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: SizedBox(
-                width: 80,
-                child: _buildSettingsButton(
-                  'DEL', 
-                  false, 
-                  headerHeight * 0.7, 
-                  labelFontSize, 
-                  _deleteActionProvider(widget.type, tableState, sampleBankState, editState, currentIndex)
-                ),
-              ),
-            ),
+          // Delete moved to Edit Buttons panel
           
           // Close button (if enabled)
           if (widget.showCloseButton)
@@ -689,6 +686,85 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     );
   }
 
+  Widget _buildPreviewButton(double height, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
+    final isEnabled = () {
+      if (widget.type == SettingsType.sample) {
+        final idx = sampleBankState.activeSlot;
+        return sampleBankState.isSlotLoaded(idx);
+      } else if (widget.type == SettingsType.cell) {
+        final sel = _resolveSelectedCell(editState);
+        if (sel == null) return false;
+        final visibleCols = tableState.getVisibleCols().length;
+        final row = sel ~/ visibleCols;
+        final col = sel % visibleCols;
+        final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
+        final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+        final cell = CellData.fromPointer(tableState.getCellPointer(step, colAbs));
+        return cell.isNotEmpty && cell.sampleSlot >= 0;
+      }
+      return false;
+    }();
+
+    return GestureDetector(
+      onTap: !isEnabled ? null : () => _triggerPreview(tableState, sampleBankState, editState),
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.4,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: AppColors.sequencerSurfaceRaised,
+            borderRadius: BorderRadius.circular(2),
+            border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+            boxShadow: const [
+              BoxShadow(color: AppColors.sequencerShadow, blurRadius: 1, offset: Offset(0, 0.5)),
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.volume_up,
+              color: AppColors.sequencerText,
+              size: 18,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _triggerPreview(TableState tableState, SampleBankState sampleBankState, EditState editState) {
+    final bindings = PlaybackBindings();
+    if (widget.type == SettingsType.sample) {
+      final idx = sampleBankState.activeSlot;
+      if (!sampleBankState.isSlotLoaded(idx)) return;
+      final vol = sampleBankState.getSampleVolumeNotifier(idx).value;
+      final pitch = sampleBankState.getSamplePitchNotifier(idx).value;
+      bindings.previewSlot(idx, pitch, vol);
+      return;
+    }
+    // Cell preview
+    final sel = _resolveSelectedCell(editState);
+    if (sel == null) return;
+    final visibleCols = tableState.getVisibleCols().length;
+    final row = sel ~/ visibleCols;
+    final col = sel % visibleCols;
+    final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
+    final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+    final cell = CellData.fromPointer(tableState.getCellPointer(step, colAbs));
+    if (!cell.isNotEmpty || cell.sampleSlot < 0) return;
+    // Resolve effective settings
+    double effVol = cell.volume;
+    if (effVol < 0.0) {
+      final sd = sampleBankState.getSampleData(cell.sampleSlot);
+      effVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
+    }
+    double effPitch = cell.pitch;
+    if (effPitch < 0.0) {
+      final sd = sampleBankState.getSampleData(cell.sampleSlot);
+      effPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
+    }
+    bindings.previewCell(step, colAbs, effPitch, effVol);
+  }
+
   // Helpers
   static int? _resolveSelectedCell(EditState editState) {
     final selected = editState.selectedCells;
@@ -716,32 +792,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return const _HasDataAndIndex(hasData: true, index: 0);
   }
 
-  VoidCallback? _deleteActionProvider(SettingsType type, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
-    if (!widget.showDeleteButton) return null;
-    if (type == SettingsType.sample) {
-      final idx = sampleBankState.activeSlot;
-      if (sampleBankState.getSlotName(idx) == null && !sampleBankState.isSlotLoaded(idx)) return null;
-      return () {
-        sampleBankState.unloadSample(idx);
-        widget.closeAction();
-      };
-    } else if (type == SettingsType.cell) {
-      final selectedCell = _resolveSelectedCell(editState);
-      if (selectedCell == null) return null;
-      final row = selectedCell ~/ tableState.maxCols;
-      final col = selectedCell % tableState.maxCols;
-      final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
-      final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
-      final cellPtr = tableState.getCellPointer(step, colAbs);
-      final cellData = CellData.fromPointer(cellPtr);
-      if (!cellData.isNotEmpty) return null;
-      return () {
-        tableState.clearCell(step, colAbs);
-        widget.closeAction();
-      };
-    }
-    return null;
-  }
+  // Delete action moved to Edit Buttons; keep stub removed.
 
   Widget _buildCellVolumeSlider(TableState tableState, int selectedCellIndex, double height) {
     final visibleCols = tableState.getVisibleCols().length;

@@ -210,7 +210,7 @@ int setup_column_node(int column, int node_index, int sample_slot, float volume,
 ## Real-time Processing
 
 ### SoundTouch Preprocessing Method (default)
-With preprocessing, each unique pitch for a sample is rendered offline in a background thread and cached in memory. When a node needs to change pitch (e.g., a new trigger with a different pitch), the node is rebuilt to pick up the correct preprocessed audio.
+With preprocessing, each unique pitch for a sample is rendered offline in a background thread and saved as a separate file on disk. When a node needs to change pitch (e.g., a new trigger with a different pitch), the preloader uses the appropriate pitched file directly.
 
 **Key Policy:** In `play_samples_for_step()`, when the same sample is already playing but with a different pitch:
 - **Preprocessing (default)**: Rebuild the entire node with `setup_column_node()` to bind the correct preprocessed audio
@@ -220,8 +220,8 @@ This ensures proper pitch data source initialization for each pitch value.
 
 ### Pitch Data Source Read Behavior
 - **Preprocessing (default)**:
-  - If cache exists: read from the preprocessed `ma_audio_buffer` (PCM in RAM).
-  - If cache missing: read unpitched from the original decoder while a background job renders and caches the requested pitch; subsequent triggers use the cache.
+  - If pitched file exists: preloader loads the pitched file directly into the decoder.
+  - If pitched file missing: read unpitched from the original decoder while a background job generates the pitched file; subsequent triggers use the generated file.
 - **Resampler (optional)**: read from original decoder and resample in real-time (only when explicitly selected).
 
 ### Immediate Native Triggering
@@ -284,26 +284,27 @@ void resetCellPitch(int cellIndex) {
 ### Async Preprocessing (Background Threading)
 ```cpp
 // SoundTouch preprocessing runs in background threads (max 4)
-if (!preprocessed && fabs(pitch - 1.0f) > 0.001f) {
+if (!pitched_file_exists && fabs(pitch - 1.0f) > 0.001f) {
     start_async_preprocessing(sample_slot, pitch);  // ← Background thread
-    // Playback continues unpitched until cache is ready
+    // Playback continues unpitched until file is generated
 }
 ```
 
 **Benefits:**
 - **UI Responsiveness**: No blocking during SoundTouch preprocessing
-- **Seamless Triggers**: Plays original pitch immediately; caches target pitch for next trigger
-- **Future Performance**: Subsequent uses get cached high-quality version
+- **Seamless Triggers**: Plays original pitch immediately; generates target pitch for next trigger
+- **Future Performance**: Subsequent uses get high-quality pitched file from disk
+- **Persistent Storage**: Pitched files persist across app sessions
 
 ## Performance Characteristics
 
 - **Default algorithm**: SoundTouch offline preprocessing (high quality)
 - **Optional algorithm**: Linear interpolation resampling via `ma_resampler` (explicit opt-in)
-- **Memory**: Cache uses additional memory per unique (sample, pitch)
-- **Latency**: Immediate playback starts at original pitch if cache is not ready; no blocking on UI thread
+- **Storage**: Pitched files are stored on disk and persist across sessions
+- **Latency**: Immediate playback starts at original pitch if pitched file is not ready; no blocking on UI thread
 - **Concurrent**: Each cell/node is independent; up to 4 preprocessing jobs run concurrently
 - **Real-time updates**: Preprocessing method rebuilds on next trigger; resampler method updates instantly
-- **Storage**: Input is decoded from disk; preprocessed output is kept in RAM only with LRU eviction
+- **Cleanup**: Pitched files are automatically cleaned up when samples are unloaded or pitch settings change
 
 ## Native API Summary
 

@@ -1,4 +1,5 @@
 #include "sample_bank.h"
+#include "pitch.h"  // For pitched file cleanup functions
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -155,6 +156,9 @@ void sample_bank_unload(int slot) {
 
     prnt("🗑️ [SAMPLE_BANK] Unloading sample from slot %d", slot);
 
+    // Clean up all pitched files for this sample
+    pitch_delete_all_files_for_sample(slot);
+
     // Uninitialize decoder
     ma_decoder_uninit(&g_sample_decoders[slot]);
 
@@ -260,6 +264,9 @@ void sample_bank_set_sample_pitch(int slot, float pitch) {
     if (pitch < 0.25f) pitch = 0.25f;
     if (pitch > 4.0f) pitch = 4.0f;
     
+    // Clean up all existing pitched files since sample pitch changed
+    pitch_delete_all_files_for_sample(slot);
+    
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
@@ -303,6 +310,9 @@ void sample_bank_set_sample_settings(int slot, float volume, float pitch) {
     if (volume > 1.0f) volume = 1.0f;
     if (pitch < 0.25f) pitch = 0.25f;
     if (pitch > 4.0f) pitch = 4.0f;
+
+    // Clean up all existing pitched files since sample pitch changed
+    pitch_delete_all_files_for_sample(slot);
 
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.volume = volume;

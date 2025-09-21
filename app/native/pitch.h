@@ -76,18 +76,11 @@ int pitch_should_rebuild_for_change(ma_pitch_data_source* p, float previous_pitc
 __attribute__((visibility("default"))) __attribute__((used))
 int pitch_ds_uses_preprocessed(ma_pitch_data_source* p);
 
-// Preprocessing cache API (SoundTouch offline). These mirror the legacy behavior.
-__attribute__((visibility("default"))) __attribute__((used))
-int pitch_preprocess_sample_sync(int source_slot, float pitch_ratio);
-
+// Preprocessing API (now disk-based)
 __attribute__((visibility("default"))) __attribute__((used))
 int pitch_start_async_preprocessing(int source_slot, float pitch_ratio);
 
-// Try to create a decoder from cached preprocessed data. Returns 1 if created, 0 if not found, <0 on error.
-__attribute__((visibility("default"))) __attribute__((used))
-int pitch_make_decoder_from_cache(int source_slot, float pitch_ratio, ma_decoder* outDecoder);
-
-// Cache maintenance & stats
+// Cache maintenance & stats (legacy compatibility - now no-ops)
 __attribute__((visibility("default"))) __attribute__((used))
 void pitch_clear_preprocessed_cache(void);
 
@@ -110,6 +103,19 @@ int pitch_set_quality(int qualityLevel);
 
 __attribute__((visibility("default"))) __attribute__((used))
 int pitch_get_quality(void);
+
+// Disk-based pitched file management
+__attribute__((visibility("default"))) __attribute__((used))
+const char* pitch_get_file_path(int sample_slot, float pitch);
+
+__attribute__((visibility("default"))) __attribute__((used))
+int pitch_generate_file(int sample_slot, float pitch, const char* output_path);
+
+__attribute__((visibility("default"))) __attribute__((used))
+void pitch_delete_file(int sample_slot, float pitch);
+
+__attribute__((visibility("default"))) __attribute__((used))
+void pitch_delete_all_files_for_sample(int sample_slot);
 
 #ifdef __cplusplus
 }

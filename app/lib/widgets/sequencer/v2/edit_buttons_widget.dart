@@ -5,6 +5,8 @@ import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/multitask_panel.dart';
 import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/ui_selection.dart';
 
 class EditButtonsWidget extends StatelessWidget {
   const EditButtonsWidget({super.key});
@@ -24,8 +26,8 @@ class EditButtonsWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<TableState, EditState>(
-      builder: (context, tableState, editState, child) {
+    return Consumer4<TableState, EditState, SampleBankState, UiSelectionState>(
+      builder: (context, tableState, editState, sampleBankState, uiSelection, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
             final panelHeight = constraints.maxHeight;
@@ -99,8 +101,18 @@ class EditButtonsWidget extends StatelessWidget {
                         label: 'DEL',
                         height: buttonHeight,
                         fontSize: textFontSize,
-                        enabled: editState.hasSelection,
-                        onPressed: editState.hasSelection ? () => editState.deleteCells() : null,
+                        enabled: editState.hasSelection || uiSelection.isSampleBank,
+                        onPressed: (editState.hasSelection || uiSelection.isSampleBank)
+                            ? () {
+                                if (uiSelection.isSampleBank) {
+                                  final slot = uiSelection.selectedSampleSlot ?? sampleBankState.activeSlot;
+                                  sampleBankState.unloadSample(slot);
+                                  uiSelection.clear();
+                                } else {
+                                  editState.deleteCells();
+                                }
+                              }
+                            : null,
                         isActive: false,
                         horizontalPadding: buttonHPad,
                       ),
@@ -181,13 +193,23 @@ class EditButtonsWidget extends StatelessWidget {
                     size: buttonSize,
                     iconSize: iconSize,
                     icon: Icons.delete,
-                    color: editState.hasSelection
+                    color: (editState.hasSelection || context.read<UiSelectionState>().isSampleBank)
                         ? AppColors.sequencerAccent.withOpacity(0.8)
                         : AppColors.sequencerLightText,
-                    onPressed: editState.hasSelection
-                        ? () => editState.deleteCells()
+                    onPressed: (editState.hasSelection || context.read<UiSelectionState>().isSampleBank)
+                        ? () {
+                            final uiSel = context.read<UiSelectionState>();
+                            final sb = context.read<SampleBankState>();
+                            if (uiSel.isSampleBank) {
+                              final slot = uiSel.selectedSampleSlot ?? sb.activeSlot;
+                              sb.unloadSample(slot);
+                              uiSel.clear();
+                            } else {
+                              editState.deleteCells();
+                            }
+                          }
                         : null,
-                    tooltip: 'Delete Selected Cells',
+                    tooltip: 'Delete Selected',
                   ),
                   _buildEditButton(
                     size: buttonSize,

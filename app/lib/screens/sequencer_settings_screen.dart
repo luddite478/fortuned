@@ -15,14 +15,22 @@ class SequencerSettingsScreen extends StatefulWidget {
 
 class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
   final _pitchFFI = PitchBindings();
-  int _pitchQuality = 0; // 0..4 (best..worst)
+  int _pitchQuality = 2; // 0..4 (best..worst) — default to Middle
 
   @override
   void initState() {
     super.initState();
     try {
-      _pitchQuality = _pitchFFI.pitchGetQuality();
-    } catch (_) {}
+      final q = _pitchFFI.pitchGetQuality();
+      if (q >= 0 && q <= 4) {
+        _pitchQuality = q;
+      } else {
+        _pitchQuality = 2;
+        try { _pitchFFI.pitchSetQuality(2); } catch (_) {}
+      }
+    } catch (_) {
+      try { _pitchFFI.pitchSetQuality(_pitchQuality); } catch (_) {}
+    }
   }
 
   // Removed performance test utilities
@@ -314,12 +322,12 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
       width: double.infinity,
       child: ElevatedButton(
         onPressed: () {
-          setState(() { _pitchQuality = 0; });
-          try { _pitchFFI.pitchSetQuality(0); } catch (_) {}
+          setState(() { _pitchQuality = 2; });
+          try { _pitchFFI.pitchSetQuality(2); } catch (_) {}
           
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Settings reset to defaults'),
+              content: Text('Settings reset to defaults (Pitch: Medium)'),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 2),
             ),

@@ -47,6 +47,10 @@
 #include "miniaudio/miniaudio.h"
 #include "pitch.h"
 #include "undo_redo.h"
+#include "preview.h"
+// Lightweight preloader thread primitives
+#include <pthread.h>
+#include <unistd.h>
 
 // Utility macros
 #ifndef MIN
@@ -61,8 +65,13 @@ static ma_device g_device;
 static ma_node_graph g_nodeGraph;
 static int g_initialized = 0;
 
-// Column nodes (A/B switching per column)
-static MAColumnNodes g_ma_column_nodes[MAX_SEQUENCER_COLS];
+// A/B playback nodes per column (audio thread)
+static ColumnPlayback g_column_playback[MAX_SEQUENCER_COLS];
+
+// Preloader thread and column controllers
+static pthread_t g_preloader_thread;
+static int g_preloader_running = 0;         // 0/1
+static AudioColumn g_audio_columns[MAX_SEQUENCER_COLS];
 
 // Playback state
 static int g_sequencer_playing = 0;        // transient
@@ -96,10 +105,16 @@ static void audio_callback(ma_device* pDevice, void* pOutput, const void* pInput
 static void run_sequencer(ma_uint32 frameCount);
 static void play_samples_for_step(int step);
 static void setup_column_node(int column, int node_index, int sample_slot, float volume, float pitch);
+static inline void switch_column_audio_node(ColumnPlayback* playback) {
+    playback->active_node = playback->next_node;
+    playback->next_node = (playback->next_node + 1) % 2;
+}
 static void update_volume_smoothing(void);
 static float calculate_smoothing_alpha(float time_ms);
 static float apply_exponential_smoothing(float current, float target, float alpha);
 static void handle_song_mode_looping(void);
+static int predict_preloader_next_step(void);
+static void* preloader_thread_func(void* arg);
 
 // Initialize playback system
 int playback_init(void) {
@@ -115,6 +130,15 @@ int playback_init(void) {
     sample_bank_init();
     // Clear any preprocessed pitch cache to avoid stale data across restarts
     pitch_clear_preprocessed_cache();
+    
+    // Clean up any stale pitched files from previous sessions
+    // This ensures we start fresh and don't accumulate old files
+    prnt("🧹 [PLAYBACK] Cleaning up stale pitched files from previous sessions");
+    for (int slot = 0; slot < MAX_SAMPLE_SLOTS; slot++) {
+        if (sample_bank_is_loaded(slot)) {
+            pitch_delete_all_files_for_sample(slot);
+        }
+    }
 
     // Reset core playback state
     g_sequencer_playing = 0;
@@ -130,13 +154,22 @@ int playback_init(void) {
     // Initialize sections loops with default values
     for (int i = 0; i < MAX_SECTIONS; i++) g_playback_state.sections_loops_num_storage[i] = DEFAULT_SECTION_LOOPS;
     
-    // Initialize column nodes
+    // Initialize column playback (A/B switching)
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
-        g_ma_column_nodes[col].active_node = -1;  // No active node
-        g_ma_column_nodes[col].next_node = 0;     // Start with node A
+        g_column_playback[col].active_node = -1;  // No active node
+        g_column_playback[col].next_node = 0;     // Start with node A
+        
+        // Initialize AudioColumn controller
+        g_audio_columns[col].playback = &g_column_playback[col];
+        g_audio_columns[col].preloader.target_step = -1;
+        g_audio_columns[col].preloader.ready = 0;
+        g_audio_columns[col].preloader.consuming = 0;
+        g_audio_columns[col].preloader.decoder = NULL;
+        g_audio_columns[col].preloader.pitch_ds = NULL;
+        g_audio_columns[col].preloader.pitch_ds_initialized = 0;
         
         for (int i = 0; i < MA_NODES_PER_COLUMN; i++) {
-            MAColumnNode* node = &g_ma_column_nodes[col].nodes[i];
+            AudioColumnNode* node = &g_column_playback[col].nodes[i];
             node->column = col;
             node->index = i;
             node->node_initialized = 0;
@@ -202,6 +235,12 @@ int playback_init(void) {
 
     // Seed undo/redo baseline for playback
     UndoRedoManager_record();
+
+    // Initialize preview subsystem
+    preview_init();
+    // Start preloader thread
+    g_preloader_running = 1;
+    pthread_create(&g_preloader_thread, NULL, preloader_thread_func, NULL);
     
     return 0;
 }
@@ -215,13 +254,46 @@ void playback_cleanup(void) {
     // Stop playback
     playback_stop();
     
+    // Clean up all pitched files before shutting down
+    prnt("🧹 [PLAYBACK] Cleaning up all pitched files");
+    for (int slot = 0; slot < MAX_SAMPLE_SLOTS; slot++) {
+        if (sample_bank_is_loaded(slot)) {
+            pitch_delete_all_files_for_sample(slot);
+        }
+    }
+
     // Cleanup sample bank
     sample_bank_cleanup();
+
+    // Cleanup preview
+    preview_cleanup();
+    // Stop preloader thread
+    if (g_preloader_running) {
+        g_preloader_running = 0;
+        pthread_join(g_preloader_thread, NULL);
+    }
+    // Cleanup preloader resources
+    for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+        ColumnPreloader* preloader = &g_audio_columns[col].preloader;
+        if (preloader->pitch_ds_initialized && preloader->pitch_ds) {
+            pitch_ds_uninit((ma_pitch_data_source*)preloader->pitch_ds);
+            free(preloader->pitch_ds);
+            preloader->pitch_ds = NULL;
+            preloader->pitch_ds_initialized = 0;
+        }
+        if (preloader->decoder) {
+            ma_decoder_uninit((ma_decoder*)preloader->decoder);
+            free(preloader->decoder);
+            preloader->decoder = NULL;
+        }
+        preloader->ready = 0;
+        preloader->target_step = -1;
+    }
     
-    // Cleanup column nodes
+    // Cleanup column playback nodes
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
         for (int i = 0; i < 2; i++) {
-            MAColumnNode* node = &g_ma_column_nodes[col].nodes[i];
+            AudioColumnNode* node = &g_column_playback[col].nodes[i];
             if (node->node_initialized) {
                 if (node->node) {
                     ma_node_uninit((ma_node_base*)node->node, NULL);
@@ -282,6 +354,7 @@ int playback_start(int bpm, int start_step) {
     g_step_frame_counter = 0;
     g_sequencer_playing = 1;
     
+    
     if (g_playback_state.song_mode) {
         g_playback_state.current_section = table_get_section_at_step(start_step);
         g_playback_state.current_section_loop = 0;
@@ -306,7 +379,7 @@ void playback_stop(void) {
     // Stop all column nodes
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
         for (int i = 0; i < 2; i++) {
-            MAColumnNode* node = &g_ma_column_nodes[col].nodes[i];
+            AudioColumnNode* node = &g_column_playback[col].nodes[i];
             if (node->node_initialized && node->node) {
                 ma_node_set_state((ma_node_base*)node->node, ma_node_state_stopped);
                 node->target_volume = 0.0f;
@@ -348,6 +421,12 @@ void playback_set_region(int start, int end) {
     g_playback_state.region_start = start;
     g_playback_state.region_end = end;
     prnt("🎭 [PLAYBACK] Set playback region: %d to %d", start, end);
+    // Clear preloader state due to region change
+    int max_cols_rc = table_get_max_cols();
+    for (int col = 0; col < max_cols_rc; col++) {
+        g_audio_columns[col].preloader.ready = 0;
+        g_audio_columns[col].preloader.target_step = -1;
+    }
     state_write_begin();
     state_update_prefix();
     state_write_end();
@@ -357,6 +436,12 @@ void playback_set_region(int start, int end) {
 void playback_set_mode(int song_mode) {
     g_playback_state.song_mode = song_mode;
     prnt("🎵 [PLAYBACK] Set mode to %s", song_mode ? "song" : "loop");
+    // Clear preloader state due to mode change
+    int max_cols_mm = table_get_max_cols();
+    for (int col = 0; col < max_cols_mm; col++) {
+        g_audio_columns[col].preloader.ready = 0;
+        g_audio_columns[col].preloader.target_step = -1;
+    }
     state_write_begin();
     state_update_prefix();
     state_write_end();
@@ -391,6 +476,12 @@ void switch_to_section(int section_index) {
 
     if (was_playing) {
         playback_start(g_playback_state.bpm, g_current_step);
+    }
+    // Clear preloader state due to section switch
+    int max_cols_ss = table_get_max_cols();
+    for (int col = 0; col < max_cols_ss; col++) {
+        g_audio_columns[col].preloader.ready = 0;
+        g_audio_columns[col].preloader.target_step = -1;
     }
     UndoRedoManager_record();
 }
@@ -457,7 +548,7 @@ static float apply_exponential_smoothing(float current, float target, float alph
 static void update_volume_smoothing(void) {
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
         for (int i = 0; i < 2; i++) {
-            MAColumnNode* node = &g_ma_column_nodes[col].nodes[i];
+            AudioColumnNode* node = &g_column_playback[col].nodes[i];
             if (!node->node_initialized || !node->node) continue;
             
             // Choose appropriate smoothing coefficient
@@ -486,7 +577,7 @@ static void setup_column_node(int column, int node_index, int sample_slot, float
         return;
     }
     
-    MAColumnNode* node = &g_ma_column_nodes[column].nodes[node_index];
+    AudioColumnNode* node = &g_column_playback[column].nodes[node_index];
     
     // If this node is already initialized with the same sample, handle according to pitch method.
     if (node->node_initialized && node->sample_slot == sample_slot) {
@@ -550,8 +641,32 @@ static void setup_column_node(int column, int node_index, int sample_slot, float
         return;
     }
     
-    // Initialize decoder with the same file as the sample bank
-    const char* file_path = sample_bank_get_file_path(sample_slot);
+    // Determine which file to use: pitched file if available, otherwise original
+    const char* file_path;
+    if (fabsf(pitch - 1.0f) > 0.001f) {
+        file_path = pitch_get_file_path(sample_slot, pitch);
+        
+        // Check if pitched file exists
+        if (file_path) {
+            FILE* test = fopen(file_path, "rb");
+            if (!test) {
+                // Pitched file doesn't exist, generate it synchronously
+                pitch_generate_file(sample_slot, pitch, file_path);
+            } else {
+                fclose(test);
+            }
+        }
+        
+        if (!file_path) {
+            // Fallback to original file if pitched path generation failed
+            file_path = sample_bank_get_file_path(sample_slot);
+        }
+    } else {
+        // Use original file for pitch 1.0
+        file_path = sample_bank_get_file_path(sample_slot);
+    }
+    
+    
     ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, CHANNELS, SAMPLE_RATE);
     ma_result result = ma_decoder_init_file(file_path, &decoderConfig, (ma_decoder*)node->decoder);
     if (result != MA_SUCCESS) {
@@ -645,17 +760,19 @@ static void play_samples_for_step(int step) {
             continue; // Empty cell
         }
         
-        // Get column nodes
-        MAColumnNodes* column_nodes = &g_ma_column_nodes[col];
+        // Get column controllers
+        AudioColumn* column = &g_audio_columns[col];
+        ColumnPlayback* playback = column->playback;
+        ColumnPreloader* preloader = &column->preloader;
         
         // Stop current active node (smooth fade out)
-        if (column_nodes->active_node >= 0) {
-            MAColumnNode* active = &column_nodes->nodes[column_nodes->active_node];
+        if (playback->active_node >= 0) {
+            AudioColumnNode* active = &playback->nodes[playback->active_node];
             active->target_volume = 0.0f; // Fade out
         }
         
         // Setup next node with resolved settings (inherit from sample bank if defaults)
-        int next_node = column_nodes->next_node;
+        int next_node = playback->next_node;
         float resolved_pitch = cell->settings.pitch;
         if (resolved_pitch == DEFAULT_CELL_PITCH) {
             Sample* s = sample_bank_get_sample(cell->sample_slot);
@@ -665,11 +782,77 @@ static void play_samples_for_step(int step) {
         if (resolved_volume == DEFAULT_CELL_VOLUME) {
             resolved_volume = sample_bank_get_sample(cell->sample_slot)->settings.volume;
         }
+
+        // Prefer preloaded resources (with safety checks)
+        // Note: pitch_ds can be NULL for already-pitched files
+        if (preloader->ready && preloader->target_step == step && preloader->decoder) {
+            // Mark as consuming to prevent preloader cleanup
+            preloader->consuming = 1;
+            // Cleanup next node if previously initialized
+            AudioColumnNode* node = &playback->nodes[next_node];
+            if (node->node_initialized) {
+                if (node->node) { ma_node_uninit((ma_node_base*)node->node, NULL); free(node->node); node->node = NULL; }
+                if (node->decoder) { ma_decoder_uninit((ma_decoder*)node->decoder); free(node->decoder); node->decoder = NULL; }
+                if (node->pitch_ds_initialized && node->pitch_ds) { pitch_ds_uninit((ma_pitch_data_source*)node->pitch_ds); free(node->pitch_ds); node->pitch_ds = NULL; node->pitch_ds_initialized = 0; }
+                node->node_initialized = 0;
+            }
+            // Transfer ownership from preloader to playback node
+            node->decoder = preloader->decoder; preloader->decoder = NULL;
+            node->pitch_ds = preloader->pitch_ds; preloader->pitch_ds = NULL;
+            node->pitch_ds_initialized = 1;
+            node->sample_slot = preloader->sample_slot;
+            node->pitch = preloader->pitch;
+            node->user_volume = preloader->volume;
+            node->current_volume = 0.0f;
+            node->target_volume = preloader->volume;
+
+            // Allocate node wrapper
+            node->node = malloc(sizeof(ma_data_source_node));
+            if (node->node) {
+                ma_data_source* ds;
+                if (node->pitch_ds) {
+                    // Use pitch data source (fallback case for original file with pitch processing)
+                    ds = (ma_data_source*)pitch_ds_as_data_source((ma_pitch_data_source*)node->pitch_ds);
+                } else {
+                    // Use decoder directly (already-pitched file case)
+                    ds = (ma_data_source*)node->decoder;
+                }
+                
+                if (ds) {
+                    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(ds);
+                    ma_result result = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, (ma_data_source_node*)node->node);
+                    if (result == MA_SUCCESS) {
+                        ma_node_attach_output_bus((ma_node_base*)node->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+                        node->node_initialized = 1;
+                        ma_node_set_state((ma_node_base*)node->node, ma_node_state_started);
+                    } else {
+                        free(node->node); node->node = NULL;
+                    }
+                } else {
+                    // Invalid data source - cleanup and fallback
+                    free(node->node); node->node = NULL;
+                }
+            }
+            
+            // Only continue if node was successfully initialized
+            if (node->node_initialized) {
+                // Mark preloader as consumed
+                preloader->ready = 0;
+                preloader->consuming = 0;
+                preloader->target_step = -1;
+                switch_column_audio_node(playback);
+                continue;
+            }
+            // If we reach here, preloaded resources were corrupted - fall back to sync setup
+            preloader->ready = 0;
+            preloader->consuming = 0;
+            preloader->target_step = -1;
+        }
+
+        // Fallback to synchronous setup
         setup_column_node(col, next_node, cell->sample_slot, resolved_volume, resolved_pitch);
-        
         // Switch active node
-        column_nodes->active_node = next_node;
-        column_nodes->next_node = (next_node + 1) % 2; // Toggle A/B
+        switch_column_audio_node(playback);
     }
 }
 
@@ -740,6 +923,9 @@ void playback_apply_state(const PlaybackState* state) {
     state_write_end();
 }
 
+// Expose node graph pointer for auxiliary modules (e.g., preview)
+ma_node_graph* playback_get_node_graph(void) { return &g_nodeGraph; }
+
 // Start/stop/isActive output recording (WAV)
 int recording_start(const char* file_path) {
     if (!g_initialized) {
@@ -777,6 +963,134 @@ int recording_is_active(void) {
     return g_is_output_recording;
 }
 
+
+
+
+// ===================== Preloader Implementation =====================
+// Predict which step the preloader should prepare next
+static int predict_preloader_next_step(void) {
+    // If we just started (step frame counter is 0), prepare current step
+    // Otherwise prepare next step as usual
+    if (g_sequencer_playing && g_step_frame_counter == 0) {
+        return g_current_step;
+    }
+    
+    // Standard next step prediction logic
+    int next = g_current_step;
+    if (next < 0) {
+        return g_playback_state.region_start;
+    }
+    next++;
+    if (next >= g_playback_state.region_end) {
+        return g_playback_state.song_mode ? next : g_playback_state.region_start;
+    }
+    return next;
+}
+
+static void* preloader_thread_func(void* arg) {
+    (void)arg;
+    while (g_preloader_running) {
+        int target = predict_preloader_next_step();
+        int max_cols = table_get_max_cols();
+        
+        for (int col = 0; col < max_cols; col++) {
+            ColumnPreloader* preloader = &g_audio_columns[col].preloader;
+            if (preloader->ready && preloader->target_step == target) {
+                continue; // already prepared
+            }
+            
+            // Skip cleanup if audio thread is consuming resources
+            if (preloader->consuming) continue;
+            
+            // Reset previous prepared resources
+            if (preloader->pitch_ds_initialized && preloader->pitch_ds) { 
+                pitch_ds_uninit((ma_pitch_data_source*)preloader->pitch_ds); 
+                free(preloader->pitch_ds); 
+                preloader->pitch_ds = NULL; 
+                preloader->pitch_ds_initialized = 0; 
+            }
+            if (preloader->decoder) { 
+                ma_decoder_uninit((ma_decoder*)preloader->decoder); 
+                free(preloader->decoder); 
+                preloader->decoder = NULL; 
+            }
+            preloader->ready = 0;
+            preloader->target_step = -1;
+
+            Cell* cell = table_get_cell(target, col);
+            if (!cell || cell->sample_slot == -1) {
+                continue;
+            }
+
+            float resolved_pitch = cell->settings.pitch;
+            if (resolved_pitch == DEFAULT_CELL_PITCH) {
+                Sample* s = sample_bank_get_sample(cell->sample_slot);
+                resolved_pitch = (s && s->loaded) ? s->settings.pitch : 1.0f;
+            }
+            float resolved_volume = cell->settings.volume;
+            if (resolved_volume == DEFAULT_CELL_VOLUME) {
+                resolved_volume = sample_bank_get_sample(cell->sample_slot)->settings.volume;
+            }
+
+
+            const char* file_path;
+            
+            // Use pitched file if pitch != 1.0, otherwise use original
+            if (fabsf(resolved_pitch - 1.0f) > 0.001f) {
+                file_path = pitch_get_file_path(cell->sample_slot, resolved_pitch);
+                
+                // Generate pitched file if it doesn't exist
+                if (file_path) {
+                    FILE* test = fopen(file_path, "rb");
+                    if (!test) {
+                        // File doesn't exist, generate it
+                        pitch_generate_file(cell->sample_slot, resolved_pitch, file_path);
+                    } else {
+                        fclose(test);
+                    }
+                }
+                
+                if (!file_path) {
+                    // Fallback to original file if pitched path generation failed
+                    file_path = sample_bank_get_file_path(cell->sample_slot);
+                }
+            } else {
+                // Use original file for pitch 1.0
+                file_path = sample_bank_get_file_path(cell->sample_slot);
+            }
+            
+            if (!file_path) continue;
+            
+            ma_decoder* dec = (ma_decoder*)malloc(sizeof(ma_decoder));
+            if (!dec) continue;
+            ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, CHANNELS, SAMPLE_RATE);
+            ma_result result = ma_decoder_init_file(file_path, &decoderConfig, dec);
+            if (result != MA_SUCCESS) { free(dec); continue; }
+
+            // For pitched files, we don't need pitch_ds since the file is already pitched
+            // For original files at pitch 1.0, we also don't need pitch processing
+            ma_pitch_data_source* pds = NULL;
+            if (fabsf(resolved_pitch - 1.0f) > 0.001f && file_path == sample_bank_get_file_path(cell->sample_slot)) {
+                // Only create pitch_ds if we're using original file with non-unity pitch (fallback case)
+                pds = pitch_ds_create((ma_data_source*)dec, resolved_pitch, CHANNELS, SAMPLE_RATE, cell->sample_slot);
+                if (!pds) { ma_decoder_uninit(dec); free(dec); continue; }
+            }
+
+            // Store prepared resources in preloader
+            preloader->decoder = dec;
+            preloader->pitch_ds = pds;
+            preloader->pitch_ds_initialized = 1;
+            preloader->sample_slot = cell->sample_slot;
+            preloader->volume = resolved_volume;
+            preloader->pitch = resolved_pitch;
+            preloader->target_step = target;
+            preloader->ready = 1;
+            
+        }
+        usleep(2000);
+    }
+    return NULL;
+}
 
 
 

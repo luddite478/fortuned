@@ -34,32 +34,14 @@ using namespace soundtouch;
 // Internal structures
 // -----------------------------------------------------------------------------
 
-typedef struct preprocessed_sample_t {
-    int source_slot;
-    float pitch_ratio;
-    unsigned int pitch_hash;
-    void* processed_data;
-    size_t processed_size;
-    ma_uint64 processed_frames;
-    int in_use;
-    ma_uint64 last_accessed;
-    ma_uint64 creation_time;
-} preprocessed_sample_t;
-
-#define MAX_PREPROCESSED_SAMPLES 64
-static preprocessed_sample_t g_pre_cache[MAX_PREPROCESSED_SAMPLES];
-static ma_uint64 g_pre_cache_access_counter = 0;
-static ma_uint64 g_pre_cache_total_bytes = 0;
+// Memory-based cache removed - now using disk-based pitched files
 
 // Global method (default to preprocessing as requested)
 static int g_pitch_method = PITCH_METHOD_SOUNDTOUCH_PREPROCESSING;
 // Global pitch quality (0..4, best..worst)
 static int g_pitch_quality = 0;
 
-// Hash helper (quantize to 0.001)
-static unsigned int hash_pitch_ratio(float r) {
-    return (unsigned int)(r * 1000.0f + 0.5f);
-}
+// Hash helper removed - no longer needed for memory cache
 
 // Async preprocessing jobs (up to 4 concurrent)
 typedef struct {
@@ -127,165 +109,10 @@ static ma_data_source_vtable g_pitch_vtable = {
 };
 
 // -----------------------------------------------------------------------------
-// Preprocess cache helpers
+// Memory cache helpers removed - now using disk-based pitched files
 // -----------------------------------------------------------------------------
 
-static preprocessed_sample_t* find_pre(int source_slot, float ratio) {
-    unsigned int h = hash_pitch_ratio(ratio);
-    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
-        preprocessed_sample_t* e = &g_pre_cache[i];
-        if (e->in_use && e->source_slot == source_slot && e->pitch_hash == h) {
-            e->last_accessed = ++g_pre_cache_access_counter;
-            prnt("📦 [PITCH] Cache hit (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu)", source_slot, ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size);
-            // Clear cell processing flags for any cells using this sample? Handled at per-cell level.
-            return e;
-        }
-    }
-    prnt("📭 [PITCH] Cache miss (slot=%d, ratio=%.3f)", source_slot, ratio);
-    return NULL;
-}
-
-static void evict_oldest(void) {
-    int idx = -1; ma_uint64 t = (ma_uint64)-1;
-    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
-        if (g_pre_cache[i].in_use && g_pre_cache[i].last_accessed < t) {
-            t = g_pre_cache[i].last_accessed; idx = i;
-        }
-    }
-    if (idx >= 0) {
-        preprocessed_sample_t* e = &g_pre_cache[idx];
-        prnt("🧹 [PITCH] Evicting cache entry (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu)", e->source_slot, e->pitch_ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size);
-        if (e->processed_data) {
-            g_pre_cache_total_bytes -= e->processed_size;
-            free(e->processed_data);
-        }
-        memset(e, 0, sizeof(*e));
-    }
-}
-
-static int preprocess_sync(int source_slot, float ratio) {
-    if (fabs(ratio - 1.0f) < 0.001f) {
-        prnt("⏭️ [PITCH] Skip preprocessing (ratio≈1.0)");
-        return 0;
-    }
-    if (find_pre(source_slot, ratio)) {
-        prnt("✅ [PITCH] Preprocess already available (slot=%d, ratio=%.3f)", source_slot, ratio);
-        return 0;
-    }
-
-    // Prepare decoder
-    ma_decoder tmp;
-    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
-    const char* file_path = sample_bank_get_file_path(source_slot);
-    if (!file_path) {
-        prnt_err("❌ [PITCH] preprocess_sync: no file path for slot=%d", source_slot);
-        return -1;
-    }
-    prnt("⚙️ [PITCH] Preprocess start (slot=%d, ratio=%.3f, file=%s)", source_slot, ratio, file_path);
-    ma_result mr = ma_decoder_init_file(file_path, &cfg, &tmp);
-    if (mr != MA_SUCCESS) {
-        prnt_err("❌ [PITCH] ma_decoder_init_file failed: %d", mr);
-        return -1;
-    }
-
-    ma_uint64 total_frames = 0;
-    ma_decoder_get_length_in_pcm_frames(&tmp, &total_frames);
-    prnt("ℹ️ [PITCH] Source length: %llu frames", (unsigned long long)total_frames);
-
-    SoundTouch st;
-    st.setSampleRate(48000);
-    st.setChannels(2);
-    st.setPitch(ratio);
-    // Apply settings based on global pitch quality preset (0 best .. 4 worst)
-    // References: SoundTouch docs and community recommendations
-    switch (g_pitch_quality) {
-        case 0: // Best quality: larger sequence/seek, AA filter on
-            st.setSetting(SETTING_USE_QUICKSEEK, 0);
-            st.setSetting(SETTING_USE_AA_FILTER, 1);
-            st.setSetting(SETTING_SEQUENCE_MS, 82);
-            st.setSetting(SETTING_SEEKWINDOW_MS, 28);
-            st.setSetting(SETTING_OVERLAP_MS, 12);
-            break;
-        case 1: // High: balanced quality/perf
-            st.setSetting(SETTING_USE_QUICKSEEK, 0);
-            st.setSetting(SETTING_USE_AA_FILTER, 1);
-            st.setSetting(SETTING_SEQUENCE_MS, 60);
-            st.setSetting(SETTING_SEEKWINDOW_MS, 24);
-            st.setSetting(SETTING_OVERLAP_MS, 10);
-            break;
-        case 2: // Medium: faster, slight artifacts allowed
-            st.setSetting(SETTING_USE_QUICKSEEK, 1);
-            st.setSetting(SETTING_USE_AA_FILTER, 1);
-            st.setSetting(SETTING_SEQUENCE_MS, 40);
-            st.setSetting(SETTING_SEEKWINDOW_MS, 15);
-            st.setSetting(SETTING_OVERLAP_MS, 8);
-            break;
-        case 3: // Low: faster, AA off
-            st.setSetting(SETTING_USE_QUICKSEEK, 1);
-            st.setSetting(SETTING_USE_AA_FILTER, 0);
-            st.setSetting(SETTING_SEQUENCE_MS, 30);
-            st.setSetting(SETTING_SEEKWINDOW_MS, 12);
-            st.setSetting(SETTING_OVERLAP_MS, 8);
-            break;
-        default: // 4: Lowest: aggressive speed
-            st.setSetting(SETTING_USE_QUICKSEEK, 1);
-            st.setSetting(SETTING_USE_AA_FILTER, 0);
-            st.setSetting(SETTING_SEQUENCE_MS, 24);
-            st.setSetting(SETTING_SEEKWINDOW_MS, 8);
-            st.setSetting(SETTING_OVERLAP_MS, 6);
-            break;
-    }
-
-    ma_uint64 est = total_frames + (total_frames / 2);
-    size_t out_bytes = est * 2 * sizeof(float);
-    float* out = (float*)malloc(out_bytes);
-    if (!out) { ma_decoder_uninit(&tmp); prnt_err("❌ [PITCH] malloc failed (bytes=%zu)", out_bytes); return -1; }
-
-    const ma_uint64 CHUNK = 16384;
-    float buf[CHUNK * 2];
-    ma_uint64 written = 0; ma_uint64 rd = 0;
-    ma_decoder_seek_to_pcm_frame(&tmp, 0);
-    for (;;) {
-        mr = ma_decoder_read_pcm_frames(&tmp, buf, CHUNK, &rd);
-        if (mr != MA_SUCCESS || rd == 0) break;
-        st.putSamples(buf, (uint)rd);
-        uint avail = st.numSamples();
-        if (avail > 0) {
-            uint max_recv = (uint)MIN((ma_uint64)avail, est - written);
-            written += st.receiveSamples(out + written * 2, max_recv);
-        }
-        if (written >= est) break;
-    }
-    st.flush();
-    uint avail = st.numSamples();
-    if (avail > 0 && written < est) {
-        uint max_recv = (uint)MIN((ma_uint64)avail, est - written);
-        written += st.receiveSamples(out + written * 2, max_recv);
-    }
-
-    ma_decoder_uninit(&tmp);
-    if (written == 0) { free(out); prnt_err("❌ [PITCH] SoundTouch produced 0 frames"); return -1; }
-
-    int slot = -1;
-    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) if (!g_pre_cache[i].in_use) { slot = i; break; }
-    if (slot == -1) { evict_oldest(); for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) if (!g_pre_cache[i].in_use) { slot = i; break; } }
-    if (slot == -1) { free(out); prnt_err("❌ [PITCH] No cache slot available after eviction"); return -1; }
-
-    preprocessed_sample_t* e = &g_pre_cache[slot];
-    e->source_slot = source_slot;
-    e->pitch_ratio = ratio;
-    e->pitch_hash = hash_pitch_ratio(ratio);
-    e->processed_data = out;
-    e->processed_size = written * 2 * sizeof(float);
-    e->processed_frames = written;
-    e->in_use = 1;
-    e->last_accessed = ++g_pre_cache_access_counter;
-    e->creation_time = g_pre_cache_access_counter;
-    g_pre_cache_total_bytes += e->processed_size;
-    prnt("✅ [PITCH] Preprocess done (slot=%d, ratio=%.3f, frames=%llu, bytes=%zu, cache_total=%llu)",
-         source_slot, ratio, (unsigned long long)e->processed_frames, (size_t)e->processed_size, (unsigned long long)g_pre_cache_total_bytes);
-    return 0;
-}
+// preprocess_sync function removed - now using disk-based pitched files
 
 static void async_worker(int job_index, int source_slot, float ratio) {
     (void)job_index; // not strictly needed beyond cleanup; keep for parity
@@ -293,8 +120,14 @@ static void async_worker(int job_index, int source_slot, float ratio) {
     // Mark sample as processing (if sample bank present)
     extern void sample_bank_set_processing(int slot, int processing);
     sample_bank_set_processing(source_slot, 1);
-    int result = preprocess_sync(source_slot, ratio);
-    (void)result;
+    
+    // Generate pitched file on disk instead of memory cache
+    const char* output_path = pitch_get_file_path(source_slot, ratio);
+    int result = -1;
+    if (output_path) {
+        result = pitch_generate_file(source_slot, ratio, output_path);
+    }
+    
     {
         std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
         if (g_async_jobs[job_index].worker_thread) {
@@ -438,23 +271,11 @@ ma_result pitch_ds_init(ma_pitch_data_source* p,
         }
     }
 
-    // Preprocessing: if cached exists, create audio buffer from memory
+    // Preprocessing approach now uses disk-based pitched files
+    // The pitch data source will use the original decoder for real-time processing
+    // or the preloader will use pitched files directly
     if (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && sample_slot >= 0) {
-        preprocessed_sample_t* e = find_pre(sample_slot, ratio);
-        if (e) {
-            ma_audio_buffer_config bufCfg = ma_audio_buffer_config_init(ma_format_f32, channels, e->processed_frames, (const float*)e->processed_data, NULL);
-            mr = ma_audio_buffer_init(&bufCfg, &p->preprocessed_buffer);
-            if (mr == MA_SUCCESS) {
-                p->preprocessed_buffer_initialized = 1;
-                p->uses_preprocessed_data = 1;
-                prnt("🔗 [PITCH] Bound preprocessed buffer (frames=%llu, bytes=%zu)", (unsigned long long)e->processed_frames, (size_t)e->processed_size);
-            } else {
-                prnt_err("❌ [PITCH] ma_audio_buffer_init failed: %d", mr);
-            }
-        } else {
-            // No cached data yet; caller may kick async preprocessing. We'll play unpitched until cache exists.
-            prnt("⏳ [PITCH] No cached data yet for slot=%d, ratio=%.3f", sample_slot, ratio);
-        }
+        prnt("ℹ️ [PITCH] Preprocessing approach - using disk-based pitched files (slot=%d, ratio=%.3f)", sample_slot, ratio);
     }
     return MA_SUCCESS;
 }
@@ -547,17 +368,20 @@ int pitch_ds_uses_preprocessed(ma_pitch_data_source* p) {
     return (p->approach == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && p->uses_preprocessed_data && p->preprocessed_buffer_initialized) ? 1 : 0;
 }
 
-int pitch_preprocess_sample_sync(int source_slot, float ratio) {
-    return preprocess_sync(source_slot, ratio);
-}
+// pitch_preprocess_sample_sync removed - now using disk-based pitched files
 
 int pitch_start_async_preprocessing(int source_slot, float ratio) {
-    // If already cached, nothing to do
-    if (find_pre(source_slot, ratio)) {
-        prnt("✅ [PITCH] Async skip, already cached (slot=%d, ratio=%.3f)", source_slot, ratio);
-        extern void sample_bank_set_processing(int slot, int processing);
-        sample_bank_set_processing(source_slot, 0);
-        return 0;
+    // Check if pitched file already exists
+    const char* output_path = pitch_get_file_path(source_slot, ratio);
+    if (output_path) {
+        FILE* test = fopen(output_path, "rb");
+        if (test) {
+            fclose(test);
+            prnt("✅ [PITCH] Async skip, file already exists (slot=%d, ratio=%.3f)", source_slot, ratio);
+            extern void sample_bank_set_processing(int slot, int processing);
+            sample_bank_set_processing(source_slot, 0);
+            return 0;
+        }
     }
 
     std::lock_guard<std::mutex> lock(g_async_jobs_mutex);
@@ -594,39 +418,22 @@ int pitch_start_async_preprocessing(int source_slot, float ratio) {
     }
 }
 
-int pitch_make_decoder_from_cache(int source_slot, float ratio, ma_decoder* outDecoder) {
-    preprocessed_sample_t* e = find_pre(source_slot, ratio);
-    if (!e) { prnt("📭 [PITCH] No cached decoder data (slot=%d, ratio=%.3f)", source_slot, ratio); return 0; }
-    ma_decoder_config dc = ma_decoder_config_init(ma_format_f32, 2, 48000);
-    ma_result mr = ma_decoder_init_memory(e->processed_data, e->processed_size, &dc, outDecoder);
-    if (mr == MA_SUCCESS) {
-        prnt("🎚️ [PITCH] Decoder created from cache (frames=%llu, bytes=%zu)", (unsigned long long)e->processed_frames, (size_t)e->processed_size);
-        return 1;
-    } else {
-        prnt_err("❌ [PITCH] ma_decoder_init_memory failed: %d", mr);
-        return -1;
-    }
-}
+// pitch_make_decoder_from_cache removed - now using disk-based pitched files
 
 void pitch_clear_preprocessed_cache(void) {
-    ma_uint64 before = g_pre_cache_total_bytes;
-    int cleared = 0;
-    for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) {
-        if (g_pre_cache[i].in_use && g_pre_cache[i].processed_data) free(g_pre_cache[i].processed_data);
-        if (g_pre_cache[i].in_use) cleared++;
-    }
-    memset(g_pre_cache, 0, sizeof(g_pre_cache));
-    g_pre_cache_total_bytes = 0;
-    g_pre_cache_access_counter = 0;
-    prnt("🧹 [PITCH] Cleared cache (entries=%d, bytes=%llu)", cleared, (unsigned long long)before);
+    // Memory cache removed - this function is now a no-op
+    // Kept for compatibility with existing code
+    prnt("🧹 [PITCH] Cache clearing no longer needed (using disk-based files)");
 }
 
 int pitch_get_preprocessed_cache_count(void) {
-    int c = 0; for (int i = 0; i < MAX_PREPROCESSED_SAMPLES; i++) if (g_pre_cache[i].in_use) c++; return c;
+    // Memory cache removed - always return 0
+    return 0;
 }
 
 ma_uint64 pitch_get_preprocessed_memory_usage(void) {
-    return g_pre_cache_total_bytes;
+    // Memory cache removed - always return 0
+    return 0;
 }
 
 int pitch_run_preprocessing(int sample_slot, float cell_pitch) {
@@ -660,4 +467,206 @@ int pitch_set_quality(int q) {
 
 int pitch_get_quality(void) {
     return g_pitch_quality;
+}
+
+// ===================== Disk-Based Pitched File Management =====================
+
+// Get pitched file path for a sample at specific pitch
+const char* pitch_get_file_path(int sample_slot, float pitch) {
+    static char path[512];
+    const char* original_path = sample_bank_get_file_path(sample_slot);
+    if (!original_path) return NULL;
+    
+    // Extract directory and filename
+    char dir[256];
+    strncpy(dir, original_path, sizeof(dir) - 1);
+    dir[sizeof(dir) - 1] = '\0';
+    
+    char* last_slash = strrchr(dir, '/');
+    if (last_slash) *last_slash = '\0';
+    
+    // Extract filename without extension
+    const char* filename = strrchr(original_path, '/');
+    filename = filename ? filename + 1 : original_path;
+    
+    char name_only[128];
+    strncpy(name_only, filename, sizeof(name_only) - 1);
+    name_only[sizeof(name_only) - 1] = '\0';
+    
+    // Remove extension
+    char* dot = strrchr(name_only, '.');
+    if (dot) *dot = '\0';
+    
+    // Create pitched version path: "kick_p1.200.wav"
+    snprintf(path, sizeof(path), "%s/%s_p%.3f.wav", dir, name_only, pitch);
+    return path;
+}
+
+// Generate pitched file on disk using SoundTouch (similar to preprocess_sync but saves to file)
+int pitch_generate_file(int sample_slot, float pitch, const char* output_path) {
+    if (fabsf(pitch - 1.0f) < 0.001f) {
+        return 0; // No need to generate for pitch 1.0
+    }
+    
+    // Check if already exists
+    FILE* test = fopen(output_path, "rb");
+    if (test) {
+        fclose(test);
+        prnt("📁 [PITCH] File already exists: %s", output_path);
+        return 0;
+    }
+    
+    prnt("🎵 [PITCH] Generating pitched file: slot=%d, pitch=%.3f → %s", sample_slot, pitch, output_path);
+    
+    // Prepare decoder
+    ma_decoder tmp;
+    ma_decoder_config cfg = ma_decoder_config_init(ma_format_f32, 2, 48000);
+    const char* file_path = sample_bank_get_file_path(sample_slot);
+    if (!file_path) {
+        prnt_err("❌ [PITCH] pitch_generate_file: no file path for slot=%d", sample_slot);
+        return -1;
+    }
+    
+    ma_result mr = ma_decoder_init_file(file_path, &cfg, &tmp);
+    if (mr != MA_SUCCESS) {
+        prnt_err("❌ [PITCH] ma_decoder_init_file failed: %d", mr);
+        return -1;
+    }
+    
+    ma_uint64 total_frames = 0;
+    ma_decoder_get_length_in_pcm_frames(&tmp, &total_frames);
+    prnt("ℹ️ [PITCH] Source length: %llu frames", (unsigned long long)total_frames);
+    
+    SoundTouch st;
+    st.setSampleRate(48000);
+    st.setChannels(2);
+    st.setPitch(pitch);
+    
+    // Apply current quality settings
+    switch (g_pitch_quality) {
+        case 0: // Best quality
+            st.setSetting(SETTING_USE_QUICKSEEK, 0);
+            st.setSetting(SETTING_USE_AA_FILTER, 1);
+            st.setSetting(SETTING_SEQUENCE_MS, 82);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 28);
+            st.setSetting(SETTING_OVERLAP_MS, 12);
+            break;
+        case 1: // High
+            st.setSetting(SETTING_USE_QUICKSEEK, 0);
+            st.setSetting(SETTING_USE_AA_FILTER, 1);
+            st.setSetting(SETTING_SEQUENCE_MS, 60);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 24);
+            st.setSetting(SETTING_OVERLAP_MS, 10);
+            break;
+        case 2: // Medium
+            st.setSetting(SETTING_USE_QUICKSEEK, 1);
+            st.setSetting(SETTING_USE_AA_FILTER, 1);
+            st.setSetting(SETTING_SEQUENCE_MS, 40);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 15);
+            st.setSetting(SETTING_OVERLAP_MS, 8);
+            break;
+        case 3: // Low
+            st.setSetting(SETTING_USE_QUICKSEEK, 1);
+            st.setSetting(SETTING_USE_AA_FILTER, 0);
+            st.setSetting(SETTING_SEQUENCE_MS, 30);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 12);
+            st.setSetting(SETTING_OVERLAP_MS, 8);
+            break;
+        default: // Lowest
+            st.setSetting(SETTING_USE_QUICKSEEK, 1);
+            st.setSetting(SETTING_USE_AA_FILTER, 0);
+            st.setSetting(SETTING_SEQUENCE_MS, 24);
+            st.setSetting(SETTING_SEEKWINDOW_MS, 8);
+            st.setSetting(SETTING_OVERLAP_MS, 6);
+            break;
+    }
+    
+    // Process and save to WAV file
+    ma_encoder encoder;
+    ma_encoder_config encoder_cfg = ma_encoder_config_init(ma_encoding_format_wav, ma_format_f32, 2, 48000);
+    mr = ma_encoder_init_file(output_path, &encoder_cfg, &encoder);
+    if (mr != MA_SUCCESS) {
+        prnt_err("❌ [PITCH] Failed to init encoder: %d", mr);
+        ma_decoder_uninit(&tmp);
+        return -1;
+    }
+    
+    const ma_uint64 CHUNK = 16384;
+    float buf[CHUNK * 2];
+    float out_buf[CHUNK * 4]; // Extra space for pitch processing
+    ma_uint64 rd = 0;
+    ma_uint64 total_written = 0;
+    
+    ma_decoder_seek_to_pcm_frame(&tmp, 0);
+    
+    for (;;) {
+        mr = ma_decoder_read_pcm_frames(&tmp, buf, CHUNK, &rd);
+        if (mr != MA_SUCCESS || rd == 0) break;
+        
+        st.putSamples(buf, (uint)rd);
+        
+        uint avail = st.numSamples();
+        if (avail > 0) {
+            uint max_recv = MIN(avail, CHUNK * 2);
+            uint received = st.receiveSamples(out_buf, max_recv);
+            if (received > 0) {
+                ma_encoder_write_pcm_frames(&encoder, out_buf, received, NULL);
+                total_written += received;
+            }
+        }
+    }
+    
+    // Flush remaining samples
+    st.flush();
+    uint avail = st.numSamples();
+    if (avail > 0) {
+        uint max_recv = MIN(avail, CHUNK * 2);
+        uint received = st.receiveSamples(out_buf, max_recv);
+        if (received > 0) {
+            ma_encoder_write_pcm_frames(&encoder, out_buf, received, NULL);
+            total_written += received;
+        }
+    }
+    
+    ma_encoder_uninit(&encoder);
+    ma_decoder_uninit(&tmp);
+    
+    if (total_written == 0) {
+        prnt_err("❌ [PITCH] SoundTouch produced 0 frames");
+        unlink(output_path); // Delete empty file
+        return -1;
+    }
+    
+    prnt("✅ [PITCH] Generated pitched file: %llu frames written to %s", (unsigned long long)total_written, output_path);
+    return 0;
+}
+
+// Delete specific pitched file
+void pitch_delete_file(int sample_slot, float pitch) {
+    const char* path = pitch_get_file_path(sample_slot, pitch);
+    if (!path) return;
+    
+    if (unlink(path) == 0) {
+        prnt("🗑️ [PITCH] Deleted: %s", path);
+    } else {
+        prnt("ℹ️ [PITCH] File not found or couldn't delete: %s", path);
+    }
+}
+
+// Delete all pitched files for a sample
+void pitch_delete_all_files_for_sample(int sample_slot) {
+    const char* original_path = sample_bank_get_file_path(sample_slot);
+    if (!original_path) return;
+    
+    prnt("🗑️ [PITCH] Cleaning up all pitched files for sample %d", sample_slot);
+    
+    // Delete common pitch ratios (we'll improve this later with directory scanning)
+    float common_pitches[] = {0.25f, 0.5f, 0.707f, 0.8f, 0.9f, 1.1f, 1.2f, 1.414f, 1.5f, 2.0f, 4.0f};
+    int num_pitches = sizeof(common_pitches) / sizeof(common_pitches[0]);
+    
+    for (int i = 0; i < num_pitches; i++) {
+        pitch_delete_file(sample_slot, common_pitches[i]);
+    }
+    
+    // TODO: Implement proper directory scanning to find all files matching pattern
 }

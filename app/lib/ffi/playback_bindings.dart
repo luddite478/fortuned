@@ -1,6 +1,7 @@
 import 'dart:ffi' as ffi;
 
 import 'native_library.dart';
+import 'package:ffi/ffi.dart' as pkg_ffi;
 
 // Native PlaybackState structure (read-only snapshot)
 final class NativePlaybackState extends ffi.Struct {
@@ -85,6 +86,22 @@ class PlaybackBindings {
     recordingStop = _recordingStopPtr.asFunction<void Function()>();
     _recordingIsActivePtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function()>>('recording_is_active');
     recordingIsActive = _recordingIsActivePtr.asFunction<int Function()>();
+
+    // Preview
+    _previewSamplePathPtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<pkg_ffi.Utf8>, ffi.Float, ffi.Float)>>('preview_sample_path');
+    previewSamplePath = _previewSamplePathPtr.asFunction<int Function(ffi.Pointer<pkg_ffi.Utf8>, double, double)>();
+
+    _previewSlotPtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32, ffi.Float, ffi.Float)>>('preview_slot');
+    previewSlot = _previewSlotPtr.asFunction<int Function(int, double, double)>();
+
+    _previewCellPtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32, ffi.Int32, ffi.Float, ffi.Float)>>('preview_cell');
+    previewCell = _previewCellPtr.asFunction<int Function(int, int, double, double)>();
+
+    _previewStopSamplePtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('preview_stop_sample');
+    previewStopSample = _previewStopSamplePtr.asFunction<void Function()>();
+
+    _previewStopCellPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('preview_stop_cell');
+    previewStopCell = _previewStopCellPtr.asFunction<void Function()>();
   }
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _playbackInitPtr;
@@ -125,6 +142,22 @@ class PlaybackBindings {
   late final void Function() recordingStop;
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _recordingIsActivePtr;
   late final int Function() recordingIsActive;
+
+  // Preview
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<pkg_ffi.Utf8>, ffi.Float, ffi.Float)>> _previewSamplePathPtr;
+  late final int Function(ffi.Pointer<pkg_ffi.Utf8>, double, double) previewSamplePath;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32, ffi.Float, ffi.Float)>> _previewSlotPtr;
+  late final int Function(int, double, double) previewSlot;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function(ffi.Int32, ffi.Int32, ffi.Float, ffi.Float)>> _previewCellPtr;
+  late final int Function(int, int, double, double) previewCell;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _previewStopSamplePtr;
+  late final void Function() previewStopSample;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _previewStopCellPtr;
+  late final void Function() previewStopCell;
 }
 
 

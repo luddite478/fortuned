@@ -1,11 +1,13 @@
 import 'package:flutter/foundation.dart';
 import 'table.dart';
+import 'ui_selection.dart';
 import '../../ffi/table_bindings.dart' show CellData;
 
 /// State management for edit operations (copy, paste, select, jump insert)
 /// Handles table editing functionality
 class EditState extends ChangeNotifier {
   final TableState _tableState;
+  final UiSelectionState _uiSelection;
   final Set<int> _selectedCells = <int>{};
   // Capture grid width at selection time to decode indices consistently
   int _selectionTableCols = 0;
@@ -29,7 +31,14 @@ class EditState extends ChangeNotifier {
   final ValueNotifier<bool> isStepInsertModeNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<int> stepInsertSizeNotifier = ValueNotifier<int>(1);
   
-  EditState(this._tableState);
+  EditState(this._tableState, this._uiSelection) {
+    // When unified selection switches to sample bank, clear cell selection without resetting UI selection
+    _uiSelection.kindNotifier.addListener(() {
+      if (_uiSelection.isSampleBank && _selectedCells.isNotEmpty) {
+        _clearSelectionInternal(preserveUiSelection: true);
+      }
+    });
+  }
   
   // Getters
   bool get isInSelectionMode => _isInSelectionMode;
@@ -59,6 +68,10 @@ class EditState extends ChangeNotifier {
   }
 
   void _applySelection(Set<int> next, {int? anchor}) {
+    _applySelectionInternal(next, anchor: anchor, preserveUiSelection: false);
+  }
+
+  void _applySelectionInternal(Set<int> next, {int? anchor, bool preserveUiSelection = false}) {
     _selectedCells
       ..clear()
       ..addAll(next);
@@ -68,6 +81,14 @@ class EditState extends ChangeNotifier {
     // Record the grid width used during this selection change
     _selectionTableCols = _tableState.getVisibleCols().length;
     selectedCellsNotifier.value = Set.from(_selectedCells);
+    // Update unified UI selection kind
+    if (!preserveUiSelection) {
+      if (_selectedCells.isNotEmpty) {
+        _uiSelection.selectCells();
+      } else {
+        _uiSelection.clear();
+      }
+    }
     notifyListeners();
   }
 
@@ -109,10 +130,14 @@ class EditState extends ChangeNotifier {
     debugPrint('✂️ [EDIT] Begin drag selection at: $cellIndex');
   }
   
-  void clearSelection() {
+  void clearSelection({bool preserveUiSelection = false}) {
+    _clearSelectionInternal(preserveUiSelection: preserveUiSelection);
+  }
+
+  void _clearSelectionInternal({bool preserveUiSelection = false}) {
     _lastSelectedCell = null;
     _selectionTableCols = 0;
-    _applySelection({});
+    _applySelectionInternal({}, preserveUiSelection: preserveUiSelection);
     debugPrint('✂️ [EDIT] Cleared selection');
   }
   

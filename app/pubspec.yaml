@@ -4,41 +4,22 @@ environment:
 version: 1.0.0+1
 flutter:
   assets:
-    - samples/acoustic/
     - samples/drums/
-    - samples/drums/China/
-    - samples/drums/Crash A/
-    - samples/drums/Crash B/
-    - samples/drums/Crash C/
-    - samples/drums/Hi Hat/
     - samples/drums/Kick/
-    - samples/drums/Ride Cymbal/
-    - samples/drums/Snare Off/
-    - samples/drums/Snare On/
-    - samples/drums/Splash/
-    - samples/drums/Tom Floor/
-    - samples/drums/Tom High/
-    - samples/drums/Tom Mid/
-    - samples/noise/
-    - samples/other/
+    - samples/drums/Plates/
+    - samples/drums/Plates/China/
+    - samples/drums/Plates/Crash/
+    - samples/drums/Plates/Hi Hat/
+    - samples/drums/Plates/Ride Cymbal/
+    - samples/drums/Plates/Splash/
+    - samples/drums/Snare/
+    - samples/drums/Toms/
     - samples/synth/
-    - samples/synth/Korg MS-20/
-    - samples/synth/Korg MS-20/Bass/
-    - samples/synth/Korg MS-20/Leads and Keys/
-    - samples/synth/Yamaha CS40M/
-    - samples/synth/Yamaha CS40M/Bass/
-    - samples/synth/Yamaha CS40M/Keys/
-    - samples/wavparty-braids-vol-1/
-    - samples/wavparty-braids-vol-1/chords-tunedC/
-    - samples/wavparty-braids-vol-1/hats/
-    - samples/wavparty-braids-vol-1/kicks/
-    - samples/wavparty-braids-vol-1/perc/
-    - samples/wavparty-braids-vol-1/snares/
-    - samples/wavparty-braids-vol-1/synth-tunedC/
-    - samples/wavparty-braids-vol-1/vox-tunedC/
+    - samples/synth/Bass/
+    - samples/synth/Lead/
     - .env
-    - samples_manifest.json
     - icons/
+    - samples_manifest.json
   uses-material-design: true
 name: niyya
 dev_dependencies:

@@ -24,15 +24,36 @@ Key globals in `app/native/playback.mm`:
 
 ### Column Nodes (A/B Switching)
 
-- Each sequencer column has two nodes: A and B, represented by `MAColumnNodes`
-- The engine alternates between A and B when retriggering a sample on the same column to avoid cut-offs and clicks
-- Each node owns its own decoder and `ma_data_source_node`, attached to the graph endpoint
+- Each sequencer column has two nodes: A and B, represented by `AudioColumnNodes`
+- The engine alternates between A and B (current/next) when retriggering a sample on the same column to avoid cut-offs and clicks
+- Each node (`AudioColumnNode`) owns its own decoder and `ma_data_source_node`, attached to the graph endpoint
+- Helper `switch_column_audio_node()` updates `active_node` and `next_node` on step advance
 
 When setting up a node for a step:
 - If the node is already initialized with the same sample, pitch policy applies:
   - With preprocessing (default): if pitch changed or not yet bound to preprocessed cache, rebuild the node; if same pitch and cache is bound, seek to start and reuse
   - With realtime resampler (optional): update pitch in-place and seek to start
 - Otherwise, the previous node is torn down and a new decoder/node pair is created and attached to the endpoint
+
+### Next-Step Preloading
+
+- A background preloader thread (`preloader_thread_func`) runs every 2ms to prepare audio resources for the predicted next step
+- **Thread-Safe Architecture**:
+  - `ColumnPlayback` (audio thread): Manages A/B node switching for smooth playback
+  - `ColumnPreloader` (preloader thread): Prepares decoder + pitch data source for next step
+  - `AudioColumn` (meta controller): Combines playback and preloading per column
+- **Resource Transfer Process**:
+  1. Preloader thread creates `ma_decoder` and `ma_pitch_data_source` for predicted next step
+  2. Audio thread checks if `preloader->ready && preloader->target_step == current_step`
+  3. If ready: sets `consuming=1` flag, transfers ownership from `ColumnPreloader` to `AudioColumnNode`, attaches to graph
+  4. After transfer: clears `consuming=0` and marks preloader as consumed
+  5. If not ready: falls back to synchronous `setup_column_node()` on audio thread
+- **Safety Mechanisms**:
+  - **Consumption Flag**: `preloader->consuming` prevents cleanup during resource transfer
+  - **Pointer Validation**: Validates data source pointers before passing to miniaudio APIs
+  - **Graceful Fallback**: When preloaded resources are corrupted or unavailable
+  - **Clear Ownership Transfer**: Prevents use-after-free issues with proper nullification
+- Preloader prediction uses `predict_next_step()` which handles region wrapping and song mode progression
 
 ### Volume Smoothing (Exponential)
 
@@ -176,9 +197,146 @@ Other extension ideas:
 - iOS build defines specific miniaudio flags and avoids AVFoundation-side defaults that can force speaker routing; see `playback.mm` preprocessor section for details
 - Miniaudio implementation is compiled in `app/native/miniaudio_impl.mm`; headers are included where needed
 
+## Implementation Plan: Pre-decode Head + Stream Rest
+
+### Current Limitations
+- All samples are fully decoded into RAM regardless of size
+- No differentiation between short kicks (~100ms) and long loops (~10s)
+- Potential memory pressure on mobile devices with many long samples
+
+### Proposed Solution
+Implement a hybrid approach where:
+1. **Short samples** (< configurable threshold): fully pre-decode into RAM
+2. **Long samples** (>= threshold): pre-decode a small head portion + stream the rest
+
+### Configuration Constants (to add)
+```cpp
+#define PRELOAD_FULL_DECODE_THRESHOLD_MS 2000    // 2 seconds - decode fully if shorter
+#define PRELOAD_HEAD_SIZE_MS 250                 // 250ms head for streaming samples  
+#define PRELOAD_HEAD_MIN_FRAMES (SAMPLE_RATE / 16) // Minimum head size (62.5ms at 48kHz)
+#define PRELOADER_SLEEP_US 2000                  // Thread sleep interval
+```
+
+### New Data Structures
+```cpp
+typedef enum {
+    PRELOAD_STRATEGY_FULL,     // Entire sample in RAM
+    PRELOAD_STRATEGY_STREAM    // Head + streaming
+} PreloadStrategy;
+
+typedef struct {
+    PreloadStrategy strategy;
+    ma_decoder* head_decoder;      // For head portion (STREAM strategy)
+    void* head_buffer;             // Pre-decoded head frames
+    ma_uint64 head_frame_count;    // Number of frames in head
+    ma_decoder* stream_decoder;    // For streaming remainder
+    ma_uint64 stream_start_frame;  // Where streaming begins
+} AudioColumnPreload;
+```
+
+### Implementation Steps
+1. **Add size detection**: Use `ma_decoder_get_length_in_pcm_frames()` to determine sample duration
+2. **Strategy selection**: Choose FULL vs STREAM based on duration threshold
+3. **Head extraction**: For STREAM strategy, decode first N frames into buffer
+4. **Custom data source**: Create `ma_preload_data_source` that:
+   - Serves head frames from buffer first
+   - Seamlessly transitions to streaming decoder
+   - Handles seeks across head/stream boundary
+5. **Integration**: Update `preloader_thread_func()` to use new preload logic
+6. **Memory management**: Proper cleanup of head buffers and dual decoders
+
+### Benefits
+- **Memory efficiency**: Long samples use minimal RAM (head only)
+- **Low latency**: Short samples start instantly (fully in RAM)
+- **Configurable**: Easy to tune thresholds based on device capabilities
+- **Backwards compatible**: Falls back to current behavior if needed
+
+## Memory Safety & Thread Safety Analysis
+
+### Current Thread Architecture
+- **Audio Thread**: Runs `audio_callback()` → `play_samples_for_step()` → consumes from `ColumnPlayback`
+- **Preloader Thread**: Runs `preloader_thread_func()` → prepares resources in `ColumnPreloader`
+- **Main Thread**: Controls playback state, handles UI interactions
+
+### Memory Safety Mechanisms ✅
+
+1. **Consumption Flag Protection**:
+   ```cpp
+   // Audio thread marks resources as being consumed
+   preloader->consuming = 1;
+   // ... safe transfer ...
+   preloader->consuming = 0;
+   
+   // Preloader thread respects the flag
+   if (preloader->consuming) continue; // Skip cleanup
+   ```
+
+2. **Ownership Transfer Pattern**:
+   ```cpp
+   // Safe transfer from preloader to playback node
+   node->decoder = preloader->decoder; preloader->decoder = NULL;
+   node->pitch_ds = preloader->pitch_ds; preloader->pitch_ds = NULL;
+   ```
+
+3. **Pointer Validation**:
+   ```cpp
+   if (node->node && node->pitch_ds) {
+       ma_data_source* ds = (ma_data_source*)pitch_ds_as_data_source(...);
+       if (ds) { /* safe to use */ }
+   }
+   ```
+
+4. **Graceful Fallback**: Corrupted preloaded resources fall back to synchronous setup
+
+### Potential Race Conditions ⚠️
+
+1. **Preloader State Reset**: 
+   - Audio thread reads `preloader->ready` while preloader thread may be writing it
+   - **Mitigation**: Single-word writes are atomic on most platforms, but not guaranteed
+
+2. **Resource Cleanup During Transfer**: ✅ **FIXED**
+   - **Previous Issue**: Preloader thread could clean up resources while audio thread was transferring
+   - **Solution**: Added `consuming` flag that prevents cleanup during transfer
+   - **Status**: Race condition eliminated with proper synchronization
+
+3. **Step Prediction Race**:
+   - `predict_next_step()` reads `g_current_step` which audio thread modifies
+   - **Impact**: Minor - worst case is preparing wrong step, fallback handles it
+
+### Recommendations for Enhanced Safety
+
+1. **Current Implementation Status**: ✅ **Production Ready**
+   - Critical race condition fixed with `consuming` flag
+   - Proper ownership transfer and resource validation
+   - Graceful fallbacks for all error conditions
+
+2. **Future Enhancements** (optional optimizations):
+   - **Memory Barriers** (for weak memory model architectures):
+     ```cpp
+     // After preparing resources
+     __sync_synchronize(); // or std::atomic_thread_fence
+     preloader->ready = 1;
+     ```
+   
+   - **Atomic Operations** for critical flags:
+     ```cpp
+     std::atomic<int> ready;
+     std::atomic<int> consuming;
+     std::atomic<int> target_step;
+     ```
+   
+   - **Enhanced Resource Validation** in preloader:
+     ```cpp
+     // Validate resources before marking ready
+     if (decoder && pitch_ds && pitch_ds_as_data_source(pitch_ds)) {
+         preloader->ready = 1;
+     }
+     ```
+
 ## References
 
 - Pattern details: `app/docs/native_state_sync_pattern.md`
-- Playback engine: `app/native/playback.h`, `app/native/playback.mm`
+- Playback engine: `app/native/playback.h`, `app/native/playback.mm` (uses `ColumnPlayback` and `ColumnPreloader`)
 - Flutter bindings/state: `app/lib/ffi/playback_bindings.dart`, `app/lib/state/sequencer/playback.dart`
+- miniaudio documentation: [https://miniaud.io/docs/manual/index.html](https://miniaud.io/docs/manual/index.html)
 

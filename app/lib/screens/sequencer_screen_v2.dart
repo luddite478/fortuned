@@ -26,6 +26,7 @@ import '../state/sequencer/edit.dart';
 import '../state/sequencer/section_settings.dart';
 import '../state/sequencer/slider_overlay.dart';
 import '../state/sequencer/undo_redo.dart';
+import '../state/sequencer/ui_selection.dart';
 
 class SequencerScreenV2 extends StatefulWidget {
   final Map<String, dynamic>? initialSnapshot;
@@ -49,6 +50,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
   late final SoundSettingsState _soundSettingsState;
   late final RecordingState _recordingState;
   late final EditState _editState;
+  late final UiSelectionState _uiSelectionState;
   late final SectionSettingsState _sectionSettingsState;
   late final SliderOverlayState _sliderOverlayState;
   late final UndoRedoState _undoRedoState;
@@ -70,9 +72,10 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     _sampleBrowserState = SampleBrowserState();
     _multitaskPanelState = MultitaskPanelState();
     _soundSettingsState = SoundSettingsState();
+    _uiSelectionState = UiSelectionState();
     _recordingState = RecordingState();
     _recordingState.attachPanelState(_multitaskPanelState);
-    _editState = EditState(_tableState);
+    _editState = EditState(_tableState, _uiSelectionState);
     _sectionSettingsState = SectionSettingsState();
     _sliderOverlayState = SliderOverlayState();
     
@@ -234,6 +237,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
         ChangeNotifierProvider.value(value: _sectionSettingsState),
         ChangeNotifierProvider.value(value: _sliderOverlayState),
         ChangeNotifierProvider.value(value: _undoRedoState),
+        ChangeNotifierProvider.value(value: _uiSelectionState),
       ],
       child: Scaffold(
         backgroundColor: AppColors.sequencerPageBackground,

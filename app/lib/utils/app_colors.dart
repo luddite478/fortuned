@@ -24,6 +24,9 @@ class AppColors {
   static const Color sequencerSecondaryButtonAlt = Color(0xFF5A5A57); // Alternative secondary button
   static const Color sequencerPrimaryButton = Color(0xFF9B8365); // Lighter main action button
   
+  // Selection visuals
+  static const Color sequencerSelectionBorder = Color(0xFFFFFFFF); // White border for selected items
+  
   // Menu colors - black-white/dark-light gray theme for navigation and content screens
   static const Color menuPageBackground = Color(0xFFF8F8F8); // Light gray background
   static const Color menuEntryBackground = Color(0xFFFFFFFF); // White entry background
