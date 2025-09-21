@@ -10,7 +10,6 @@ from pymongo import MongoClient
 from pydantic import BaseModel
 from db.connection import get_database
 from bson import ObjectId
-from bson import ObjectId
 
 # Initialize database connection
 db = get_database()
@@ -35,6 +34,10 @@ class LoginResponse(BaseModel):
     name: Optional[str] = None
     email: Optional[str] = None
     message: Optional[str] = None
+
+class FollowRequest(BaseModel):
+    user_id: str
+    target_user_id: str
 
 def get_db():
     return get_database()
@@ -133,7 +136,8 @@ async def register_handler(request: Request, register_data: RegisterRequest):
             },
             "preferences": {
                 "theme": "dark"
-            }
+            },
+            "following": []
         }
         
         # Insert user
@@ -199,3 +203,131 @@ async def get_users_handler(request: Request, token: str = Query(...), limit: in
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get users: {str(e)}")
+
+async def follow_user_handler(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+    """Follow a user"""
+    try:
+        verify_token(token)
+        
+        user_id = follow_data.user_id
+        target_user_id = follow_data.target_user_id
+        
+        # Check if both users exist
+        user = db.users.find_one({"id": user_id})
+        target_user = db.users.find_one({"id": target_user_id})
+        
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        if not target_user:
+            raise HTTPException(status_code=404, detail=f"Target user not found: {target_user_id}")
+        
+        # Check if already following
+        following = user.get("following", [])
+        if any(f["user_id"] == target_user_id for f in following):
+            return {"success": True, "message": "Already following this user"}
+        
+        # Add to following list
+        following_entry = {
+            "user_id": target_user_id,
+            "username": target_user["username"]
+        }
+        
+        db.users.update_one(
+            {"id": user_id},
+            {"$push": {"following": following_entry}}
+        )
+        
+        return {"success": True, "message": "User followed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to follow user: {str(e)}")
+
+async def unfollow_user_handler(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+    """Unfollow a user"""
+    try:
+        verify_token(token)
+        
+        user_id = follow_data.user_id
+        target_user_id = follow_data.target_user_id
+        
+        # Check if user exists
+        user = db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        
+        # Remove from following list
+        db.users.update_one(
+            {"id": user_id},
+            {"$pull": {"following": {"user_id": target_user_id}}}
+        )
+        
+        return {"success": True, "message": "User unfollowed successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to unfollow user: {str(e)}")
+
+async def search_users_handler(request: Request, token: str = Query(...), query: str = Query(...), limit: int = Query(20)):
+    """Search users by username"""
+    try:
+        verify_token(token)
+        
+        # Search users by username (case-insensitive)
+        search_filter = {
+            "username": {"$regex": query, "$options": "i"}
+        }
+        
+        users_cursor = db.users.find(
+            search_filter,
+            {"_id": 0, "password_hash": 0, "salt": 0}
+        ).limit(limit)
+        
+        users_list = list(users_cursor)
+        
+        return {
+            "users": users_list,
+            "query": query,
+            "count": len(users_list)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to search users: {str(e)}")
+
+async def get_followed_users_handler(request: Request, token: str = Query(...), user_id: str = Query(...)):
+    """Get users followed by a specific user"""
+    try:
+        verify_token(token)
+        
+        # Get user with following list
+        user = db.users.find_one({"id": user_id}, {"following": 1})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        
+        following = user.get("following", [])
+        followed_user_ids = [f["user_id"] for f in following]
+        
+        if not followed_user_ids:
+            return {"users": [], "count": 0}
+        
+        # Get full user data for followed users
+        followed_users_cursor = db.users.find(
+            {"id": {"$in": followed_user_ids}},
+            {"_id": 0, "password_hash": 0, "salt": 0}
+        )
+        
+        followed_users = list(followed_users_cursor)
+        
+        return {
+            "users": followed_users,
+            "count": len(followed_users)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get followed users: {str(e)}")

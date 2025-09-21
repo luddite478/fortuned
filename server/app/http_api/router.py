@@ -5,8 +5,13 @@ from http_api.users import (
     register_handler, 
     get_user_handler, 
     get_users_handler,
+    follow_user_handler,
+    unfollow_user_handler,
+    search_users_handler,
+    get_followed_users_handler,
     LoginRequest,
-    RegisterRequest
+    RegisterRequest,
+    FollowRequest
 )
 from http_api.threads import (
     create_thread_handler,
@@ -53,6 +58,26 @@ async def get_user(request: Request, id: str = Query(...), token: str = Query(..
 async def get_users(request: Request, token: str = Query(...), limit: int = Query(20), offset: int = Query(0)):
     """Get list of users"""
     return await get_users_handler(request, token, limit, offset)
+
+@router.post("/users/follow")
+async def follow_user(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+    """Follow a user"""
+    return await follow_user_handler(request, follow_data, token)
+
+@router.post("/users/unfollow")
+async def unfollow_user(request: Request, follow_data: FollowRequest, token: str = Query(...)):
+    """Unfollow a user"""
+    return await unfollow_user_handler(request, follow_data, token)
+
+@router.get("/users/search")
+async def search_users(request: Request, token: str = Query(...), query: str = Query(...), limit: int = Query(20)):
+    """Search users by username"""
+    return await search_users_handler(request, token, query, limit)
+
+@router.get("/users/following")
+async def get_followed_users(request: Request, token: str = Query(...), user_id: str = Query(...)):
+    """Get users followed by a specific user"""
+    return await get_followed_users_handler(request, token, user_id)
 
 # Threads endpoints (new paths)
 @router.get("/threads")

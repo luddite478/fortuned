@@ -116,7 +116,8 @@ SAMPLE_DATA_TEMPLATES = {
             "last_online": "2024-03-20T14:22:00Z",
             "email_verified": True,
             "preferences": {"theme": "dark"},
-            "threads": []
+            "threads": [],
+            "following": []
         },
         {
             "schema_version": 1,
@@ -131,7 +132,8 @@ SAMPLE_DATA_TEMPLATES = {
             "last_online": "2024-03-19T16:45:00Z",
             "email_verified": True,
             "preferences": {"theme": "light"},
-            "threads": []
+            "threads": [],
+            "following": []
         }
     ],
     "threads": [],

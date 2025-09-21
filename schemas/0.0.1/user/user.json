@@ -59,6 +59,24 @@
                 "type": "string",
                 "pattern": "^[a-fA-F0-9]{24}$"
             }
+        },
+        "following": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "user_id": {
+                        "type": "string",
+                        "pattern": "^[a-fA-F0-9]{24}$"
+                    },
+                    "username": {
+                        "type": "string",
+                        "minLength": 1
+                    }
+                },
+                "required": ["user_id", "username"],
+                "additionalProperties": false
+            }
         }
     },
     "required": [
@@ -71,7 +89,8 @@
         "created_at",
         "email_verified",
         "preferences",
-        "threads"
+        "threads",
+        "following"
     ],
     "additionalProperties": false,
     "indexes": [
