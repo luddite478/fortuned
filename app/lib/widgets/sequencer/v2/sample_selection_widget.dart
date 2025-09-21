@@ -4,6 +4,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/sample_browser.dart';
 import '../../../state/sequencer/sample_bank.dart';
+import '../../../ffi/playback_bindings.dart';
+import 'package:ffi/ffi.dart';
+import 'package:flutter/services.dart' show rootBundle;
+import 'dart:io';
 
 // Main sizing control variables for easy adjustment
 class SampleBrowserSizing {
@@ -231,6 +235,128 @@ class SampleSelectionWidget extends StatelessWidget {
                       final screenWidth = constraints.maxWidth;
                       final spacing = screenWidth * (SampleBrowserSizing.tileSpacing / 100);
                       
+                      final items = context.watch<SampleBrowserState>().currentItems;
+                      final folders = items.where((i) => i.isFolder).toList();
+                      final files = items.where((i) => !i.isFolder).toList();
+
+                      // If this folder contains files (and no subfolders), show a simple list of files
+                      if (folders.isEmpty && files.isNotEmpty) {
+                        return ListView.builder(
+                          padding: EdgeInsets.all(spacing),
+                          itemCount: files.length,
+                          itemBuilder: (context, index) {
+                            final item = files[index];
+                            final browserState = context.read<SampleBrowserState>();
+                            final sampleBankState = context.read<SampleBankState>();
+
+                            final fileNameStyle = GoogleFonts.sourceSans3(
+                              color: AppColors.sequencerText,
+                              fontSize: (screenWidth * 0.035).clamp(12.0, 16.0),
+                              fontWeight: FontWeight.w600,
+                            );
+                            final metaStyle = GoogleFonts.sourceSans3(
+                              color: AppColors.sequencerLightText,
+                              fontSize: (screenWidth * 0.028).clamp(10.0, 13.0),
+                              fontWeight: FontWeight.w600,
+                            );
+
+                            return Container(
+                              margin: EdgeInsets.only(bottom: spacing),
+                              decoration: BoxDecoration(
+                                color: AppColors.sequencerSurfaceRaised,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppColors.sequencerBorder, width: 1),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.sequencerShadow,
+                                    blurRadius: 2,
+                                    offset: const Offset(0, 1),
+                                  ),
+                                ],
+                              ),
+                              child: Material(
+                                color: Colors.transparent,
+                                child: InkWell(
+                                  borderRadius: BorderRadius.circular(6),
+                                  onTap: () async {
+                                    final targetSlot = browserState.targetCol;
+                                    if (targetSlot != null && item.sampleId != null) {
+                                      debugPrint('🎵 Loading sample id=${item.sampleId} into slot $targetSlot');
+                                      final success = await sampleBankState.loadSample(targetSlot, item.sampleId!);
+                                      debugPrint(success ? '✅ Sample loaded successfully' : '❌ Failed to load sample');
+                                    }
+                                    browserState.hide();
+                                  },
+                                  child: Padding(
+                                    padding: EdgeInsets.symmetric(horizontal: spacing, vertical: spacing * 0.8),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                item.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: fileNameStyle,
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                item.name.toLowerCase().endsWith('.wav') ? 'WAV' :
+                                                item.name.toLowerCase().endsWith('.mp3') ? 'MP3' :
+                                                item.name.toLowerCase().endsWith('.m4a') ? 'M4A' : 'AUDIO',
+                                                style: metaStyle,
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        GestureDetector(
+                                          onTap: () async {
+                                            // Preview asset by dumping it to a temp file, then calling native preview
+                                            final bindings = PlaybackBindings();
+                                            final assetPath = item.path;
+                                            if (assetPath.isNotEmpty) {
+                                              try {
+                                                final data = await rootBundle.load(assetPath);
+                                                final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+                                                final safeName = assetPath.replaceAll('/', '_');
+                                                final tmpFile = File('${Directory.systemTemp.path}/preview_$safeName');
+                                                await tmpFile.writeAsBytes(bytes, flush: true);
+                                                final cPath = tmpFile.path.toNativeUtf8();
+                                                try {
+                                                  bindings.previewSamplePath(cPath, 1.0, 1.0);
+                                                } finally {
+                                                  malloc.free(cPath);
+                                                }
+                                              } catch (_) {}
+                                            }
+                                          },
+                                          child: Container(
+                                            width: (screenWidth * 0.10).clamp(40.0, 56.0),
+                                            height: (screenWidth * 0.10).clamp(40.0, 56.0),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.sequencerAccent.withOpacity(0.15),
+                                              borderRadius: BorderRadius.circular(6),
+                                              border: Border.all(color: AppColors.sequencerAccent.withOpacity(0.6), width: 1),
+                                            ),
+                                            child: Icon(
+                                              Icons.play_arrow,
+                                              color: AppColors.sequencerAccent,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      }
+
+                      // Otherwise keep existing grid (folders or mixed content)
                       return GridView.builder(
                         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                           crossAxisCount: 2, // 2 columns as requested
@@ -238,10 +364,10 @@ class SampleSelectionWidget extends StatelessWidget {
                           mainAxisSpacing: spacing,
                           childAspectRatio: SampleBrowserSizing.tileAspectRatio, // Controlled aspect ratio
                         ),
-                        itemCount: context.watch<SampleBrowserState>().currentItems.length,
+                        itemCount: items.length,
                         padding: EdgeInsets.all(spacing),
                     itemBuilder: (context, index) {
-                      final item = context.read<SampleBrowserState>().currentItems[index];
+                      final item = items[index];
                       final browserState = context.read<SampleBrowserState>();
                             
                       return GestureDetector(
@@ -322,9 +448,24 @@ class SampleSelectionWidget extends StatelessWidget {
                                         Expanded(
                                           flex: (SampleBrowserSizing.playButtonAreaRatio * 100).round(),
                                           child: GestureDetector(
-                                            onTap: () {
-                                              // TODO: Implement preview via new audio preview pathway (out of scope here)
-                                              debugPrint('Preview ${item.path} (not implemented)');
+                                            onTap: () async {
+                                              final bindings = PlaybackBindings();
+                                              final assetPath = item.path;
+                                              if (assetPath.isNotEmpty) {
+                                                try {
+                                                  final data = await rootBundle.load(assetPath);
+                                                  final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
+                                                  final safeName = assetPath.replaceAll('/', '_');
+                                                  final tmpFile = File('${Directory.systemTemp.path}/preview_$safeName');
+                                                  await tmpFile.writeAsBytes(bytes, flush: true);
+                                                  final cPath = tmpFile.path.toNativeUtf8();
+                                                  try {
+                                                    bindings.previewSamplePath(cPath, 1.0, 1.0);
+                                                  } finally {
+                                                    malloc.free(cPath);
+                                                  }
+                                                } catch (_) {}
+                                              }
                                             },
                                             child: Container(
                                               width: double.infinity,

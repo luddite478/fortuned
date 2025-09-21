@@ -78,6 +78,7 @@ set(SEQUENCER_SOURCES
   sample_bank.mm
   pitch.mm
   undo_redo.mm
+  preview.mm
 )
 
 # Add SoundTouch sources if enabled
@@ -96,6 +97,7 @@ set_source_files_properties(
   sample_bank.mm
   pitch.mm
   undo_redo.mm
+  preview.mm
   PROPERTIES
   LANGUAGE CXX
   COMPILE_FLAGS "-x c++"

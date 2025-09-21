@@ -36,25 +36,9 @@ class ValueControlOverlay extends StatelessWidget {
                         horizontal: 40.0,
                         vertical: 30.0,
                       ),
-                      decoration: BoxDecoration(
-                        color: AppColors.sequencerSurfaceBase.withOpacity(0.95),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: AppColors.sequencerBorder,
-                          width: 2,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.sequencerShadow.withOpacity(0.8),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          ),
-                          BoxShadow(
-                            color: AppColors.sequencerSurfaceRaised.withOpacity(0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
+                      decoration: const BoxDecoration(
+                        // Make the tile fully transparent with no border/shadow
+                        color: Colors.transparent,
                       ),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -103,13 +87,37 @@ class ValueControlOverlay extends StatelessWidget {
                               return Text(
                                 value,
                                 style: GoogleFonts.sourceSans3(
-                                  color: AppColors.sequencerAccent,
+                                  color: Colors.white,
                                   fontSize: 48,
                                   fontWeight: FontWeight.bold,
                                   letterSpacing: 2.0,
                                 ),
                               );
                             },
+                          ),
+
+                          const SizedBox(height: 12),
+
+                          // Reserve fixed space to avoid layout jumps when spinner shows/hides
+                          SizedBox(
+                            height: 20,
+                            child: Center(
+                              child: ValueListenableBuilder<bool>(
+                                valueListenable: sliderOverlay.processingSource ?? ValueNotifier<bool>(false),
+                                builder: (context, isProcessing, child) {
+                                  return isProcessing
+                                      ? const SizedBox(
+                                          width: 18,
+                                          height: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: AppColors.sequencerAccent,
+                                          ),
+                                        )
+                                      : const SizedBox(width: 18, height: 18);
+                                },
+                              ),
+                            ),
                           ),
                         ],
                       ),

@@ -5,6 +5,8 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/multitask_panel.dart';
 import '../../../utils/app_colors.dart';
+import 'generic_slider.dart';
+import '../../../state/sequencer/slider_overlay.dart';
 
 class StepInsertSettingsWidget extends StatelessWidget {
   const StepInsertSettingsWidget({super.key});
@@ -40,6 +42,7 @@ class StepInsertSettingsWidget extends StatelessWidget {
               final panelHeight = constraints.maxHeight;
               final sliderHeight = panelHeight * 0.7;
               final textHeight = panelHeight * 0.3;
+              final padding = panelHeight * 0.03;
               
               return Column(
                 children: [
@@ -73,48 +76,50 @@ class StepInsertSettingsWidget extends StatelessWidget {
                       ],
                     ),
                   ),
-                  // Slider
+                  // Slider styled like sound settings tile
                   Container(
                     height: sliderHeight,
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        Text(
-                          '1',
-                          style: GoogleFonts.sourceSans3(
-                            color: AppColors.sequencerLightText,
-                            fontSize: 12,
-                          ),
+                    padding: EdgeInsets.all(padding),
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: padding * 0.3,
+                        vertical: padding * 0.05,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.sequencerSurfaceRaised,
+                        borderRadius: BorderRadius.circular(2),
+                        border: Border.all(
+                          color: AppColors.sequencerBorder,
+                          width: 1,
                         ),
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderThemeData(
-                              activeTrackColor: AppColors.sequencerAccent,
-                              inactiveTrackColor: AppColors.sequencerBorder,
-                              thumbColor: AppColors.sequencerAccent,
-                              overlayColor: AppColors.sequencerAccent.withOpacity(0.3),
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-                              trackHeight: 4,
-                            ),
-                            child: Slider(
-                              value: editState.stepInsertSize.toDouble(),
-                              min: 1,
-                              max: 16,
-                              divisions: 15,
-                              onChanged: (value) {
-                                editState.setStepInsertSize(value.round());
-                              },
-                            ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.sequencerShadow,
+                            blurRadius: 2,
+                            offset: const Offset(0, 1),
                           ),
-                        ),
-                        Text(
-                          '16',
-                          style: GoogleFonts.sourceSans3(
-                            color: AppColors.sequencerLightText,
-                            fontSize: 12,
+                          BoxShadow(
+                            color: AppColors.sequencerSurfaceRaised,
+                            blurRadius: 1,
+                            offset: const Offset(0, -0.5),
                           ),
+                        ],
+                      ),
+                      child: Center(
+                        child: GenericSlider(
+                          value: editState.stepInsertSize.toDouble(),
+                          min: 1,
+                          max: 16,
+                          divisions: 15,
+                          type: SliderType.steps,
+                          onChanged: (value) {
+                            editState.setStepInsertSize(value.round());
+                          },
+                          height: sliderHeight,
+                          sliderOverlay: context.read<SliderOverlayState>(),
+                          contextLabel: 'Jump Insert',
                         ),
-                      ],
+                      ),
                     ),
                   ),
                 ],

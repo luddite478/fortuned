@@ -129,6 +129,14 @@ class ThreadsApi {
       throw Exception('Failed to decline invite: ${res.statusCode} ${res.body}');
     }
   }
+
+  // Thread deletion
+  static Future<void> deleteThread(String threadId) async {
+    final res = await ApiHttpClient.delete('/threads/$threadId');
+    if (res.statusCode != 200) {
+      throw Exception('Failed to delete thread: ${res.statusCode} ${res.body}');
+    }
+  }
 }
 
 

@@ -195,7 +195,7 @@ class MessageBarWidget extends StatelessWidget {
                                     child: Center(
                                       child: AppIcons.buildSendIcon(
                                         size: rightButtonSize,
-                                        color: const Color.fromARGB(255, 234, 237, 237),
+                                        color: const Color.fromARGB(255, 197, 199, 199),
                                       ),
                                     ),
                                   ),

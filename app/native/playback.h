@@ -43,14 +43,33 @@ typedef struct {
     float volume_fall_coeff;        // Smoothing coefficient for fade-out
     
     uint64_t id;                    // Unique identifier
-} MAColumnNode;
+} AudioColumnNode;
 
-// Column management (2 nodes per column)
+// A/B node switching for smooth playback (used on audio thread)
 typedef struct {
-    MAColumnNode nodes[2];          // A and B nodes
+    AudioColumnNode nodes[2];       // A and B nodes
     int active_node;                // 0=A, 1=B, -1=none
     int next_node;                  // Which node to use next
-} MAColumnNodes;
+} ColumnPlayback;
+
+// Preloader state for preparing next step resources (used on preloader thread)
+typedef struct {
+    int target_step;                // step index of prepared resources
+    int ready;                      // 0/1 prepared and ready for transfer
+    int consuming;                  // 0/1 audio thread is consuming resources (don't cleanup)
+    int sample_slot;                // prepared sample slot
+    float volume;                   // prepared volume
+    float pitch;                    // prepared pitch
+    void* decoder;                  // ma_decoder*
+    void* pitch_ds;                 // ma_pitch_data_source*
+    int   pitch_ds_initialized;     // 0/1
+} ColumnPreloader;
+
+// Complete column controller combining playback and preloading
+typedef struct {
+    ColumnPlayback* playback;       // reference to A/B playback nodes
+    ColumnPreloader preloader;      // preloaded resources for next step
+} AudioColumn;
 
 // Playback region
 // typedef struct {
@@ -120,6 +139,10 @@ const PlaybackState* playback_state_get_ptr(void);
 __attribute__((visibility("default"))) __attribute__((used))
 void playback_apply_state(const PlaybackState* state);
 
+// Accessor to global node graph for auxiliary modules (e.g., preview)
+__attribute__((visibility("default"))) __attribute__((used))
+struct ma_node_graph* playback_get_node_graph(void);
+
 // Components-based apply removed in favor of unified state snapshot
 
 // Sample bank functions (forward declarations)
@@ -134,6 +157,12 @@ int sample_bank_is_loaded(int slot);
 
 __attribute__((visibility("default"))) __attribute__((used))
 const char* sample_bank_get_file_path(int slot);
+
+// Forward declarations for pitched file management (implemented in pitch.mm)
+const char* pitch_get_file_path(int sample_slot, float pitch);
+int pitch_generate_file(int sample_slot, float pitch, const char* output_path);
+void pitch_delete_file(int sample_slot, float pitch);
+void pitch_delete_all_files_for_sample(int sample_slot);
 
 // Output recording (WAV) control
 __attribute__((visibility("default"))) __attribute__((used))

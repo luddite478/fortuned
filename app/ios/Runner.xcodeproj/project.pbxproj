@@ -18,6 +18,7 @@
 		5571F8C02DF776A00025EF91 /* conversion.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BE2DF776980025EF91 /* conversion.mm */; };
 		5571F8E72DF77A000025EF91 /* table.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8E82DF77A000025EF91 /* table.mm */; };
 		5571F8E92DF77A010025EF91 /* playback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8EA2DF77A010025EF91 /* playback.mm */; };
+		BEEF00012DEFACED00000001 /* preview.mm in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00002DEFACED00000001 /* preview.mm */; };
 		5571F8F02DF77A900025EF91 /* sample_bank.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8F12DF77A900025EF91 /* sample_bank.mm */; };
 		5571F8F22DF77B0A0025EF91 /* miniaudio_impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */; };
 		A1B2C3D40000000100000001 /* undo_redo.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D30000000100000001 /* undo_redo.mm */; };
@@ -106,6 +107,8 @@
 		5571F8BF2DF776990025EF91 /* conversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = conversion.h; path = ../native/conversion.h; sourceTree = "<group>"; };
 		5571F8E82DF77A000025EF91 /* table.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = table.mm; path = ../native/table.mm; sourceTree = "<group>"; };
 		5571F8EA2DF77A010025EF91 /* playback.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = playback.mm; path = ../native/playback.mm; sourceTree = "<group>"; };
+		BEEF00002DEFACED00000001 /* preview.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = preview.mm; path = ../native/preview.mm; sourceTree = "<group>"; };
+		BEEF00032DEFACED00000001 /* preview.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = preview.h; path = ../native/preview.h; sourceTree = "<group>"; };
 		5571F8F12DF77A900025EF91 /* sample_bank.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sample_bank.mm; path = ../native/sample_bank.mm; sourceTree = "<group>"; };
 		5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_impl.mm; path = ../native/miniaudio_impl.mm; sourceTree = "<group>"; };
 		AA11BB201234567800000001 /* cpu_detect_arm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = cpu_detect_arm.cpp; path = ../native/soundtouch/cpu_detect_arm.cpp; sourceTree = "<group>"; };
@@ -238,6 +241,7 @@
 
 				5571F8E82DF77A000025EF91 /* table.mm */,
 				5571F8EA2DF77A010025EF91 /* playback.mm */,
+				BEEF00002DEFACED00000001 /* preview.mm */,
 				5571F8F12DF77A900025EF91 /* sample_bank.mm */,
 				5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */,
 				A1B2C3D30000000100000001 /* undo_redo.mm */,
@@ -246,6 +250,7 @@
 				AA11BB211234567800000001 /* pitch.mm */,
 				5571F8EB2DF77A020025EF91 /* table.h */,
 				5571F8EC2DF77A030025EF91 /* playback.h */,
+				BEEF00032DEFACED00000001 /* preview.h */,
 
 				5571F8BE2DF776980025EF91 /* conversion.mm */,
 				5571F8BF2DF776990025EF91 /* conversion.h */,
@@ -528,6 +533,7 @@
 
 				5571F8E72DF77A000025EF91 /* table.mm in Sources */,
 				5571F8E92DF77A010025EF91 /* playback.mm in Sources */,
+				BEEF00012DEFACED00000001 /* preview.mm in Sources */,
 				5571F8F02DF77A900025EF91 /* sample_bank.mm in Sources */,
 				5571F8F22DF77B0A0025EF91 /* miniaudio_impl.mm in Sources */,
 				A1B2C3D40000000100000001 /* undo_redo.mm in Sources */,

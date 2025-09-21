@@ -4,25 +4,158 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/multitask_panel.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/ui_selection.dart';
 
 class EditButtonsWidget extends StatelessWidget {
   const EditButtonsWidget({super.key});
 
+  // Percent-based sizing configuration for layouts
+  static const double _v1ButtonSizePercent = 0.6; // of container height
+  static const double _v1HorizontalPaddingPercent = 0.1; // of container height
+
+  // V2 percent-based configuration
+  static const double _v2ButtonHeightPercent = 0.7; // of container height
+  static const double _v2RightPaddingPercent = 0.01; // of container width
+  static const double _v2LeftChevronWidthPercent = 0.08; // of container width
+  static const double _v2ButtonHorizontalPaddingPercent = 0.035; // of container height
+  static const double _v2ButtonSpacingPercent = 0.015; // of container width
+  static const double _v2TextFontScale = 0.23; // of button height
+  static const double _v2PerButtonWidthPercent = 0.162; // of container width
+
   @override
   Widget build(BuildContext context) {
-    return Consumer<EditState>(
-      builder: (context, editState, child) {
+    return Consumer4<TableState, EditState, SampleBankState, UiSelectionState>(
+      builder: (context, tableState, editState, sampleBankState, uiSelection, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            // Calculate responsive button size based on available height
             final panelHeight = constraints.maxHeight;
-            final buttonSize = (panelHeight * 0.6).clamp(20.0, 48.0); // 60% of panel height, clamped between 20-48px
-            final iconSize = (buttonSize * 0.6).clamp(16.0, 32.0); // 60% of button size
-            // final badgeSize = (buttonSize * 0.25).clamp(8.0, 16.0); // 25% of button size
-            // final fontSize = (badgeSize * 0.6).clamp(6.0, 12.0); // 60% of badge size
-            
+            final panelWidth = constraints.maxWidth;
+
+            if (tableState.uiEditButtonsLayoutMode == EditButtonsLayoutMode.v2) {
+              // V2: Text buttons, equal size via percents, right-aligned, with small inactive left chevron
+              final buttonHeight = (panelHeight * _v2ButtonHeightPercent).clamp(20.0, 64.0);
+              final textFontSize = (buttonHeight * _v2TextFontScale).clamp(10.0, 22.0);
+              final buttonHPad = (panelHeight * _v2ButtonHorizontalPaddingPercent).clamp(6.0, 18.0);
+              final spacing = (panelWidth * _v2ButtonSpacingPercent).clamp(4.0, 16.0);
+              final buttonWidth = panelWidth * _v2PerButtonWidthPercent;
+
+              return Container(
+                padding: EdgeInsets.only(right: panelWidth * _v2RightPaddingPercent),
+                decoration: BoxDecoration(
+                  color: AppColors.sequencerSurfaceBase,
+                  borderRadius: BorderRadius.circular(2),
+                  border: Border.all(
+                    color: AppColors.sequencerBorder,
+                    width: 0.5,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.sequencerShadow,
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: (panelWidth * _v2LeftChevronWidthPercent).clamp(16.0, buttonHeight),
+                      child: _buildChevronButton(size: (panelWidth * _v2LeftChevronWidthPercent).clamp(16.0, buttonHeight)),
+                    ),
+                    const Spacer(),
+                    SizedBox(
+                      width: buttonWidth,
+                      child: _buildTextActionButton(
+                        label: 'SELECT',
+                        height: buttonHeight,
+                        fontSize: textFontSize,
+                        enabled: true,
+                        onPressed: () => editState.toggleSelectionMode(),
+                        isActive: editState.isInSelectionMode,
+                        horizontalPadding: buttonHPad,
+                      ),
+                    ),
+                    SizedBox(width: spacing),
+                    SizedBox(
+                      width: buttonWidth,
+                      child: _buildTextActionButton(
+                        label: 'JUMP ${editState.stepInsertSize}',
+                        height: buttonHeight,
+                        fontSize: textFontSize,
+                        enabled: true,
+                        onPressed: () {
+                          editState.toggleStepInsertMode();
+                          Provider.of<MultitaskPanelState>(context, listen: false).showStepInsertSettings();
+                        },
+                        isActive: editState.isStepInsertMode,
+                        horizontalPadding: buttonHPad,
+                      ),
+                    ),
+                    SizedBox(width: spacing),
+                    SizedBox(
+                      width: buttonWidth,
+                      child: _buildTextActionButton(
+                        label: 'DEL',
+                        height: buttonHeight,
+                        fontSize: textFontSize,
+                        enabled: editState.hasSelection || uiSelection.isSampleBank,
+                        onPressed: (editState.hasSelection || uiSelection.isSampleBank)
+                            ? () {
+                                if (uiSelection.isSampleBank) {
+                                  final slot = uiSelection.selectedSampleSlot ?? sampleBankState.activeSlot;
+                                  sampleBankState.unloadSample(slot);
+                                  uiSelection.clear();
+                                } else {
+                                  editState.deleteCells();
+                                }
+                              }
+                            : null,
+                        isActive: false,
+                        horizontalPadding: buttonHPad,
+                      ),
+                    ),
+                    SizedBox(width: spacing),
+                    SizedBox(
+                      width: buttonWidth,
+                      child: _buildTextActionButton(
+                        label: 'COPY',
+                        height: buttonHeight,
+                        fontSize: textFontSize,
+                        enabled: editState.hasSelection,
+                        onPressed: editState.hasSelection ? () => editState.copyCells() : null,
+                        isActive: false,
+                        horizontalPadding: buttonHPad,
+                      ),
+                    ),
+                    SizedBox(width: spacing),
+                    SizedBox(
+                      width: buttonWidth,
+                      child: _buildTextActionButton(
+                        label: 'PASTE',
+                        height: buttonHeight,
+                        fontSize: textFontSize,
+                        enabled: editState.hasClipboardData && editState.hasSelection,
+                        onPressed: (editState.hasClipboardData && editState.hasSelection)
+                            ? () => editState.pasteCells()
+                            : null,
+                        isActive: false,
+                        horizontalPadding: buttonHPad,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }
+
+            // V1: Keep as-is (icon buttons, evenly spaced)
+            final buttonSize = (panelHeight * _v1ButtonSizePercent).clamp(20.0, 48.0);
+            final iconSize = (buttonSize * 0.6).clamp(16.0, 32.0);
+
             return Container(
-              padding: EdgeInsets.symmetric(horizontal: panelHeight * 0.1), // Only horizontal padding
+              padding: EdgeInsets.symmetric(horizontal: panelHeight * _v1HorizontalPaddingPercent),
               decoration: BoxDecoration(
                 color: AppColors.sequencerSurfaceBase,
                 borderRadius: BorderRadius.circular(2), // Sharp corners
@@ -42,7 +175,6 @@ class EditButtonsWidget extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Selection Mode Toggle button
                   _buildEditButton(
                     size: buttonSize,
                     iconSize: iconSize,
@@ -51,27 +183,34 @@ class EditButtonsWidget extends StatelessWidget {
                     onPressed: () => editState.toggleSelectionMode(),
                     tooltip: editState.isInSelectionMode ? 'Exit Selection Mode' : 'Enter Selection Mode',
                   ),
-                  // Jump Insert Mode Toggle button with settings access
                   _buildStepInsertToggleButton(
                     size: buttonSize,
                     iconSize: iconSize,
                     editState: editState,
                     context: context,
                   ),
-                  // Delete button
                   _buildEditButton(
                     size: buttonSize,
                     iconSize: iconSize,
                     icon: Icons.delete,
-                    color: editState.hasSelection
+                    color: (editState.hasSelection || context.read<UiSelectionState>().isSampleBank)
                         ? AppColors.sequencerAccent.withOpacity(0.8)
                         : AppColors.sequencerLightText,
-                    onPressed: editState.hasSelection
-                        ? () => editState.deleteCells()
+                    onPressed: (editState.hasSelection || context.read<UiSelectionState>().isSampleBank)
+                        ? () {
+                            final uiSel = context.read<UiSelectionState>();
+                            final sb = context.read<SampleBankState>();
+                            if (uiSel.isSampleBank) {
+                              final slot = uiSel.selectedSampleSlot ?? sb.activeSlot;
+                              sb.unloadSample(slot);
+                              uiSel.clear();
+                            } else {
+                              editState.deleteCells();
+                            }
+                          }
                         : null,
-                    tooltip: 'Delete Selected Cells',
+                    tooltip: 'Delete Selected',
                   ),
-                  // Copy button
                   _buildEditButton(
                     size: buttonSize,
                     iconSize: iconSize,
@@ -84,7 +223,6 @@ class EditButtonsWidget extends StatelessWidget {
                         : null,
                     tooltip: 'Copy Selected Cells',
                   ),
-                  // Paste button
                   _buildEditButton(
                     size: buttonSize,
                     iconSize: iconSize,
@@ -236,6 +374,113 @@ class EditButtonsWidget extends StatelessWidget {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+ 
+  Widget _buildTextActionButton({
+    required String label,
+    required double height,
+    required double fontSize,
+    required bool enabled,
+    required VoidCallback? onPressed,
+    required bool isActive,
+    required double horizontalPadding,
+  }) {
+    final backgroundColor = enabled
+        ? AppColors.sequencerSurfaceRaised
+        : AppColors.sequencerSurfacePressed;
+    final textColor = isActive
+        ? AppColors.sequencerAccent
+        : (enabled ? AppColors.sequencerText : AppColors.sequencerLightText);
+    return Container(
+      height: height,
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(3),
+        border: Border.all(
+          color: isActive ? AppColors.sequencerAccent : AppColors.sequencerBorder,
+          width: isActive ? 1.0 : 0.5,
+        ),
+        boxShadow: enabled
+            ? [
+                BoxShadow(
+                  color: AppColors.sequencerShadow,
+                  blurRadius: 1.5,
+                  offset: const Offset(0, 1),
+                ),
+                BoxShadow(
+                  color: AppColors.sequencerSurfaceRaised,
+                  blurRadius: 0.5,
+                  offset: const Offset(0, -0.5),
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: AppColors.sequencerShadow,
+                  blurRadius: 1,
+                  offset: const Offset(0, 0.5),
+                ),
+              ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled ? onPressed : null,
+          borderRadius: BorderRadius.circular(3),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+            child: Center(
+              child: Text(
+                label,
+                style: GoogleFonts.sourceSans3(
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w700,
+                  color: textColor,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChevronButton({
+    required double size,
+  }) {
+    return Container(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: AppColors.sequencerSurfaceRaised,
+          borderRadius: BorderRadius.circular(2),
+          border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sequencerShadow,
+              blurRadius: 1.5,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: null, // inactive for now
+            borderRadius: BorderRadius.circular(2),
+            child: const Center(
+              child: Icon(
+                Icons.chevron_left,
+                size: 20,
+                color: Colors.white38,
               ),
             ),
           ),

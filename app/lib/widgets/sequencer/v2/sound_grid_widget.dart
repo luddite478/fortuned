@@ -11,6 +11,7 @@ import '../../../state/sequencer/multitask_panel.dart';
 import '../../../ffi/table_bindings.dart';
 import '../../../utils/app_colors.dart';
 import '../../stacked_cards_widget.dart';
+import '../../../state/sequencer/ui_selection.dart';
 
 // Custom ScrollPhysics to retain position when content changes
 class PositionRetainedScrollPhysics extends ScrollPhysics {
@@ -193,12 +194,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       if (yPosition < _edgeThreshold && _scrollController.hasClients && _scrollController.offset > 0) {
         _startAutoScroll(-1.0, localPosition);
         if (cellIndex != null) {
+          context.read<UiSelectionState>().selectCells();
           context.read<EditState>().selectCell(cellIndex, extend: true);
         }
         return;
       } else if (yPosition > containerHeight - _edgeThreshold && _scrollController.hasClients && _scrollController.offset < _scrollController.position.maxScrollExtent) {
         _startAutoScroll(1.0, localPosition);
         if (cellIndex != null) {
+          context.read<UiSelectionState>().selectCells();
           context.read<EditState>().selectCell(cellIndex, extend: true);
         }
         return;
@@ -208,6 +211,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     }
     
     if (cellIndex != null) {
+      context.read<UiSelectionState>().selectCells();
       context.read<EditState>().selectCell(cellIndex, extend: true);
     }
   }
@@ -441,6 +445,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             
             return GestureDetector(
               onTap: () {
+                context.read<UiSelectionState>().selectCells();
                 final edit = Provider.of<EditState>(context, listen: false);
                 if (edit.isInSelectionMode) {
                   if (edit.selectedCells.contains(index)) {
@@ -482,23 +487,14 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                       : cellColor,
                   borderRadius: BorderRadius.circular(2),
                   border: isSelected 
-                      ? Border.all(color: AppColors.sequencerAccent, width: 1.5)
+                      ? Border.all(color: AppColors.sequencerSelectionBorder, width: 2)
                       : isCurrentStep 
                           ? Border.all(color: const Color(0xFF87CEEB), width: 1.5) // Light blue border for current step
                           : isDragHovering
-                              ? Border.all(color: AppColors.sequencerAccent, width: 1.5)
-                              : hasPlacedSample && !isActivePad
-                                  ? Border.all(color: AppColors.sequencerBorder, width: 0.5)
-                                  : Border.all(color: AppColors.sequencerBorder.withOpacity(0.3), width: 0.5),
-                  boxShadow: isSelected 
-                      ? [
-                          BoxShadow(
-                            color: AppColors.sequencerAccent.withOpacity(0.4),
-                            blurRadius: 3,
-                            spreadRadius: 0,
-                            offset: const Offset(0, 1),
-                          )
-                        ]
+                              ? Border.all(color: AppColors.sequencerAccent, width: 0.75)
+                              : Border.all(color: cellColor, width: 0.5),
+                  boxShadow: isSelected
+                      ? null
                       : isCurrentStep
                           ? [
                               // Extra glow for current step - light bulb effect
@@ -524,7 +520,9 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
                 ),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final actualPadding = math.min(constraints.maxWidth, constraints.maxHeight) * (cellPaddingPercent / 100.0);
+                    // Increase inner padding slightly to create space for thin selection border
+                    final basePadding = math.min(constraints.maxWidth, constraints.maxHeight) * (cellPaddingPercent / 100.0);
+                    final actualPadding = basePadding + 1.0;
                     return Padding(
                       padding: EdgeInsets.all(actualPadding), // Use percentage-based padding relative to cell size
                       child: hasPlacedSample ? _buildSampleCellContent(context, tableState, index, placedSample, isActivePad, isCurrentStep, isDragHovering) : _buildEmptyCellContent(),
@@ -1048,6 +1046,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
           final width = rb?.size.width ?? MediaQuery.of(context).size.width;
           final cellIndex = _positionToCellIndex(details.localPosition, width);
           if (cellIndex != null) {
+            context.read<UiSelectionState>().selectCells();
             context.read<EditState>().beginDragSelectionAt(cellIndex);
           }
         }

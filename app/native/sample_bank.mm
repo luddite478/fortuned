@@ -1,4 +1,5 @@
 #include "sample_bank.h"
+#include "pitch.h"  // For pitched file cleanup functions
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -51,6 +52,7 @@ void sample_bank_init(void) {
         g_sample_bank_state.samples[i].loaded = 0;
         g_sample_bank_state.samples[i].settings.volume = 1.0f;
         g_sample_bank_state.samples[i].settings.pitch = 1.0f;
+        g_sample_bank_state.samples[i].is_processing = 0;
         g_sample_bank_state.samples[i].file_path[0] = '\0';
         g_sample_bank_state.samples[i].display_name[0] = '\0';
         g_sample_bank_state.samples[i].sample_id[0] = '\0';
@@ -113,6 +115,7 @@ int sample_bank_load(int slot, const char* file_path) {
     g_sample_bank_state.samples[slot].loaded = 1;
     g_sample_bank_state.samples[slot].settings.volume = 1.0f;
     g_sample_bank_state.samples[slot].settings.pitch = 1.0f;
+    g_sample_bank_state.samples[slot].is_processing = 0;
 
     prnt("✅ [SAMPLE_BANK] Sample loaded in slot %d: %s", slot, file_path);
 
@@ -154,6 +157,9 @@ void sample_bank_unload(int slot) {
 
     prnt("🗑️ [SAMPLE_BANK] Unloading sample from slot %d", slot);
 
+    // Clean up all pitched files for this sample
+    pitch_delete_all_files_for_sample(slot);
+
     // Uninitialize decoder
     ma_decoder_uninit(&g_sample_decoders[slot]);
 
@@ -161,6 +167,7 @@ void sample_bank_unload(int slot) {
     g_sample_bank_state.samples[slot].loaded = 0;
     g_sample_bank_state.samples[slot].settings.volume = 1.0f;
     g_sample_bank_state.samples[slot].settings.pitch = 1.0f;
+    g_sample_bank_state.samples[slot].is_processing = 0;
     g_sample_bank_state.samples[slot].file_path[0] = '\0';
     g_sample_bank_state.samples[slot].display_name[0] = '\0';
     g_sample_bank_state.samples[slot].sample_id[0] = '\0';
@@ -258,11 +265,15 @@ void sample_bank_set_sample_pitch(int slot, float pitch) {
     if (pitch < 0.25f) pitch = 0.25f;
     if (pitch > 4.0f) pitch = 4.0f;
     
+    // Clean up all existing pitched files since sample pitch changed
+    pitch_delete_all_files_for_sample(slot);
+    
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
     // Kick preprocessing for new default pitch so next triggers hit cache
     if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
+        // Centralized processing toggles in pitch_start_async_preprocessing
         pitch_start_async_preprocessing(slot, pitch);
     }
     UndoRedoManager_record();
@@ -301,11 +312,15 @@ void sample_bank_set_sample_settings(int slot, float volume, float pitch) {
     if (pitch < 0.25f) pitch = 0.25f;
     if (pitch > 4.0f) pitch = 4.0f;
 
+    // Clean up all existing pitched files since sample pitch changed
+    pitch_delete_all_files_for_sample(slot);
+
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.volume = volume;
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
     if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
+        // Centralized processing toggles in pitch_start_async_preprocessing
         pitch_start_async_preprocessing(slot, pitch);
     }
     UndoRedoManager_record();
@@ -318,6 +333,11 @@ const SampleBankState* sample_bank_state_get_ptr(void) {
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+extern "C" void sample_bank_set_processing(int slot, int processing) {
+    if (slot < 0 || slot >= MAX_SAMPLE_SLOTS) return;
+    g_sample_bank_state.samples[slot].is_processing = processing ? 1 : 0;
+}
 
 
 

@@ -23,6 +23,9 @@ final class Sample extends ffi.Struct {
 
   external SampleSettings settings;
 
+  @ffi.Int32()
+  external int is_processing; // mirrors native Sample.is_processing
+
   @ffi.Array(SAMPLE_MAX_ID)
   external ffi.Array<ffi.Char> sample_id; // Inline fixed-size array
 
@@ -49,6 +52,7 @@ class SampleData {
   final bool loaded;
   final double volume;
   final double pitch;
+  final bool isProcessing;
   final String? id;
   final String? filePath;
   final String? displayName;
@@ -57,6 +61,7 @@ class SampleData {
     required this.loaded,
     required this.volume,
     required this.pitch,
+    required this.isProcessing,
     this.id,
     this.filePath,
     this.displayName,
@@ -71,6 +76,7 @@ class SampleData {
       loaded: sample.loaded != 0,
       volume: sample.settings.volume,
       pitch: sample.settings.pitch,
+      isProcessing: sample.is_processing != 0,
       id: id.isEmpty ? null : id,
       filePath: path.isEmpty ? null : path,
       displayName: name.isEmpty ? null : name,

@@ -369,3 +369,30 @@ async def manage_invitation_handler(request: Request, thread_id: str, user_id: s
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
+async def delete_thread_handler(request: Request, thread_id: str, token: str = Query(...)):
+    """Delete a thread by ID"""
+    verify_token(token)
+    try:
+        db = get_db()
+        
+        # Check if thread exists
+        thread = db.threads.find_one({"id": thread_id})
+        if not thread:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        
+        # Delete all messages associated with this thread
+        db.messages.delete_many({"parent_thread": thread_id})
+        
+        # Delete the thread itself
+        result = db.threads.delete_one({"id": thread_id})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(status_code=404, detail="Thread not found")
+        
+        return {"status": "thread_deleted", "thread_id": thread_id}
+    
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+

@@ -17,6 +17,9 @@ final class Cell extends ffi.Struct {
   external int sample_slot;
 
   external CellSettings settings;
+
+  @ffi.Int32()
+  external int is_processing;
 }
 
 // Native Section structure matching C definition
@@ -59,11 +62,13 @@ class CellData {
   final int sampleSlot;
   final double volume;
   final double pitch;
+  final bool isProcessing;
 
   const CellData({
     required this.sampleSlot,
     required this.volume,
     required this.pitch,
+    required this.isProcessing,
   });
 
   factory CellData.fromPointer(ffi.Pointer<Cell> cellPtr) {
@@ -72,6 +77,7 @@ class CellData {
         sampleSlot: -1,
         volume: 1.0,
         pitch: 1.0,
+        isProcessing: false,
       );
     }
 
@@ -80,6 +86,7 @@ class CellData {
       sampleSlot: cell.sample_slot,
       volume: cell.settings.volume,
       pitch: cell.settings.pitch,
+      isProcessing: cell.is_processing != 0,
     );
   }
 

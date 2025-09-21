@@ -83,6 +83,7 @@ class _NativeTableState {
 /// This file maintains references/pointers to native table data and provides
 /// efficient change tracking using ValueNotifiers for UI updates.
 enum SoundGridViewMode { stack, flat }
+enum EditButtonsLayoutMode { v1, v2 }
 
 class TableState extends ChangeNotifier {
   static const int maxNotifiersRows = 256;
@@ -117,6 +118,8 @@ class TableState extends ChangeNotifier {
   
   // UI: sound grid view mode (stacked cards vs flat tabs)
   SoundGridViewMode _uiSoundGridViewMode = SoundGridViewMode.stack;
+  // UI: edit buttons layout mode (v1 classic, v2 right-aligned large)
+  EditButtonsLayoutMode _uiEditButtonsLayoutMode = EditButtonsLayoutMode.v2;
   
   // Sound grid stack (multiple grids)
   int _uiCurrentSoundGridIndex = 0;
@@ -164,6 +167,14 @@ class TableState extends ChangeNotifier {
     _uiSoundGridViewMode = mode;
     notifyListeners();
     debugPrint('🎛️ [TABLE_STATE] Set UI sound grid view mode to $mode');
+  }
+
+  /// Set UI edit buttons layout mode (v1 vs v2)
+  void setUiEditButtonsLayoutMode(EditButtonsLayoutMode mode) {
+    if (_uiEditButtonsLayoutMode == mode) return;
+    _uiEditButtonsLayoutMode = mode;
+    notifyListeners();
+    debugPrint('🎚️ [TABLE_STATE] Set UI edit buttons layout mode to $mode');
   }
 
   // Removed: setUiColsPerLayer; using native layers config
@@ -297,6 +308,12 @@ class TableState extends ChangeNotifier {
     
     return _cellNotifiers[step][col]!;
   }
+
+  // Convenience: read a single cell snapshot (no notifier) using direct pointer
+  CellData readCell(int step, int col) {
+    final ptr = getCellPointer(step, col);
+    return CellData.fromPointer(ptr);
+  }
   
   /// Sync table state from native using seqlock pattern (called by timer each frame)
   void syncTableState() {
@@ -428,6 +445,7 @@ class TableState extends ChangeNotifier {
   int get uiSelectedLayer => _uiSelectedLayer;
   bool get initialized => _initialized;
   SoundGridViewMode get uiSoundGridViewMode => _uiSoundGridViewMode;
+  EditButtonsLayoutMode get uiEditButtonsLayoutMode => _uiEditButtonsLayoutMode;
 
   /// Get layers-per-section count including empty layers (length = sectionsCount)
   List<int> getLayersLengthPerSection() {

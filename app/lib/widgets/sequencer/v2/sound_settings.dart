@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../utils/app_colors.dart';
 import 'package:provider/provider.dart';
@@ -7,6 +8,7 @@ import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/sample_bank.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/playback.dart';
+import '../../../ffi/playback_bindings.dart';
 import '../../../ffi/table_bindings.dart' show CellData;
 // musical notes handled elsewhere if needed
 import 'generic_slider.dart';
@@ -56,7 +58,7 @@ class SoundSettingsWidget extends StatefulWidget {
     required this.closeAction,
     required this.noDataMessage,
     required this.noDataIcon,
-    this.showDeleteButton = true,
+    this.showDeleteButton = false,
     this.showCloseButton = true,
   });
 
@@ -113,6 +115,16 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
   // Simple variables for slider components heights (within the slider tile)
   // Reserved for future layout tuning
 
+  // Debounce timers for pitch changes
+  Timer? _cellPitchDebounceTimer;
+  Timer? _samplePitchDebounceTimer;
+  // Processing timers to stop spinner heuristically
+  Timer? _processingStopTimer; // fallback (kept in case polling misses)
+  Timer? _processingPollTimer;
+  // Debounce timers for volume
+  Timer? _sampleVolumeDebounceTimer;
+  Timer? _cellVolumeDebounceTimer;
+
   @override
   void initState() {
     super.initState();
@@ -122,6 +134,19 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     } else {
       _selectedControl = 'VOL';
     }
+  }
+
+  // (removed legacy ratio-based polling)
+
+  @override
+  void dispose() {
+    _cellPitchDebounceTimer?.cancel();
+    _samplePitchDebounceTimer?.cancel();
+    _processingStopTimer?.cancel();
+    _processingPollTimer?.cancel();
+    _sampleVolumeDebounceTimer?.cancel();
+    _cellVolumeDebounceTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -221,6 +246,15 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
       scrollDirection: Axis.horizontal,
       child: Row(
         children: [
+          // Preview button (speaker) for cell/sample settings, placed left of VOL
+          if (widget.type != SettingsType.master)
+            Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: SizedBox(
+                width: 48,
+                child: _buildPreviewButton(headerHeight * 0.7, tableState, sampleBankState, editState, currentIndex),
+              ),
+            ),
           // Header buttons from the configuration
           ...widget.headerButtons.map((buttonName) {
             return Padding(
@@ -247,20 +281,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
             const SizedBox(width: 16.0),
           
           // DEL button (if enabled)
-          if (widget.showDeleteButton)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: SizedBox(
-                width: 80,
-                child: _buildSettingsButton(
-                  'DEL', 
-                  false, 
-                  headerHeight * 0.7, 
-                  labelFontSize, 
-                  _deleteActionProvider(widget.type, tableState, sampleBankState, editState, currentIndex)
-                ),
-              ),
-            ),
+          // Delete moved to Edit Buttons panel
           
           // Close button (if enabled)
           if (widget.showCloseButton)
@@ -457,7 +478,12 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                   max: 1.0,
                   divisions: 100,
                   type: SliderType.volume,
-                  onChanged: (value) => sampleBankState.setSampleSettings(index, volume: value),
+                  onChanged: (value) {
+                    _sampleVolumeDebounceTimer?.cancel();
+                    _sampleVolumeDebounceTimer = Timer(const Duration(milliseconds: 200), () {
+                      sampleBankState.setSampleSettings(index, volume: value);
+                    });
+                  },
                   height: height,
                   sliderOverlay: context.read<SliderOverlayState>(),
                   contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
@@ -495,16 +521,32 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         child: widget.type == SettingsType.sample
             ? ValueListenableBuilder<double>(
                 valueListenable: sampleBankState.getSamplePitchNotifier(index),
-                builder: (context, pitch, _) => GenericSlider(
-                  value: PitchConversion.pitchRatioToUiValue(pitch),
-                  min: 0.0,
-                  max: 1.0,
-                  divisions: 24,
-                  type: SliderType.pitch,
-                  onChanged: (value) => sampleBankState.setSampleSettings(index, pitch: PitchConversion.uiValueToPitchRatio(value)),
-                  height: height,
-                  sliderOverlay: context.read<SliderOverlayState>(),
-                  contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
+                builder: (context, pitch, _) => ValueListenableBuilder<bool>(
+                  valueListenable: sampleBankState.getSampleProcessingNotifier(index),
+                  builder: (context, isProcessing, __) {
+                    // Provide processing source to overlay instead of mutating overlay state
+                    final overlay = context.read<SliderOverlayState>();
+                    overlay.setProcessingSource(sampleBankState.getSampleProcessingNotifier(index));
+                    return GenericSlider(
+                      value: PitchConversion.pitchRatioToUiValue(pitch),
+                      min: 0.0,
+                      max: 1.0,
+                      divisions: 24,
+                      type: SliderType.pitch,
+                      onChanged: (value) {
+                        // Debounce sample pitch commit
+                        _samplePitchDebounceTimer?.cancel();
+                        _samplePitchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+                          final ratio = PitchConversion.uiValueToPitchRatio(value);
+                          sampleBankState.setSampleSettings(index, pitch: ratio);
+                        });
+                      },
+                      height: height,
+                      sliderOverlay: overlay,
+                      processingSource: sampleBankState.getSampleProcessingNotifier(index),
+                      contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
+                    );
+                  },
                 ),
               )
             : _buildCellPitchSlider(tableState, index, height),
@@ -644,6 +686,85 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     );
   }
 
+  Widget _buildPreviewButton(double height, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
+    final isEnabled = () {
+      if (widget.type == SettingsType.sample) {
+        final idx = sampleBankState.activeSlot;
+        return sampleBankState.isSlotLoaded(idx);
+      } else if (widget.type == SettingsType.cell) {
+        final sel = _resolveSelectedCell(editState);
+        if (sel == null) return false;
+        final visibleCols = tableState.getVisibleCols().length;
+        final row = sel ~/ visibleCols;
+        final col = sel % visibleCols;
+        final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
+        final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+        final cell = CellData.fromPointer(tableState.getCellPointer(step, colAbs));
+        return cell.isNotEmpty && cell.sampleSlot >= 0;
+      }
+      return false;
+    }();
+
+    return GestureDetector(
+      onTap: !isEnabled ? null : () => _triggerPreview(tableState, sampleBankState, editState),
+      child: Opacity(
+        opacity: isEnabled ? 1.0 : 0.4,
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: AppColors.sequencerSurfaceRaised,
+            borderRadius: BorderRadius.circular(2),
+            border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+            boxShadow: const [
+              BoxShadow(color: AppColors.sequencerShadow, blurRadius: 1, offset: Offset(0, 0.5)),
+            ],
+          ),
+          child: const Center(
+            child: Icon(
+              Icons.volume_up,
+              color: AppColors.sequencerText,
+              size: 18,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _triggerPreview(TableState tableState, SampleBankState sampleBankState, EditState editState) {
+    final bindings = PlaybackBindings();
+    if (widget.type == SettingsType.sample) {
+      final idx = sampleBankState.activeSlot;
+      if (!sampleBankState.isSlotLoaded(idx)) return;
+      final vol = sampleBankState.getSampleVolumeNotifier(idx).value;
+      final pitch = sampleBankState.getSamplePitchNotifier(idx).value;
+      bindings.previewSlot(idx, pitch, vol);
+      return;
+    }
+    // Cell preview
+    final sel = _resolveSelectedCell(editState);
+    if (sel == null) return;
+    final visibleCols = tableState.getVisibleCols().length;
+    final row = sel ~/ visibleCols;
+    final col = sel % visibleCols;
+    final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
+    final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+    final cell = CellData.fromPointer(tableState.getCellPointer(step, colAbs));
+    if (!cell.isNotEmpty || cell.sampleSlot < 0) return;
+    // Resolve effective settings
+    double effVol = cell.volume;
+    if (effVol < 0.0) {
+      final sd = sampleBankState.getSampleData(cell.sampleSlot);
+      effVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
+    }
+    double effPitch = cell.pitch;
+    if (effPitch < 0.0) {
+      final sd = sampleBankState.getSampleData(cell.sampleSlot);
+      effPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
+    }
+    bindings.previewCell(step, colAbs, effPitch, effVol);
+  }
+
   // Helpers
   static int? _resolveSelectedCell(EditState editState) {
     final selected = editState.selectedCells;
@@ -671,32 +792,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     return const _HasDataAndIndex(hasData: true, index: 0);
   }
 
-  VoidCallback? _deleteActionProvider(SettingsType type, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
-    if (!widget.showDeleteButton) return null;
-    if (type == SettingsType.sample) {
-      final idx = sampleBankState.activeSlot;
-      if (sampleBankState.getSlotName(idx) == null && !sampleBankState.isSlotLoaded(idx)) return null;
-      return () {
-        sampleBankState.unloadSample(idx);
-        widget.closeAction();
-      };
-    } else if (type == SettingsType.cell) {
-      final selectedCell = _resolveSelectedCell(editState);
-      if (selectedCell == null) return null;
-      final row = selectedCell ~/ tableState.maxCols;
-      final col = selectedCell % tableState.maxCols;
-      final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
-      final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
-      final cellPtr = tableState.getCellPointer(step, colAbs);
-      final cellData = CellData.fromPointer(cellPtr);
-      if (!cellData.isNotEmpty) return null;
-      return () {
-        tableState.clearCell(step, colAbs);
-        widget.closeAction();
-      };
-    }
-    return null;
-  }
+  // Delete action moved to Edit Buttons; keep stub removed.
 
   Widget _buildCellVolumeSlider(TableState tableState, int selectedCellIndex, double height) {
     final visibleCols = tableState.getVisibleCols().length;
@@ -704,8 +800,9 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     final col = selectedCellIndex % visibleCols;
     final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
     final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+    final cellNotifier = tableState.getCellNotifier(step, colAbs);
     return ValueListenableBuilder<CellData>(
-      valueListenable: tableState.getCellNotifier(step, colAbs),
+      valueListenable: cellNotifier,
       builder: (context, cell, _) {
         final sampleBank = context.read<SampleBankState>();
         double defaultVol = 1.0;
@@ -723,7 +820,10 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           type: SliderType.volume,
           onChanged: (value) {
             if (cell.isNotEmpty && cell.sampleSlot != -1) {
-              tableState.setCellSettings(step, colAbs, volume: value);
+              _cellVolumeDebounceTimer?.cancel();
+              _cellVolumeDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+                tableState.setCellSettings(step, colAbs, volume: value);
+              });
             }
           },
           height: height,
@@ -740,8 +840,9 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     final col = selectedCellIndex % visibleCols;
     final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
     final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
+    final cellNotifier = tableState.getCellNotifier(step, colAbs);
     return ValueListenableBuilder<CellData>(
-      valueListenable: tableState.getCellNotifier(step, colAbs),
+      valueListenable: cellNotifier,
       builder: (context, cell, _) {
         final sampleBank = context.read<SampleBankState>();
         double defaultPitch = 1.0;
@@ -751,25 +852,59 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         }
         final effectiveRatio = (cell.pitch < 0.0) ? defaultPitch : cell.pitch;
         final uiPitch = PitchConversion.pitchRatioToUiValue(effectiveRatio);
-        return GenericSlider(
-          value: uiPitch,
-          min: 0.0,
-          max: 1.0,
-          divisions: 24,
-          type: SliderType.pitch,
-          onChanged: (value) {
-            if (cell.isNotEmpty && cell.sampleSlot != -1) {
-              final ratio = PitchConversion.uiValueToPitchRatio(value);
-              tableState.setCellSettings(step, colAbs, pitch: ratio);
-            }
-          },
-          height: height,
-          sliderOverlay: context.read<SliderOverlayState>(),
-          contextLabel: 'Cell ${row + 1}:${col + 1}',
-        );
+        final overlay = context.read<SliderOverlayState>();
+        final sampleSlot = cell.sampleSlot;
+        if (sampleSlot >= 0) {
+          return ValueListenableBuilder<bool>(
+            valueListenable: sampleBank.getSampleProcessingNotifier(sampleSlot),
+            builder: (context, isProcessing, ___) {
+              // Provide processing source to overlay during interaction
+              overlay.setProcessingSource(sampleBank.getSampleProcessingNotifier(sampleSlot));
+              return GenericSlider(
+                value: uiPitch,
+                min: 0.0,
+                max: 1.0,
+                divisions: 24,
+                type: SliderType.pitch,
+                onChanged: (value) {
+                  if (cell.isNotEmpty && cell.sampleSlot != -1) {
+                    // Debounce cell pitch commit
+                    _cellPitchDebounceTimer?.cancel();
+                    _cellPitchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+                      final ratio = PitchConversion.uiValueToPitchRatio(value);
+                      tableState.setCellSettings(step, colAbs, pitch: ratio);
+                    });
+                  }
+                },
+                height: height,
+                sliderOverlay: overlay,
+                processingSource: sampleBank.getSampleProcessingNotifier(sampleSlot),
+                contextLabel: 'Cell ${row + 1}:${col + 1}',
+              );
+            },
+          );
+        } else {
+          // No sample → no processing
+          // No sample → ensure processing source is null
+          overlay.setProcessingSource(null);
+          return GenericSlider(
+            value: uiPitch,
+            min: 0.0,
+            max: 1.0,
+            divisions: 24,
+            type: SliderType.pitch,
+            onChanged: (_) {},
+            height: height,
+            sliderOverlay: overlay,
+            processingSource: null,
+            contextLabel: 'Cell ${row + 1}:${col + 1}',
+          );
+        }
       },
     );
   }
+
+  // (watch helpers removed in favor of direct ValueListenableBuilder wiring)
 } 
 
 class _HasDataAndIndex {

@@ -77,3 +77,5 @@ Batching (multi-cell optimization):
 - Grid hit-testing accounts for vertical scroll and horizontal spacing to ensure that the cell computed from pointer position aligns with the rendered grid, keeping selection and paste targets in sync.
 
 
+
+

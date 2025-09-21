@@ -24,6 +24,7 @@ typedef struct {
 typedef struct {
     int loaded;                         // 0 = empty, 1 = loaded
     SampleSettings settings;            // audio settings
+    int is_processing;                  // 1 while preprocessing job(s) active for this sample
     char sample_id[SAMPLE_MAX_ID];      // Stable ID for the sample (optional)
     char file_path[SAMPLE_MAX_PATH];    // Path to sample file (empty string if none)
     char display_name[SAMPLE_MAX_NAME]; // Display name for UI (empty string if none)
@@ -90,6 +91,10 @@ const SampleBankState* sample_bank_state_get_ptr(void);
 // Unified naming to mirror table_apply_state
 __attribute__((visibility("default"))) __attribute__((used))
 void sample_bank_apply_state(const SampleBankState* state);
+
+// Processing state hooks used by pitch module
+__attribute__((visibility("default"))) __attribute__((used))
+void sample_bank_set_processing(int slot, int processing);
 
 
 #ifdef __cplusplus

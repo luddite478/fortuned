@@ -70,6 +70,10 @@ if (Test-Path ".env") {
     $pubspec.flutter.assets += ".env"
 }
 
+# Add icons if it exists
+if (Test-Path "icons/") {
+    $pubspec.flutter.assets += "icons/"
+}
 # Add samples_manifest.json
 $pubspec.flutter.assets += "samples_manifest.json"
 
