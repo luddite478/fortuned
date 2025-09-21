@@ -154,7 +154,7 @@ class TableState extends ChangeNotifier {
     final layers = totalLayers;
     if (layer >= 0 && layer < layers) {
       _uiSelectedLayer = layer;
-      notifyListeners() ; // ???
+      notifyListeners();
       debugPrint('🎨 [TABLE_STATE] Set UI selected layer to $layer / totalLayers=$layers');
     } else {
       debugPrint('⚠️ [TABLE_STATE] Ignored setUiSelectedLayer($layer) out of range [0, ${layers - 1}]');

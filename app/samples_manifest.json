@@ -1,301 +1,49 @@
 {
-  "scan_timestamp": 1758463593,
+  "scan_timestamp": 1758466821,
   "total_files": 146,
   "samples": {
-    "adf729ed6de6": {
-      "path": "samples/drums/Kick/Kick 1.wav",
-      "built_in": true
-    },
-    "1ed0605aef68": {
-      "path": "samples/drums/Kick/Kick 2.wav",
-      "built_in": true
-    },
-    "26dda5340a69": {
-      "path": "samples/drums/Kick/Kick 3.wav",
-      "built_in": true
-    },
-    "9f8efe160c11": {
-      "path": "samples/drums/Kick/Kick 4.wav",
+    "7db254aa2a8a": {
+      "path": "samples/drums/Kick/Kick Ghost.wav",
       "built_in": true
     },
     "eefe32928bf9": {
       "path": "samples/drums/Kick/Kick 5.wav",
       "built_in": true
     },
+    "9f8efe160c11": {
+      "path": "samples/drums/Kick/Kick 4.wav",
+      "built_in": true
+    },
     "fbd6e574b3c7": {
       "path": "samples/drums/Kick/Kick 6.wav",
       "built_in": true
     },
-    "7db254aa2a8a": {
-      "path": "samples/drums/Kick/Kick Ghost.wav",
+    "26dda5340a69": {
+      "path": "samples/drums/Kick/Kick 3.wav",
       "built_in": true
     },
-    "b39e9ad93c63": {
-      "path": "samples/drums/Plates/China/China 1.wav",
+    "1ed0605aef68": {
+      "path": "samples/drums/Kick/Kick 2.wav",
       "built_in": true
     },
-    "64cc0e989258": {
-      "path": "samples/drums/Plates/China/China 2.wav",
-      "built_in": true
-    },
-    "008305cda93e": {
-      "path": "samples/drums/Plates/China/China 3.wav",
-      "built_in": true
-    },
-    "db43b35b8765": {
-      "path": "samples/drums/Plates/China/China 4.wav",
-      "built_in": true
-    },
-    "3fc868990b29": {
-      "path": "samples/drums/Plates/China/China Bell.wav",
-      "built_in": true
-    },
-    "3ec39880de87": {
-      "path": "samples/drums/Plates/China/China Mute 1.wav",
-      "built_in": true
-    },
-    "3724519f4675": {
-      "path": "samples/drums/Plates/China/China Mute 2.wav",
-      "built_in": true
-    },
-    "a67ebaa64fe9": {
-      "path": "samples/drums/Plates/China/China Mute 3.wav",
-      "built_in": true
-    },
-    "6b2528f2ff14": {
-      "path": "samples/drums/Plates/Crash/Crash A 1.wav",
-      "built_in": true
-    },
-    "259bb8002bca": {
-      "path": "samples/drums/Plates/Crash/Crash A 2.wav",
-      "built_in": true
-    },
-    "82d18714d25a": {
-      "path": "samples/drums/Plates/Crash/Crash A 3.wav",
-      "built_in": true
-    },
-    "65319028da63": {
-      "path": "samples/drums/Plates/Crash/Crash A 4.wav",
-      "built_in": true
-    },
-    "57d2634e47e1": {
-      "path": "samples/drums/Plates/Crash/Crash A 5.wav",
-      "built_in": true
-    },
-    "6444a2769cd9": {
-      "path": "samples/drums/Plates/Crash/Crash A Bell.wav",
-      "built_in": true
-    },
-    "57febbcf5f77": {
-      "path": "samples/drums/Plates/Crash/Crash A Mute.wav",
-      "built_in": true
-    },
-    "c818fc7a16f1": {
-      "path": "samples/drums/Plates/Crash/Crash B 1.wav",
-      "built_in": true
-    },
-    "f9ec8692ccd0": {
-      "path": "samples/drums/Plates/Crash/Crash B 2.wav",
-      "built_in": true
-    },
-    "0379097a5836": {
-      "path": "samples/drums/Plates/Crash/Crash B 3.wav",
-      "built_in": true
-    },
-    "9435748880e1": {
-      "path": "samples/drums/Plates/Crash/Crash B Mute.wav",
-      "built_in": true
-    },
-    "886236337f90": {
-      "path": "samples/drums/Plates/Crash/Crash C 1.wav",
-      "built_in": true
-    },
-    "0c985d7bf1e5": {
-      "path": "samples/drums/Plates/Crash/Crash C 2.wav",
-      "built_in": true
-    },
-    "ae68106aba1c": {
-      "path": "samples/drums/Plates/Crash/Crash C 3.wav",
-      "built_in": true
-    },
-    "63c5a820c78e": {
-      "path": "samples/drums/Plates/Crash/Crash C 4.wav",
-      "built_in": true
-    },
-    "c343f366359a": {
-      "path": "samples/drums/Plates/Crash/Crash C Mute.wav",
-      "built_in": true
-    },
-    "a6fce3a8e1b6": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 1.wav",
-      "built_in": true
-    },
-    "971c261bcc0c": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 10.wav",
-      "built_in": true
-    },
-    "65be2a6e4a9f": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 11.wav",
-      "built_in": true
-    },
-    "21d01cb6fa1a": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 12.wav",
-      "built_in": true
-    },
-    "dfb07fd7af72": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 13.wav",
-      "built_in": true
-    },
-    "893e74ee6a30": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 14.wav",
-      "built_in": true
-    },
-    "f5512b8e0001": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 15.wav",
-      "built_in": true
-    },
-    "bbbb6771ef24": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 2.wav",
-      "built_in": true
-    },
-    "9ed9494b1cd4": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 3.wav",
-      "built_in": true
-    },
-    "864c2254f211": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 4.wav",
-      "built_in": true
-    },
-    "e873ee9f3eab": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 5.wav",
-      "built_in": true
-    },
-    "d8dc2680ec66": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 6.wav",
-      "built_in": true
-    },
-    "66e7951ef0d8": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 7.wav",
-      "built_in": true
-    },
-    "8653dcd291dc": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 8.wav",
-      "built_in": true
-    },
-    "a5d1fc6f913f": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat 9.wav",
-      "built_in": true
-    },
-    "0fe7e1b0e9f8": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Bell 1.wav",
-      "built_in": true
-    },
-    "fd1e3827e955": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Bell 2.wav",
-      "built_in": true
-    },
-    "b52528ca6281": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Flam.wav",
-      "built_in": true
-    },
-    "6477f491b886": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 1.wav",
-      "built_in": true
-    },
-    "2da026dbf5e2": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 2.wav",
-      "built_in": true
-    },
-    "91368b1661fa": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 3.wav",
-      "built_in": true
-    },
-    "c54d82ac9b64": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 4.wav",
-      "built_in": true
-    },
-    "bff0cad235b7": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 5.wav",
-      "built_in": true
-    },
-    "f654c5bf0c35": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 1.wav",
-      "built_in": true
-    },
-    "16b1a6b2a62a": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 2.wav",
-      "built_in": true
-    },
-    "1c9bb672b24d": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 3.wav",
-      "built_in": true
-    },
-    "d808fe1b1be2": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 4.wav",
-      "built_in": true
-    },
-    "01a01d68d313": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 5.wav",
-      "built_in": true
-    },
-    "dc8267fb56cd": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 6.wav",
-      "built_in": true
-    },
-    "ed0d7abb3115": {
-      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 7.wav",
-      "built_in": true
-    },
-    "0025a5310dda": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 1.wav",
-      "built_in": true
-    },
-    "e4a2415101ba": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 2.wav",
-      "built_in": true
-    },
-    "45928200bc6a": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 3.wav",
-      "built_in": true
-    },
-    "a23f4fd08df9": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 4.wav",
-      "built_in": true
-    },
-    "e0006e219b45": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 5.wav",
-      "built_in": true
-    },
-    "142f20683d5f": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal Bell 1.wav",
-      "built_in": true
-    },
-    "472370307e02": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal Bell 2.wav",
-      "built_in": true
-    },
-    "913ba417be05": {
-      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal Bell Mute.wav",
-      "built_in": true
-    },
-    "6adf2592e30c": {
-      "path": "samples/drums/Plates/Splash/Splash 1.wav",
-      "built_in": true
-    },
-    "324accad909e": {
-      "path": "samples/drums/Plates/Splash/Splash 2.wav",
-      "built_in": true
-    },
-    "1cd750884411": {
-      "path": "samples/drums/Plates/Splash/Splash Mute 1.wav",
-      "built_in": true
-    },
-    "0bff1fb5789d": {
-      "path": "samples/drums/Plates/Splash/Splash Mute 2.wav",
+    "adf729ed6de6": {
+      "path": "samples/drums/Kick/Kick 1.wav",
       "built_in": true
     },
     "44cb2c912d58": {
       "path": "samples/drums/Snare/Snare 1.wav",
+      "built_in": true
+    },
+    "e41cd58b12dc": {
+      "path": "samples/drums/Snare/Snare 3.wav",
+      "built_in": true
+    },
+    "f8a6db159980": {
+      "path": "samples/drums/Snare/Snare 2.wav",
+      "built_in": true
+    },
+    "06a784b4e050": {
+      "path": "samples/drums/Snare/Snare 6.wav",
       "built_in": true
     },
     "d0f4c80fc4bf": {
@@ -306,32 +54,20 @@
       "path": "samples/drums/Snare/Snare 11.wav",
       "built_in": true
     },
-    "f8a6db159980": {
-      "path": "samples/drums/Snare/Snare 2.wav",
-      "built_in": true
-    },
-    "e41cd58b12dc": {
-      "path": "samples/drums/Snare/Snare 3.wav",
-      "built_in": true
-    },
-    "a02b483d5821": {
-      "path": "samples/drums/Snare/Snare 4.wav",
+    "567d0d241196": {
+      "path": "samples/drums/Snare/Snare 7.wav",
       "built_in": true
     },
     "d02a25a5ece5": {
       "path": "samples/drums/Snare/Snare 5.wav",
       "built_in": true
     },
-    "06a784b4e050": {
-      "path": "samples/drums/Snare/Snare 6.wav",
+    "a02b483d5821": {
+      "path": "samples/drums/Snare/Snare 4.wav",
       "built_in": true
     },
-    "567d0d241196": {
-      "path": "samples/drums/Snare/Snare 7.wav",
-      "built_in": true
-    },
-    "0ba280da39c4": {
-      "path": "samples/drums/Snare/Snare 8.wav",
+    "3eae9c764fc5": {
+      "path": "samples/drums/Snare/Snare Off 4.wav",
       "built_in": true
     },
     "d13fe5fbab0f": {
@@ -342,12 +78,24 @@
       "path": "samples/drums/Snare/Snare Flam 1.wav",
       "built_in": true
     },
+    "0ba280da39c4": {
+      "path": "samples/drums/Snare/Snare 8.wav",
+      "built_in": true
+    },
+    "b45ee6a142f2": {
+      "path": "samples/drums/Snare/Snare Off 5.wav",
+      "built_in": true
+    },
+    "20c8ea14f4bf": {
+      "path": "samples/drums/Snare/Snare Off 7.wav",
+      "built_in": true
+    },
     "e14b75a8d2a9": {
       "path": "samples/drums/Snare/Snare Flam 2.wav",
       "built_in": true
     },
-    "d6aec31f5117": {
-      "path": "samples/drums/Snare/Snare Off 1.wav",
+    "2a3ee8488c33": {
+      "path": "samples/drums/Snare/Snare Off 6.wav",
       "built_in": true
     },
     "8ca63fc4836e": {
@@ -358,72 +106,20 @@
       "path": "samples/drums/Snare/Snare Off 3.wav",
       "built_in": true
     },
-    "3eae9c764fc5": {
-      "path": "samples/drums/Snare/Snare Off 4.wav",
-      "built_in": true
-    },
-    "b45ee6a142f2": {
-      "path": "samples/drums/Snare/Snare Off 5.wav",
-      "built_in": true
-    },
-    "2a3ee8488c33": {
-      "path": "samples/drums/Snare/Snare Off 6.wav",
-      "built_in": true
-    },
-    "20c8ea14f4bf": {
-      "path": "samples/drums/Snare/Snare Off 7.wav",
-      "built_in": true
-    },
-    "73b8f8514bc6": {
-      "path": "samples/drums/Toms/Tom Floor 1.wav",
-      "built_in": true
-    },
-    "c5a2aa508437": {
-      "path": "samples/drums/Toms/Tom Floor 2.wav",
-      "built_in": true
-    },
-    "64e184e3b7f1": {
-      "path": "samples/drums/Toms/Tom Floor 3.wav",
-      "built_in": true
-    },
-    "b520c409f153": {
-      "path": "samples/drums/Toms/Tom Floor 4.wav",
-      "built_in": true
-    },
-    "5992eeb36169": {
-      "path": "samples/drums/Toms/Tom Floor 5.wav",
-      "built_in": true
-    },
-    "3cf8ac832248": {
-      "path": "samples/drums/Toms/Tom Floor 6.wav",
-      "built_in": true
-    },
-    "ce1a3fb33ab4": {
-      "path": "samples/drums/Toms/Tom Floor Flam 1.wav",
-      "built_in": true
-    },
-    "c479813c160f": {
-      "path": "samples/drums/Toms/Tom Floor Flam 2.wav",
+    "d6aec31f5117": {
+      "path": "samples/drums/Snare/Snare Off 1.wav",
       "built_in": true
     },
     "faa47f71a84a": {
       "path": "samples/drums/Toms/Tom High 1.wav",
       "built_in": true
     },
-    "83ff1619d108": {
-      "path": "samples/drums/Toms/Tom High 2.wav",
-      "built_in": true
-    },
     "7665938a1fe1": {
       "path": "samples/drums/Toms/Tom High 3.wav",
       "built_in": true
     },
-    "5ba08d893764": {
-      "path": "samples/drums/Toms/Tom High 4.wav",
-      "built_in": true
-    },
-    "b7b5f564522d": {
-      "path": "samples/drums/Toms/Tom High 5.wav",
+    "83ff1619d108": {
+      "path": "samples/drums/Toms/Tom High 2.wav",
       "built_in": true
     },
     "455e33d4fd33": {
@@ -434,20 +130,16 @@
       "path": "samples/drums/Toms/Tom High 7.wav",
       "built_in": true
     },
-    "d7ab73fe68e1": {
-      "path": "samples/drums/Toms/Tom High Flam.wav",
+    "ff7c2035e9fc": {
+      "path": "samples/drums/Toms/Tom Mid Flam.wav",
       "built_in": true
     },
-    "d3c3bf5bde1e": {
-      "path": "samples/drums/Toms/Tom Mid 1.wav",
+    "b7b5f564522d": {
+      "path": "samples/drums/Toms/Tom High 5.wav",
       "built_in": true
     },
-    "58d0d90a850f": {
-      "path": "samples/drums/Toms/Tom Mid 2.wav",
-      "built_in": true
-    },
-    "18bf89177ed0": {
-      "path": "samples/drums/Toms/Tom Mid 3.wav",
+    "5ba08d893764": {
+      "path": "samples/drums/Toms/Tom High 4.wav",
       "built_in": true
     },
     "bc8e277b4b3e": {
@@ -458,84 +150,392 @@
       "path": "samples/drums/Toms/Tom Mid 5.wav",
       "built_in": true
     },
+    "51da08c9377a": {
+      "path": "samples/drums/Toms/Tom Mid 7.wav",
+      "built_in": true
+    },
     "2a794e392215": {
       "path": "samples/drums/Toms/Tom Mid 6.wav",
       "built_in": true
     },
-    "51da08c9377a": {
-      "path": "samples/drums/Toms/Tom Mid 7.wav",
+    "58d0d90a850f": {
+      "path": "samples/drums/Toms/Tom Mid 2.wav",
+      "built_in": true
+    },
+    "18bf89177ed0": {
+      "path": "samples/drums/Toms/Tom Mid 3.wav",
+      "built_in": true
+    },
+    "d3c3bf5bde1e": {
+      "path": "samples/drums/Toms/Tom Mid 1.wav",
+      "built_in": true
+    },
+    "3cf8ac832248": {
+      "path": "samples/drums/Toms/Tom Floor 6.wav",
+      "built_in": true
+    },
+    "5992eeb36169": {
+      "path": "samples/drums/Toms/Tom Floor 5.wav",
+      "built_in": true
+    },
+    "b520c409f153": {
+      "path": "samples/drums/Toms/Tom Floor 4.wav",
+      "built_in": true
+    },
+    "73b8f8514bc6": {
+      "path": "samples/drums/Toms/Tom Floor 1.wav",
+      "built_in": true
+    },
+    "64e184e3b7f1": {
+      "path": "samples/drums/Toms/Tom Floor 3.wav",
       "built_in": true
     },
     "2045c2f58065": {
       "path": "samples/drums/Toms/Tom Mid 8.wav",
       "built_in": true
     },
-    "ff7c2035e9fc": {
-      "path": "samples/drums/Toms/Tom Mid Flam.wav",
+    "c5a2aa508437": {
+      "path": "samples/drums/Toms/Tom Floor 2.wav",
       "built_in": true
     },
-    "10e0e588a45c": {
-      "path": "samples/synth/Bass/BAS_MS20_10_F1.wav",
+    "c479813c160f": {
+      "path": "samples/drums/Toms/Tom Floor Flam 2.wav",
       "built_in": true
     },
-    "624e726a2cd8": {
-      "path": "samples/synth/Bass/BAS_MS20_11_F1.wav",
+    "ce1a3fb33ab4": {
+      "path": "samples/drums/Toms/Tom Floor Flam 1.wav",
       "built_in": true
     },
-    "b838f1c84736": {
-      "path": "samples/synth/Bass/BAS_MS20_12_F1.wav",
+    "d7ab73fe68e1": {
+      "path": "samples/drums/Toms/Tom High Flam.wav",
+      "built_in": true
+    },
+    "1cd750884411": {
+      "path": "samples/drums/Plates/Splash/Splash Mute 1.wav",
+      "built_in": true
+    },
+    "0bff1fb5789d": {
+      "path": "samples/drums/Plates/Splash/Splash Mute 2.wav",
+      "built_in": true
+    },
+    "324accad909e": {
+      "path": "samples/drums/Plates/Splash/Splash 2.wav",
+      "built_in": true
+    },
+    "6adf2592e30c": {
+      "path": "samples/drums/Plates/Splash/Splash 1.wav",
+      "built_in": true
+    },
+    "e0006e219b45": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 5.wav",
+      "built_in": true
+    },
+    "a23f4fd08df9": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 4.wav",
+      "built_in": true
+    },
+    "0025a5310dda": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 1.wav",
+      "built_in": true
+    },
+    "45928200bc6a": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 3.wav",
+      "built_in": true
+    },
+    "e4a2415101ba": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal 2.wav",
+      "built_in": true
+    },
+    "913ba417be05": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal Bell Mute.wav",
+      "built_in": true
+    },
+    "472370307e02": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal Bell 2.wav",
+      "built_in": true
+    },
+    "142f20683d5f": {
+      "path": "samples/drums/Plates/Ride Cymbal/Ride Cymbal Bell 1.wav",
+      "built_in": true
+    },
+    "63c5a820c78e": {
+      "path": "samples/drums/Plates/Crash/Crash C 4.wav",
+      "built_in": true
+    },
+    "65319028da63": {
+      "path": "samples/drums/Plates/Crash/Crash A 4.wav",
+      "built_in": true
+    },
+    "57d2634e47e1": {
+      "path": "samples/drums/Plates/Crash/Crash A 5.wav",
+      "built_in": true
+    },
+    "6b2528f2ff14": {
+      "path": "samples/drums/Plates/Crash/Crash A 1.wav",
+      "built_in": true
+    },
+    "ae68106aba1c": {
+      "path": "samples/drums/Plates/Crash/Crash C 3.wav",
+      "built_in": true
+    },
+    "0c985d7bf1e5": {
+      "path": "samples/drums/Plates/Crash/Crash C 2.wav",
+      "built_in": true
+    },
+    "259bb8002bca": {
+      "path": "samples/drums/Plates/Crash/Crash A 2.wav",
+      "built_in": true
+    },
+    "886236337f90": {
+      "path": "samples/drums/Plates/Crash/Crash C 1.wav",
+      "built_in": true
+    },
+    "82d18714d25a": {
+      "path": "samples/drums/Plates/Crash/Crash A 3.wav",
+      "built_in": true
+    },
+    "57febbcf5f77": {
+      "path": "samples/drums/Plates/Crash/Crash A Mute.wav",
+      "built_in": true
+    },
+    "c818fc7a16f1": {
+      "path": "samples/drums/Plates/Crash/Crash B 1.wav",
+      "built_in": true
+    },
+    "0379097a5836": {
+      "path": "samples/drums/Plates/Crash/Crash B 3.wav",
+      "built_in": true
+    },
+    "f9ec8692ccd0": {
+      "path": "samples/drums/Plates/Crash/Crash B 2.wav",
+      "built_in": true
+    },
+    "6444a2769cd9": {
+      "path": "samples/drums/Plates/Crash/Crash A Bell.wav",
+      "built_in": true
+    },
+    "9435748880e1": {
+      "path": "samples/drums/Plates/Crash/Crash B Mute.wav",
+      "built_in": true
+    },
+    "c343f366359a": {
+      "path": "samples/drums/Plates/Crash/Crash C Mute.wav",
+      "built_in": true
+    },
+    "3ec39880de87": {
+      "path": "samples/drums/Plates/China/China Mute 1.wav",
+      "built_in": true
+    },
+    "a67ebaa64fe9": {
+      "path": "samples/drums/Plates/China/China Mute 3.wav",
+      "built_in": true
+    },
+    "3724519f4675": {
+      "path": "samples/drums/Plates/China/China Mute 2.wav",
+      "built_in": true
+    },
+    "3fc868990b29": {
+      "path": "samples/drums/Plates/China/China Bell.wav",
+      "built_in": true
+    },
+    "db43b35b8765": {
+      "path": "samples/drums/Plates/China/China 4.wav",
+      "built_in": true
+    },
+    "008305cda93e": {
+      "path": "samples/drums/Plates/China/China 3.wav",
+      "built_in": true
+    },
+    "64cc0e989258": {
+      "path": "samples/drums/Plates/China/China 2.wav",
+      "built_in": true
+    },
+    "b39e9ad93c63": {
+      "path": "samples/drums/Plates/China/China 1.wav",
+      "built_in": true
+    },
+    "bff0cad235b7": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 5.wav",
+      "built_in": true
+    },
+    "c54d82ac9b64": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 4.wav",
+      "built_in": true
+    },
+    "91368b1661fa": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 3.wav",
+      "built_in": true
+    },
+    "2da026dbf5e2": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 2.wav",
+      "built_in": true
+    },
+    "6477f491b886": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open 1.wav",
+      "built_in": true
+    },
+    "f5512b8e0001": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 15.wav",
+      "built_in": true
+    },
+    "b52528ca6281": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Flam.wav",
+      "built_in": true
+    },
+    "893e74ee6a30": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 14.wav",
+      "built_in": true
+    },
+    "8653dcd291dc": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 8.wav",
+      "built_in": true
+    },
+    "a5d1fc6f913f": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 9.wav",
+      "built_in": true
+    },
+    "dfb07fd7af72": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 13.wav",
+      "built_in": true
+    },
+    "21d01cb6fa1a": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 12.wav",
+      "built_in": true
+    },
+    "971c261bcc0c": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 10.wav",
+      "built_in": true
+    },
+    "65be2a6e4a9f": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 11.wav",
+      "built_in": true
+    },
+    "bbbb6771ef24": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 2.wav",
+      "built_in": true
+    },
+    "9ed9494b1cd4": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 3.wav",
+      "built_in": true
+    },
+    "a6fce3a8e1b6": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 1.wav",
+      "built_in": true
+    },
+    "864c2254f211": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 4.wav",
+      "built_in": true
+    },
+    "0fe7e1b0e9f8": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Bell 1.wav",
+      "built_in": true
+    },
+    "e873ee9f3eab": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 5.wav",
+      "built_in": true
+    },
+    "66e7951ef0d8": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 7.wav",
+      "built_in": true
+    },
+    "fd1e3827e955": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Bell 2.wav",
+      "built_in": true
+    },
+    "d8dc2680ec66": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat 6.wav",
+      "built_in": true
+    },
+    "d808fe1b1be2": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 4.wav",
+      "built_in": true
+    },
+    "01a01d68d313": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 5.wav",
+      "built_in": true
+    },
+    "ed0d7abb3115": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 7.wav",
+      "built_in": true
+    },
+    "dc8267fb56cd": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 6.wav",
+      "built_in": true
+    },
+    "16b1a6b2a62a": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 2.wav",
+      "built_in": true
+    },
+    "1c9bb672b24d": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 3.wav",
+      "built_in": true
+    },
+    "f654c5bf0c35": {
+      "path": "samples/drums/Plates/Hi Hat/Hi Hat Open Close 1.wav",
       "built_in": true
     },
     "6d6d7c389081": {
       "path": "samples/synth/Bass/BAS_MS20_13_F1.wav",
       "built_in": true
     },
-    "99e30666c5c8": {
-      "path": "samples/synth/Bass/BAS_MS20_14_F1.wav",
-      "built_in": true
-    },
-    "664ba710a5b7": {
-      "path": "samples/synth/Bass/BAS_MS20_15_F2.wav",
-      "built_in": true
-    },
-    "04ddf934e65c": {
-      "path": "samples/synth/Bass/BAS_MS20_16_F2.wav",
-      "built_in": true
-    },
     "b8b78b1da229": {
       "path": "samples/synth/Bass/BAS_MS20_1_F1.wav",
-      "built_in": true
-    },
-    "31e5866eb0d8": {
-      "path": "samples/synth/Bass/BAS_MS20_2_F1.wav",
       "built_in": true
     },
     "b29eb0cb8657": {
       "path": "samples/synth/Bass/BAS_MS20_3_F1.wav",
       "built_in": true
     },
-    "b7be275dc446": {
-      "path": "samples/synth/Bass/BAS_MS20_4_F2.wav",
+    "624e726a2cd8": {
+      "path": "samples/synth/Bass/BAS_MS20_11_F1.wav",
       "built_in": true
     },
-    "a0ac80e037ee": {
-      "path": "samples/synth/Bass/BAS_MS20_5_F1.wav",
-      "built_in": true
-    },
-    "18cbeb6ebf75": {
-      "path": "samples/synth/Bass/BAS_MS20_6_F1.wav",
+    "664ba710a5b7": {
+      "path": "samples/synth/Bass/BAS_MS20_15_F2.wav",
       "built_in": true
     },
     "f7b5f50f7e64": {
       "path": "samples/synth/Bass/BAS_MS20_7_F1.wav",
       "built_in": true
     },
-    "f11c30fbbb3c": {
-      "path": "samples/synth/Bass/BAS_MS20_8_F1.wav",
+    "a0ac80e037ee": {
+      "path": "samples/synth/Bass/BAS_MS20_5_F1.wav",
       "built_in": true
     },
     "41f6b195681c": {
       "path": "samples/synth/Bass/BAS_MS20_9_F1.wav",
+      "built_in": true
+    },
+    "b838f1c84736": {
+      "path": "samples/synth/Bass/BAS_MS20_12_F1.wav",
+      "built_in": true
+    },
+    "10e0e588a45c": {
+      "path": "samples/synth/Bass/BAS_MS20_10_F1.wav",
+      "built_in": true
+    },
+    "31e5866eb0d8": {
+      "path": "samples/synth/Bass/BAS_MS20_2_F1.wav",
+      "built_in": true
+    },
+    "99e30666c5c8": {
+      "path": "samples/synth/Bass/BAS_MS20_14_F1.wav",
+      "built_in": true
+    },
+    "18cbeb6ebf75": {
+      "path": "samples/synth/Bass/BAS_MS20_6_F1.wav",
+      "built_in": true
+    },
+    "04ddf934e65c": {
+      "path": "samples/synth/Bass/BAS_MS20_16_F2.wav",
+      "built_in": true
+    },
+    "f11c30fbbb3c": {
+      "path": "samples/synth/Bass/BAS_MS20_8_F1.wav",
+      "built_in": true
+    },
+    "b7be275dc446": {
+      "path": "samples/synth/Bass/BAS_MS20_4_F2.wav",
       "built_in": true
     },
     "17be4e7307d4": {
@@ -548,6 +548,10 @@
     },
     "f760d9209bbd": {
       "path": "samples/synth/Lead/PLK_OBXA_3_C4.wav",
+      "built_in": true
+    },
+    "e500319dc5ab": {
+      "path": "samples/synth/Lead/SYNTH-BrassyBoard1.wav",
       "built_in": true
     },
     "8ad2bfbbc72a": {
@@ -566,24 +570,20 @@
       "path": "samples/synth/Lead/poly-1-3.wav",
       "built_in": true
     },
-    "37729d7146cf": {
-      "path": "samples/synth/Lead/poly-1-4.wav",
-      "built_in": true
-    },
-    "7015456a2ada": {
-      "path": "samples/synth/Lead/poly-1-5.wav",
+    "002cadfc798c": {
+      "path": "samples/synth/Lead/poly-1-7.wav",
       "built_in": true
     },
     "a3ff8858f8a2": {
       "path": "samples/synth/Lead/poly-1-6.wav",
       "built_in": true
     },
-    "002cadfc798c": {
-      "path": "samples/synth/Lead/poly-1-7.wav",
+    "37729d7146cf": {
+      "path": "samples/synth/Lead/poly-1-4.wav",
       "built_in": true
     },
-    "e500319dc5ab": {
-      "path": "samples/synth/Lead/SYNTH-BrassyBoard1.wav",
+    "7015456a2ada": {
+      "path": "samples/synth/Lead/poly-1-5.wav",
       "built_in": true
     }
   }

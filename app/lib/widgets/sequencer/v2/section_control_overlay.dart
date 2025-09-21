@@ -35,7 +35,8 @@ class SectionControlOverlay extends StatelessWidget {
     return Container(
       height: headerHeight,
       decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised.withOpacity(0.85),
+        // Header should be fully opaque so controls never appear translucent
+        color: AppColors.sequencerSurfaceRaised,
         border: Border(
           bottom: BorderSide(
             color: AppColors.sequencerBorder,
@@ -67,6 +68,16 @@ class SectionControlOverlay extends StatelessWidget {
     final screenSize = MediaQuery.of(context).size;
     
     return Container(
+      // Opaque surface behind buttons to avoid any bleed-through from semi-transparent overlay
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceBase,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.sequencerBorder,
+            width: 1,
+          ),
+        ),
+      ),
       padding: EdgeInsets.all(screenSize.width * 0.04),
       child: Column(
         mainAxisSize: MainAxisSize.min,

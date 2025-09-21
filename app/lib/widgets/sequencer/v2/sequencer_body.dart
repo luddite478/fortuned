@@ -108,7 +108,7 @@ class _SequencerBodyState extends State<SequencerBody> {
                 top: 0,
                 bottom: 0,
                 child: const SequencerBodyOverlayMenu(
-                  type: SequencerBodyOverlayMenuType.sectionSettings,
+                  type: SequencerBodyOverlayMenuType.sampleBrowser,
                   child: SampleSelectionWidget(),
                 ),
               ),
