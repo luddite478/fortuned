@@ -485,6 +485,8 @@ async def send_message_created_notification(thread_id: str, message_doc: Dict[st
         if not thread:
             return 0
         recipients = [u.get("id") for u in thread.get("users", []) if isinstance(u, dict) and u.get("id")]
+        sender_id = message_doc.get("user_id")
+        recipients = [uid for uid in recipients if uid != sender_id]
         delivered = 0
         for user_id in recipients:
             ws = clients.get(user_id)

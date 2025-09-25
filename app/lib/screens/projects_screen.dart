@@ -784,6 +784,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         });
       }
 
+      // Set active thread context so Sequencer V2 doesn't create a new unpublished thread
+      final threadsState = context.read<ThreadsState>();
+      threadsState.setActiveThread(project);
+
       // Load latest message only for CONTINUE
       final latest = await ThreadsApi.getLatestMessage(project.id, includeSnapshot: true);
       Map<String, dynamic>? initialSnapshot = latest?.snapshot;

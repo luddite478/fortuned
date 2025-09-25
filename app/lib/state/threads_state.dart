@@ -24,6 +24,7 @@ class ThreadsState extends ChangeNotifier {
   final List<Thread> _threads = [];
   Thread? _activeThread;
   final Map<String, List<Message>> _messagesByThread = {};
+  bool _isThreadViewActive = false;
 
   // UI state
   bool _isLoading = false;
@@ -57,6 +58,7 @@ class ThreadsState extends ChangeNotifier {
   String? get error => _error;
   String? get currentUserId => _currentUserId;
   String? get currentUserName => _currentUserName;
+  bool get isThreadViewActive => _isThreadViewActive;
 
   void setCurrentUser(String userId, [String? userName]) {
     _currentUserId = userId;
@@ -66,6 +68,16 @@ class ThreadsState extends ChangeNotifier {
 
   void setActiveThread(Thread? thread) {
     _activeThread = thread;
+    notifyListeners();
+  }
+
+  void enterThreadView(String threadId) {
+    _isThreadViewActive = true;
+    notifyListeners();
+  }
+
+  void exitThreadView() {
+    _isThreadViewActive = false;
     notifyListeners();
   }
 

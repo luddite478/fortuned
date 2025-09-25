@@ -66,6 +66,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final threadsState = context.read<ThreadsState>();
+      threadsState.enterThreadView(widget.threadId);
       try {
         await threadsState.ensureThreadSummary(widget.threadId);
       } catch (_) {}
@@ -632,6 +633,10 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
   @override
   void dispose() {
+    try {
+      final threadsState = context.read<ThreadsState>();
+      threadsState.exitThreadView();
+    } catch (_) {}
     _scrollController.dispose();
     _colorAnimationController?.dispose();
     _timestampRefreshTimer?.cancel();

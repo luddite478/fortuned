@@ -148,7 +148,8 @@ class _MainPageState extends State<MainPage> {
       if (event.type == AppNotificationType.messageCreated) {
         try {
           final threadsState = Provider.of<ThreadsState>(context, listen: false);
-          if (threadsState.activeThread?.id == event.threadId) {
+          // Suppress only when user is actively viewing the same thread screen
+          if (threadsState.isThreadViewActive && threadsState.activeThread?.id == event.threadId) {
             suppress = true;
           }
         } catch (_) {}
