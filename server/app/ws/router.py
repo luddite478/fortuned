@@ -508,9 +508,11 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
         recipients = set()
         for u in thread.get("users", []):
             if isinstance(u, dict) and u.get("id"):
-                recipients.add(u["id"])
+                if u["id"] != accepted_user_id:
+                    recipients.add(u["id"])
         if invited_by:
-            recipients.add(invited_by)
+            if invited_by != accepted_user_id:
+                recipients.add(invited_by)
         delivered = 0
         for user_id in recipients:
             ws = clients.get(user_id)

@@ -13,6 +13,7 @@ class AppNotificationEvent {
   final String title;
   final String body;
   final String? threadId;
+  final String? messageId;
   final Map<String, dynamic> raw;
 
   const AppNotificationEvent({
@@ -21,6 +22,7 @@ class AppNotificationEvent {
     required this.body,
     required this.raw,
     this.threadId,
+    this.messageId,
   });
 }
 
@@ -42,12 +44,14 @@ class NotificationsService {
 
   void _onMessageCreated(Map<String, dynamic> msg) {
     final String? threadId = msg['parent_thread'] as String? ?? msg['thread_id'] as String?;
+    final String? messageId = msg['id'] as String?;
     // final String fromUserId = (msg['user_id'] ?? '') as String;
     _controller.add(AppNotificationEvent(
       type: AppNotificationType.messageCreated,
       title: 'New message',
       body: 'New update in a thread you follow',
       threadId: threadId,
+      messageId: messageId,
       raw: msg,
     ));
   }

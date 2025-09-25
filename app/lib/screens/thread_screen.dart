@@ -15,11 +15,13 @@ import '../services/auth_service.dart';
 class ThreadScreen extends StatefulWidget {
   final String threadId;
   final bool highlightNewest;
+  final String? targetMessageId;
 
   const ThreadScreen({
     super.key,
     required this.threadId,
     this.highlightNewest = false,
+    this.targetMessageId,
   });
 
   @override
@@ -28,6 +30,7 @@ class ThreadScreen extends StatefulWidget {
 
 class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _messageKeys = {};
   AnimationController? _colorAnimationController;
   Animation<Color?>? _colorAnimation;
   Timer? _timestampRefreshTimer;
@@ -63,7 +66,9 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final threadsState = context.read<ThreadsState>();
-      await threadsState.ensureThreadSummary(widget.threadId);
+      try {
+        await threadsState.ensureThreadSummary(widget.threadId);
+      } catch (_) {}
       threadsState.setActiveThread(
         threadsState.threads.firstWhere(
           (t) => t.id == widget.threadId,
@@ -71,7 +76,11 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         ),
       );
       await threadsState.loadMessages(widget.threadId, includeSnapshot: false, order: 'asc');
-      _scrollToBottom();
+      if (widget.targetMessageId != null) {
+        _scrollToMessageIfNeeded(widget.targetMessageId!);
+      } else {
+        _scrollToBottom();
+      }
     });
 
     // Periodically refresh timestamps like "Just now" / "2m ago"
@@ -88,6 +97,22 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         curve: Curves.easeOut,
       );
     }
+  }
+
+  void _scrollToMessageIfNeeded(String messageId) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final key = _messageKeys[messageId];
+      if (key != null && key.currentContext != null) {
+        Scrollable.ensureVisible(
+          key.currentContext!,
+          duration: const Duration(milliseconds: 350),
+          alignment: 0.2,
+          curve: Curves.easeOut,
+        );
+      } else {
+        _scrollToBottom();
+      }
+    });
   }
 
   @override
@@ -156,8 +181,10 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               final isCurrentUser = message.userId == threadsState.currentUserId;
               final isNewest = index == messages.length - 1;
               final shouldHighlight = widget.highlightNewest && isNewest && _colorAnimation != null;
+              final isTarget = widget.targetMessageId != null && widget.targetMessageId == message.id;
+              final key = _messageKeys.putIfAbsent(message.id, () => GlobalKey());
 
-              return shouldHighlight
+              Widget bubble = shouldHighlight
                   ? AnimatedBuilder(
                       animation: _colorAnimation!,
                       builder: (context, child) {
@@ -176,6 +203,18 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                       message,
                       isCurrentUser,
                     );
+              if (isTarget) {
+                bubble = Container(
+                  key: key,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.lightBlueAccent.withOpacity(0.6), width: 1),
+                  ),
+                  child: bubble,
+                );
+              } else {
+                bubble = Container(key: key, child: bubble);
+              }
+              return bubble;
             },
           );
         },

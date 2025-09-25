@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'screens/main_navigation_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/thread_screen.dart';
 import 'services/auth_service.dart';
 import 'services/threads_service.dart';
 import 'services/users_service.dart';
@@ -13,6 +14,8 @@ import 'services/notifications.dart';
 import 'utils/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'services/http_client.dart';
+import 'models/thread/thread.dart';
+import 'models/thread/thread_user.dart';
 
 import 'state/threads_state.dart';
 import 'services/ws_client.dart';
@@ -163,17 +166,80 @@ class _MainPageState extends State<MainPage> {
       }
 
       if (!suppress) {
-        _showOverlayNotification(title: event.title, body: event.body);
+        String body = event.body;
+        VoidCallback? onTap;
+        if (event.type == AppNotificationType.messageCreated) {
+          String senderName = 'Someone';
+          try {
+            final threadsState = Provider.of<ThreadsState>(context, listen: false);
+            final userId = event.raw['user_id'] as String?;
+            if (event.threadId != null && userId != null) {
+              final thread = threadsState.threads.firstWhere(
+                (t) => t.id == event.threadId,
+                orElse: () => threadsState.activeThread ?? Thread(id: event.threadId!, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+              );
+              final user = thread.users.firstWhere(
+                (u) => u.id == userId,
+                orElse: () => ThreadUser(id: userId, name: 'User ${userId.substring(0, 6)}', joinedAt: DateTime.now()),
+              );
+              senderName = user.name;
+            }
+          } catch (_) {}
+          body = '$senderName sent a new message';
+          if (event.threadId != null) {
+            onTap = () async {
+              try {
+                final threadsState = Provider.of<ThreadsState>(context, listen: false);
+                await threadsState.ensureThreadSummary(event.threadId!);
+                threadsState.setActiveThread(
+                  threadsState.threads.firstWhere(
+                    (t) => t.id == event.threadId,
+                    orElse: () => Thread(id: event.threadId!, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                  ),
+                );
+                await threadsState.loadMessages(event.threadId!, includeSnapshot: false, order: 'asc', limit: 1000);
+                if (!mounted) return;
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => ThreadScreen(threadId: event.threadId!, highlightNewest: false, targetMessageId: event.messageId),
+                  ),
+                );
+              } catch (_) {}
+            };
+          }
+        } else if (event.type == AppNotificationType.invitationReceived) {
+          final inviter = (event.raw['from_user_name'] as String?) ?? 'Someone';
+          body = '$inviter sent you an invitation';
+          onTap = null; // stay on current screen
+        } else if (event.type == AppNotificationType.invitationAccepted) {
+          final userName = (event.raw['user_name'] as String?) ?? 'A collaborator';
+          final acceptedUserId = event.raw['user_id'] as String?;
+          try {
+            final auth = Provider.of<AuthService>(context, listen: false);
+            if (acceptedUserId != null && auth.currentUser?.id == acceptedUserId) {
+              // Suppress for the user who accepted their own invite
+              return;
+            }
+          } catch (_) {}
+          body = '$userName accepted invitation';
+          onTap = null;
+        }
+        _showOverlayNotification(
+          title: event.title,
+          body: body,
+          onTap: onTap,
+        );
       }
     });
   }
 
-  void _showOverlayNotification({required String title, required String body}) {
+  void _showOverlayNotification({required String title, required String body, VoidCallback? onTap}) {
     _removeOverlayNotification();
     final overlay = OverlayEntry(
       builder: (context) {
         return Positioned(
-          top: 12,
+          top: 20,
           left: 12,
           right: 12,
           child: SafeArea(
@@ -181,7 +247,7 @@ class _MainPageState extends State<MainPage> {
               color: Colors.transparent,
               child: Container
               (
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                 decoration: BoxDecoration(
                   color: AppColors.menuEntryBackground,
                   borderRadius: BorderRadius.circular(12),
@@ -190,23 +256,26 @@ class _MainPageState extends State<MainPage> {
                   ],
                   border: Border.all(color: AppColors.menuBorder, width: 1),
                 ),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 10,
-                      height: 10,
-                      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(2)),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        body,
-                        style: GoogleFonts.sourceSans3(color: AppColors.menuText, fontSize: 13, fontWeight: FontWeight.w700),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                child: InkWell(
+                  onTap: onTap,
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(2)),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          body,
+                          style: GoogleFonts.sourceSans3(color: AppColors.menuText, fontSize: 14, fontWeight: FontWeight.w700),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
