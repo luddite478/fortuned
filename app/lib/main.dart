@@ -10,7 +10,8 @@ import 'services/auth_service.dart';
 import 'services/threads_service.dart';
 import 'services/users_service.dart';
 import 'services/notifications.dart';
-import 'screens/thread_screen.dart';
+import 'utils/app_colors.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'services/http_client.dart';
 
 import 'state/threads_state.dart';
@@ -88,6 +89,8 @@ class _MainPageState extends State<MainPage> {
   bool _hasInitializedUser = false;
   StreamSubscription? _notifSub;
   NotificationsService? _notificationsService;
+  OverlayEntry? _notifOverlay;
+  Timer? _notifOverlayTimer;
   
   @override
   void initState() {
@@ -103,6 +106,8 @@ class _MainPageState extends State<MainPage> {
     final wsClient = Provider.of<WebSocketClient>(context, listen: false);
     
     if (authService.currentUser != null) {
+      // Ensure we have latest user fields (e.g., pending_invites_to_threads)
+      authService.refreshCurrentUserFromServer();
       threadsState.setCurrentUser(
         authService.currentUser!.id,
         authService.currentUser!.name,
@@ -134,7 +139,7 @@ class _MainPageState extends State<MainPage> {
     final notifications = NotificationsService(wsClient: wsClient);
     _notificationsService = notifications;
     _notifSub?.cancel();
-    _notifSub = notifications.stream.listen((event) {
+    _notifSub = notifications.stream.listen((event) async {
       // Do not show messageCreated banner if already on same thread screen
       bool suppress = false;
       if (event.type == AppNotificationType.messageCreated) {
@@ -145,31 +150,89 @@ class _MainPageState extends State<MainPage> {
           }
         } catch (_) {}
       }
+      // If an invitation arrives while on Projects, refresh user + load that thread summary so INVITES appears instantly
+      if (event.type == AppNotificationType.invitationReceived) {
+        try {
+          final auth = Provider.of<AuthService>(context, listen: false);
+          await auth.refreshCurrentUserFromServer();
+          if (event.threadId != null) {
+            final threadsState = Provider.of<ThreadsState>(context, listen: false);
+            await threadsState.ensureThreadSummary(event.threadId!);
+          }
+        } catch (_) {}
+      }
+
       if (!suppress) {
-        final snack = SnackBar(
-          content: Text('${event.title}: ${event.body}'),
-          action: (event.threadId != null)
-              ? SnackBarAction(
-                  label: 'Open',
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ThreadScreen(threadId: event.threadId!, highlightNewest: event.type == AppNotificationType.messageCreated),
-                      ),
-                    );
-                  },
-                )
-              : null,
-        );
-        ScaffoldMessenger.of(context).showSnackBar(snack);
+        _showOverlayNotification(title: event.title, body: event.body);
       }
     });
+  }
+
+  void _showOverlayNotification({required String title, required String body}) {
+    _removeOverlayNotification();
+    final overlay = OverlayEntry(
+      builder: (context) {
+        return Positioned(
+          top: 12,
+          left: 12,
+          right: 12,
+          child: SafeArea(
+            child: Material(
+              color: Colors.transparent,
+              child: Container
+              (
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.menuEntryBackground,
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10, offset: const Offset(0, 4)),
+                  ],
+                  border: Border.all(color: AppColors.menuBorder, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(2)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        body,
+                        style: GoogleFonts.sourceSans3(color: AppColors.menuText, fontSize: 13, fontWeight: FontWeight.w700),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+    Overlay.of(context).insert(overlay);
+    _notifOverlay = overlay;
+    _notifOverlayTimer = Timer(const Duration(seconds: 4), () {
+      _removeOverlayNotification();
+    });
+  }
+
+  void _removeOverlayNotification() {
+    _notifOverlayTimer?.cancel();
+    _notifOverlayTimer = null;
+    _notifOverlay?.remove();
+    _notifOverlay = null;
   }
 
   @override
   void dispose() {
     _notifSub?.cancel();
     _notificationsService?.dispose();
+    _removeOverlayNotification();
     super.dispose();
   }
 

@@ -47,16 +47,47 @@ class ThreadsApi {
   }
 
   // Messages
-  static Future<List<Message>> getMessages(String threadId) async {
-    final http.Response res = await ApiHttpClient.get('/messages', queryParams: {
+  static Future<List<Message>> getMessages(
+    String threadId, {
+    int? limit,
+    String? order, // 'asc' | 'desc'
+    bool includeSnapshot = true,
+  }) async {
+    final query = <String, String>{
       'thread_id': threadId,
-    });
+      'include_snapshot': includeSnapshot ? 'true' : 'false',
+    };
+    if (limit != null) query['limit'] = limit.toString();
+    if (order != null) query['order'] = order;
+    final http.Response res = await ApiHttpClient.get('/messages', queryParams: query);
     if (res.statusCode != 200) {
       throw Exception('Failed to get messages: ${res.statusCode} ${res.body}');
     }
     final data = json.decode(res.body);
     final list = (data is List) ? data : (data['messages'] as List<dynamic>? ?? []);
     return list.map((e) => Message.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  static Future<Message> getMessageById(String messageId, {bool includeSnapshot = true}) async {
+    final http.Response res = await ApiHttpClient.get('/messages/$messageId', queryParams: {
+      'include_snapshot': includeSnapshot ? 'true' : 'false',
+    });
+    if (res.statusCode != 200) {
+      throw Exception('Failed to get message: ${res.statusCode} ${res.body}');
+    }
+    final data = json.decode(res.body) as Map<String, dynamic>;
+    return Message.fromJson(data);
+  }
+
+  static Future<Message?> getLatestMessage(String threadId, {bool includeSnapshot = true}) async {
+    final list = await getMessages(
+      threadId,
+      limit: 1,
+      order: 'desc',
+      includeSnapshot: includeSnapshot,
+    );
+    if (list.isEmpty) return null;
+    return list.first;
   }
 
   static Future<Message> createMessage({

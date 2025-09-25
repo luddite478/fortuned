@@ -10,6 +10,7 @@ import '../utils/app_colors.dart';
 import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
 import '../widgets/sections_chain_squares.dart';
+import '../services/auth_service.dart';
 
 class ThreadScreen extends StatefulWidget {
   final String threadId;
@@ -62,7 +63,14 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final threadsState = context.read<ThreadsState>();
-      await threadsState.loadThread(widget.threadId);
+      await threadsState.ensureThreadSummary(widget.threadId);
+      threadsState.setActiveThread(
+        threadsState.threads.firstWhere(
+          (t) => t.id == widget.threadId,
+          orElse: () => Thread(id: widget.threadId, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+        ),
+      );
+      await threadsState.loadMessages(widget.threadId, includeSnapshot: false, order: 'asc');
       _scrollToBottom();
     });
 
@@ -513,6 +521,8 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         onPressed: () => Navigator.of(context).pop(),
       ),
       actions: [
+        _ParticipantsIndicator(threadId: widget.threadId),
+        const SizedBox(width: 8),
         IconButton(
           icon: Icon(Icons.person_add, color: AppColors.menuText),
           onPressed: () => _showInviteCollaboratorsModal(context),
@@ -587,6 +597,47 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     _colorAnimationController?.dispose();
     _timestampRefreshTimer?.cancel();
     super.dispose();
+  }
+}
+
+class _ParticipantsIndicator extends StatelessWidget {
+  final String threadId;
+  const _ParticipantsIndicator({required this.threadId});
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<ThreadsState, AuthService>(
+      builder: (context, threadsState, auth, _) {
+        final thread = threadsState.threads.firstWhere(
+          (t) => t.id == threadId,
+          orElse: () => threadsState.activeThread ?? Thread(id: threadId, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+        );
+        final me = auth.currentUser?.id;
+        final others = thread.users.where((u) => u.id != me).map((u) => u.name).toList();
+        if (others.isEmpty) {
+          return const SizedBox.shrink();
+        }
+        final text = others.take(3).join(', ');
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          decoration: BoxDecoration(
+            color: AppColors.menuBorder.withOpacity(0.3),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.group, size: 16, color: Colors.white70),
+              const SizedBox(width: 6),
+              Text(
+                text,
+                style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 11),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

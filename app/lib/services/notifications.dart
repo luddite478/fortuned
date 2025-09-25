@@ -70,7 +70,7 @@ class NotificationsService {
     _controller.add(AppNotificationEvent(
       type: AppNotificationType.invitationAccepted,
       title: 'Invitation accepted',
-      body: '$userName joined your thread',
+      body: '$userName accepted invitation',
       threadId: threadId,
       raw: msg,
     ));

@@ -12,12 +12,14 @@
 - pattern chain (song)
     - send message bar icon pattern - done
 - contacts and all users search - done
+- undo many - done 
 
-- undo many
+- conversion 
 - remove default 0 renders for message
 - rename messages count project to checkpints
 - server schema validation
 - pass token in body/query param for all requests
+- check schema validation client/server
 
 
 - smooth volume and pitch change ui
@@ -29,3 +31,5 @@
 - comment(reply)-menu for chekpoints
 - pitch (optimize speed)
 - local project storage
+- on app startup check invites of the user
+- on nthread open check pending invites

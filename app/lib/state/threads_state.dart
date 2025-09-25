@@ -95,9 +95,8 @@ class ThreadsState extends ChangeNotifier {
     }
   }
 
-  Future<void> loadThread(String threadId) async {
+  Future<void> ensureThreadSummary(String threadId) async {
     try {
-      _setLoading(true);
       _setError(null);
       final thread = await ThreadsApi.getThread(threadId);
       final existingIndex = _threads.indexWhere((t) => t.id == threadId);
@@ -106,11 +105,32 @@ class ThreadsState extends ChangeNotifier {
       } else {
         _threads.add(thread);
       }
-      _activeThread = thread;
-      final messages = await ThreadsApi.getMessages(threadId);
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load thread summary: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> loadMessages(
+    String threadId, {
+    bool force = true,
+    int? limit,
+    String? order,
+    bool includeSnapshot = false,
+  }) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+      final messages = await ThreadsApi.getMessages(
+        threadId,
+        limit: limit,
+        order: order,
+        includeSnapshot: includeSnapshot,
+      );
       _messagesByThread[threadId] = messages;
     } catch (e) {
-      _setError('Failed to load thread: $e');
+      _setError('Failed to load messages: $e');
       rethrow;
     } finally {
       _setLoading(false);
@@ -126,7 +146,21 @@ class ThreadsState extends ChangeNotifier {
       _setLoading(true);
       _setError(null);
       final threadId = await ThreadsApi.createThread(users: users, metadata: metadata);
-      await loadThread(threadId);
+      await ensureThreadSummary(threadId);
+      // Set active thread to the newly created one
+      final idx = _threads.indexWhere((t) => t.id == threadId);
+      if (idx >= 0) {
+        _activeThread = _threads[idx];
+      } else {
+        _activeThread = Thread(
+          id: threadId,
+          createdAt: DateTime.now(),
+          updatedAt: DateTime.now(),
+          users: const [],
+          messageIds: const [],
+          invites: const [],
+        );
+      }
       return threadId;
     } catch (e) {
       _setError('Failed to create thread: $e');
@@ -266,7 +300,12 @@ class ThreadsState extends ChangeNotifier {
       sampleBankState: _sampleBankState,
     );
     try {
-      final jsonString = json.encode(message.snapshot);
+      Map<String, dynamic> snapshotToApply = message.snapshot;
+      if (snapshotToApply.isEmpty) {
+        final full = await ThreadsApi.getMessageById(message.id, includeSnapshot: true);
+        snapshotToApply = full.snapshot;
+      }
+      final jsonString = json.encode(snapshotToApply);
       final ok = await service.importFromJson(jsonString);
       return ok;
     } catch (_) {
@@ -348,9 +387,10 @@ class ThreadsState extends ChangeNotifier {
     try {
       final threadId = payload['parent_thread'] as String? ?? payload['thread_id'] as String?;
       if (threadId == null) return;
+      final shouldApply = (_activeThread?.id == threadId) || _messagesByThread.containsKey(threadId);
+      if (!shouldApply) return;
       final message = Message.fromJson(payload);
       final list = _messagesByThread[threadId] ?? [];
-      // Reconcile: replace pending by snapshot/timestamp match or append if new
       final pendingIdx = list.indexWhere((m) => m.sendStatus != null && m.sendStatus != SendStatus.sent && _isSameMessageContent(m, message));
       if (pendingIdx >= 0) {
         list[pendingIdx] = message.copyWith(sendStatus: SendStatus.sent, localTempId: null);

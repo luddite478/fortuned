@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Section Swipe feature introduces horizontal navigation between sequencer sections using a feed-like interface. This replaces the traditional right-side control panel with intuitive swipe gestures, providing a more modern and mobile-friendly user experience.
+The Section Swipe feature introduces horizontal navigation between sequencer sections.
 
 ## Core Requirements
 

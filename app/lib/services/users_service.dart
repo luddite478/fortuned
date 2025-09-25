@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'dart:async';
-import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import '../state/threads_state.dart';
 import 'http_client.dart';
 import 'ws_client.dart';
 
@@ -20,6 +18,8 @@ class UserProfile {
   final UserStats stats;
 
   final UserPreferences preferences;
+  final List<String> threads;
+  final List<String> pendingInvitesToThreads;
 
   UserProfile({
     required this.id,
@@ -35,6 +35,8 @@ class UserProfile {
     required this.stats,
 
     required this.preferences,
+    this.threads = const [],
+    this.pendingInvitesToThreads = const [],
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,8 @@ class UserProfile {
       stats: UserStats.fromJson(json['stats'] ?? {}),
 
       preferences: UserPreferences.fromJson(json['preferences'] ?? {}),
+      threads: (json['threads'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      pendingInvitesToThreads: (json['pending_invites_to_threads'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
     );
   }
 
@@ -77,6 +81,8 @@ class UserProfile {
               'preferences': {
           'theme': preferences.theme,
         },
+      'threads': threads,
+      'pending_invites_to_threads': pendingInvitesToThreads,
     };
   }
 

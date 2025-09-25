@@ -6,7 +6,7 @@ class Message {
   final DateTime timestamp;
   final String userId;
   final String? parentThread;
-  final Map<String, dynamic> snapshot;
+  final Map<String, dynamic> snapshot; // can be empty when include_snapshot=false
   final Map<String, dynamic>? snapshotMetadata;
 
   // Client-only

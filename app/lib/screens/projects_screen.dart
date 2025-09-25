@@ -11,6 +11,8 @@ import '../widgets/common_header_widget.dart';
 import '../ffi/table_bindings.dart';
 import '../ffi/playback_bindings.dart';
 import '../ffi/sample_bank_bindings.dart';
+import '../services/auth_service.dart';
+import '../widgets/buttons/action_button.dart';
 
 class ProjectsScreen extends StatefulWidget {
   const ProjectsScreen({Key? key}) : super(key: key);
@@ -42,8 +44,15 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         _error = null;
       });
       
+      // Refresh current user to fetch pending_invites_to_threads
+      await Provider.of<AuthService>(context, listen: false).refreshCurrentUserFromServer();
       final threadsState = Provider.of<ThreadsState>(context, listen: false);
       await threadsState.loadThreads();
+      // Also load invite thread summaries not in membership list if any
+      final invites = Provider.of<AuthService>(context, listen: false).currentUser?.pendingInvitesToThreads ?? const [];
+      for (final threadId in invites) {
+        await threadsState.ensureThreadSummary(threadId);
+      }
       
       setState(() {
         _isLoading = false;
@@ -135,6 +144,48 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                   return Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
+                                      // Invites section (if current user has pending invites)
+                                      Consumer2<AuthService, ThreadsState>(
+                                        builder: (context, auth, threadsState, _) {
+                                          final invites = auth.currentUser?.pendingInvitesToThreads ?? const [];
+                                          if (invites.isEmpty) return const SizedBox.shrink();
+                                          // Ensure missing invite thread summaries are loaded
+                                          final existingIds = threadsState.threads.map((t) => t.id).toSet();
+                                          final missing = invites.where((id) => !existingIds.contains(id)).toList();
+                                          if (missing.isNotEmpty) {
+                                            WidgetsBinding.instance.addPostFrameCallback((_) async {
+                                              for (final id in missing) {
+                                                try { await threadsState.ensureThreadSummary(id); } catch (_) {}
+                                              }
+                                              if (mounted) setState(() {});
+                                            });
+                                          }
+                                          return Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Padding(
+                                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                                child: Text(
+                                                  'INVITES',
+                                                  style: GoogleFonts.sourceSans3(
+                                                    color: AppColors.menuText,
+                                                    fontSize: 13,
+                                                    fontWeight: FontWeight.w600,
+                                                    letterSpacing: 1.5,
+                                                  ),
+                                                ),
+                                              ),
+                                              ...invites.map((id) {
+                                                final t = threadsState.threads.firstWhere(
+                                                  (x) => x.id == id,
+                                                  orElse: () => Thread(id: id, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                                                );
+                                                return _buildInviteCard(t.users.isEmpty ? null : t, auth, id);
+                                              }).toList(),
+                                            ],
+                                          );
+                                        },
+                                      ),
                                       // Recent header - only show when there are projects
                                       Padding(
                                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
@@ -453,13 +504,20 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           letterSpacing: 1.0,
                         ),
                       ),
-                      Text(
-                        '${project.messageIds.length} checkpoints',
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuLightText,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w400,
-                        ),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '${project.messageIds.length} checkpoints',
+                              style: GoogleFonts.sourceSans3(
+                                color: AppColors.menuLightText,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ),
+                          _buildParticipantsChips(project),
+                        ],
                       ),
                     ],
                   ),
@@ -490,6 +548,203 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       ),
     );
   }
+
+  Widget _buildInviteCard(Thread? thread, AuthService auth, String threadId) {
+    // Same visual style as project list tile; only right side differs
+    return Container(
+      height: 60,
+      margin: const EdgeInsets.only(bottom: 2),
+      decoration: BoxDecoration(
+        color: AppColors.menuEntryBackground,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.menuBorder,
+            width: 0.5,
+          ),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Row(
+            children: [
+              // Leading square (same as project row)
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(
+                  color: Colors.black,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Middle info (same structure as project row)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      thread != null ? _formatDateYmd(thread.createdAt) : _formatDateYmd(DateTime.now()),
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.menuText,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${thread?.messageIds.length ?? 0} checkpoints',
+                            style: GoogleFonts.sourceSans3(
+                              color: AppColors.menuLightText,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w400,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        // Participant chips (or invited username)
+                        if (thread != null)
+                          _buildParticipantsChips(thread)
+                        else
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: AppColors.menuBorder.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'invite',
+                              style: GoogleFonts.sourceSans3(
+                                color: AppColors.menuLightText,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              // Right actions instead of timestamp (match right spacing of Recent: timer + chevron ~ 56px)
+              const SizedBox(width: 8),
+              ActionButton(
+                label: 'ACCEPT',
+                background: AppColors.menuPrimaryButton,
+                border: AppColors.menuPrimaryButton,
+                textColor: AppColors.menuPrimaryButtonText,
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                fontSize: 12,
+                onTap: () async {
+                  await ThreadsApi.acceptInvite(threadId: threadId, userId: auth.currentUser!.id);
+                  final authSvc = context.read<AuthService>();
+                  final threadsState = context.read<ThreadsState>();
+                  await authSvc.refreshCurrentUserFromServer();
+                  await threadsState.loadThreads();
+                  final invites = authSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                  for (final id in invites) {
+                    await threadsState.ensureThreadSummary(id);
+                  }
+                  if (mounted) setState(() {});
+                },
+              ),
+              const SizedBox(width: 8),
+              ActionButton(
+                label: 'DENY',
+                background: AppColors.menuSecondaryButton,
+                border: AppColors.menuSecondaryButtonBorder,
+                textColor: AppColors.menuSecondaryButtonText,
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                fontSize: 12,
+                onTap: () async {
+                  await ThreadsApi.declineInvite(threadId: threadId, userId: auth.currentUser!.id);
+                  final authSvc = context.read<AuthService>();
+                  final threadsState = context.read<ThreadsState>();
+                  await authSvc.refreshCurrentUserFromServer();
+                  await threadsState.loadThreads();
+                  final invites = authSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                  for (final id in invites) {
+                    await threadsState.ensureThreadSummary(id);
+                  }
+                  if (mounted) setState(() {});
+                },
+              ),
+              const SizedBox(width: 4),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildParticipantsChips(Thread project) {
+    final auth = context.read<AuthService>();
+    final me = auth.currentUser?.id;
+    final others = project.users.where((u) => u.id != me).map((u) => u.name).toList();
+    if (others.isEmpty) return const SizedBox.shrink();
+    final List<Widget> chips = [];
+    const maxVisible = 2;
+    for (final name in others.take(maxVisible)) {
+      chips.add(Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.menuBorder.withOpacity(0.5),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          name,
+          style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 12, fontWeight: FontWeight.w500),
+          overflow: TextOverflow.ellipsis,
+        ),
+      ));
+    }
+    final remaining = others.length - maxVisible;
+    if (remaining > 0) {
+      chips.add(Container(
+        margin: const EdgeInsets.only(left: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.menuBorder.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          '+$remaining',
+          style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 12, fontWeight: FontWeight.w500),
+        ),
+      ));
+    }
+    return SizedBox(
+      width: 140,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        physics: const ClampingScrollPhysics(),
+        child: Row(children: chips),
+      ),
+    );
+  }
+
+  Widget _buildParticipantsLine(Thread thread) {
+    final auth = context.read<AuthService>();
+    final me = auth.currentUser?.id;
+    final names = thread.users.where((u) => u.id != me).map((u) => u.name).toList();
+    final text = names.join(', ');
+    return Text(
+      text,
+      style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 11),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
 
   String _formatProjectTimestamp(DateTime timestamp) {
     final now = DateTime.now();
@@ -529,14 +784,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         });
       }
 
-      // Load thread details and latest message, prepare snapshot for sequencer
-      final threadsState = context.read<ThreadsState>();
-      await threadsState.loadThread(project.id);
-      Map<String, dynamic>? initialSnapshot;
-      final messages = threadsState.activeThreadMessages;
-      if (messages.isNotEmpty) {
-        initialSnapshot = messages.last.snapshot;
-      }
+      // Load latest message only for CONTINUE
+      final latest = await ThreadsApi.getLatestMessage(project.id, includeSnapshot: true);
+      Map<String, dynamic>? initialSnapshot = latest?.snapshot;
 
       // Navigate to V2 sequencer screen
       if (mounted) {

@@ -84,6 +84,8 @@ class AuthService extends ChangeNotifier {
           profile: UserProfileInfo(bio: '', location: ''),
           stats: UserStats(totalPlays: 0),
           preferences: UserPreferences(theme: 'dark'),
+          threads: const [],
+          pendingInvitesToThreads: const [],
         );
         
         _isAuthenticated = true;
@@ -129,6 +131,8 @@ class AuthService extends ChangeNotifier {
           profile: UserProfileInfo(bio: '', location: ''),
           stats: UserStats(totalPlays: 0),
           preferences: UserPreferences(theme: 'dark'),
+          threads: const [],
+          pendingInvitesToThreads: const [],
         );
         
         _isAuthenticated = true;
@@ -157,6 +161,18 @@ class AuthService extends ChangeNotifier {
       await prefs.setString(_tokenKey, _token!);
       await prefs.setString(_userKey, json.encode(_currentUser!.toJson()));
       await prefs.setInt(_loginTimeKey, DateTime.now().millisecondsSinceEpoch);
+    }
+  }
+
+  Future<void> refreshCurrentUserFromServer() async {
+    try {
+      if (_currentUser == null) return;
+      final fetched = await UsersService.getUser(_currentUser!.id);
+      _currentUser = fetched;
+      await _saveAuthState();
+      notifyListeners();
+    } catch (e) {
+      // Ignore network errors silently for now
     }
   }
 

@@ -22,6 +22,7 @@ from http_api.threads import (
     send_invitation_handler,
     manage_invitation_handler,
     get_messages_handler,
+    get_message_by_id_handler,
     create_message_handler,
     delete_message_handler,
 )
@@ -119,9 +120,26 @@ async def manage_invitation(request: Request, thread_id: str, user_id: str, acti
 
 # Messages endpoints
 @router.get("/messages")
-async def get_messages(request: Request, thread_id: str = Query(...), token: str = Query(...)):
-    """List messages for a thread"""
-    return await get_messages_handler(request, thread_id, token)
+async def get_messages(
+    request: Request,
+    thread_id: str = Query(...),
+    token: str = Query(...),
+    limit: int = Query(100),
+    order: str = Query("asc"),
+    include_snapshot: bool = Query(True),
+):
+    """List messages for a thread with optional pagination and projection"""
+    return await get_messages_handler(request, thread_id, token, limit, order, include_snapshot)
+
+@router.get("/messages/{message_id}")
+async def get_message_by_id(
+    request: Request,
+    message_id: str,
+    token: str = Query(...),
+    include_snapshot: bool = Query(True),
+):
+    """Get a single message by ID"""
+    return await get_message_by_id_handler(request, message_id, token, include_snapshot)
 
 @router.post("/messages")
 async def create_message(request: Request, message_data: Dict[str, Any] = Body(...)):

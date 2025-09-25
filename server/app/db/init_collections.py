@@ -92,7 +92,8 @@ COLLECTIONS_CONFIG = {
     "messages": {
         "indexes": [
             {"fields": "id", "unique": True},
-            {"fields": "thread_id", "unique": False},
+            {"fields": "parent_thread", "unique": False},
+            {"fields": [("parent_thread", ASCENDING), ("timestamp", ASCENDING)], "unique": False},
             {"fields": "user_id", "unique": False},
             {"fields": "created_at", "unique": False}
         ],

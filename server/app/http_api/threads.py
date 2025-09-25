@@ -246,13 +246,36 @@ async def send_invitation_handler(request: Request, thread_id: str, invitation_d
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 # Messages handlers (store messages in a separate collection with reference, or inline for simplicity)
-async def get_messages_handler(request: Request, thread_id: str, token: str):
+async def get_messages_handler(request: Request, thread_id: str, token: str, limit: int = 100, order: str = "asc", include_snapshot: bool = True):
     verify_token(token)
     try:
         db = get_db()
-        # For now messages are stored in separate 'messages' collection
-        messages_cursor = db.messages.find({"parent_thread": thread_id}, {"_id": 0}).sort("timestamp", 1)
-        return {"messages": list(messages_cursor)}
+        sort_dir = 1 if order == "asc" else -1
+        projection = {"_id": 0}
+        if not include_snapshot:
+            projection["snapshot"] = 0
+        cursor = (
+            db.messages
+            .find({"parent_thread": thread_id}, projection)
+            .sort("timestamp", sort_dir)
+            .limit(limit)
+        )
+        return {"messages": list(cursor)}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+async def get_message_by_id_handler(request: Request, message_id: str, token: str, include_snapshot: bool = True):
+    verify_token(token)
+    try:
+        db = get_db()
+        projection = {"_id": 0}
+        if not include_snapshot:
+            projection["snapshot"] = 0
+        doc = db.messages.find_one({"id": message_id}, projection)
+        if not doc:
+            raise HTTPException(status_code=404, detail=f"Message not found: {message_id}")
+        return doc
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
