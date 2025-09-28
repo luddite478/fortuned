@@ -252,6 +252,12 @@ class MessageBarWidget extends StatelessWidget {
   }
 
   void _navigateToThread(BuildContext context, ThreadsState threadsState) {
+    // Stop playback if active before navigating
+    final playbackState = Provider.of<PlaybackState>(context, listen: false);
+    if (playbackState.isPlaying) {
+      playbackState.stop();
+    }
+
     // Same logic as in app_header_widget.dart
     final thread = threadsState.activeThread;
     
@@ -302,6 +308,12 @@ class MessageBarWidget extends StatelessWidget {
   }
 
   void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) async {
+    // Stop playback if active before sending and navigating
+    final playbackState = Provider.of<PlaybackState>(context, listen: false);
+    if (playbackState.isPlaying) {
+      playbackState.stop();
+    }
+
     final activeThread = threadsState.activeThread;
     try {
       if (activeThread != null) {

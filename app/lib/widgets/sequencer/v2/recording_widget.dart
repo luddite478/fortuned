@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:path/path.dart' as path;
+// import 'package:path/path.dart' as path;
 import 'package:share_plus/share_plus.dart';
 import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/recording.dart';
@@ -78,7 +78,7 @@ class RecordingWidget extends StatelessWidget {
   Widget _buildRecordingMenu(BuildContext context, RecordingState recording, 
       double panelHeight, double panelWidth, double padding, double borderRadius) {
     
-    final fileName = path.basename(recording.currentRecordingPath ?? 'recording.wav');
+    // final fileName = path.basename(recording.currentRecordingPath ?? 'recording.wav');
     
     // Follow sample_banks_widget pattern: only horizontal padding to avoid overflow
     final horizontalPadding = padding;
@@ -103,7 +103,7 @@ class RecordingWidget extends StatelessWidget {
       ),
       child: Column(
         children: [
-          // File name row (left title, right close)
+          // Title row (left title, right close)
           Container(
             height: titleHeight,
             child: Stack(
@@ -111,7 +111,7 @@ class RecordingWidget extends StatelessWidget {
                 Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    fileName,
+                    'Recording',
                     style: TextStyle(
                       color: AppColors.sequencerText,
                       fontSize: titleFontSize,
@@ -148,22 +148,104 @@ class RecordingWidget extends StatelessWidget {
             ),
           ),
           
-          // Buttons section (4 compact buttons centered) for new take
+          // Buttons section (compact buttons centered) for new take
           Container(
             height: buttonAreaHeight,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                _buildSequencerButton(icon: Icons.play_arrow, onTap: () => _playRecording(recording), iconColor: Colors.greenAccent),
+                Consumer<RecordingState>(
+                  builder: (context, rec, _) => _buildSequencerButton(
+                    icon: rec.isPreviewing ? Icons.stop : Icons.play_arrow,
+                    onTap: rec.isConverting ? null : () => _togglePreview(rec),
+                    iconColor: rec.isPreviewing ? Colors.redAccent : Colors.greenAccent,
+                  ),
+                ),
                 SizedBox(width: horizontalPadding * 0.5),
-                _buildSequencerButton(icon: Icons.delete, onTap: () => _showDeleteConfirmation(context, recording), iconColor: Colors.redAccent),
+                Consumer<RecordingState>(
+                  builder: (context, rec, _) => _buildSequencerButton(
+                    icon: Icons.delete, 
+                    onTap: rec.isConverting ? null : () => _showDeleteConfirmation(context, rec), 
+                    iconColor: Colors.redAccent
+                  ),
+                ),
                 SizedBox(width: horizontalPadding * 0.5),
-                _buildSequencerButton(icon: Icons.share, onTap: () => _shareRecording(recording.currentRecordingPath), iconColor: Colors.cyanAccent),
-                SizedBox(width: horizontalPadding * 0.5),
-                _buildSequencerButton(icon: Icons.audiotrack, onTap: null, iconColor: Colors.grey),
+                Consumer<RecordingState>(
+                  builder: (context, rec, _) => _buildSequencerButton(
+                    icon: Icons.share, 
+                    onTap: rec.isConverting ? null : () => _shareRecordingAuto(context, rec), 
+                    iconColor: Colors.cyanAccent
+                  ),
+                ),
               ],
             ),
           ),
+          
+          // Conversion status indicator (spinner while converting)
+          Consumer<RecordingState>(
+            builder: (context, rec, _) {
+              if (rec.isConverting) {
+                return Container(
+                  height: availableHeight * 0.15,
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        Text(
+                          'Converting to MP3...',
+                          style: TextStyle(
+                            color: Colors.orange,
+                            fontSize: (availableHeight * 0.12).clamp(10.0, 14.0),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              } else if (rec.conversionError != null) {
+                return Container(
+                  height: availableHeight * 0.15,
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error,
+                          color: Colors.red,
+                          size: 16,
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Conversion failed',
+                            style: TextStyle(
+                              color: Colors.red,
+                              fontSize: (availableHeight * 0.12).clamp(10.0, 14.0),
+                              fontWeight: FontWeight.w500,
+                            ),
+                            textAlign: TextAlign.center,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              return SizedBox(height: availableHeight * 0.15);
+            },
+          ),
+          
           // Optional footer space to avoid cramped look
           SizedBox(height: verticalSpacing),
         ],
@@ -204,10 +286,8 @@ class RecordingWidget extends StatelessWidget {
 
   // Removed status area (not used)
 
-  void _playRecording(RecordingState recording) {
-    // TODO: Implement audio playback functionality
-    // For now, show a placeholder message
-    debugPrint('🎵 Play recording: ${recording.currentRecordingPath}');
+  void _togglePreview(RecordingState recording) {
+    recording.togglePreview();
   }
 
   void _showDeleteConfirmation(BuildContext context, RecordingState recording) {
@@ -251,11 +331,18 @@ class RecordingWidget extends StatelessWidget {
     );
   }
 
-  void _shareRecording(String? filePath) async {
+  void _shareRecordingAuto(BuildContext context, RecordingState recording) async {
     try {
-      if (filePath == null) return;
+      // Ensure MP3 is ready; if not, convert first
+      final mp3 = await recording.getShareableMp3Path(bitrateKbps: 320);
+      if (mp3 == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Conversion failed. Cannot share.')),
+        );
+        return;
+      }
       await Share.shareXFiles(
-        [XFile(filePath)],
+        [XFile(mp3)],
         text: 'Check out my track created with NIYYA!',
         subject: 'NIYYA Track',
       );
@@ -263,4 +350,5 @@ class RecordingWidget extends StatelessWidget {
       debugPrint('Failed to share recording: $e');
     }
   }
-} 
+
+  }

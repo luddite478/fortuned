@@ -10,8 +10,6 @@ IPHONE_MODEL="$3"
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
 
-
-
 # Set default iPhone model if not provided for simulator
 if [[ "$DEVICE_TYPE" == "simulator" && -z "$IPHONE_MODEL" ]]; then
   IPHONE_MODEL="iPhone 15"
@@ -65,7 +63,8 @@ else
   flutter build ios --release
 
   echo "Detecting first connected physical iPhone..."
-  DEVICE_ID=$(ios-deploy --detect 2>/dev/null | grep -oE '[0-9A-Fa-f-]{25,}' | head -n 1)
+  DEVICE_ID="00008030-001564DA14F9802E"
+  # DEVICE_ID=$(ios-deploy --detect 2>/dev/null | grep -oE '[0-9A-Fa-f-]{25,}' | head -n 1)
 
   if [[ -z "$DEVICE_ID" ]]; then
     echo "❌ No physical device detected. Please connect your iPhone via USB."

@@ -243,7 +243,12 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
         backgroundColor: AppColors.sequencerPageBackground,
         appBar: AppHeaderWidget(
           mode: HeaderMode.sequencer,
-          onBack: () => Navigator.of(context).pop(),
+          onBack: () {
+            if (_playbackState.isPlaying) {
+              _playbackState.stop();
+            }
+            Navigator.of(context).pop();
+          },
           threadsService: _threadsService,
         ),
         body: Stack(

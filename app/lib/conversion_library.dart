@@ -1,6 +1,7 @@
 import 'dart:ffi' as ffi;
 import 'dart:io';
 import 'package:ffi/ffi.dart';
+import 'package:flutter/foundation.dart';
 import 'conversion_bindings_generated.dart';
 
 /// Dart wrapper for the audio conversion library
@@ -151,6 +152,33 @@ class ConversionLibrary {
     _bindings.conversion_cleanup();
     print('✅ Conversion library cleanup completed');
   }
+
+  // Run conversion in a background isolate to avoid blocking the UI isolate
+  static Future<bool> convertInBackground(
+    String wavPath,
+    String mp3Path,
+    int bitrateKbps,
+  ) async {
+    return compute(_convertWorker, <String, dynamic>{
+      'wavPath': wavPath,
+      'mp3Path': mp3Path,
+      'bitrate': bitrateKbps,
+    });
+  }
+}
+
+// Top-level worker function for the background isolate
+bool _convertWorker(Map<String, dynamic> args) {
+  final String wavPath = args['wavPath'] as String;
+  final String mp3Path = args['mp3Path'] as String;
+  final int bitrate = args['bitrate'] as int;
+
+  final lib = ConversionLibrary();
+  lib.initialize();
+  if (!lib.init()) {
+    return false;
+  }
+  return lib.convertWavToMp3(wavPath, mp3Path, bitrate);
 }
 
  
