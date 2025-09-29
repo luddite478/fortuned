@@ -144,16 +144,38 @@ start_nginx() {
     echo "Starting nginx..."
     
     # Process template and create final config
+    echo "Processing nginx template..."
     envsubst '${SERVER_HOST},${HTTP_API_PORT},${HTTPS_API_PORT},${WEBSOCKET_PORT}' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf
     
+    echo "Generated nginx config:"
+    cat /etc/nginx/conf.d/app.conf
+    
     # Test nginx configuration
-    nginx -t
+    echo "Testing nginx configuration..."
+    if nginx -t; then
+        echo "✅ Nginx configuration is valid"
+    else
+        echo "❌ Nginx configuration test failed!"
+        echo "Config file contents:"
+        cat /etc/nginx/conf.d/app.conf
+        exit 1
+    fi
     
     # Start nginx
+    echo "Starting nginx daemon..."
     nginx -g "daemon off;" &
     nginx_pid=$!
     
-    echo "✅ Nginx started with PID $nginx_pid"
+    # Wait a moment and check if nginx is still running
+    sleep 2
+    if kill -0 $nginx_pid 2>/dev/null; then
+        echo "✅ Nginx started successfully with PID $nginx_pid"
+    else
+        echo "❌ Nginx failed to start or crashed immediately!"
+        echo "Checking nginx error logs..."
+        cat /var/log/nginx/error.log || echo "No error log found"
+        exit 1
+    fi
 }
 
 # Function to reload nginx
@@ -283,6 +305,11 @@ show_final_status() {
 
 # Function to run the main application
 run_main() {
+    echo "🚀 STARTING CERTIFICATE SETUP PROCESS"
+    echo "Timestamp: $(date)"
+    echo "PID: $$"
+    echo ""
+    
     # Setup certificates and check if new certificate is needed
     setup_certificates
     needs_new_cert=$?
@@ -292,6 +319,7 @@ run_main() {
     
     # If we need a new certificate, request it
     if [ "$needs_new_cert" = 1 ]; then
+        echo "📋 Certificate needed - proceeding with Let's Encrypt request"
         handle_certificate_request
     else
         echo ""
@@ -301,8 +329,20 @@ run_main() {
     # Show final status
     show_final_status
     
-    # Keep the script running
-    wait $nginx_pid
+    echo "🔄 ENTERING NGINX WAIT LOOP"
+    echo "Nginx PID: $nginx_pid"
+    echo "Script will now keep nginx running..."
+    
+    # Keep the script running and monitor nginx
+    while true; do
+        if ! kill -0 $nginx_pid 2>/dev/null; then
+            echo "❌ Nginx process died! PID $nginx_pid no longer exists"
+            echo "Checking error logs..."
+            cat /var/log/nginx/error.log || echo "No error log found"
+            exit 1
+        fi
+        sleep 30
+    done
 }
 
 # Main execution
