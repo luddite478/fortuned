@@ -306,6 +306,7 @@ request_certificate() {
 
 # Function to setup certificates
 setup_certificates() {
+    echo "🔧 === SETUP_CERTIFICATES FUNCTION CALLED ==="
     echo "Starting certificate validation process..."
     
     # Check if we have a valid certificate (this handles container restarts)
@@ -314,6 +315,7 @@ setup_certificates() {
         echo "🎉 CONTAINER RESTART DETECTED: Using existing valid certificate"
         echo "   No new certificate needed - skipping certificate request"
         echo ""
+        echo "🔧 === SETUP_CERTIFICATES RETURNING 0 (no new cert needed) ==="
         return 0  # No new certificate needed
     else
         echo ""
@@ -324,7 +326,8 @@ setup_certificates() {
         fi
         echo ""
         # Create self-signed certificate for nginx to start
-        create_dummy_certificate
+        create_dummy_certificate || true  # Don't let this fail the script
+        echo "🔧 === SETUP_CERTIFICATES RETURNING 1 (new cert needed) ==="
         return 1  # New certificate needed
     fi
 }
@@ -375,11 +378,15 @@ run_main() {
     echo ""
     
     # Setup certificates and check if new certificate is needed
+    echo "📋 About to call setup_certificates..."
     setup_certificates
     needs_new_cert=$?
+    echo "📋 setup_certificates returned: $needs_new_cert"
     
     # Start nginx (works with either existing cert or dummy cert)
+    echo "📋 About to call start_nginx..."
     start_nginx
+    echo "📋 start_nginx completed successfully"
     
     # If we need a new certificate, request it
     if [ "$needs_new_cert" = 1 ]; then
