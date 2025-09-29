@@ -22,6 +22,7 @@
 - check schema validation client/server
 
 
+- ci create tags
 - smooth volume and pitch change ui
 - recording fix and ui change
 - mute/solo

@@ -170,12 +170,52 @@ request_certificate() {
     # Delete dummy certificate
     delete_dummy_certificate
     
-    # Request certificate
-    certbot certonly --webroot --webroot-path=/var/www/certbot \
-        --email "$EMAIL" --agree-tos --no-eff-email \
-        --force-renewal -d "$SERVER_HOST"
+    # Request certificate with detailed error logging
+    echo "Running certbot command with verbose output..."
+    echo "Command: certbot certonly --webroot --webroot-path=/var/www/certbot --email $EMAIL --agree-tos --no-eff-email --force-renewal -d $SERVER_HOST"
     
-    echo "✅ Let's Encrypt PRODUCTION certificate obtained for $SERVER_HOST"
+    if certbot certonly --webroot --webroot-path=/var/www/certbot \
+        --email "$EMAIL" --agree-tos --no-eff-email \
+        --force-renewal -d "$SERVER_HOST" --verbose 2>&1; then
+        echo "✅ Let's Encrypt PRODUCTION certificate obtained for $SERVER_HOST"
+        return 0
+    else
+        local exit_code=$?
+        echo ""
+        echo "❌ CERTIFICATE REQUEST FAILED!"
+        echo "Exit code: $exit_code"
+        echo ""
+        echo "🔍 TROUBLESHOOTING INFORMATION:"
+        echo "1. Check if domain resolves correctly:"
+        echo "   dig $SERVER_HOST"
+        echo ""
+        echo "2. Test ACME challenge accessibility:"
+        echo "   curl -I http://$SERVER_HOST/.well-known/acme-challenge/"
+        echo ""
+        echo "3. Check certbot logs:"
+        echo "   ls -la /var/log/letsencrypt/"
+        echo "   cat /var/log/letsencrypt/letsencrypt.log"
+        echo ""
+        echo "4. Common issues:"
+        echo "   - Domain not pointing to this server"
+        echo "   - Port 80 not accessible from internet"
+        echo "   - Rate limiting (5 failures per hour, 50 certificates per week)"
+        echo "   - Firewall blocking Let's Encrypt servers"
+        echo ""
+        
+        # Show recent log entries if available
+        if [ -f "/var/log/letsencrypt/letsencrypt.log" ]; then
+            echo "📋 RECENT CERTBOT LOG ENTRIES:"
+            tail -20 /var/log/letsencrypt/letsencrypt.log
+            echo ""
+        fi
+        
+        # Create dummy certificate to allow nginx to continue
+        echo "Creating dummy certificate to allow nginx to continue..."
+        create_dummy_certificate
+        
+        return $exit_code
+    fi
 }
 
 # Function to setup certificates
@@ -212,10 +252,18 @@ handle_certificate_request() {
     else
         echo "Waiting for nginx to fully start..."
         sleep 5
-        request_certificate
-        reload_nginx
-        echo ""
-        echo "🎉 PRODUCTION CERTIFICATE SETUP COMPLETE"
+        
+        if request_certificate; then
+            reload_nginx
+            echo ""
+            echo "🎉 PRODUCTION CERTIFICATE SETUP COMPLETE"
+        else
+            echo ""
+            echo "⚠️  PRODUCTION CERTIFICATE REQUEST FAILED"
+            echo "   Continuing with dummy certificate for now"
+            echo "   Check the error messages above and troubleshoot"
+            echo "   Nginx will still serve HTTPS but with self-signed certificate"
+        fi
     fi
 }
 
