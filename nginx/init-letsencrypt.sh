@@ -2,52 +2,6 @@
 
 set -e
 
-# Enable comprehensive debugging
-set -x
-exec 2>&1
-
-echo "🐛 DEBUG MODE ENABLED - All commands will be logged"
-echo "Script: $0"
-echo "Arguments: $@"
-echo "Working directory: $(pwd)"
-echo "User: $(whoami)"
-echo "Environment variables:"
-env | grep -E "(SERVER_HOST|EMAIL|HTTP_API_PORT|HTTPS_API_PORT|WEBSOCKET_PORT|ENV)" || echo "No relevant env vars found"
-
-# Error trap function
-error_trap() {
-    local exit_code=$?
-    local line_number=$1
-    echo ""
-    echo "💥 SCRIPT FAILED!"
-    echo "Exit code: $exit_code"
-    echo "Line number: $line_number"
-    echo "Command that failed: ${BASH_COMMAND}"
-    echo "Call stack:"
-    local frame=0
-    while caller $frame; do
-        ((frame++))
-    done
-    echo ""
-    echo "🔍 DEBUGGING INFO:"
-    echo "Current processes:"
-    ps aux || echo "Failed to get processes"
-    echo ""
-    echo "Nginx status:"
-    nginx -t 2>&1 || echo "Nginx test failed"
-    echo ""
-    echo "Nginx error log:"
-    cat /var/log/nginx/error.log 2>/dev/null || echo "No nginx error log"
-    echo ""
-    echo "Directory contents:"
-    ls -la /etc/letsencrypt/live/ 2>/dev/null || echo "No letsencrypt directory"
-    echo ""
-    exit $exit_code
-}
-
-# Set up error trap
-trap 'error_trap $LINENO' ERR
-
 # Check if SERVER_HOST is set
 if [ -z "$SERVER_HOST" ]; then
     echo "Error: SERVER_HOST environment variable is not set"
@@ -187,59 +141,27 @@ delete_dummy_certificate() {
 
 # Function to start nginx
 start_nginx() {
-    echo "🔧 === START_NGINX FUNCTION CALLED ==="
     echo "Starting nginx..."
-    echo "Current directory: $(pwd)"
-    echo "Available templates:"
-    ls -la /etc/nginx/templates/ || echo "No templates directory"
     
     # Process template and create final config
-    echo "Processing nginx template..."
     envsubst '${SERVER_HOST},${HTTP_API_PORT},${HTTPS_API_PORT},${WEBSOCKET_PORT}' < /etc/nginx/templates/app.conf.template > /etc/nginx/conf.d/app.conf
     
-    echo "Generated nginx config:"
-    cat /etc/nginx/conf.d/app.conf
-    
     # Test nginx configuration
-    echo "Testing nginx configuration..."
-    if nginx -t; then
-        echo "✅ Nginx configuration is valid"
-    else
-        echo "❌ Nginx configuration test failed!"
-        echo "Config file contents:"
-        cat /etc/nginx/conf.d/app.conf
-        exit 1
-    fi
+    nginx -t
     
     # Start nginx
-    echo "Starting nginx daemon..."
     nginx -g "daemon off;" &
     nginx_pid=$!
     
     # Wait a moment and check if nginx is still running
-    echo "Waiting 2 seconds to check nginx status..."
     sleep 2
-    
-    echo "Checking if nginx process $nginx_pid is still running..."
     if kill -0 $nginx_pid 2>/dev/null; then
-        echo "✅ Nginx started successfully with PID $nginx_pid"
-        echo "Nginx processes:"
-        ps aux | grep nginx | grep -v grep || echo "No nginx processes found"
-        echo "Listening ports:"
-        netstat -tlnp 2>/dev/null | grep nginx || echo "No nginx ports found"
+        echo "✅ Nginx started with PID $nginx_pid"
     else
-        echo "❌ Nginx failed to start or crashed immediately!"
-        echo "Process status:"
-        ps aux | grep nginx | grep -v grep || echo "No nginx processes found"
-        echo "Checking nginx access logs..."
-        cat /var/log/nginx/access.log 2>/dev/null || echo "No access log found"
-        echo "Checking nginx error logs..."
+        echo "❌ Nginx failed to start"
         cat /var/log/nginx/error.log 2>/dev/null || echo "No error log found"
-        echo "Certificate files:"
-        ls -la /etc/letsencrypt/live/$SERVER_HOST/ 2>/dev/null || echo "No certificate files"
         exit 1
     fi
-    echo "🔧 === START_NGINX FUNCTION COMPLETED ==="
 }
 
 # Function to reload nginx
@@ -251,83 +173,45 @@ reload_nginx() {
 
 # Function to request certificate from Let's Encrypt
 request_certificate() {
-    echo "Requesting Let's Encrypt PRODUCTION certificate for $SERVER_HOST..."
+    echo "Requesting Let's Encrypt certificate for $SERVER_HOST..."
     
     # Delete dummy certificate
     delete_dummy_certificate
     
-    # Request certificate with detailed error logging
-    echo "Running certbot command with verbose output..."
-    echo "Command: certbot certonly --webroot --webroot-path=/var/www/certbot --email $EMAIL --agree-tos --no-eff-email --force-renewal -d $SERVER_HOST"
-    
+    # Request certificate
     if certbot certonly --webroot --webroot-path=/var/www/certbot \
         --email "$EMAIL" --agree-tos --no-eff-email \
-        --force-renewal -d "$SERVER_HOST" --verbose 2>&1; then
-        echo "✅ Let's Encrypt PRODUCTION certificate obtained for $SERVER_HOST"
+        --force-renewal -d "$SERVER_HOST"; then
+        echo "✅ Let's Encrypt certificate obtained for $SERVER_HOST"
         return 0
     else
-        local exit_code=$?
-        echo ""
-        echo "❌ CERTIFICATE REQUEST FAILED!"
-        echo "Exit code: $exit_code"
-        echo ""
-        echo "🔍 TROUBLESHOOTING INFORMATION:"
-        echo "1. Check if domain resolves correctly:"
-        echo "   dig $SERVER_HOST"
-        echo ""
-        echo "2. Test ACME challenge accessibility:"
-        echo "   curl -I http://$SERVER_HOST/.well-known/acme-challenge/"
-        echo ""
-        echo "3. Check certbot logs:"
-        echo "   ls -la /var/log/letsencrypt/"
-        echo "   cat /var/log/letsencrypt/letsencrypt.log"
-        echo ""
-        echo "4. Common issues:"
-        echo "   - Domain not pointing to this server"
-        echo "   - Port 80 not accessible from internet"
-        echo "   - Rate limiting (5 failures per hour, 50 certificates per week)"
-        echo "   - Firewall blocking Let's Encrypt servers"
-        echo ""
-        
-        # Show recent log entries if available
+        echo "❌ Certificate request failed"
         if [ -f "/var/log/letsencrypt/letsencrypt.log" ]; then
-            echo "📋 RECENT CERTBOT LOG ENTRIES:"
-            tail -20 /var/log/letsencrypt/letsencrypt.log
-            echo ""
+            echo "Recent log entries:"
+            tail -10 /var/log/letsencrypt/letsencrypt.log
         fi
-        
         # Create dummy certificate to allow nginx to continue
-        echo "Creating dummy certificate to allow nginx to continue..."
         create_dummy_certificate
-        
-        return $exit_code
+        return 1
     fi
 }
 
 # Function to setup certificates
 setup_certificates() {
-    echo "🔧 === SETUP_CERTIFICATES FUNCTION CALLED ==="
     echo "Starting certificate validation process..."
     
     # Check if we have a valid certificate (this handles container restarts)
     if validate_certificate; then
-        echo ""
-        echo "🎉 CONTAINER RESTART DETECTED: Using existing valid certificate"
-        echo "   No new certificate needed - skipping certificate request"
-        echo ""
-        echo "🔧 === SETUP_CERTIFICATES RETURNING 0 (no new cert needed) ==="
+        echo "✅ Using existing valid certificate"
         return 0  # No new certificate needed
     else
-        echo ""
         if [ "$ENV" = "stage" ]; then
-            echo "🔄 NEW SETUP OR INVALID CERTIFICATE: Will create self-signed certificate"
+            echo "Creating self-signed certificate for staging"
         else
-            echo "🔄 NEW SETUP OR INVALID CERTIFICATE: Will obtain new certificate"
+            echo "Will obtain new Let's Encrypt certificate"
         fi
-        echo ""
         # Create self-signed certificate for nginx to start
-        create_dummy_certificate || true  # Don't let this fail the script
-        echo "🔧 === SETUP_CERTIFICATES RETURNING 1 (new cert needed) ==="
+        create_dummy_certificate || true
         return 1  # New certificate needed
     fi
 }
@@ -335,88 +219,56 @@ setup_certificates() {
 # Function to handle certificate request flow
 handle_certificate_request() {
     if [ "$ENV" = "stage" ]; then
-        echo ""
-        echo "🎉 STAGING SELF-SIGNED CERTIFICATE SETUP COMPLETE"
-        echo "   Self-signed certificate is already in place and ready to use"
+        echo "✅ Staging setup complete"
     else
-        echo "Waiting for nginx to fully start..."
+        echo "Waiting for nginx to start..."
         sleep 5
         
         if request_certificate; then
             reload_nginx
-            echo ""
-            echo "🎉 PRODUCTION CERTIFICATE SETUP COMPLETE"
+            echo "✅ Production certificate setup complete"
         else
-            echo ""
-            echo "⚠️  PRODUCTION CERTIFICATE REQUEST FAILED"
-            echo "   Continuing with dummy certificate for now"
-            echo "   Check the error messages above and troubleshoot"
-            echo "   Nginx will still serve HTTPS but with self-signed certificate"
+            echo "⚠️ Certificate request failed, continuing with dummy certificate"
         fi
     fi
 }
 
 # Function to show final status
 show_final_status() {
-    echo ""
     echo "================================================"
     echo "SSL Certificate status: READY"
     if [ "$ENV" = "stage" ]; then
-        echo "Nginx is running with SELF-SIGNED certificate"
-        echo "Note: Browsers will show security warnings for self-signed certificates"
+        echo "Nginx running with self-signed certificate"
     else
-        echo "Nginx is running and serving HTTPS traffic"
+        echo "Nginx running and serving HTTPS traffic"
     fi
     echo "================================================"
 }
 
 # Function to run the main application
 run_main() {
-    echo "🚀 STARTING CERTIFICATE SETUP PROCESS"
-    echo "Timestamp: $(date)"
-    echo "PID: $$"
-    echo ""
+    echo "Starting SSL certificate setup..."
     
     # Setup certificates and check if new certificate is needed
-    echo "📋 About to call setup_certificates..."
     if setup_certificates; then
         needs_new_cert=0
     else
         needs_new_cert=1
     fi
-    echo "📋 setup_certificates returned: $needs_new_cert"
     
     # Start nginx (works with either existing cert or dummy cert)
-    echo "📋 About to call start_nginx..."
     start_nginx
-    echo "📋 start_nginx completed successfully"
     
     # If we need a new certificate, request it
     if [ "$needs_new_cert" = 1 ]; then
-        echo "📋 Certificate needed - proceeding with Let's Encrypt request"
         handle_certificate_request
-    else
-        echo ""
-        echo "🎉 USING EXISTING CERTIFICATE - READY TO SERVE TRAFFIC"
     fi
     
     # Show final status
     show_final_status
     
-    echo "🔄 ENTERING NGINX WAIT LOOP"
-    echo "Nginx PID: $nginx_pid"
-    echo "Script will now keep nginx running..."
-    
-    # Keep the script running and monitor nginx
-    while true; do
-        if ! kill -0 $nginx_pid 2>/dev/null; then
-            echo "❌ Nginx process died! PID $nginx_pid no longer exists"
-            echo "Checking error logs..."
-            cat /var/log/nginx/error.log || echo "No error log found"
-            exit 1
-        fi
-        sleep 30
-    done
+    # Keep the script running
+    wait $nginx_pid
 }
 
 # Main execution

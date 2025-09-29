@@ -2,6 +2,14 @@ log_format upstream_log '$remote_addr - $remote_user [$time_local] "$request" '
                         '$status $body_bytes_sent "$http_referer" "$http_user_agent" '
                         '$request_time $upstream_response_time $upstream_addr $upstream_status';
 
+upstream api_backend {
+    server server:5000;
+}
+
+upstream websocket_backend {
+    server server:8765;
+}
+
 server {
     listen ${HTTP_API_PORT};
     listen [::]:${HTTP_API_PORT};
@@ -13,12 +21,14 @@ server {
 
     location /.well-known/acme-challenge/ {
         root /var/www/certbot;
-        try_files $uri =404;
     }
 
     location / {
-        return 200 "Certificate test server - HTTP working\n";
-        add_header Content-Type text/plain;
+        proxy_pass http://api_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
@@ -40,9 +50,13 @@ server {
     ssl_session_cache shared:SSL:10m;
     ssl_session_timeout 10m;
 
+    # API endpoints over HTTPS
     location / {
-        return 200 "Certificate test server - HTTPS working with Let's Encrypt certificate!\n";
-        add_header Content-Type text/plain;
+        proxy_pass http://api_backend;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
@@ -54,6 +68,7 @@ server {
     
     server_name ${SERVER_HOST};
     server_tokens off;
+    tcp_nodelay on;
 
     ssl_certificate /etc/letsencrypt/live/${SERVER_HOST}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/${SERVER_HOST}/privkey.pem;
@@ -65,7 +80,14 @@ server {
     ssl_session_timeout 10m;
 
     location / {
-        return 200 "WebSocket endpoint - HTTPS working!\n";
-        add_header Content-Type text/plain;
+        proxy_pass http://websocket_backend;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 86400;
     }
 }
