@@ -2,6 +2,52 @@
 
 set -e
 
+# Enable comprehensive debugging
+set -x
+exec 2>&1
+
+echo "🐛 DEBUG MODE ENABLED - All commands will be logged"
+echo "Script: $0"
+echo "Arguments: $@"
+echo "Working directory: $(pwd)"
+echo "User: $(whoami)"
+echo "Environment variables:"
+env | grep -E "(SERVER_HOST|EMAIL|HTTP_API_PORT|HTTPS_API_PORT|WEBSOCKET_PORT|ENV)" || echo "No relevant env vars found"
+
+# Error trap function
+error_trap() {
+    local exit_code=$?
+    local line_number=$1
+    echo ""
+    echo "💥 SCRIPT FAILED!"
+    echo "Exit code: $exit_code"
+    echo "Line number: $line_number"
+    echo "Command that failed: ${BASH_COMMAND}"
+    echo "Call stack:"
+    local frame=0
+    while caller $frame; do
+        ((frame++))
+    done
+    echo ""
+    echo "🔍 DEBUGGING INFO:"
+    echo "Current processes:"
+    ps aux || echo "Failed to get processes"
+    echo ""
+    echo "Nginx status:"
+    nginx -t 2>&1 || echo "Nginx test failed"
+    echo ""
+    echo "Nginx error log:"
+    cat /var/log/nginx/error.log 2>/dev/null || echo "No nginx error log"
+    echo ""
+    echo "Directory contents:"
+    ls -la /etc/letsencrypt/live/ 2>/dev/null || echo "No letsencrypt directory"
+    echo ""
+    exit $exit_code
+}
+
+# Set up error trap
+trap 'error_trap $LINENO' ERR
+
 # Check if SERVER_HOST is set
 if [ -z "$SERVER_HOST" ]; then
     echo "Error: SERVER_HOST environment variable is not set"
@@ -141,7 +187,11 @@ delete_dummy_certificate() {
 
 # Function to start nginx
 start_nginx() {
+    echo "🔧 === START_NGINX FUNCTION CALLED ==="
     echo "Starting nginx..."
+    echo "Current directory: $(pwd)"
+    echo "Available templates:"
+    ls -la /etc/nginx/templates/ || echo "No templates directory"
     
     # Process template and create final config
     echo "Processing nginx template..."
@@ -167,15 +217,29 @@ start_nginx() {
     nginx_pid=$!
     
     # Wait a moment and check if nginx is still running
+    echo "Waiting 2 seconds to check nginx status..."
     sleep 2
+    
+    echo "Checking if nginx process $nginx_pid is still running..."
     if kill -0 $nginx_pid 2>/dev/null; then
         echo "✅ Nginx started successfully with PID $nginx_pid"
+        echo "Nginx processes:"
+        ps aux | grep nginx | grep -v grep || echo "No nginx processes found"
+        echo "Listening ports:"
+        netstat -tlnp 2>/dev/null | grep nginx || echo "No nginx ports found"
     else
         echo "❌ Nginx failed to start or crashed immediately!"
+        echo "Process status:"
+        ps aux | grep nginx | grep -v grep || echo "No nginx processes found"
+        echo "Checking nginx access logs..."
+        cat /var/log/nginx/access.log 2>/dev/null || echo "No access log found"
         echo "Checking nginx error logs..."
-        cat /var/log/nginx/error.log || echo "No error log found"
+        cat /var/log/nginx/error.log 2>/dev/null || echo "No error log found"
+        echo "Certificate files:"
+        ls -la /etc/letsencrypt/live/$SERVER_HOST/ 2>/dev/null || echo "No certificate files"
         exit 1
     fi
+    echo "🔧 === START_NGINX FUNCTION COMPLETED ==="
 }
 
 # Function to reload nginx
