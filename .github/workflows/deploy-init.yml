@@ -26,9 +26,9 @@ jobs:
       environment: stage
     secrets: inherit
 
-  deploy-prod:
+  deploy-manual:
     if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/deploy.yml
     with:
-      environment: prod
+      environment: ${{ github.event.inputs.environment }}
     secrets: inherit
