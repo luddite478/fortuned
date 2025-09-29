@@ -115,3 +115,8 @@ app/ios/ThirdParty/
 .metadata
 niyya.iml
 build
+
+nginx/letsencrypt/*
+!nginx/letsencrypt/.gitkeep
+nginx/certbot-webroot/*
+!nginx/certbot-webroot/.gitkeep

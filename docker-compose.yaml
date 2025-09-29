@@ -38,7 +38,6 @@ services:
       - mongodb_data:/data/db
       - mongodb_config:/data/configdb
     restart: on-failure
-    command: mongod --auth
 
 volumes:
   mongodb_data:
