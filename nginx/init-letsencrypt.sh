@@ -379,8 +379,11 @@ run_main() {
     
     # Setup certificates and check if new certificate is needed
     echo "📋 About to call setup_certificates..."
-    setup_certificates
-    needs_new_cert=$?
+    if setup_certificates; then
+        needs_new_cert=0
+    else
+        needs_new_cert=1
+    fi
     echo "📋 setup_certificates returned: $needs_new_cert"
     
     # Start nginx (works with either existing cert or dummy cert)
