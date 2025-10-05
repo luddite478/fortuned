@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 // import 'package:path/path.dart' as path;
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/recording.dart';
 
@@ -341,10 +342,11 @@ class RecordingWidget extends StatelessWidget {
         );
         return;
       }
+      final appName = dotenv.env['APP_NAME']!.toUpperCase();
       await Share.shareXFiles(
         [XFile(mp3)],
-        text: 'Check out my track created with NIYYA!',
-        subject: 'NIYYA Track',
+        text: 'Check out my track created with $appName!',
+        subject: '$appName Track',
       );
     } catch (e) {
       debugPrint('Failed to share recording: $e');

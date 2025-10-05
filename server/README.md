@@ -1,4 +1,4 @@
-# NIYYA Server HTTPS Setup
+# Fortuned Server HTTPS Setup
 
 Simple HTTPS setup with HAProxy and Let's Encrypt.
 

@@ -21,4 +21,4 @@ if (g_is_output_recording) {
 - **Record Button** (red dot): Start capturing grid output to WAV file
 - **Live Duration Display**: Shows MM:SS recording time with red pulsing indicator
 - **Stop Recording**: Saves file to device Documents folder
-- **Automatic Naming**: Files named `niyya_recording_YYYYMMDD_HHMMSS.wav`
+- **Automatic Naming**: Files named `fortuned_recording_YYYYMMDD_HHMMSS.wav`

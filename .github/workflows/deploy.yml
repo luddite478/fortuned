@@ -9,7 +9,7 @@ on:
         type: string
 
 env:
-  REPO_DIR_PATH: /home/luddite478/niyya
+  REPO_DIR_PATH: /home/luddite478/fortuned
 
 jobs:
   deploy:

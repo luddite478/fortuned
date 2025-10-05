@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as path;
 import 'package:docman/docman.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Reliable cross-platform storage that uses DocMan for Android app directories
 /// Avoids SharedPreferences pigeon channel issues on Android
@@ -9,44 +10,47 @@ class ReliableStorage {
   
   /// Get the best available app data directory path
   static Future<String> get _documentsPath async {
+    final appName = dotenv.env['APP_NAME']!;
     if (Platform.isAndroid) {
       return await _getAndroidAppDataPath();
     } else if (Platform.isIOS) {
       return await _getIOSDocumentsPath();
     } else if (Platform.isWindows) {
-      return '${Platform.environment['USERPROFILE']}\\Documents\\niyya';
+      return '${Platform.environment['USERPROFILE']}\\Documents\\$appName';
     } else if (Platform.isMacOS) {
-      return '${Platform.environment['HOME']}/Documents/niyya';
+      return '${Platform.environment['HOME']}/Documents/$appName';
     } else {
-      return '/tmp/niyya'; // Fallback
+      return '/tmp/$appName'; // Fallback
     }
   }
   
   /// Get the best available Android app data path using DocMan
   static Future<String> _getAndroidAppDataPath() async {
+    final appName = dotenv.env['APP_NAME']!;
     try {
       // Try internal app files directory first (most persistent for preferences)
       final filesDir = await DocMan.dir.files();
       if (filesDir != null) {
-        return path.join(filesDir.path, 'niyya_prefs');
+        return path.join(filesDir.path, '${appName}_prefs');
       }
       
       // Fallback to cache directory
       final cacheDir = await DocMan.dir.cache();
       if (cacheDir != null) {
-        return path.join(cacheDir.path, 'niyya_prefs');
+        return path.join(cacheDir.path, '${appName}_prefs');
       }
       
       // Last resort fallback to Downloads
-      return '/storage/emulated/0/Download/niyya_data';
+      return '/storage/emulated/0/Download/${appName}_data';
     } catch (e) {
       print('⚠️ DocMan failed, using Downloads fallback: $e');
-      return '/storage/emulated/0/Download/niyya_data';
+      return '/storage/emulated/0/Download/${appName}_data';
     }
   }
 
   /// Get a safe iOS documents path using DocMan fallbacks
   static Future<String> _getIOSDocumentsPath() async {
+    final appName = dotenv.env['APP_NAME']!;
     try {
       // Prefer internal app files directory (sandboxed, always writable)
       final filesDir = await DocMan.dir.files();
@@ -59,16 +63,17 @@ class ReliableStorage {
         return cacheDir.path;
       }
 
-      return '/tmp/niyya';
+      return '/tmp/$appName';
     } catch (e) {
       print('⚠️ DocMan iOS failed, using /tmp fallback: $e');
-      return '/tmp/niyya';
+      return '/tmp/$appName';
     }
   }
   
   static Future<File> get _prefsFile async {
+    final appName = dotenv.env['APP_NAME']!;
     final docPath = await _documentsPath;
-    final file = File(path.join(docPath, 'niyya_prefs.json'));
+    final file = File(path.join(docPath, '${appName}_prefs.json'));
     await file.parent.create(recursive: true);
     return file;
   }

@@ -1,4 +1,4 @@
-package com.example.niyya
+package com.example.audiochat
 
 import io.flutter.embedding.android.FlutterActivity
 

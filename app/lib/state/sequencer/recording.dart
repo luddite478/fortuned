@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import 'dart:ffi' as ffi;
 import 'package:ffi/ffi.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../ffi/playback_bindings.dart';
 import '../../conversion_library.dart';
 import 'multitask_panel.dart';
@@ -369,19 +370,20 @@ class RecordingState extends ChangeNotifier {
   }
   
   Future<String> _deriveWritableBasePath() async {
+    final appName = dotenv.env['APP_NAME']!;
     if (Platform.isAndroid) {
-      return '/storage/emulated/0/Download/niyya_data';
+      return '/storage/emulated/0/Download/${appName}_data';
     }
     if (Platform.isIOS) {
-      return path.join(Directory.systemTemp.path, 'niyya');
+      return path.join(Directory.systemTemp.path, appName);
     }
     if (Platform.isMacOS) {
-      return '${Platform.environment['HOME']}/Documents/niyya';
+      return '${Platform.environment['HOME']}/Documents/$appName';
     }
     if (Platform.isWindows) {
-      return '${Platform.environment['USERPROFILE']}\\Documents\\niyya';
+      return '${Platform.environment['USERPROFILE']}\\Documents\\$appName';
     }
-    return path.join(Directory.systemTemp.path, 'niyya');
+    return path.join(Directory.systemTemp.path, appName);
   }
 
   // Private methods

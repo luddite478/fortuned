@@ -1,6 +1,6 @@
 # WebSocket Messaging System
 
-Real-time messaging architecture for NIYYA using centralized message routing.
+Real-time messaging architecture for Fortuned using centralized message routing.
 
 ## Architecture
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -103,7 +104,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       
                       // Logo/Title
                       Text(
-                        'NIYYA',
+                        dotenv.env['APP_NAME']!.toUpperCase(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 48,

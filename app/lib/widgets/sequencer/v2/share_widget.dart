@@ -351,10 +351,11 @@ class ShareWidget extends StatelessWidget {
       final file = File(filePath);
       
       if (await file.exists()) {
+        final appName = dotenv.env['APP_NAME']!.toUpperCase();
         await Share.shareXFiles(
           [XFile(filePath)],
-          text: 'Check out my track created with NIYYA!',
-          subject: 'NIYYA Track',
+          text: 'Check out my track created with $appName!',
+          subject: '$appName Track',
         );
       } else {
         _showError(context, 'Recording file not found');

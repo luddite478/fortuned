@@ -1,5 +1,5 @@
-#ifndef NIYYA_LOG_H
-#define NIYYA_LOG_H
+#ifndef FORTUNED_LOG_H
+#define FORTUNED_LOG_H
 
 #ifdef prnt
 #undef prnt

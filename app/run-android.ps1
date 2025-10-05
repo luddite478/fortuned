@@ -92,7 +92,7 @@ Write-Output "Building debug APK..."
 # Step 4: Go back to root and install the APK with ADB
 Set-Location ..
 
-# adb uninstall com.example.niyya
+# adb uninstall com.example.fortuned
 
 $apkPath = "android\app\build\outputs\apk\debug\app-debug.apk"
 # Set adb argument arrays based on device type

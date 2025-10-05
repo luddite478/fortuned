@@ -4,15 +4,15 @@
 #ifdef __APPLE__
     #include "log.h"
     #undef LOG_TAG
-    #define LOG_TAG "NIYYA_CONVERSION"
+    #define LOG_TAG "CONVERSION"
 #elif defined(__ANDROID__)
     #include "log.h"
     #undef LOG_TAG
-    #define LOG_TAG "NIYYA_CONVERSION"
+    #define LOG_TAG "CONVERSION"
 #else
     #include "log.h"
     #undef LOG_TAG
-    #define LOG_TAG "NIYYA_CONVERSION"
+    #define LOG_TAG "CONVERSION"
 #endif
 
 // Include all standard headers that LAME needs

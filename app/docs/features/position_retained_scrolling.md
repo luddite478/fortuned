@@ -266,4 +266,4 @@ ListView.builder(
 
 ---
 
-*This approach was successfully implemented in the Niyya app for both the test screen and sound grid widget, providing smooth "building blocks" behavior where content grows naturally from the top without disrupting the user's current view.* 
+*This approach was successfully implemented in the Fortuned app for both the test screen and sound grid widget, providing smooth "building blocks" behavior where content grows naturally from the top without disrupting the user's current view.* 

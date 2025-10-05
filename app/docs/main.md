@@ -1,4 +1,4 @@
-# Niyya - Flutter FFI + Miniaudio Integration Project
+# Fortuned - Flutter FFI + Miniaudio Integration Project
 
 **Grid Layout:**
 - **4 columns × 16 rows** = 64 cells total (will be configurable in feature)

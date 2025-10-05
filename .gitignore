@@ -113,7 +113,7 @@ app/ios/ThirdParty/
 .dart_tool/
 .flutter-plugins-dependencies
 .metadata
-niyya.iml
+fortuned.iml
 build
 
 nginx/letsencrypt/*

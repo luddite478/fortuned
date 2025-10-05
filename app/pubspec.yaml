@@ -37,7 +37,7 @@ dependencies:
   path: ^1.9.0
   share_plus: ^7.2.2
   shared_preferences: ^2.2.2
-name: niyya
+name: fortuned
 publish_to: none
 dev_dependencies:
   flutter_test:

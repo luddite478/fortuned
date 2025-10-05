@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io';
 import '../../../state/sequencer_state.dart';
 import '../../../state/threads_state.dart';
@@ -354,10 +355,11 @@ class ShareWidget extends StatelessWidget {
       final file = File(filePath);
       
       if (await file.exists()) {
+        final appName = dotenv.env['APP_NAME']!.toUpperCase();
         await Share.shareXFiles(
           [XFile(filePath)],
-          text: 'Check out my track created with NIYYA!',
-          subject: 'NIYYA Track',
+          text: 'Check out my track created with $appName!',
+          subject: '$appName Track',
         );
       } else {
         _showError(context, 'Recording file not found');
