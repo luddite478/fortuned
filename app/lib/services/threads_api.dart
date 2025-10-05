@@ -121,6 +121,16 @@ class ThreadsApi {
     }
   }
 
+  static Future<void> attachRenderToMessage(String messageId, Render render) async {
+    final body = <String, dynamic>{
+      'render': render.toJson(),
+    };
+    final http.Response res = await ApiHttpClient.post('/messages/$messageId/renders', body: body);
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      throw Exception('Failed to attach render: ${res.statusCode} ${res.body}');
+    }
+  }
+
   // Invites
   static Future<void> sendInvite({
     required String threadId,

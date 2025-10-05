@@ -207,17 +207,6 @@ class ThreadsState extends ChangeNotifier {
       'renders': <dynamic>[],
     };
 
-    // Check if there's a recording to upload
-    List<Render> renders = [];
-    if (_recordingState != null && _recordingState!.convertedMp3Path != null) {
-      debugPrint('🎵 [THREADS] Found recording to upload: ${_recordingState!.convertedMp3Path}');
-      _recordingState!.setUploading(true);
-      _recordingState!.clearUploadStatus();
-      
-      // Start upload in background (don't await here to minimize delay)
-      unawaited(_uploadRecordingInBackground(threadId, _recordingState!.convertedMp3Path!));
-    }
-
     final tempId = 'local_${DateTime.now().microsecondsSinceEpoch}';
     final pending = Message(
       id: '',
@@ -227,7 +216,7 @@ class ThreadsState extends ChangeNotifier {
       parentThread: threadId,
       snapshot: snapshotMap,
       snapshotMetadata: snapshotMetadata,
-      renders: renders,
+      renders: [],
       localTempId: tempId,
       sendStatus: SendStatus.sending,
     );
@@ -241,7 +230,7 @@ class ThreadsState extends ChangeNotifier {
         userId: _currentUserId ?? 'unknown',
         snapshot: snapshotMap,
         snapshotMetadata: snapshotMetadata,
-        renders: renders,
+        renders: [],
         timestamp: pending.timestamp,
       );
 
@@ -261,6 +250,16 @@ class ThreadsState extends ChangeNotifier {
           notifyListeners();
         }
       }
+      
+      // Check if there's a recording to upload - do this AFTER we have the message ID
+      if (_recordingState != null && _recordingState!.convertedMp3Path != null) {
+        debugPrint('🎵 [THREADS] Found recording to upload for message: ${saved.id}');
+        _recordingState!.setUploading(true);
+        _recordingState!.clearUploadStatus();
+        
+        // Start upload in background with the specific message ID
+        unawaited(_uploadRecordingInBackground(saved.id, _recordingState!.convertedMp3Path!));
+      }
     } catch (e) {
       // Mark as failed
       final list = _messagesByThread[threadId] ?? [];
@@ -273,9 +272,9 @@ class ThreadsState extends ChangeNotifier {
     }
   }
 
-  Future<void> _uploadRecordingInBackground(String threadId, String mp3Path) async {
+  Future<void> _uploadRecordingInBackground(String messageId, String mp3Path) async {
     try {
-      debugPrint('🔄 [THREADS] Starting upload: $mp3Path');
+      debugPrint('🔄 [THREADS] Starting upload for message $messageId: $mp3Path');
       
       final render = await UploadService.uploadAudio(
         filePath: mp3Path,
@@ -288,8 +287,8 @@ class ThreadsState extends ChangeNotifier {
         _recordingState?.setUploadedRenderUrl(render.url);
         _recordingState?.setUploading(false);
         
-        // Update the message with the uploaded render
-        await _attachRenderToLastMessage(threadId, render);
+        // Update the specific message with the uploaded render
+        await _attachRenderToMessage(messageId, render);
       } else {
         debugPrint('❌ [THREADS] Upload failed');
         _recordingState?.setUploadError('Upload failed');
@@ -302,20 +301,33 @@ class ThreadsState extends ChangeNotifier {
     }
   }
 
-  Future<void> _attachRenderToLastMessage(String threadId, Render render) async {
-    // Find the most recent message for this thread and update it with the render
-    final list = _messagesByThread[threadId] ?? [];
-    if (list.isEmpty) return;
+  Future<void> _attachRenderToMessage(String messageId, Render render) async {
+    // Update on server first
+    try {
+      await ThreadsApi.attachRenderToMessage(messageId, render);
+      debugPrint('✅ [THREADS] Render attached to message $messageId on server');
+    } catch (e) {
+      debugPrint('❌ [THREADS] Failed to attach render on server: $e');
+      return;
+    }
     
-    final lastMessage = list.last;
-    final updatedRenders = [...lastMessage.renders, render];
-    final updatedMessage = lastMessage.copyWith(renders: updatedRenders);
-    
-    list[list.length - 1] = updatedMessage;
-    _messagesByThread[threadId] = List<Message>.from(list);
-    notifyListeners();
-    
-    debugPrint('✅ [THREADS] Attached render to message ${lastMessage.id}');
+    // Update local state - find the message by ID across all threads
+    for (final entry in _messagesByThread.entries) {
+      final list = entry.value;
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx >= 0) {
+        final message = list[idx];
+        final updatedRenders = [...message.renders, render];
+        final updatedMessage = message.copyWith(renders: updatedRenders);
+        
+        list[idx] = updatedMessage;
+        _messagesByThread[entry.key] = List<Message>.from(list);
+        notifyListeners();
+        
+        debugPrint('✅ [THREADS] Attached render to message $messageId locally');
+        break;
+      }
+    }
   }
 
   Future<bool> deleteMessage(String threadId, String messageId) async {

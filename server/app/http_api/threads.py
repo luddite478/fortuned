@@ -345,6 +345,40 @@ async def delete_message_handler(request: Request, message_id: str, token: str =
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
+async def attach_render_to_message_handler(request: Request, message_id: str, render_data: Dict[str, Any] = Body(...)):
+    """Attach a render to an existing message (for background upload completion)"""
+    verify_token(render_data.get("token", ""))
+    try:
+        db = get_db()
+        # Find message
+        message = db.messages.find_one({"id": message_id})
+        if not message:
+            raise HTTPException(status_code=404, detail=f"Message not found: {message_id}")
+        
+        # Get render from request
+        render = render_data.get("render")
+        if not render:
+            raise HTTPException(status_code=400, detail="render is required")
+        
+        # Add render to message
+        db.messages.update_one(
+            {"id": message_id},
+            {"$push": {"renders": render}}
+        )
+        
+        # Update thread timestamp
+        thread_id = message.get("parent_thread")
+        if thread_id:
+            db.threads.update_one(
+                {"id": thread_id},
+                {"$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}}
+            )
+        
+        return {"status": "render_attached", "message_id": message_id}
+    except Exception as e:
+        if isinstance(e, HTTPException): raise e
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
 async def manage_invitation_handler(request: Request, thread_id: str, user_id: str, action_data: Dict[str, Any] = Body(...)):
     verify_token(action_data.get("token", ""))
     try:

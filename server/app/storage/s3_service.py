@@ -39,8 +39,7 @@ class S3Service:
                 ACL='public-read'
             )
             
-            # Construct public URL
-            public_url = f"{self.endpoint_url}/{self.bucket_name}/{file_key}"
+            public_url = f"{self.endpoint_url}/{file_key}"
             logger.info(f"✅ Uploaded file to S3: {public_url}")
             return public_url
             
@@ -64,7 +63,7 @@ class S3Service:
     
     def get_file_url(self, file_key: str) -> str:
         """Get public URL for a file"""
-        return f"{self.endpoint_url}/{self.bucket_name}/{file_key}"
+        return f"{self.endpoint_url}/{file_key}"
 
 # Global instance
 _s3_service: Optional[S3Service] = None

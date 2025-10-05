@@ -25,6 +25,7 @@ from http_api.threads import (
     get_message_by_id_handler,
     create_message_handler,
     delete_message_handler,
+    attach_render_to_message_handler,
 )
 from http_api.files import upload_audio_handler
 from typing import Dict, Any
@@ -151,6 +152,11 @@ async def create_message(request: Request, message_data: Dict[str, Any] = Body(.
 async def delete_message(request: Request, message_id: str, token: str = Query(...)):
     """Delete a message by ID"""
     return await delete_message_handler(request, message_id, token)
+
+@router.post("/messages/{message_id}/renders")
+async def attach_render_to_message(request: Request, message_id: str, render_data: Dict[str, Any] = Body(...)):
+    """Attach a render to a message after background upload"""
+    return await attach_render_to_message_handler(request, message_id, render_data)
 
 # File upload endpoints
 @router.post("/upload/audio")
