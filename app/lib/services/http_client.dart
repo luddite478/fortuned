@@ -167,4 +167,52 @@ class ApiHttpClient {
       rethrow;
     }
   }
+
+  /// Multipart upload request for file uploads with authentication token
+  static Future<http.Response> uploadFile(
+    String path, 
+    String filePath, {
+    String fileFieldName = 'file',
+    Map<String, String>? fields,
+  }) async {
+    final url = Uri.parse('$_baseUrl$path');
+    
+    print('🌐 UPLOAD: $url');
+    print('📁 File: $filePath');
+    
+    try {
+      final request = http.MultipartRequest('POST', url);
+      
+      // Add authentication token
+      request.fields['token'] = _apiToken;
+      
+      // Add additional fields
+      if (fields != null) {
+        request.fields.addAll(fields);
+      }
+      
+      // Add file
+      request.files.add(
+        await http.MultipartFile.fromPath(fileFieldName, filePath),
+      );
+      
+      print('📤 Uploading file...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      
+      print('📥 Response status: ${response.statusCode}');
+      print('📥 Response body: ${response.body}');
+      
+      if (response.statusCode >= 400) {
+        print('❌ HTTP Error ${response.statusCode} for UPLOAD $path');
+      } else {
+        print('✅ UPLOAD $path completed successfully');
+      }
+      
+      return response;
+    } catch (e) {
+      print('❌ Network error for UPLOAD $path: $e');
+      rethrow;
+    }
+  }
 } 

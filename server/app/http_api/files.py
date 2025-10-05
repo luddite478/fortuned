@@ -31,16 +31,15 @@ async def upload_audio_handler(
         file_data = await file.read()
         file_size = len(file_data)
         
-        # Generate unique file key
+        # Generate unique file key with environment prefix
+        env = os.getenv("ENV", "dev")
         file_id = str(uuid.uuid4())
-        timestamp = datetime.utcnow().strftime("%Y%m%d")
-        file_key = f"renders/{timestamp}/{file_id}.{format}"
+        file_key = f"{env}/renders/{file_id}.{format}"
         
         # Determine content type
         content_type_map = {
             "mp3": "audio/mpeg",
             "wav": "audio/wav",
-            "ogg": "audio/ogg"
         }
         content_type = content_type_map.get(format, "audio/mpeg")
         

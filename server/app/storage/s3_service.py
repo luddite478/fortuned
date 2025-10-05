@@ -16,7 +16,7 @@ class S3Service:
         self.bucket_name = os.getenv("S3_BUCKET_NAME")
         
         if not all([self.endpoint_url, self.access_key, self.secret_key, self.bucket_name]):
-            raise ValueError("Missing S3 configuration. Please set S3_ENDPOINT_URL, S3_ACCESS_KEY, S3_SECRET_KEY, and S3_BUCKET_NAME")
+            raise ValueError("Missing S3 configuration.")
         
         self.client = boto3.client(
             's3',

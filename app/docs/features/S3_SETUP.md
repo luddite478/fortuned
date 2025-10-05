@@ -8,6 +8,9 @@ This application uses Digital Ocean Spaces (S3-compatible storage) for storing a
 Add the following variables to your server's `.env` file:
 
 ```bash
+# Environment Configuration
+ENV=prod  # or 'stage', 'dev' - used as prefix in S3 paths
+
 # S3 / Digital Ocean Spaces Configuration
 S3_ENDPOINT_URL=https://nyc3.digitaloceanspaces.com  # Your DO Spaces endpoint
 S3_REGION=us-east-1  # or your preferred region
@@ -40,14 +43,19 @@ Once configured, you can test the upload functionality:
 
 ## File Structure
 
-Uploaded files are organized as:
+Uploaded files are organized with environment prefix:
 ```
-renders/
-  └── YYYYMMDD/
+{ENV}/
+  └── renders/
       └── {uuid}.mp3
 ```
 
-Example: `renders/20250105/abc123-def456.mp3`
+Examples:
+- Production: `prod/renders/abc123-def456.mp3`
+- Staging: `stage/renders/abc123-def456.mp3`
+- Development: `dev/renders/abc123-def456.mp3`
+
+This keeps different environments separate in the same S3 bucket.
 
 ## Upload Flow
 
