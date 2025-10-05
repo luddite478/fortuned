@@ -1,14 +1,12 @@
 import 'package:flutter/foundation.dart';
-import 'dart:ffi' as ffi;
-import 'package:ffi/ffi.dart';
-import '../ffi/playback_bindings.dart';
+import 'package:just_audio/just_audio.dart';
 import '../models/thread/message.dart';
 import '../services/audio_cache_service.dart';
 
 /// State for playing audio from messages (renders)
-/// Uses the same native playback system as recording preview
+/// Uses just_audio for full playback control with seeking
 class AudioPlayerState extends ChangeNotifier {
-  final PlaybackBindings _playback = PlaybackBindings();
+  final AudioPlayer _audioPlayer = AudioPlayer();
   
   String? _currentlyPlayingMessageId;
   String? _currentlyPlayingRenderId;
@@ -16,6 +14,48 @@ class AudioPlayerState extends ChangeNotifier {
   bool _isLoading = false;
   double _downloadProgress = 0.0;
   String? _error;
+  Duration _duration = Duration.zero;
+  Duration _position = Duration.zero;
+
+  AudioPlayerState() {
+    _setupListeners();
+  }
+
+  void _setupListeners() {
+    // Listen to playing state
+    _audioPlayer.playingStream.listen((playing) {
+      _isPlaying = playing;
+      notifyListeners();
+    });
+
+    // Listen to duration changes
+    _audioPlayer.durationStream.listen((duration) {
+      _duration = duration ?? Duration.zero;
+      notifyListeners();
+    });
+
+    // Listen to position changes
+    _audioPlayer.positionStream.listen((position) {
+      _position = position;
+      notifyListeners();
+    });
+
+    // Listen to player state for loading
+    _audioPlayer.playerStateStream.listen((state) {
+      _isLoading = state.processingState == ProcessingState.loading ||
+                   state.processingState == ProcessingState.buffering;
+      notifyListeners();
+    });
+
+    // Listen to completion
+    _audioPlayer.processingStateStream.listen((state) {
+      if (state == ProcessingState.completed) {
+        _isPlaying = false;
+        _position = Duration.zero;
+        notifyListeners();
+      }
+    });
+  }
 
   // Getters
   String? get currentlyPlayingMessageId => _currentlyPlayingMessageId;
@@ -24,6 +64,8 @@ class AudioPlayerState extends ChangeNotifier {
   bool get isLoading => _isLoading;
   double get downloadProgress => _downloadProgress;
   String? get error => _error;
+  Duration get duration => _duration;
+  Duration get position => _position;
 
   bool isPlayingRender(String messageId, String renderId) {
     return _currentlyPlayingMessageId == messageId && 
@@ -44,25 +86,38 @@ class AudioPlayerState extends ChangeNotifier {
     String? localPathIfRecorded,
   }) async {
     try {
-      // If already playing this render, stop it
+      // If already playing this render, pause it
       if (isPlayingRender(messageId, render.id)) {
-        stop();
+        await _audioPlayer.pause();
         return;
       }
 
-      // Stop any currently playing audio
-      if (_isPlaying) {
-        stop();
+      // If it's loaded but paused, resume
+      if (_currentlyPlayingMessageId == messageId && 
+          _currentlyPlayingRenderId == render.id && 
+          !_isPlaying) {
+        await _audioPlayer.play();
+        return;
       }
 
+      // Set loading state BEFORE stopping to prevent flicker
+      final wasPlaying = _isPlaying;
       _currentlyPlayingMessageId = messageId;
       _currentlyPlayingRenderId = render.id;
       _isLoading = true;
+      _isPlaying = false; // Prevent flicker by setting this immediately
       _downloadProgress = 0.0;
       _error = null;
-      notifyListeners();
+      _position = Duration.zero;
+      _duration = Duration.zero;
+      notifyListeners(); // Update UI immediately with loading state
 
       debugPrint('🎵 [AUDIO_PLAYER] Loading render: ${render.url}');
+
+      // Stop any currently playing audio
+      if (wasPlaying) {
+        await _audioPlayer.stop();
+      }
 
       // Get playable path (local file or download and cache)
       final playablePath = await AudioCacheService.getPlayablePath(
@@ -82,26 +137,14 @@ class AudioPlayerState extends ChangeNotifier {
         return;
       }
 
-      _isLoading = false;
-      notifyListeners();
-
-      // Play using native playback (volume 1.0, pitch 1.0)
-      final pathPtr = playablePath.toNativeUtf8();
-      final result = _playback.previewSamplePath(pathPtr, 1.0, 1.0);
-      malloc.free(pathPtr);
-
-      if (result == 0) {
-        _isPlaying = true;
-        notifyListeners();
-        debugPrint('▶️ [AUDIO_PLAYER] Playing: $playablePath');
-        
-        // Note: In production, you'd want to listen for playback completion
-        // and automatically stop. For now, user can tap again to stop.
-      } else {
-        _error = 'Playback failed';
-        debugPrint('❌ [AUDIO_PLAYER] Native playback failed: $result');
-        notifyListeners();
-      }
+      // Load audio file
+      await _audioPlayer.setFilePath(playablePath);
+      
+      // Start playing
+      await _audioPlayer.play();
+      
+      debugPrint('▶️ [AUDIO_PLAYER] Playing: $playablePath');
+      
     } catch (e) {
       _error = 'Error: $e';
       _isLoading = false;
@@ -111,22 +154,33 @@ class AudioPlayerState extends ChangeNotifier {
     }
   }
 
+  /// Seek to a specific position
+  Future<void> seek(Duration position) async {
+    try {
+      await _audioPlayer.seek(position);
+    } catch (e) {
+      debugPrint('❌ [AUDIO_PLAYER] Seek error: $e');
+    }
+  }
+
   /// Stop playback
-  void stop() {
-    if (_isPlaying) {
-      _playback.previewStopSample();
+  Future<void> stop() async {
+    try {
+      await _audioPlayer.stop();
       _isPlaying = false;
       _currentlyPlayingMessageId = null;
       _currentlyPlayingRenderId = null;
+      _position = Duration.zero;
       notifyListeners();
       debugPrint('⏹️ [AUDIO_PLAYER] Stopped playback');
+    } catch (e) {
+      debugPrint('❌ [AUDIO_PLAYER] Stop error: $e');
     }
   }
 
   @override
   void dispose() {
-    stop();
+    _audioPlayer.dispose();
     super.dispose();
   }
 }
-

@@ -12,6 +12,7 @@ import '../utils/app_colors.dart';
 import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
 import '../services/audio_cache_service.dart';
+import '../services/playlist_service.dart';
 import '../widgets/sections_chain_squares.dart';
 import '../services/auth_service.dart';
 
@@ -87,10 +88,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       }
     });
 
-    // Periodically refresh timestamps like "Just now" / "2m ago"
-    _timestampRefreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
-      if (mounted) setState(() {});
-    });
+    // No need to refresh timestamps anymore since we show fixed dates
   }
 
   void _scrollToBottom() {
@@ -190,6 +188,12 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               final isTarget = widget.targetMessageId != null && widget.targetMessageId == message.id;
               final key = _messageKeys.putIfAbsent(message.id, () => GlobalKey());
 
+              // Check if we need a day divider before this message
+              final bool needsDivider = index == 0 || _needsDayDivider(
+                messages[index - 1].timestamp,
+                message.timestamp,
+              );
+
               Widget bubble = shouldHighlight
                   ? AnimatedBuilder(
                       animation: _colorAnimation!,
@@ -220,6 +224,19 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               } else {
                 bubble = Container(key: key, child: bubble);
               }
+
+              // Add day divider if needed
+              if (needsDivider) {
+                return Column(
+                  children: [
+                    if (index > 0) const SizedBox(height: 8),
+                    _buildDayDivider(message.timestamp),
+                    const SizedBox(height: 8),
+                    bubble,
+                  ],
+                );
+              }
+
               return bubble;
             },
           );
@@ -341,21 +358,42 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                       const SizedBox(height: 4),
                     ],
                   ),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: OutlinedButton(
-                    onPressed: () => _applyMessage(context, message),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.menuText,
-                      side: BorderSide(color: AppColors.menuText),
-                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                      minimumSize: const Size(0, 28),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(4),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    // Add to playlist button (only if renders exist)
+                    if (message.renders.isNotEmpty) ...[
+                      OutlinedButton.icon(
+                        onPressed: () => _addToPlaylist(context, message.renders.first),
+                        icon: Icon(Icons.playlist_add, size: 16),
+                        label: const Text('Add to playlist'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.menuText,
+                          side: BorderSide(color: AppColors.menuBorder),
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          minimumSize: const Size(0, 28),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                        ),
                       ),
+                      const SizedBox(width: 8),
+                    ],
+                    // Load button
+                    OutlinedButton(
+                      onPressed: () => _applyMessage(context, message),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.menuText,
+                        side: BorderSide(color: AppColors.menuBorder),
+                        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                        minimumSize: const Size(0, 28),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      child: const Text('Load'),
                     ),
-                    child: const Text('Load'),
-                  ),
+                  ],
                 ),
               ],
             ),
@@ -636,11 +674,76 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
   String _formatTimestamp(DateTime timestamp) {
     final now = DateTime.now();
-    final difference = now.difference(timestamp);
-    if (difference.inDays > 0) return '${difference.inDays}d ago';
-    if (difference.inHours > 0) return '${difference.inHours}h ago';
-    if (difference.inMinutes > 0) return '${difference.inMinutes}m ago';
-    return 'Just now';
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+    
+    // Format time as HH:mm
+    final timeStr = '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
+    
+    if (messageDate == today) {
+      // Today: just show time
+      return timeStr;
+    } else if (messageDate == yesterday) {
+      // Yesterday: show "Yesterday at HH:mm"
+      return 'Yesterday at $timeStr';
+    } else {
+      // Older: show "DD/MM/YYYY, HH:mm"
+      return '${timestamp.day.toString().padLeft(2, '0')}/${timestamp.month.toString().padLeft(2, '0')}/${timestamp.year}, $timeStr';
+    }
+  }
+
+  bool _needsDayDivider(DateTime previous, DateTime current) {
+    final prevDate = DateTime(previous.year, previous.month, previous.day);
+    final currDate = DateTime(current.year, current.month, current.day);
+    return prevDate != currDate;
+  }
+
+  Widget _buildDayDivider(DateTime timestamp) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
+    
+    String dateLabel;
+    if (messageDate == today) {
+      dateLabel = 'Today';
+    } else if (messageDate == yesterday) {
+      dateLabel = 'Yesterday';
+    } else {
+      // Format as "2 October 2025"
+      final months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+      dateLabel = '${timestamp.day} ${months[timestamp.month - 1]} ${timestamp.year}';
+    }
+    
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 1,
+            color: AppColors.menuBorder.withOpacity(0.5),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          child: Text(
+            dateLabel,
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.menuLightText,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Container(
+            height: 1,
+            color: AppColors.menuBorder.withOpacity(0.5),
+          ),
+        ),
+      ],
+    );
   }
 
   String _formatDuration(double duration) {
@@ -656,6 +759,8 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       builder: (context, audioPlayer, _) {
         final isPlaying = audioPlayer.isPlayingRender(message.id, render.id);
         final isLoading = audioPlayer.isLoadingRender(message.id, render.id);
+        final isThisRender = audioPlayer.currentlyPlayingMessageId == message.id && 
+                             audioPlayer.currentlyPlayingRenderId == render.id;
         
         // Try to get RecordingState if available (might not be if not coming from sequencer)
         final recordingState = context.read<RecordingState?>();
@@ -675,115 +780,94 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               }
             }
             
-            return GestureDetector(
-              onTap: () async {
-                if (isLoading) return;
-                
-                final player = context.read<AudioPlayerState>();
-                await player.playRender(
-                  messageId: message.id,
-                  render: render,
-                  localPathIfRecorded: localPath,
-                );
-              },
-              child: Container(
-                margin: const EdgeInsets.only(bottom: 4),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isPlaying 
-                      ? AppColors.menuOnlineIndicator.withOpacity(0.2)
-                      : AppColors.menuButtonBackground,
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                    color: isPlaying 
-                        ? AppColors.menuOnlineIndicator
-                        : AppColors.menuBorder,
-                    width: isPlaying ? 1.5 : 0.5,
-                  ),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppColors.menuButtonBackground,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: AppColors.menuBorder,
+                  width: 0.5,
                 ),
-                child: Row(
-                  children: [
-                    // Play/Stop/Loading icon
-                    Container(
-                      width: 24,
-                      height: 24,
+              ),
+              child: Row(
+                children: [
+                  // Play/Pause/Loading button
+                  GestureDetector(
+                    onTap: () async {
+                      if (isLoading) return;
+                      
+                      final player = context.read<AudioPlayerState>();
+                      await player.playRender(
+                        messageId: message.id,
+                        render: render,
+                        localPathIfRecorded: localPath,
+                      );
+                    },
+                    child: Container(
+                      width: 28,
+                      height: 28,
                       decoration: BoxDecoration(
-                        color: isPlaying 
-                            ? AppColors.menuOnlineIndicator
-                            : (isLoading ? Colors.grey : AppColors.menuOnlineIndicator),
-                        borderRadius: BorderRadius.circular(12),
+                        color: isLoading 
+                            ? AppColors.menuBorder.withOpacity(0.5)
+                            : AppColors.menuText.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(14),
                       ),
                       child: isLoading
                           ? Padding(
-                              padding: const EdgeInsets.all(4),
+                              padding: const EdgeInsets.all(6),
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                                color: Colors.white,
+                                color: AppColors.menuLightText,
                                 value: audioPlayer.downloadProgress > 0 
                                     ? audioPlayer.downloadProgress 
                                     : null,
                               ),
                             )
                           : Icon(
-                              isPlaying ? Icons.stop : Icons.play_arrow,
-                              color: Colors.white,
-                              size: 14,
+                              isPlaying ? Icons.pause : Icons.play_arrow,
+                              color: AppColors.menuPageBackground,
+                              size: 16,
                             ),
                     ),
-                    const SizedBox(width: 10),
-                    
-                    // Audio info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Text(
-                                'Audio Render',
-                                style: GoogleFonts.sourceSans3(
-                                  color: AppColors.menuText,
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              if (isCached || localPath != null)
-                                Icon(
-                                  Icons.offline_pin,
-                                  size: 14,
-                                  color: AppColors.menuOnlineIndicator,
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            isCached || localPath != null
-                                ? 'Cached • ${render.format.toUpperCase()}'
-                                : isLoading
-                                    ? 'Downloading...'
-                                    : 'Tap to play • ${render.format.toUpperCase()}',
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuLightText,
-                              fontSize: 11,
-                              fontStyle: FontStyle.italic,
+                  ),
+                  const SizedBox(width: 12),
+                  
+                  // Seek bar
+                  Expanded(
+                    child: isThisRender
+                        ? SliderTheme(
+                            data: SliderThemeData(
+                              trackHeight: 2,
+                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                              activeTrackColor: AppColors.menuText.withOpacity(0.6),
+                              inactiveTrackColor: AppColors.menuBorder.withOpacity(0.3),
+                              thumbColor: AppColors.menuText,
+                              overlayColor: AppColors.menuText.withOpacity(0.1),
+                            ),
+                            child: Slider(
+                              value: audioPlayer.duration.inMilliseconds > 0
+                                  ? audioPlayer.position.inMilliseconds.toDouble()
+                                  : 0.0,
+                              min: 0.0,
+                              max: audioPlayer.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
+                              onChanged: (value) async {
+                                final player = context.read<AudioPlayerState>();
+                                await player.seek(Duration(milliseconds: value.toInt()));
+                              },
+                            ),
+                          )
+                        : Container(
+                            height: 2,
+                            decoration: BoxDecoration(
+                              color: AppColors.menuBorder.withOpacity(0.3),
+                              borderRadius: BorderRadius.circular(1),
                             ),
                           ),
-                        ],
-                      ),
-                    ),
-                    
-                    // Duration if available
-                    if (render.duration != null)
-                      Text(
-                        _formatDuration(render.duration!),
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuLightText,
-                          fontSize: 11,
-                        ),
-                      ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             );
           },
@@ -803,6 +887,47 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         ),
       );
       return;
+    }
+  }
+
+  Future<void> _addToPlaylist(BuildContext context, Render render) async {
+    final auth = context.read<AuthService>();
+    final userId = auth.currentUser?.id;
+    
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please log in to add to playlist'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    final success = await PlaylistService.addToPlaylist(
+      userId: userId,
+      render: render,
+    );
+    
+    if (!mounted) return;
+    
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Added to playlist'),
+          backgroundColor: AppColors.menuOnlineIndicator,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Failed to add to playlist'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 2),
+        ),
+      );
     }
   }
 

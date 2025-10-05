@@ -1,6 +1,7 @@
 import uuid
 import json
 import asyncio
+import logging
 from datetime import datetime, timezone
 from fastapi import Request, Query, HTTPException, Body
 from typing import Optional, Dict, Any, List
@@ -8,6 +9,8 @@ import os
 from db.connection import get_database
 from ws.router import send_thread_invitation_notification, send_message_created_notification, send_invitation_accepted_notification
 from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 
 # Initialize database connection
 db = get_database()
@@ -329,18 +332,48 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
 async def delete_message_handler(request: Request, message_id: str, token: str = Query(...)):
     verify_token(token)
     try:
+        from storage.s3_service import get_s3_service
+        import re
+        
         db = get_db()
         # Find message
         message = db.messages.find_one({"id": message_id})
         if not message:
             raise HTTPException(status_code=404, detail=f"Message not found: {message_id}")
+        
         thread_id = message.get("parent_thread")
+        
+        # Delete associated render files from S3
+        renders = message.get("renders", [])
+        if renders:
+            s3_service = get_s3_service()
+            for render in renders:
+                try:
+                    render_url = render.get("url", "")
+                    if render_url:
+                        # Extract file key from URL
+                        # URL format: https://fortuned.fra1.digitaloceanspaces.com/prod/renders/uuid.mp3
+                        # We need: prod/renders/uuid.mp3
+                        match = re.search(r'\.com/(.+)$', render_url)
+                        if match:
+                            file_key = match.group(1)
+                            deleted = s3_service.delete_file(file_key)
+                            if deleted:
+                                logger.info(f"🗑️  Deleted render from S3: {file_key}")
+                            else:
+                                logger.warning(f"⚠️  Failed to delete render from S3: {file_key}")
+                except Exception as e:
+                    # Don't fail message deletion if S3 deletion fails
+                    logger.error(f"❌ Error deleting render from S3: {e}")
+        
         # Delete message document
         db.messages.delete_one({"id": message_id})
+        
         # Remove reference from thread and update timestamp
         if thread_id:
             db.threads.update_one({"id": thread_id}, {"$pull": {"messages": message_id}, "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}})
-        return {"status": "deleted", "id": message_id}
+        
+        return {"status": "deleted", "id": message_id, "renders_deleted": len(renders)}
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

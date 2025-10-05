@@ -331,3 +331,91 @@ async def get_followed_users_handler(request: Request, token: str = Query(...), 
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get followed users: {str(e)}")
+
+async def add_to_playlist_handler(request: Request, playlist_data: Dict[str, Any]):
+    """Add a render to user's playlist"""
+    try:
+        verify_token(playlist_data.get("token", ""))
+        
+        user_id = playlist_data.get("user_id")
+        render = playlist_data.get("render")
+        
+        if not user_id or not render:
+            raise HTTPException(status_code=400, detail="Missing user_id or render data")
+        
+        # Check if user exists
+        user = db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        
+        # Check if render already in playlist (prevent duplicates)
+        playlist = user.get("playlist", [])
+        if any(item["id"] == render["id"] for item in playlist):
+            return {"success": True, "message": "Render already in playlist"}
+        
+        # Add type field
+        render["type"] = "render"
+        
+        # Add to playlist
+        db.users.update_one(
+            {"id": user_id},
+            {"$push": {"playlist": render}}
+        )
+        
+        return {"success": True, "message": "Added to playlist"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to add to playlist: {str(e)}")
+
+async def remove_from_playlist_handler(request: Request, playlist_data: Dict[str, Any]):
+    """Remove a render from user's playlist"""
+    try:
+        verify_token(playlist_data.get("token", ""))
+        
+        user_id = playlist_data.get("user_id")
+        render_id = playlist_data.get("render_id")
+        
+        if not user_id or not render_id:
+            raise HTTPException(status_code=400, detail="Missing user_id or render_id")
+        
+        # Check if user exists
+        user = db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        
+        # Remove from playlist
+        db.users.update_one(
+            {"id": user_id},
+            {"$pull": {"playlist": {"id": render_id}}}
+        )
+        
+        return {"success": True, "message": "Removed from playlist"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to remove from playlist: {str(e)}")
+
+async def get_playlist_handler(request: Request, token: str = Query(...), user_id: str = Query(...)):
+    """Get user's playlist"""
+    try:
+        verify_token(token)
+        
+        # Get user with playlist
+        user = db.users.find_one({"id": user_id}, {"playlist": 1})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        
+        playlist = user.get("playlist", [])
+        
+        return {
+            "playlist": playlist,
+            "count": len(playlist)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get playlist: {str(e)}")

@@ -85,6 +85,26 @@
                 "type": "string",
                 "pattern": "^[a-fA-F0-9]{24}$"
             }
+        },
+        "playlist": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": { "type": "string" },
+                    "url": { "type": "string" },
+                    "id": { "type": "string" },
+                    "format": { "type": "string" },
+                    "bitrate": { "type": "integer" },
+                    "duration": { "type": "number" },
+                    "size_bytes": { "type": "integer" },
+                    "created_at": { "type": "string" },
+                    "type": { "type": "string", "enum": ["render"] }
+                },
+                "required": ["name", "url", "id", "format", "created_at", "type"],
+                "additionalProperties": false
+            },
+            "description": "User's playlist of audio renders"
         }
     },
     "required": [

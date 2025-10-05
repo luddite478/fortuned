@@ -9,6 +9,9 @@ from http_api.users import (
     unfollow_user_handler,
     search_users_handler,
     get_followed_users_handler,
+    add_to_playlist_handler,
+    remove_from_playlist_handler,
+    get_playlist_handler,
     LoginRequest,
     RegisterRequest
 )
@@ -80,6 +83,22 @@ async def search_users(request: Request, token: str = Query(...), query: str = Q
 async def get_followed_users(request: Request, token: str = Query(...), user_id: str = Query(...)):
     """Get users followed by a specific user"""
     return await get_followed_users_handler(request, token, user_id)
+
+# Playlist endpoints
+@router.post("/users/playlist/add")
+async def add_to_playlist(request: Request, playlist_data: Dict[str, Any] = Body(...)):
+    """Add a render to user's playlist"""
+    return await add_to_playlist_handler(request, playlist_data)
+
+@router.post("/users/playlist/remove")
+async def remove_from_playlist(request: Request, playlist_data: Dict[str, Any] = Body(...)):
+    """Remove a render from user's playlist"""
+    return await remove_from_playlist_handler(request, playlist_data)
+
+@router.get("/users/playlist")
+async def get_playlist(request: Request, token: str = Query(...), user_id: str = Query(...)):
+    """Get user's playlist"""
+    return await get_playlist_handler(request, token, user_id)
 
 # Threads endpoints (new paths)
 @router.get("/threads")
