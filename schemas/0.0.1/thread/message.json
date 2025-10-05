@@ -52,6 +52,22 @@
     "snapshot": {
       "type": "object",
       "additionalProperties": true
+    },
+    "renders": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "url": { "type": "string" },
+          "format": { "type": "string" },
+          "bitrate": { "type": "integer" },
+          "duration": { "type": "number" },
+          "size_bytes": { "type": "integer" },
+          "created_at": { "type": "string" }
+        }
+      },
+      "description": "Audio renders attached to this message"
     }
   },
   "required": [

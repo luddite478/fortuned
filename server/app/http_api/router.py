@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Query, Body
+from fastapi import APIRouter, Request, Query, Body, UploadFile, File, Form
 from typing import Optional
 from http_api.users import (
     login_handler, 
@@ -26,6 +26,7 @@ from http_api.threads import (
     create_message_handler,
     delete_message_handler,
 )
+from http_api.files import upload_audio_handler
 from typing import Dict, Any
 import json
 
@@ -150,3 +151,16 @@ async def create_message(request: Request, message_data: Dict[str, Any] = Body(.
 async def delete_message(request: Request, message_id: str, token: str = Query(...)):
     """Delete a message by ID"""
     return await delete_message_handler(request, message_id, token)
+
+# File upload endpoints
+@router.post("/upload/audio")
+async def upload_audio(
+    request: Request,
+    file: UploadFile = File(...),
+    token: str = Form(...),
+    format: str = Form("mp3"),
+    bitrate: Optional[int] = Form(None),
+    duration: Optional[float] = Form(None),
+):
+    """Upload an audio file"""
+    return await upload_audio_handler(request, file, token, format, bitrate, duration)

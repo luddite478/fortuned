@@ -5,6 +5,7 @@ import 'dart:io';
 import '../../../state/sequencer/recording.dart';
 import '../../../state/sequencer/multitask_panel.dart';
 import '../../../state/threads_state.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ShareWidget extends StatelessWidget {
   const ShareWidget({super.key});

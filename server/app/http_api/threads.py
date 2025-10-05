@@ -287,8 +287,9 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
         thread_id = message_data.get("parent_thread")
         user_id = message_data.get("user_id")
         snapshot = message_data.get("snapshot")
-        # Explicitly supported optional: snapshot_metadata
+        # Explicitly supported optional: snapshot_metadata, renders
         snapshot_metadata = message_data.get("snapshot_metadata")
+        renders = message_data.get("renders", [])
         timestamp = message_data.get("timestamp") or datetime.utcnow().isoformat() + "Z"
         if not thread_id or not user_id or snapshot is None:
             raise HTTPException(status_code=400, detail="parent_thread, user_id and snapshot are required")
@@ -308,6 +309,7 @@ async def create_message_handler(request: Request, message_data: Dict[str, Any] 
             "parent_thread": thread_id,
             "snapshot": snapshot,
             **({"snapshot_metadata": snapshot_metadata} if snapshot_metadata is not None else {}),
+            "renders": renders,
         }
         # Insert a shallow copy so the original doc isn't mutated with Mongo's _id
         db.messages.insert_one({**doc})

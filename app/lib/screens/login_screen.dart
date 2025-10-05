@@ -107,7 +107,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         dotenv.env['APP_NAME']!.toUpperCase(),
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 48,
+                          fontSize: 22,
                           fontWeight: FontWeight.bold,
                           color: Colors.black,
                           letterSpacing: 2,

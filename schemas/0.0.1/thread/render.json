@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Render Schema",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-fA-F0-9]{24}$",
+      "minLength": 24,
+      "maxLength": 24
+    },
+    "url": {
+      "type": "string",
+      "format": "uri",
+      "description": "Public URL to the rendered audio file"
+    },
+    "format": {
+      "type": "string",
+      "enum": ["mp3", "wav"],
+      "description": "Audio file format"
+    },
+    "bitrate": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 320,
+      "description": "Audio bitrate in kbps"
+    },
+    "duration": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Audio duration in seconds"
+    },
+    "size_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "File size in bytes"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "upload_status": {
+      "type": "string",
+      "enum": ["pending", "uploading", "completed", "failed"],
+      "description": "Upload status for client-side tracking"
+    }
+  },
+  "required": [
+    "id",
+    "url",
+    "format",
+    "created_at"
+  ],
+  "additionalProperties": false
+}
+

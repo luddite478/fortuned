@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
+import '../screens/app_settings_screen.dart';
 
 class CommonHeaderWidget extends StatelessWidget {
   final String? customTitle; // Optional custom title instead of current user name
@@ -33,10 +34,9 @@ class CommonHeaderWidget extends StatelessWidget {
           ),
           child: Row(
             children: [
-              // User info
+              // User info with online indicator
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
                     Text(
                       customTitle ?? currentUser!.name,
@@ -47,39 +47,42 @@ class CommonHeaderWidget extends StatelessWidget {
                         letterSpacing: 1.5,
                       ),
                     ),
+                    if (customTitle == null) ...[
+                      const SizedBox(width: 8),
+                      // Online indicator next to user name
+                      Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: AppColors.menuOnlineIndicator,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
               
-              // Logout button (only show for current user, not for custom titles)
-              if (customTitle == null) ...[
+              // Settings button (only show for current user, not for custom titles)
+              if (customTitle == null)
                 GestureDetector(
-                  onTap: () async {
-                    final authService = Provider.of<AuthService>(context, listen: false);
-                    await authService.logout();
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const AppSettingsScreen(),
+                      ),
+                    );
                   },
                   child: Container(
                     padding: const EdgeInsets.all(4),
                     child: Icon(
-                      Icons.logout,
+                      Icons.settings,
                       size: 16,
                       color: AppColors.menuText,
                     ),
                   ),
                 ),
-                
-                const SizedBox(width: 8),
-                
-                // Online indicator
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: AppColors.menuOnlineIndicator,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
             ],
           ),
         );

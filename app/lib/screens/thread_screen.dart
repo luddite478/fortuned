@@ -4,11 +4,14 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../state/threads_state.dart';
+import '../state/audio_player_state.dart';
+import '../state/sequencer/recording.dart';
 import '../models/thread/message.dart';
 import '../models/thread/thread.dart';
 import '../utils/app_colors.dart';
 import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
+import '../services/audio_cache_service.dart';
 import '../widgets/sections_chain_squares.dart';
 import '../services/auth_service.dart';
 
@@ -118,11 +121,13 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildHeader(context),
-      backgroundColor: AppColors.menuPageBackground,
-      body: Consumer<ThreadsState>(
-        builder: (context, threadsState, child) {
+    return ChangeNotifierProvider(
+      create: (_) => AudioPlayerState(),
+      child: Scaffold(
+        appBar: _buildHeader(context),
+        backgroundColor: AppColors.menuPageBackground,
+        body: Consumer<ThreadsState>(
+          builder: (context, threadsState, child) {
           final thread = threadsState.activeThread;
           final messages = threadsState.activeThreadMessages;
 
@@ -218,7 +223,8 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               return bubble;
             },
           );
-        },
+          },
+        ),
       ),
     );
   }
@@ -279,6 +285,62 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               children: [
                 _buildMessagePreviewFromMetadata(message),
                 const SizedBox(height: 8),
+                // Show upload indicator if message has no renders but recording might be uploading
+                if (message.renders.isEmpty && message.sendStatus == SendStatus.sent && isCurrentUser)
+                  Consumer<ThreadsState>(
+                    builder: (context, threadsState, _) {
+                      // Try to get RecordingState if available
+                      final recordingState = context.read<RecordingState?>();
+                      
+                      // Check if recording is currently uploading (only for latest message from current user)
+                      final messages = threadsState.activeThreadMessages;
+                      final isLatestMessage = messages.isNotEmpty && messages.last.id == message.id;
+                      final isUploading = isLatestMessage && recordingState != null && recordingState.isUploading;
+                      
+                      if (!isUploading) return const SizedBox.shrink();
+                      
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        margin: const EdgeInsets.only(bottom: 8),
+                        decoration: BoxDecoration(
+                          color: AppColors.menuBorder.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 12,
+                              height: 12,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.5,
+                                color: AppColors.menuLightText,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Uploading audio...',
+                              style: GoogleFonts.sourceSans3(
+                                color: AppColors.menuLightText,
+                                fontSize: 11,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                // Show renders if they exist
+                if (message.renders.isNotEmpty)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final render in message.renders)
+                        _buildRenderButton(context, message, render, threadsState: context.read<ThreadsState>()),
+                      const SizedBox(height: 4),
+                    ],
+                  ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: OutlinedButton(
@@ -587,9 +649,152 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
+  Widget _buildRenderButton(BuildContext context, Message message, Render render, {required ThreadsState threadsState}) {
+    final isCurrentUser = message.userId == threadsState.currentUserId;
+    
+    return Consumer<AudioPlayerState>(
+      builder: (context, audioPlayer, _) {
+        final isPlaying = audioPlayer.isPlayingRender(message.id, render.id);
+        final isLoading = audioPlayer.isLoadingRender(message.id, render.id);
+        
+        // Try to get RecordingState if available (might not be if not coming from sequencer)
+        final recordingState = context.read<RecordingState?>();
+        
+        // Check if audio is cached
+        return FutureBuilder<bool>(
+          future: AudioCacheService.isCached(render.url),
+          builder: (context, snapshot) {
+            final isCached = snapshot.data ?? false;
+            
+            // For current user, check if they have local file
+            String? localPath;
+            if (isCurrentUser && recordingState != null && recordingState.convertedMp3Path != null) {
+              // Check if this render URL matches the recently uploaded one
+              if (render.url == recordingState.uploadedRenderUrl) {
+                localPath = recordingState.convertedMp3Path;
+              }
+            }
+            
+            return GestureDetector(
+              onTap: () async {
+                if (isLoading) return;
+                
+                final player = context.read<AudioPlayerState>();
+                await player.playRender(
+                  messageId: message.id,
+                  render: render,
+                  localPathIfRecorded: localPath,
+                );
+              },
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isPlaying 
+                      ? AppColors.menuOnlineIndicator.withOpacity(0.2)
+                      : AppColors.menuButtonBackground,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isPlaying 
+                        ? AppColors.menuOnlineIndicator
+                        : AppColors.menuBorder,
+                    width: isPlaying ? 1.5 : 0.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // Play/Stop/Loading icon
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        color: isPlaying 
+                            ? AppColors.menuOnlineIndicator
+                            : (isLoading ? Colors.grey : AppColors.menuOnlineIndicator),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: isLoading
+                          ? Padding(
+                              padding: const EdgeInsets.all(4),
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                                value: audioPlayer.downloadProgress > 0 
+                                    ? audioPlayer.downloadProgress 
+                                    : null,
+                              ),
+                            )
+                          : Icon(
+                              isPlaying ? Icons.stop : Icons.play_arrow,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                    ),
+                    const SizedBox(width: 10),
+                    
+                    // Audio info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Text(
+                                'Audio Render',
+                                style: GoogleFonts.sourceSans3(
+                                  color: AppColors.menuText,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              if (isCached || localPath != null)
+                                Icon(
+                                  Icons.offline_pin,
+                                  size: 14,
+                                  color: AppColors.menuOnlineIndicator,
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            isCached || localPath != null
+                                ? 'Cached • ${render.format.toUpperCase()}'
+                                : isLoading
+                                    ? 'Downloading...'
+                                    : 'Tap to play • ${render.format.toUpperCase()}',
+                            style: GoogleFonts.sourceSans3(
+                              color: AppColors.menuLightText,
+                              fontSize: 11,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Duration if available
+                    if (render.duration != null)
+                      Text(
+                        _formatDuration(render.duration!),
+                        style: GoogleFonts.sourceSans3(
+                          color: AppColors.menuLightText,
+                          fontSize: 11,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   void _playMessageRender(Message message) {
-    final renders = (message.snapshot['audio']?['renders'] as List?) ?? const [];
-    if (renders.isEmpty) {
+    // Legacy method - now handled by _buildRenderButton
+    if (message.renders.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('No audio renders available for this message'),
@@ -599,15 +804,6 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       );
       return;
     }
-    final last = renders.last as Map<String, dynamic>;
-    final url = last['url'] as String?;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Playing render: ${url ?? 'Latest render'}'),
-        backgroundColor: const Color(0xFF10B981),
-        duration: const Duration(seconds: 2),
-      ),
-    );
   }
 
   void _applyMessage(BuildContext context, Message message) async {

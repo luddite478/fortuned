@@ -91,6 +91,10 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
     _threadsService = Provider.of<ThreadsService>(context, listen: false);
     _setupThreadsServiceListeners();
     
+    // Attach RecordingState to ThreadsState for audio upload functionality
+    final threadsState = Provider.of<ThreadsState>(context, listen: false);
+    threadsState.attachRecordingState(_recordingState);
+    
     // Start new state system and ensure active thread
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _bootstrapInitialLoad();

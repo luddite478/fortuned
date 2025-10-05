@@ -9,9 +9,11 @@ import '../models/thread/thread_invite.dart';
 import '../services/threads_api.dart';
 import '../services/ws_client.dart';
 import '../services/snapshot/snapshot_service.dart';
+import '../services/upload_service.dart';
 import 'sequencer/table.dart';
 import 'sequencer/playback.dart';
 import 'sequencer/sample_bank.dart';
+import 'sequencer/recording.dart';
 
 class ThreadsState extends ChangeNotifier {
   final WebSocketClient _wsClient;
@@ -34,6 +36,7 @@ class ThreadsState extends ChangeNotifier {
   final TableState _tableState;
   final PlaybackState _playbackState;
   final SampleBankState _sampleBankState;
+  RecordingState? _recordingState;
 
   ThreadsState({
     required WebSocketClient wsClient,
@@ -45,6 +48,10 @@ class ThreadsState extends ChangeNotifier {
         _playbackState = playbackState,
         _sampleBankState = sampleBankState {
     _registerWsHandlers();
+  }
+
+  void attachRecordingState(RecordingState recordingState) {
+    _recordingState = recordingState;
   }
 
   // Getters
@@ -200,6 +207,17 @@ class ThreadsState extends ChangeNotifier {
       'renders': <dynamic>[],
     };
 
+    // Check if there's a recording to upload
+    List<Render> renders = [];
+    if (_recordingState != null && _recordingState!.convertedMp3Path != null) {
+      debugPrint('🎵 [THREADS] Found recording to upload: ${_recordingState!.convertedMp3Path}');
+      _recordingState!.setUploading(true);
+      _recordingState!.clearUploadStatus();
+      
+      // Start upload in background (don't await here to minimize delay)
+      unawaited(_uploadRecordingInBackground(threadId, _recordingState!.convertedMp3Path!));
+    }
+
     final tempId = 'local_${DateTime.now().microsecondsSinceEpoch}';
     final pending = Message(
       id: '',
@@ -209,6 +227,7 @@ class ThreadsState extends ChangeNotifier {
       parentThread: threadId,
       snapshot: snapshotMap,
       snapshotMetadata: snapshotMetadata,
+      renders: renders,
       localTempId: tempId,
       sendStatus: SendStatus.sending,
     );
@@ -222,6 +241,7 @@ class ThreadsState extends ChangeNotifier {
         userId: _currentUserId ?? 'unknown',
         snapshot: snapshotMap,
         snapshotMetadata: snapshotMetadata,
+        renders: renders,
         timestamp: pending.timestamp,
       );
 
@@ -251,6 +271,51 @@ class ThreadsState extends ChangeNotifier {
         notifyListeners();
       }
     }
+  }
+
+  Future<void> _uploadRecordingInBackground(String threadId, String mp3Path) async {
+    try {
+      debugPrint('🔄 [THREADS] Starting upload: $mp3Path');
+      
+      final render = await UploadService.uploadAudio(
+        filePath: mp3Path,
+        format: 'mp3',
+        bitrate: 320,
+      );
+
+      if (render != null) {
+        debugPrint('✅ [THREADS] Upload completed: ${render.url}');
+        _recordingState?.setUploadedRenderUrl(render.url);
+        _recordingState?.setUploading(false);
+        
+        // Update the message with the uploaded render
+        await _attachRenderToLastMessage(threadId, render);
+      } else {
+        debugPrint('❌ [THREADS] Upload failed');
+        _recordingState?.setUploadError('Upload failed');
+        _recordingState?.setUploading(false);
+      }
+    } catch (e) {
+      debugPrint('❌ [THREADS] Upload error: $e');
+      _recordingState?.setUploadError('Upload error: $e');
+      _recordingState?.setUploading(false);
+    }
+  }
+
+  Future<void> _attachRenderToLastMessage(String threadId, Render render) async {
+    // Find the most recent message for this thread and update it with the render
+    final list = _messagesByThread[threadId] ?? [];
+    if (list.isEmpty) return;
+    
+    final lastMessage = list.last;
+    final updatedRenders = [...lastMessage.renders, render];
+    final updatedMessage = lastMessage.copyWith(renders: updatedRenders);
+    
+    list[list.length - 1] = updatedMessage;
+    _messagesByThread[threadId] = List<Message>.from(list);
+    notifyListeners();
+    
+    debugPrint('✅ [THREADS] Attached render to message ${lastMessage.id}');
   }
 
   Future<bool> deleteMessage(String threadId, String messageId) async {

@@ -95,6 +95,7 @@ class ThreadsApi {
     required String userId,
     required Map<String, dynamic> snapshot,
     Map<String, dynamic>? snapshotMetadata,
+    List<Render>? renders,
     DateTime? timestamp,
   }) async {
     final body = <String, dynamic>{
@@ -102,6 +103,7 @@ class ThreadsApi {
       'user_id': userId,
       'snapshot': snapshot,
       if (snapshotMetadata != null) 'snapshot_metadata': snapshotMetadata,
+      if (renders != null && renders.isNotEmpty) 'renders': renders.map((r) => r.toJson()).toList(),
       if (timestamp != null) 'timestamp': timestamp.toIso8601String(),
     };
     final http.Response res = await ApiHttpClient.post('/messages', body: body);

@@ -34,6 +34,7 @@ def load_json_schema(collection_name: str) -> Dict:
         'threads': os.path.join(schemas_root, 'thread', 'thread.json'),
         'samples': os.path.join(schemas_root, 'sample', 'sample.json'),
         'messages': os.path.join(schemas_root, 'thread', 'message.json'),
+        'renders': os.path.join(schemas_root, 'thread', 'render.json'),
     }
 
     schema_path = collection_to_schema_path.get(collection_name)
@@ -57,6 +58,7 @@ JSON_SCHEMAS = {
     "threads": load_json_schema("threads"),
     "samples": load_json_schema("samples"),
     "messages": load_json_schema("messages"),
+    "renders": load_json_schema("renders"),
 }
 
 # Collection Schema Definitions
@@ -98,6 +100,14 @@ COLLECTIONS_CONFIG = {
             {"fields": "created_at", "unique": False}
         ],
         "schema": {k: v for k, v in JSON_SCHEMAS.get("messages", {}).get("properties", {}).items()}
+    },
+    "renders": {
+        "indexes": [
+            {"fields": "id", "unique": True},
+            {"fields": "created_at", "unique": False},
+            {"fields": "upload_status", "unique": False}
+        ],
+        "schema": {k: v for k, v in JSON_SCHEMAS.get("renders", {}).get("properties", {}).items()}
     }
 }
 
@@ -160,7 +170,8 @@ SAMPLE_DATA_TEMPLATES = {
                 "settings": {"volume": 1.0, "pitch": 1.0}
             }
         }
-    ]
+    ],
+    "renders": []
 }
 
 # =============================================================================

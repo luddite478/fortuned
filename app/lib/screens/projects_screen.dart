@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../models/thread/thread.dart';
 import '../services/threads_api.dart';
+import 'dart:math';
 
 import '../utils/app_colors.dart';
 import 'sequencer_screen_v2.dart';
@@ -25,6 +26,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _isLoading = true;
   String? _error;
   bool _isOpeningProject = false;
+
+  // Emoji pool for project names
+  static const List<String> _emojiPool = [
+    // nature
+    "🌲","🌳","🌴","🌵","🌾","🍀","🌸","🌼","🌻","🌺","🍄","🌊","⛰️","🏞️","🌅","🌄","🌠","☀️","🌤️","🌧️","⛈️","🌩️","🌪️","❄️","🦁","🐯","🐻","🐼","🐨","🐸","🐍","🦅","🦉","🦋","🐞","🐝","🐌",
+    // heroes
+    "⚔️","🛡️","🏹","🗡️","🪄","🪓","🪙","💎","🪶","👑","🏰","🏯","🐉","🧙‍♂️","🧝‍♀️","🧛‍♂️","🧟‍♀️","🧞‍♂️","🧜‍♀️","🔥","💫","✨"
+  ];
 
   @override
   void initState() {
@@ -255,19 +264,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             width: double.infinity,
             height: 100,
             decoration: BoxDecoration(
-              color: AppColors.menuPrimaryButton, // Dark primary button
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.menuSecondaryButton, // White secondary button
+              borderRadius: BorderRadius.circular(6), // More square corners
               border: Border.all(
-                color: AppColors.menuPrimaryButton,
+                color: AppColors.menuSecondaryButtonBorder, // Dark border
                 width: 2,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.15),
-                  blurRadius: 4,
-                  offset: const Offset(2, 2),
-                ),
-              ],
             ),
             child: Material(
               color: Colors.transparent,
@@ -291,7 +293,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     ),
                   );
                 },
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(6),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Stack(
@@ -301,7 +303,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                          child: Text(
                            'NEW',
                            style: GoogleFonts.sourceSans3(
-                             color: AppColors.menuPrimaryButtonText, // White text on dark button
+                             color: AppColors.menuSecondaryButtonText, // Dark text on light button
                              fontSize: 16,
                              fontWeight: FontWeight.w600,
                              letterSpacing: 1.2,
@@ -322,23 +324,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             // Continue button - TOP (full width, slightly smaller height)
             Container(
               width: double.infinity,
-              height: 84,
+              height: 60,
               margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
-                  color: AppColors.menuPrimaryButton, // Dark primary button
-                  borderRadius: BorderRadius.circular(12), // More rounded corners
-                  border: Border.all(
-                    color: AppColors.menuPrimaryButton,
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 4,
-                      offset: const Offset(2, 2),
-                    ),
-                  ],
+                color: AppColors.menuSecondaryButton, // White secondary button
+                borderRadius: BorderRadius.circular(2), // More square corners
+                border: Border.all(
+                  color: AppColors.menuSecondaryButtonBorder, // Dark border
+                  width: 1,
                 ),
+              ),
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -346,7 +341,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     // Load project into sequencer and navigate
                     await _loadProjectInSequencer(mostRecentProject);
                   },
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(2),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     child: Stack(
@@ -356,7 +351,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           child: Text(
                             'CONTINUE',
                             style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuPrimaryButtonText, // White text on dark button
+                              color: AppColors.menuSecondaryButtonText, // Dark text on light button
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               letterSpacing: 1.2,
@@ -364,32 +359,32 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           ),
                         ),
                         // Bottom row with project info
-                        Positioned(
-                          bottom: 0,
-                          left: 0,
-                          child: Text(
-                            'Project ${mostRecentProject.id.substring(0, 8)}',
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuPrimaryButtonText, // White text on dark button
-                              fontSize: 9,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Text(
-                            _formatProjectTimestamp(mostRecentProject.updatedAt),
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuPrimaryButtonText.withOpacity(0.8), // Dimmed white text
-                              fontSize: 9,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ),
+                        // Positioned(
+                        //   bottom: 0,
+                        //   left: 0,
+                        //   child: Text(
+                        //     'Project ${mostRecentProject.id.substring(0, 8)}',
+                        //     style: GoogleFonts.sourceSans3(
+                        //       color: AppColors.menuPrimaryButtonText, // White text on dark button
+                        //       fontSize: 9,
+                        //       fontWeight: FontWeight.w400,
+                        //     ),
+                        //     maxLines: 1,
+                        //     overflow: TextOverflow.ellipsis,
+                        //   ),
+                        // ),
+                        // Positioned(
+                        //   bottom: 0,
+                        //   right: 0,
+                        //   child: Text(
+                        //     _formatProjectTimestamp(mostRecentProject.updatedAt),
+                        //     style: GoogleFonts.sourceSans3(
+                        //       color: AppColors.menuPrimaryButtonText.withOpacity(0.8), // Dimmed white text
+                        //       fontSize: 9,
+                        //       fontWeight: FontWeight.w400,
+                        //     ),
+                        //   ),
+                        // ),
                       ],
                     ),
                   ),
@@ -400,13 +395,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             // New button - BOTTOM (full width, slightly smaller height)
             Container(
               width: double.infinity,
-              height: 72,
+              height: 60,
               decoration: BoxDecoration(
                 color: AppColors.menuSecondaryButton, // White secondary button
-                borderRadius: BorderRadius.circular(12), // More rounded corners
+                borderRadius: BorderRadius.circular(2), // More square corners
                 border: Border.all(
                   color: AppColors.menuSecondaryButtonBorder, // Dark border
-                  width: 2,
+                  width: 1,
                 ),
               ),
               child: Material(
@@ -431,7 +426,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       ),
                     );
                   },
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(6),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Center(
@@ -462,6 +457,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       decoration: BoxDecoration(
         color: AppColors.menuEntryBackground,
         border: Border(
+          left: BorderSide(
+            color: AppColors.menuLightText.withOpacity(0.3),
+            width: 2,
+          ),
           bottom: BorderSide(
             color: AppColors.menuBorder,
             width: 0.5,
@@ -477,48 +476,40 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               children: [
-                // Small black square instead of folder icon
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                
-                const SizedBox(width: 12),
-                
                 // Project info
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Text(
-                        _formatDateYmd(project.createdAt),
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuText,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.0,
+                      // Emojis
+                      ColorFiltered(
+                        colorFilter: const ColorFilter.matrix(<double>[
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0,      0,      0,      1, 0,
+                        ]),
+                        child: Text(
+                          _generateEmojiName(project.id),
+                          style: GoogleFonts.sourceSans3(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2.0,
+                          ),
                         ),
                       ),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '${project.messageIds.length} checkpoints',
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuLightText,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ),
-                          _buildParticipantsChips(project),
-                        ],
+                      const SizedBox(width: 8),
+                      // Checkpoint counter to the right of emojis
+                      Text(
+                        '${project.messageIds.length}',
+                        style: GoogleFonts.sourceSans3(
+                          color: AppColors.menuLightText,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
+                      const Spacer(),
+                      _buildParticipantsChips(project),
                     ],
                   ),
                 ),
@@ -557,6 +548,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       decoration: BoxDecoration(
         color: AppColors.menuEntryBackground,
         border: Border(
+          left: BorderSide(
+            color: AppColors.menuLightText.withOpacity(0.3),
+            width: 2,
+          ),
           bottom: BorderSide(
             color: AppColors.menuBorder,
             width: 0.5,
@@ -569,66 +564,59 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: Row(
             children: [
-              // Leading square (same as project row)
-              Container(
-                width: 10,
-                height: 10,
-                decoration: BoxDecoration(
-                  color: Colors.black,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(width: 12),
               // Middle info (same structure as project row)
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Text(
-                      thread != null ? _formatDateYmd(thread.createdAt) : _formatDateYmd(DateTime.now()),
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.menuText,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 1.0,
+                    // Emojis
+                    ColorFiltered(
+                      colorFilter: const ColorFilter.matrix(<double>[
+                        0.2126, 0.7152, 0.0722, 0, 0,
+                        0.2126, 0.7152, 0.0722, 0, 0,
+                        0.2126, 0.7152, 0.0722, 0, 0,
+                        0,      0,      0,      1, 0,
+                      ]),
+                      child: Text(
+                        _generateEmojiName(threadId),
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2.0,
+                        ),
                       ),
                     ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${thread?.messageIds.length ?? 0} checkpoints',
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuLightText,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w400,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                    const SizedBox(width: 8),
+                    // Checkpoint counter to the right of emojis
+                    Text(
+                      '${thread?.messageIds.length ?? 0}',
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.menuLightText,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const Spacer(),
+                    // Participant chips (or invited username)
+                    if (thread != null)
+                      _buildParticipantsChips(thread)
+                    else
+                      Container(
+                        margin: const EdgeInsets.only(left: 6),
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: AppColors.menuBorder.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          'invite',
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.menuLightText,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
-                        // Participant chips (or invited username)
-                        if (thread != null)
-                          _buildParticipantsChips(thread)
-                        else
-                          Container(
-                            margin: const EdgeInsets.only(left: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.menuBorder.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'invite',
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuLightText,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
+                      ),
                   ],
                 ),
               ),
@@ -732,20 +720,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  Widget _buildParticipantsLine(Thread thread) {
-    final auth = context.read<AuthService>();
-    final me = auth.currentUser?.id;
-    final names = thread.users.where((u) => u.id != me).map((u) => u.name).toList();
-    final text = names.join(', ');
-    return Text(
-      text,
-      style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 11),
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
-  }
-
-
   String _formatProjectTimestamp(DateTime timestamp) {
     final now = DateTime.now();
     final difference = now.difference(timestamp);
@@ -765,11 +739,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
 
-  String _formatDateYmd(DateTime date) {
-    final y = date.year.toString().padLeft(4, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    final d = date.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
+  // Generate 3 emojis based on thread ID for consistent project names
+  String _generateEmojiName(String threadId) {
+    // Use thread ID to seed random generator for consistency
+    final seed = threadId.hashCode;
+    final random = Random(seed);
+    
+    final emojis = <String>[];
+    for (int i = 0; i < 3; i++) {
+      emojis.add(_emojiPool[random.nextInt(_emojiPool.length)]);
+    }
+    
+    return emojis.join(' ');
   }
 
   Future<void> _openProject(Thread project) async {

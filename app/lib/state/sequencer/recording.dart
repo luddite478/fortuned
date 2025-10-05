@@ -31,6 +31,11 @@ class RecordingState extends ChangeNotifier {
   bool _isPreviewing = false;
   Timer? _previewTimer;
   
+  // Upload state
+  bool _isUploading = false;
+  String? _uploadedRenderUrl;
+  String? _uploadError;
+  
   // Value notifiers for UI binding
   final ValueNotifier<bool> isRecordingNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<Duration> recordingDurationNotifier = ValueNotifier<Duration>(Duration.zero);
@@ -51,6 +56,9 @@ class RecordingState extends ChangeNotifier {
   String? get conversionError => _conversionError;
   String? get convertedMp3Path => _convertedMp3Path;
   bool get isPreviewing => _isPreviewing;
+  bool get isUploading => _isUploading;
+  String? get uploadedRenderUrl => _uploadedRenderUrl;
+  String? get uploadError => _uploadError;
 
   String get formattedDuration {
     final minutes = _recordingDuration.inMinutes;
@@ -243,6 +251,28 @@ class RecordingState extends ChangeNotifier {
     _convertedMp3Path = null;
     conversionErrorNotifier.value = _conversionError;
     convertedMp3PathNotifier.value = _convertedMp3Path;
+    notifyListeners();
+  }
+
+  void clearUploadStatus() {
+    _isUploading = false;
+    _uploadedRenderUrl = null;
+    _uploadError = null;
+    notifyListeners();
+  }
+
+  void setUploading(bool value) {
+    _isUploading = value;
+    notifyListeners();
+  }
+
+  void setUploadedRenderUrl(String? url) {
+    _uploadedRenderUrl = url;
+    notifyListeners();
+  }
+
+  void setUploadError(String? error) {
+    _uploadError = error;
     notifyListeners();
   }
 
