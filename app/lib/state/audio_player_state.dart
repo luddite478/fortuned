@@ -51,7 +51,7 @@ class AudioPlayerState extends ChangeNotifier {
     _audioPlayer.processingStateStream.listen((state) {
       if (state == ProcessingState.completed) {
         _isPlaying = false;
-        _position = Duration.zero;
+        // Keep position at duration so UI can detect completion
         notifyListeners();
       }
     });
@@ -160,6 +160,26 @@ class AudioPlayerState extends ChangeNotifier {
       await _audioPlayer.seek(position);
     } catch (e) {
       debugPrint('❌ [AUDIO_PLAYER] Seek error: $e');
+    }
+  }
+
+  /// Pause playback
+  Future<void> pause() async {
+    try {
+      await _audioPlayer.pause();
+      debugPrint('⏸️ [AUDIO_PLAYER] Paused playback');
+    } catch (e) {
+      debugPrint('❌ [AUDIO_PLAYER] Pause error: $e');
+    }
+  }
+
+  /// Resume playback
+  Future<void> resume() async {
+    try {
+      await _audioPlayer.play();
+      debugPrint('▶️ [AUDIO_PLAYER] Resumed playback');
+    } catch (e) {
+      debugPrint('❌ [AUDIO_PLAYER] Resume error: $e');
     }
   }
 

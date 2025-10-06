@@ -16,8 +16,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'services/http_client.dart';
 import 'models/thread/thread.dart';
 import 'models/thread/thread_user.dart';
+import 'utils/thread_name_generator.dart';
 
 import 'state/threads_state.dart';
+import 'state/audio_player_state.dart';
 import 'services/ws_client.dart';
 // import 'state/patterns_state.dart';
 import 'state/sequencer/table.dart';
@@ -45,6 +47,7 @@ class App extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => AuthService()),
+        ChangeNotifierProvider(create: (context) => AudioPlayerState()),
         Provider(create: (context) => WebSocketClient()),
         ChangeNotifierProvider(create: (context) => TableState()),
         ChangeNotifierProvider(create: (context) => PlaybackState(Provider.of<TableState>(context, listen: false))),
@@ -177,7 +180,7 @@ class _MainPageState extends State<MainPage> {
             if (event.threadId != null && userId != null) {
               final thread = threadsState.threads.firstWhere(
                 (t) => t.id == event.threadId,
-                orElse: () => threadsState.activeThread ?? Thread(id: event.threadId!, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                orElse: () => threadsState.activeThread ?? Thread(id: event.threadId!, name: ThreadNameGenerator.generate(event.threadId!), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
               );
               final user = thread.users.firstWhere(
                 (u) => u.id == userId,
@@ -195,7 +198,7 @@ class _MainPageState extends State<MainPage> {
                 threadsState.setActiveThread(
                   threadsState.threads.firstWhere(
                     (t) => t.id == event.threadId,
-                    orElse: () => Thread(id: event.threadId!, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                    orElse: () => Thread(id: event.threadId!, name: ThreadNameGenerator.generate(event.threadId!), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
                   ),
                 );
                 await threadsState.loadMessages(event.threadId!, includeSnapshot: false, order: 'asc', limit: 1000);

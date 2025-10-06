@@ -12,6 +12,7 @@ import '../state/threads_state.dart';
 import '../services/threads_service.dart';
 import '../services/snapshot/snapshot_service.dart';
 import '../utils/app_colors.dart';
+import '../utils/thread_name_generator.dart';
 import '../models/thread/thread_user.dart';
 // New state imports for migration
 import '../state/sequencer/table.dart';
@@ -150,10 +151,13 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
         
         if (currentUserId != null) {
           // Create an unpublished thread for this new project
+          // Generate name using timestamp as seed for uniqueness
+          final threadName = ThreadNameGenerator.generate(DateTime.now().microsecondsSinceEpoch.toString());
           final threadId = await threadsState.createThread(
             users: [
               ThreadUser(id: currentUserId, name: currentUserName ?? 'User', joinedAt: DateTime.now()),
             ],
+            name: threadName,
             metadata: {
               'project_type': 'solo',
               'is_public': false,
@@ -162,7 +166,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
             },
           );
           
-          debugPrint('✅ Created new unpublished thread: $threadId');
+          debugPrint('✅ Created new unpublished thread: $threadId with name: $threadName');
         } else {
           debugPrint('❌ Cannot create thread: No current user ID');
         }

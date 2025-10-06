@@ -4,6 +4,7 @@ import '../widgets/user_profile_widget.dart';
 import '../utils/app_colors.dart';
 import '../services/users_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/bottom_audio_player.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -198,12 +199,19 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
           ),
         ),
       ),
-      body: SafeArea(
-        child: UserProfileWidget(
-          userId: widget.userId,
-          userName: widget.userName,
-          isOnline: widget.isOnline,
-        ),
+      body: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              child: UserProfileWidget(
+                userId: widget.userId,
+                userName: widget.userName,
+                isOnline: widget.isOnline,
+              ),
+            ),
+          ),
+          const BottomAudioPlayer(),
+        ],
       ),
     );
   }

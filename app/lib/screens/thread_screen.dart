@@ -9,6 +9,7 @@ import '../state/sequencer/recording.dart';
 import '../models/thread/message.dart';
 import '../models/thread/thread.dart';
 import '../utils/app_colors.dart';
+import '../utils/thread_name_generator.dart';
 import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
 import '../services/audio_cache_service.dart';
@@ -77,7 +78,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       threadsState.setActiveThread(
         threadsState.threads.firstWhere(
           (t) => t.id == widget.threadId,
-          orElse: () => Thread(id: widget.threadId, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+          orElse: () => Thread(id: widget.threadId, name: ThreadNameGenerator.generate(widget.threadId), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
         ),
       );
       await threadsState.loadMessages(widget.threadId, includeSnapshot: false, order: 'asc');
@@ -119,15 +120,13 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AudioPlayerState(),
-      child: Scaffold(
-        appBar: _buildHeader(context),
-        backgroundColor: AppColors.menuPageBackground,
-        body: Consumer<ThreadsState>(
-          builder: (context, threadsState, child) {
-          final thread = threadsState.activeThread;
-          final messages = threadsState.activeThreadMessages;
+    return Scaffold(
+      appBar: _buildHeader(context),
+      backgroundColor: AppColors.menuPageBackground,
+      body: Consumer<ThreadsState>(
+        builder: (context, threadsState, child) {
+        final thread = threadsState.activeThread;
+        final messages = threadsState.activeThreadMessages;
 
           if (thread == null) {
             return Center(
@@ -240,8 +239,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               return bubble;
             },
           );
-          },
-        ),
+        },
       ),
     );
   }
@@ -957,6 +955,9 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     try {
       final threadsState = context.read<ThreadsState>();
       threadsState.exitThreadView();
+      // Stop audio playback when leaving thread screen
+      final audioPlayer = context.read<AudioPlayerState>();
+      audioPlayer.stop();
     } catch (_) {}
     _scrollController.dispose();
     _colorAnimationController?.dispose();
@@ -975,7 +976,7 @@ class _ParticipantsIndicator extends StatelessWidget {
       builder: (context, threadsState, auth, _) {
         final thread = threadsState.threads.firstWhere(
           (t) => t.id == threadId,
-          orElse: () => threadsState.activeThread ?? Thread(id: threadId, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+          orElse: () => threadsState.activeThread ?? Thread(id: threadId, name: ThreadNameGenerator.generate(threadId), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
         );
         final me = auth.currentUser?.id;
         final others = thread.users.where((u) => u.id != me).map((u) => u.name).toList();

@@ -31,6 +31,7 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         thread_id = str(ObjectId())
         now = datetime.utcnow().isoformat() + "Z"
         users = thread_data.get("users", [])
+        name = thread_data.get("name")
 
         # Ensure users array items have required fields (id, name, joined_at)
         normalized_users: List[Dict[str, Any]] = []
@@ -53,6 +54,7 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         thread_doc = {
             "schema_version": 1,
             "id": thread_id,
+            "name": name,
             "users": normalized_users,
             "messages": [],
             "invites": invites,

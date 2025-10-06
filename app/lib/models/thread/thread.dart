@@ -3,6 +3,7 @@ import 'thread_invite.dart';
 
 class Thread {
   final String id;
+  final String name;
   final DateTime createdAt;
   final DateTime updatedAt;
   final List<ThreadUser> users;
@@ -11,6 +12,7 @@ class Thread {
 
   const Thread({
     required this.id,
+    required this.name,
     required this.createdAt,
     required this.updatedAt,
     required this.users,
@@ -21,6 +23,7 @@ class Thread {
   factory Thread.fromJson(Map<String, dynamic> json) {
     return Thread(
       id: json['id'] ?? '',
+      name: json['name'] as String? ?? '',
       createdAt: DateTime.parse(json['created_at'] ?? DateTime.now().toIso8601String()),
       updatedAt: DateTime.parse(json['updated_at'] ?? DateTime.now().toIso8601String()),
       users: (json['users'] as List<dynamic>? ?? [])
@@ -37,6 +40,7 @@ class Thread {
 
   Map<String, dynamic> toJson() => {
         'id': id,
+        'name': name,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
         'users': users.map((u) => u.toJson()).toList(),
@@ -46,6 +50,7 @@ class Thread {
 
   Thread copyWith({
     String? id,
+    String? name,
     DateTime? createdAt,
     DateTime? updatedAt,
     List<ThreadUser>? users,
@@ -54,6 +59,7 @@ class Thread {
   }) {
     return Thread(
       id: id ?? this.id,
+      name: name ?? this.name,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       users: users ?? this.users,

@@ -4,6 +4,8 @@ import 'projects_screen.dart';
 import 'library_screen.dart';
 import 'network_screen.dart';
 import '../utils/app_colors.dart';
+import '../widgets/bottom_audio_player.dart';
+
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
   
@@ -25,7 +27,11 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       backgroundColor: AppColors.menuPageBackground,
       body: _screens[_currentIndex],
-      bottomNavigationBar: Container(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const BottomAudioPlayer(),
+          Container(
         decoration: BoxDecoration(
           color: AppColors.menuEntryBackground,
           border: Border(
@@ -74,6 +80,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
             ),
           ],
         ),
+      ),
+        ],
       ),
     );
   }

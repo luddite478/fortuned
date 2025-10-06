@@ -32,10 +32,12 @@ class ThreadsApi {
 
   static Future<String> createThread({
     required List<ThreadUser> users,
+    required String name,
     Map<String, dynamic>? metadata,
   }) async {
     final body = <String, dynamic>{
       'users': users.map((u) => u.toJson()).toList(),
+      'name': name,
       if (metadata != null) 'metadata': metadata,
     };
     final http.Response res = await ApiHttpClient.post('/threads', body: body);

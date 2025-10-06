@@ -45,3 +45,9 @@ dev_dependencies:
     sdk: flutter
   ffigen: ^13.0.0
   flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "icons/app_icon.png"
+  remove_alpha_ios: true

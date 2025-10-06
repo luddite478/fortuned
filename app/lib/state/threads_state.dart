@@ -159,12 +159,17 @@ class ThreadsState extends ChangeNotifier {
 
   Future<String> createThread({
     required List<ThreadUser> users,
+    required String name,
     Map<String, dynamic>? metadata,
   }) async {
     try {
       _setLoading(true);
       _setError(null);
-      final threadId = await ThreadsApi.createThread(users: users, metadata: metadata);
+      final threadId = await ThreadsApi.createThread(
+        users: users, 
+        name: name,
+        metadata: metadata,
+      );
       await ensureThreadSummary(threadId);
       // Set active thread to the newly created one
       final idx = _threads.indexWhere((t) => t.id == threadId);
@@ -173,6 +178,7 @@ class ThreadsState extends ChangeNotifier {
       } else {
         _activeThread = Thread(
           id: threadId,
+          name: name,
           createdAt: DateTime.now(),
           updatedAt: DateTime.now(),
           users: const [],

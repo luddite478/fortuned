@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
+import '../state/audio_player_state.dart';
 import '../models/thread/thread.dart';
 import '../services/threads_api.dart';
-import 'dart:math';
 
 import '../utils/app_colors.dart';
+import '../utils/thread_name_generator.dart';
 import 'sequencer_screen_v2.dart';
 import '../widgets/common_header_widget.dart';
 import '../ffi/table_bindings.dart';
@@ -26,14 +27,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _isLoading = true;
   String? _error;
   bool _isOpeningProject = false;
-
-  // Emoji pool for project names
-  static const List<String> _emojiPool = [
-    // nature
-    "🌲","🌳","🌴","🌵","🌾","🍀","🌸","🌼","🌻","🌺","🍄","🌊","⛰️","🏞️","🌅","🌄","🌠","☀️","🌤️","🌧️","⛈️","🌩️","🌪️","❄️","🦁","🐯","🐻","🐼","🐨","🐸","🐍","🦅","🦉","🦋","🐞","🐝","🐌",
-    // heroes
-    "⚔️","🛡️","🏹","🗡️","🪄","🪓","🪙","💎","🪶","👑","🏰","🏯","🐉","🧙‍♂️","🧝‍♀️","🧛‍♂️","🧟‍♀️","🧞‍♂️","🧜‍♀️","🔥","💫","✨"
-  ];
 
   @override
   void initState() {
@@ -187,7 +180,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                               ...invites.map((id) {
                                                 final t = threadsState.threads.firstWhere(
                                                   (x) => x.id == id,
-                                                  orElse: () => Thread(id: id, createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                                                  orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
                                                 );
                                                 return _buildInviteCard(t.users.isEmpty ? null : t, auth, id);
                                               }).toList(),
@@ -275,6 +268,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () async {
+                  // Stop any playing audio from playlist/renders
+                  context.read<AudioPlayerState>().stop();
                   // Clear active thread context for new project
                   context.read<ThreadsState>().setActiveThread(null);
                   // Initialize native subsystems (idempotent: init performs cleanup)
@@ -318,125 +313,92 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           );
         }
         
-        // If projects exist, show CONTINUE + NEW buttons (vertical stack)
-        return Column(
+        // If projects exist, show NEW + CONTINUE buttons (horizontal)
+        return Row(
           children: [
-            // Continue button - TOP (full width, slightly smaller height)
-            Container(
-              width: double.infinity,
-              height: 60,
-              margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: AppColors.menuSecondaryButton, // White secondary button
-                borderRadius: BorderRadius.circular(2), // More square corners
-                border: Border.all(
-                  color: AppColors.menuSecondaryButtonBorder, // Dark border
-                  width: 1,
+            // New button - LEFT (square)
+            Expanded(
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.menuSecondaryButton, // White secondary button
+                  borderRadius: BorderRadius.circular(4), // More square corners
+                  border: Border.all(
+                    color: AppColors.menuSecondaryButtonBorder, // Dark border
+                    width: 1,
+                  ),
                 ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () async {
-                    // Load project into sequencer and navigate
-                    await _loadProjectInSequencer(mostRecentProject);
-                  },
-                  borderRadius: BorderRadius.circular(2),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    child: Stack(
-                      children: [
-                        // Centered CONTINUE text
-                        Center(
-                          child: Text(
-                            'CONTINUE',
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      // Stop any playing audio from playlist/renders
+                      context.read<AudioPlayerState>().stop();
+                      // Clear active thread context for new project
+                      context.read<ThreadsState>().setActiveThread(null);
+                      // Initialize native subsystems (idempotent: init performs cleanup)
+                      try {
+                        TableBindings().tableInit();
+                        PlaybackBindings().playbackInit();
+                        SampleBankBindings().sampleBankInit();
+                      } catch (e) {
+                        debugPrint('❌ Failed to init native subsystems: $e');
+                      }
+                      // Navigate to V2 sequencer implementation
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const SequencerScreenV2(),
                         ),
-                        // Bottom row with project info
-                        // Positioned(
-                        //   bottom: 0,
-                        //   left: 0,
-                        //   child: Text(
-                        //     'Project ${mostRecentProject.id.substring(0, 8)}',
-                        //     style: GoogleFonts.sourceSans3(
-                        //       color: AppColors.menuPrimaryButtonText, // White text on dark button
-                        //       fontSize: 9,
-                        //       fontWeight: FontWeight.w400,
-                        //     ),
-                        //     maxLines: 1,
-                        //     overflow: TextOverflow.ellipsis,
-                        //   ),
-                        // ),
-                        // Positioned(
-                        //   bottom: 0,
-                        //   right: 0,
-                        //   child: Text(
-                        //     _formatProjectTimestamp(mostRecentProject.updatedAt),
-                        //     style: GoogleFonts.sourceSans3(
-                        //       color: AppColors.menuPrimaryButtonText.withOpacity(0.8), // Dimmed white text
-                        //       fontSize: 9,
-                        //       fontWeight: FontWeight.w400,
-                        //     ),
-                        //   ),
-                        // ),
-                      ],
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(4),
+                    child: Center(
+                      child: Text(
+                        'NEW',
+                        style: GoogleFonts.sourceSans3(
+                          color: AppColors.menuSecondaryButtonText, // Dark text on light button
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
 
-            // New button - BOTTOM (full width, slightly smaller height)
-            Container(
-              width: double.infinity,
-              height: 60,
-              decoration: BoxDecoration(
-                color: AppColors.menuSecondaryButton, // White secondary button
-                borderRadius: BorderRadius.circular(2), // More square corners
-                border: Border.all(
-                  color: AppColors.menuSecondaryButtonBorder, // Dark border
-                  width: 1,
+            const SizedBox(width: 6),
+
+            // Continue button - RIGHT (square)
+            Expanded(
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: AppColors.menuSecondaryButton, // White secondary button
+                  borderRadius: BorderRadius.circular(4), // More square corners
+                  border: Border.all(
+                    color: AppColors.menuSecondaryButtonBorder, // Dark border
+                    width: 1,
+                  ),
                 ),
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () async {
-                    // Clear active thread context for new project
-                    context.read<ThreadsState>().setActiveThread(null);
-                    // Initialize native subsystems (idempotent: init performs cleanup)
-                    try {
-                      TableBindings().tableInit();
-                      PlaybackBindings().playbackInit();
-                      SampleBankBindings().sampleBankInit();
-                    } catch (e) {
-                      debugPrint('❌ Failed to init native subsystems: $e');
-                    }
-                    // Navigate to V2 sequencer implementation
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const SequencerScreenV2(),
-                      ),
-                    );
-                  },
-                  borderRadius: BorderRadius.circular(6),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () async {
+                      // Load project into sequencer and navigate
+                      await _loadProjectInSequencer(mostRecentProject);
+                    },
+                    borderRadius: BorderRadius.circular(2),
                     child: Center(
                       child: Text(
-                        'NEW',
+                        'CONTINUE',
                         style: GoogleFonts.sourceSans3(
                           color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                          fontSize: 13,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
-                          letterSpacing: 1.5,
+                          letterSpacing: 1.2,
                         ),
                       ),
                     ),
@@ -489,14 +451,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           0.2126, 0.7152, 0.0722, 0, 0,
                           0,      0,      0,      1, 0,
                         ]),
-                        child: Text(
-                          _generateEmojiName(project.id),
-                          style: GoogleFonts.sourceSans3(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 2.0,
-                          ),
+                      child: Text(
+                        _getProjectName(project),
+                        style: GoogleFonts.sourceSans3(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 2.0,
                         ),
+                      ),
                       ),
                       const SizedBox(width: 8),
                       // Checkpoint counter to the right of emojis
@@ -578,7 +540,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                         0,      0,      0,      1, 0,
                       ]),
                       child: Text(
-                        _generateEmojiName(threadId),
+                        thread?.name ?? '',
                         style: GoogleFonts.sourceSans3(
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -739,18 +701,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
 
-  // Generate 3 emojis based on thread ID for consistent project names
-  String _generateEmojiName(String threadId) {
-    // Use thread ID to seed random generator for consistency
-    final seed = threadId.hashCode;
-    final random = Random(seed);
-    
-    final emojis = <String>[];
-    for (int i = 0; i < 3; i++) {
-      emojis.add(_emojiPool[random.nextInt(_emojiPool.length)]);
-    }
-    
-    return emojis.join(' ');
+  // Get project name
+  String _getProjectName(Thread project) {
+    return project.name;
   }
 
   Future<void> _openProject(Thread project) async {
@@ -778,6 +731,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         setState(() {
           _isOpeningProject = false;
         });
+        // Stop any playing audio from playlist/renders
+        context.read<AudioPlayerState>().stop();
         Navigator.push(
           context,
           MaterialPageRoute(

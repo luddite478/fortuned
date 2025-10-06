@@ -163,31 +163,20 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
-                color: AppColors.menuEntryBackground,
+                color: isPlaying 
+                    ? AppColors.menuOnlineIndicator.withOpacity(0.1)
+                    : AppColors.menuEntryBackground,
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(
-                  color: AppColors.menuBorder,
-                  width: 0.5,
+                  color: isPlaying 
+                      ? AppColors.menuOnlineIndicator.withOpacity(0.5)
+                      : AppColors.menuBorder,
+                  width: isPlaying ? 1 : 0.5,
                 ),
               ),
               child: ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                leading: GestureDetector(
-                  onTap: () => _playPlaylistItem(item),
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.menuText.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(
-                      isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: AppColors.menuPageBackground,
-                      size: 20,
-                    ),
-                  ),
-                ),
+                onTap: () => _playPlaylistItem(item),
                 title: Text(
                   item.name,
                   style: GoogleFonts.sourceSans3(

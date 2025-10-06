@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'http_client.dart';
 import 'ws_client.dart';
+import '../models/playlist_item.dart';
 
 class UserProfile {
   final String id;
@@ -20,6 +21,7 @@ class UserProfile {
   final UserPreferences preferences;
   final List<String> threads;
   final List<String> pendingInvitesToThreads;
+  final List<PlaylistItem> playlist;
 
   UserProfile({
     required this.id,
@@ -37,6 +39,7 @@ class UserProfile {
     required this.preferences,
     this.threads = const [],
     this.pendingInvitesToThreads = const [],
+    this.playlist = const [],
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
@@ -56,6 +59,7 @@ class UserProfile {
       preferences: UserPreferences.fromJson(json['preferences'] ?? {}),
       threads: (json['threads'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
       pendingInvitesToThreads: (json['pending_invites_to_threads'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      playlist: (json['playlist'] as List<dynamic>? ?? []).map((e) => PlaylistItem.fromJson(e as Map<String, dynamic>)).toList(),
     );
   }
 
