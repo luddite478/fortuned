@@ -30,7 +30,11 @@ class ThreadsState extends ChangeNotifier {
 
   // UI state
   bool _isLoading = false;
+  bool _isRefreshing = false;
   String? _error;
+  
+  // Track if initial load is complete
+  bool _hasLoaded = false;
 
   // Snapshot service factory deps
   final TableState _tableState;
@@ -62,6 +66,8 @@ class ThreadsState extends ChangeNotifier {
   List<Message> get activeThreadMessages =>
       _activeThread == null ? const [] : List.unmodifiable(_messagesByThread[_activeThread!.id] ?? const []);
   bool get isLoading => _isLoading;
+  bool get isRefreshing => _isRefreshing;
+  bool get hasLoaded => _hasLoaded;
   String? get error => _error;
   String? get currentUserId => _currentUserId;
   String? get currentUserName => _currentUserName;
@@ -98,20 +104,51 @@ class ThreadsState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadThreads() async {
+  Future<void> loadThreads({bool silent = false}) async {
+    // If already loaded and not forcing refresh, return immediately
+    if (_hasLoaded && !silent) {
+      debugPrint('🧵 [THREADS] Using cached threads (${_threads.length} items)');
+      return;
+    }
+    
     try {
-      _setLoading(true);
-      _setError(null);
+      if (!silent) {
+        _isLoading = true;
+        notifyListeners();
+      } else {
+        _isRefreshing = true;
+      }
+      
+      _error = null;
+      
       final result = await ThreadsApi.getThreads(userId: _currentUserId);
       _threads
         ..clear()
         ..addAll(result);
+      _hasLoaded = true;
+      
+      debugPrint('🧵 [THREADS] Loaded threads: ${_threads.length} items');
     } catch (e) {
       _setError('Failed to load threads: $e');
+      debugPrint('❌ [THREADS] Error loading threads: $e');
       rethrow;
     } finally {
-      _setLoading(false);
+      _isLoading = false;
+      _isRefreshing = false;
+      notifyListeners();
     }
+  }
+  
+  /// Refresh threads in background (silent update)
+  Future<void> refreshThreadsInBackground() async {
+    if (!_hasLoaded) {
+      // If not loaded yet, do a normal load
+      await loadThreads();
+      return;
+    }
+    
+    debugPrint('🔄 [THREADS] Refreshing threads in background...');
+    await loadThreads(silent: true);
   }
 
   Future<void> ensureThreadSummary(String threadId) async {

@@ -24,7 +24,6 @@ class ProjectsScreen extends StatefulWidget {
 }
 
 class _ProjectsScreenState extends State<ProjectsScreen> {
-  bool _isLoading = true;
   String? _error;
   bool _isOpeningProject = false;
 
@@ -41,29 +40,51 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Future<void> _loadProjects() async {
     try {
-      setState(() {
-        _isLoading = true;
-        _error = null;
-      });
-      
-      // Refresh current user to fetch pending_invites_to_threads
-      await Provider.of<AuthService>(context, listen: false).refreshCurrentUserFromServer();
+      final authService = Provider.of<AuthService>(context, listen: false);
       final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      
+      // Load threads (returns cached data immediately if available)
       await threadsState.loadThreads();
-      // Also load invite thread summaries not in membership list if any
-      final invites = Provider.of<AuthService>(context, listen: false).currentUser?.pendingInvitesToThreads ?? const [];
-      for (final threadId in invites) {
-        await threadsState.ensureThreadSummary(threadId);
+      
+      // Refresh in background if already loaded (collaborative data)
+      if (threadsState.hasLoaded) {
+        // Refresh user and threads in background
+        _refreshInBackground(authService, threadsState);
+      } else {
+        // First load - also fetch invites
+        await _loadInvites(authService, threadsState);
       }
       
       setState(() {
-        _isLoading = false;
+        _error = null;
       });
     } catch (e) {
       setState(() {
         _error = 'Failed to load projects: $e';
-        _isLoading = false;
       });
+    }
+  }
+  
+  Future<void> _refreshInBackground(AuthService authService, ThreadsState threadsState) async {
+    try {
+      // Refresh current user to fetch pending_invites_to_threads
+      await authService.refreshCurrentUserFromServer();
+      
+      // Refresh threads in background
+      await threadsState.refreshThreadsInBackground();
+      
+      // Also load invite thread summaries
+      await _loadInvites(authService, threadsState);
+    } catch (e) {
+      debugPrint('❌ [PROJECTS] Background refresh error: $e');
+      // Don't show error to user for background refresh
+    }
+  }
+  
+  Future<void> _loadInvites(AuthService authService, ThreadsState threadsState) async {
+    final invites = authService.currentUser?.pendingInvitesToThreads ?? const [];
+    for (final threadId in invites) {
+      await threadsState.ensureThreadSummary(threadId);
     }
   }
 
@@ -79,14 +100,20 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             // User indicator at the top
             const CommonHeaderWidget(),
             
-            // Show only loading indicator while loading
-            if (_isLoading)
-              Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(color: AppColors.menuLightText),
-                ),
-              )
-            else ...[
+            Consumer<ThreadsState>(
+              builder: (context, threadsState, _) {
+                // Show loading only on first load (no cached data)
+                if (threadsState.isLoading && !threadsState.hasLoaded) {
+                  return Expanded(
+                    child: Center(
+                      child: CircularProgressIndicator(color: AppColors.menuLightText),
+                    ),
+                  );
+                }
+                
+                return Expanded(
+                  child: Column(
+                    children: [
               Container(
                 width: double.infinity,
                 margin: const EdgeInsets.all(12),
@@ -220,8 +247,36 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   ],
                 ),
               ),
-            ], 
-          ], // Close the main children array
+                      // Show subtle refresh indicator when refreshing in background
+                      if (threadsState.isRefreshing && threadsState.hasLoaded)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: AppColors.menuEntryBackground.withOpacity(0.9),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: AppColors.menuBorder),
+                            ),
+                            child: SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  AppColors.menuOnlineIndicator,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
           if (_isOpeningProject)
@@ -240,10 +295,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
 
   Widget _buildMySequencerButton() {
-    // Don't show buttons while loading
-    if (_isLoading) {
-      return const SizedBox.shrink();
-    }
     
     return Consumer<ThreadsState>(
       builder: (context, threadsState, child) {

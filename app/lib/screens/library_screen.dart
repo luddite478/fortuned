@@ -3,11 +3,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
 import '../widgets/common_header_widget.dart';
-import '../services/playlist_service.dart';
-import '../services/audio_cache_service.dart';
 import '../models/playlist_item.dart';
 import '../models/thread/message.dart';
 import '../state/audio_player_state.dart';
+import '../state/library_state.dart';
 import '../services/auth_service.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -19,8 +18,6 @@ class LibraryScreen extends StatefulWidget {
 
 class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateMixin {
   late TabController _tabController;
-  List<PlaylistItem> _playlist = [];
-  bool _isLoading = false;
   
   @override
   void initState() {
@@ -35,14 +32,10 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
     
     if (userId == null) return;
     
-    setState(() => _isLoading = true);
+    final libraryState = context.read<LibraryState>();
     
-    final playlist = await PlaylistService.getPlaylist(userId: userId);
-    
-    setState(() {
-      _playlist = playlist;
-      _isLoading = false;
-    });
+    // Load playlist (only loads once on first call)
+    await libraryState.loadPlaylist(userId: userId);
   }
   
   @override
@@ -114,52 +107,53 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
 
 
   Widget _buildPlaylistsTab() {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    
-    if (_playlist.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.library_music_outlined,
-              color: AppColors.menuLightText,
-              size: 48,
+    return Consumer2<LibraryState, AudioPlayerState>(
+      builder: (context, libraryState, audioPlayer, _) {
+        // Show loading indicator only on initial load
+        if (libraryState.isLoading && !libraryState.hasLoaded) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        // Show empty state
+        if (libraryState.playlist.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.library_music_outlined,
+                  color: AppColors.menuLightText,
+                  size: 48,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Your playlist is empty',
+                  style: GoogleFonts.sourceSans3(
+                    color: AppColors.menuLightText,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Add audio renders from messages',
+                  style: GoogleFonts.sourceSans3(
+                    color: AppColors.menuLightText,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              'Your playlist is empty',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.menuLightText,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Add audio renders from messages',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.menuLightText,
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-    
-    return Consumer<AudioPlayerState>(
-      builder: (context, audioPlayer, _) {
+          );
+        }
+        
         return ListView.builder(
           padding: const EdgeInsets.all(12),
-          itemCount: _playlist.length,
+          itemCount: libraryState.playlist.length,
           itemBuilder: (context, index) {
-            final item = _playlist[index];
+            final item = libraryState.playlist[index];
             final isPlaying = audioPlayer.currentlyPlayingRenderId == item.id && audioPlayer.isPlaying;
-            final isThisTrack = audioPlayer.currentlyPlayingRenderId == item.id;
-            
+        
             return Container(
               margin: const EdgeInsets.only(bottom: 8),
               decoration: BoxDecoration(
@@ -258,25 +252,20 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
     
     if (userId == null) return;
     
-    final success = await PlaylistService.removeFromPlaylist(
+    final libraryState = context.read<LibraryState>();
+    final success = await libraryState.removeFromPlaylist(
       userId: userId,
       renderId: item.id,
     );
     
-    if (success) {
-      setState(() {
-        _playlist.removeWhere((i) => i.id == item.id);
-      });
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Removed from playlist'),
-            backgroundColor: AppColors.menuBorder,
-            duration: const Duration(seconds: 1),
-          ),
-        );
-      }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(success ? 'Removed from playlist' : 'Failed to remove'),
+          backgroundColor: success ? AppColors.menuBorder : Colors.red.shade900,
+          duration: const Duration(seconds: 1),
+        ),
+      );
     }
   }
 

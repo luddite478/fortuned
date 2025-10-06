@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
+import '../state/library_state.dart';
 import '../utils/app_colors.dart';
 
 class AppSettingsScreen extends StatelessWidget {
@@ -81,6 +82,11 @@ class AppSettingsScreen extends StatelessWidget {
                         child: InkWell(
                           onTap: () async {
                             final authService = Provider.of<AuthService>(context, listen: false);
+                            final libraryState = Provider.of<LibraryState>(context, listen: false);
+                            
+                            // Clear library data on logout
+                            libraryState.clear();
+                            
                             await authService.logout();
                             if (context.mounted) {
                               Navigator.of(context).popUntil((route) => route.isFirst);
@@ -117,4 +123,3 @@ class AppSettingsScreen extends StatelessWidget {
     );
   }
 }
-

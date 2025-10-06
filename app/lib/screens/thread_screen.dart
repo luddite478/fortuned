@@ -5,6 +5,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
+import '../state/library_state.dart';
 import '../state/sequencer/recording.dart';
 import '../models/thread/message.dart';
 import '../models/thread/thread.dart';
@@ -13,7 +14,6 @@ import '../utils/thread_name_generator.dart';
 import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
 import '../services/audio_cache_service.dart';
-import '../services/playlist_service.dart';
 import '../widgets/sections_chain_squares.dart';
 import '../services/auth_service.dart';
 
@@ -903,7 +903,9 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
       return;
     }
     
-    final success = await PlaylistService.addToPlaylist(
+    // Use LibraryState which handles optimistic update + background sync
+    final libraryState = context.read<LibraryState>();
+    final success = await libraryState.addToPlaylist(
       userId: userId,
       render: render,
     );

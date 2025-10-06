@@ -20,6 +20,8 @@ import 'utils/thread_name_generator.dart';
 
 import 'state/threads_state.dart';
 import 'state/audio_player_state.dart';
+import 'state/library_state.dart';
+import 'state/followed_state.dart';
 import 'services/ws_client.dart';
 // import 'state/patterns_state.dart';
 import 'state/sequencer/table.dart';
@@ -48,6 +50,8 @@ class App extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (context) => AuthService()),
         ChangeNotifierProvider(create: (context) => AudioPlayerState()),
+        ChangeNotifierProvider(create: (context) => LibraryState()),
+        ChangeNotifierProvider(create: (context) => FollowedState()),
         Provider(create: (context) => WebSocketClient()),
         ChangeNotifierProvider(create: (context) => TableState()),
         ChangeNotifierProvider(create: (context) => PlaybackState(Provider.of<TableState>(context, listen: false))),
@@ -110,6 +114,8 @@ class _MainPageState extends State<MainPage> {
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     final threadsService = Provider.of<ThreadsService>(context, listen: false);
     final wsClient = Provider.of<WebSocketClient>(context, listen: false);
+    final libraryState = Provider.of<LibraryState>(context, listen: false);
+    final followedState = Provider.of<FollowedState>(context, listen: false);
     
     if (authService.currentUser != null) {
       // Ensure we have latest user fields (e.g., pending_invites_to_threads)
@@ -118,6 +124,11 @@ class _MainPageState extends State<MainPage> {
         authService.currentUser!.id,
         authService.currentUser!.name,
       );
+      
+      // Load data on startup (cached for session)
+      libraryState.loadPlaylist(userId: authService.currentUser!.id);
+      threadsState.loadThreads();
+      followedState.loadFollowedUsers(userId: authService.currentUser!.id);
       
       // Initialize single WebSocket connection for this user
       _initializeThreadsService(threadsService, authService.currentUser!.id, context);
