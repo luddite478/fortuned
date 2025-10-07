@@ -346,11 +346,43 @@ class _MainPageState extends State<MainPage> {
         }
         
         if (authService.isLoading) {
-          return const Scaffold(
-            backgroundColor: Colors.black,
-            body: Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Colors.purple),
+          return Scaffold(
+            backgroundColor: Colors.white,
+            body: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SizedBox(height: 60),
+                    
+                    // Logo/Title
+                    // Text(
+                    //   dotenv.env['APP_NAME']!.toUpperCase(),
+                    //   textAlign: TextAlign.center,
+                    //   style: const TextStyle(
+                    //     fontSize: 22,
+                    //     fontWeight: FontWeight.bold,
+                    //     color: Colors.black,
+                    //     letterSpacing: 2,
+                    //   ),
+                    // ),
+                    
+                    const Spacer(),
+                    
+                    // Linear progress indicator
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        backgroundColor: Colors.grey[200],
+                        valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF333333)),
+                        minHeight: 3,
+                      ),
+                    ),
+                    
+                    const Spacer(),
+                  ],
+                ),
               ),
             ),
           );

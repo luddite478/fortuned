@@ -15,7 +15,7 @@ class AppSettingsScreen extends StatelessWidget {
       body: SafeArea(
         child: Column(
           children: [
-            // Header with back button
+            // Header without back button (since this is now a tab)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -30,21 +30,6 @@ class AppSettingsScreen extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  // Back button
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      child: Icon(
-                        Icons.chevron_left,
-                        size: 20,
-                        color: AppColors.menuText,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   // Title
                   Text(
                     'SETTINGS',
@@ -71,7 +56,7 @@ class AppSettingsScreen extends StatelessWidget {
                       height: 56,
                       decoration: BoxDecoration(
                         color: AppColors.menuEntryBackground,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(3),
                         border: Border.all(
                           color: AppColors.menuBorder,
                           width: 1,

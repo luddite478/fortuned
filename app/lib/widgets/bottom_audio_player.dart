@@ -5,7 +5,12 @@ import '../state/audio_player_state.dart';
 import '../utils/app_colors.dart';
 
 class BottomAudioPlayer extends StatelessWidget {
-  const BottomAudioPlayer({Key? key}) : super(key: key);
+  final bool showLoopButton;
+  
+  const BottomAudioPlayer({
+    Key? key,
+    this.showLoopButton = false,
+  }) : super(key: key);
 
   String _formatDuration(Duration duration) {
     final minutes = duration.inMinutes;
@@ -27,8 +32,20 @@ class BottomAudioPlayer extends StatelessWidget {
         final position = audioPlayer.position;
         final duration = audioPlayer.duration;
 
+        // Get screen dimensions for responsive sizing
+        final media = MediaQuery.of(context);
+        final screenWidth = media.size.width;
+
+        // Calculate responsive button size (between 40-48px)
+        final buttonSize = (screenWidth * 0.11).clamp(40.0, 48.0);
+        
+        // Calculate responsive horizontal spacing (2-3% of screen width)
+        final horizontalSpacing = (screenWidth * 0.025).clamp(12.0, 16.0);
+        
+        // Calculate responsive side padding (3-4% of screen width)
+        final sidePadding = (screenWidth * 0.035).clamp(12.0, 16.0);
+
         return Container(
-          height: 70,
           decoration: BoxDecoration(
             color: AppColors.menuEntryBackground,
             border: Border(
@@ -38,112 +55,145 @@ class BottomAudioPlayer extends StatelessWidget {
               ),
             ),
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                // Play/Pause button
-                GestureDetector(
-                  onTap: () async {
-                    // Access audio player state to trigger play/pause
-                    if (isPlaying) {
-                      audioPlayer.pause();
-                    } else {
-                      // If at or near end, restart from beginning
-                      if (duration.inMilliseconds > 0 && 
-                          position.inMilliseconds >= duration.inMilliseconds - 100) {
-                        await audioPlayer.seek(Duration.zero);
-                      }
-                      await audioPlayer.resume();
-                    }
-                  },
-                  child: Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.menuText.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Icon(
-                      isPlaying ? Icons.pause : Icons.play_arrow,
-                      color: AppColors.menuPageBackground,
-                      size: 20,
-                    ),
-                  ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Seek bar with thumb (interactive)
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+          child: SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: sidePadding,
+                vertical: 8,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Main controls row: centers of buttons aligned with slider
+                  Row(
                     children: [
-                      SliderTheme(
-                        data: SliderThemeData(
-                          trackHeight: 3,
-                          thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                          overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                          activeTrackColor: AppColors.menuText.withOpacity(0.7),
-                          inactiveTrackColor: AppColors.menuBorder.withOpacity(0.3),
-                          thumbColor: AppColors.menuText,
-                          overlayColor: AppColors.menuText.withOpacity(0.1),
-                        ),
-                        child: Slider(
-                          value: duration.inMilliseconds > 0
-                              ? position.inMilliseconds.toDouble()
-                              : 0.0,
-                          min: 0.0,
-                          max: duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
-                          onChanged: (value) async {
-                            await audioPlayer.seek(Duration(milliseconds: value.toInt()));
-                          },
+                      // Play/Pause button
+                      GestureDetector(
+                        onTap: () async {
+                          if (isPlaying) {
+                            await audioPlayer.pause();
+                          } else {
+                            await audioPlayer.resume();
+                          }
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          width: buttonSize,
+                          height: buttonSize,
+                          decoration: BoxDecoration(
+                            color: AppColors.menuText.withOpacity(0.7),
+                            borderRadius: BorderRadius.circular(buttonSize / 2),
+                          ),
+                          child: Icon(
+                            isPlaying ? Icons.pause : Icons.play_arrow,
+                            color: AppColors.menuPageBackground,
+                            size: buttonSize * 0.42,
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 2),
-                      // Time labels
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              _formatDuration(position),
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuLightText,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
+                      SizedBox(width: horizontalSpacing),
+                      // Seek bar with thumb (interactive)
+                      Expanded(
+                        child: SliderTheme(
+                          data: SliderThemeData(
+                            trackHeight: 3,
+                            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                            overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                            activeTrackColor: AppColors.menuText.withOpacity(0.7),
+                            inactiveTrackColor: AppColors.menuBorder.withOpacity(0.3),
+                            thumbColor: AppColors.menuText,
+                            overlayColor: AppColors.menuText.withOpacity(0.1),
+                          ),
+                          child: Slider(
+                            value: duration.inMilliseconds > 0
+                                ? position.inMilliseconds.toDouble()
+                                : 0.0,
+                            min: 0.0,
+                            max: duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
+                            onChanged: (value) async {
+                              await audioPlayer.seek(Duration(milliseconds: value.toInt()));
+                            },
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: horizontalSpacing),
+                      // Loop button (conditionally shown before close button)
+                      if (showLoopButton) ...[
+                        GestureDetector(
+                          onTap: () {
+                            audioPlayer.toggleLoop();
+                          },
+                          behavior: HitTestBehavior.opaque,
+                          child: Container(
+                            width: buttonSize,
+                            height: buttonSize,
+                            decoration: BoxDecoration(
+                              color: audioPlayer.isLooping 
+                                  ? AppColors.menuOnlineIndicator.withOpacity(0.15)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(buttonSize / 2),
                             ),
-                            Text(
-                              _formatDuration(duration),
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuLightText,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
+                            child: Icon(
+                              Icons.repeat,
+                              color: audioPlayer.isLooping 
+                                  ? AppColors.menuOnlineIndicator 
+                                  : AppColors.menuLightText,
+                              size: buttonSize * 0.45,
                             ),
-                          ],
+                          ),
+                        ),
+                        SizedBox(width: horizontalSpacing),
+                      ],
+                      // Stop button aligned with slider
+                      GestureDetector(
+                        onTap: () async {
+                          await audioPlayer.stop();
+                        },
+                        behavior: HitTestBehavior.opaque,
+                        child: SizedBox(
+                          width: buttonSize,
+                          height: buttonSize,
+                          child: Center(
+                            child: Icon(
+                              Icons.close,
+                              color: AppColors.menuText,
+                              size: buttonSize * 0.42,
+                            ),
+                          ),
                         ),
                       ),
                     ],
                   ),
-                ),
-                
-                const SizedBox(width: 16),
-                
-                // Stop button
-                GestureDetector(
-                  onTap: () async {
-                    await audioPlayer.stop();
-                  },
-                  child: Icon(
-                    Icons.close,
-                    color: AppColors.menuText,
-                    size: 20,
+                  const SizedBox(height: 4),
+                  // Time labels row
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: sidePadding * 0.5),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          _formatDuration(position),
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.menuLightText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        Text(
+                          _formatDuration(duration),
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.menuLightText,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                ],
+              ),
             ),
           ),
         );

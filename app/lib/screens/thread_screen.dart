@@ -6,7 +6,6 @@ import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
 import '../state/library_state.dart';
-import '../state/sequencer/recording.dart';
 import '../models/thread/message.dart';
 import '../models/thread/thread.dart';
 import '../utils/app_colors.dart';
@@ -38,13 +37,30 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   final Map<String, GlobalKey> _messageKeys = {};
   AnimationController? _colorAnimationController;
   Animation<Color?>? _colorAnimation;
+  AnimationController? _slideAnimationController;
+  Animation<Offset>? _slideAnimation;
   Timer? _timestampRefreshTimer;
+  bool _isLoadingOlderMessages = false;
+  bool _hasMoreMessages = true;
+  
+  // Track which render the user just tapped to play so we can show
+  // the pause icon immediately (optimistic UI), even if the player is
+  // still buffering/loading.
+  String? _optimisticRenderKey;
+  
+  // Control the speed of the slide animation for new messages (in milliseconds)
+  static const int _newMessageSlideDurationMs = 300;
+  static const int _initialMessageCount = 30; // Load last 30 messages initially
 
   @override
   void initState() {
     super.initState();
+    
+    // Add scroll listener for pagination
+    _scrollController.addListener(_onScroll);
 
     if (widget.highlightNewest) {
+      // Color highlight animation
       _colorAnimationController = AnimationController(
         duration: const Duration(seconds: 1),
         vsync: this,
@@ -58,17 +74,22 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         parent: _colorAnimationController!,
         curve: Curves.easeInOut,
       ));
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _colorAnimationController?.forward().then((_) {
-            if (mounted) {
-              _colorAnimationController?.reverse();
-            }
-          });
-        }
-      });
+      
+      // Slide-up animation for new message (like Telegram)
+      _slideAnimationController = AnimationController(
+        duration: Duration(milliseconds: _newMessageSlideDurationMs),
+        vsync: this,
+      );
+      _slideAnimation = Tween<Offset>(
+        begin: const Offset(0, 1), // Start from bottom (off-screen)
+        end: Offset.zero, // End at normal position
+      ).animate(CurvedAnimation(
+        parent: _slideAnimationController!,
+        curve: Curves.easeOut,
+      ));
     }
 
+    // Load thread data and initial messages
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       final threadsState = context.read<ThreadsState>();
       threadsState.enterThreadView(widget.threadId);
@@ -81,49 +102,122 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
           orElse: () => Thread(id: widget.threadId, name: ThreadNameGenerator.generate(widget.threadId), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
         ),
       );
-      await threadsState.loadMessages(widget.threadId, includeSnapshot: false, order: 'asc');
-      if (widget.targetMessageId != null) {
-        _scrollToMessageIfNeeded(widget.targetMessageId!);
-      } else {
-        _scrollToBottom();
+      
+      // Load only recent messages in ascending order (oldest to newest)
+      // If already preloaded by sequencer, use cached data. Otherwise load fresh.
+      final alreadyLoaded = threadsState.hasMessagesLoaded(widget.threadId);
+      
+      if (!alreadyLoaded) {
+        // Ask API for newest first to guarantee latest messages are included, then store ascending
+        await threadsState.loadMessages(
+          widget.threadId,
+          includeSnapshot: false,
+          order: 'desc',
+          limit: _initialMessageCount,
+        );
+      }
+      
+      // Check if we loaded fewer messages than requested (means no more older messages)
+      final loadedCount = threadsState.activeThreadMessages.length;
+      if (mounted) {
+        setState(() {
+          _hasMoreMessages = loadedCount >= _initialMessageCount;
+        });
+      }
+      debugPrint('📜 Loaded $loadedCount messages, hasMoreMessages: $_hasMoreMessages');
+      
+      // Start slide animation for new message if needed
+      if (widget.highlightNewest) {
+        Future.delayed(const Duration(milliseconds: 150), () {
+          if (mounted) {
+            _slideAnimationController?.forward();
+            _colorAnimationController?.forward().then((_) {
+              if (mounted) {
+                _colorAnimationController?.reverse();
+              }
+            });
+          }
+        });
       }
     });
-
-    // No need to refresh timestamps anymore since we show fixed dates
   }
-
-  void _scrollToBottom() {
-    if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+  
+  void _onScroll() {
+    // With reverse: true, maxScrollExtent is the "top" (oldest messages)
+    // When we're near maxScrollExtent, load older messages
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+    
+    if (maxScroll - currentScroll <= 100 && !_isLoadingOlderMessages && _hasMoreMessages) {
+      _loadOlderMessages();
     }
   }
-
-  void _scrollToMessageIfNeeded(String messageId) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final key = _messageKeys[messageId];
-      if (key != null && key.currentContext != null) {
-        Scrollable.ensureVisible(
-          key.currentContext!,
-          duration: const Duration(milliseconds: 350),
-          alignment: 0.2,
-          curve: Curves.easeOut,
-        );
-      } else {
-        _scrollToBottom();
-      }
+  
+  Future<void> _loadOlderMessages() async {
+    if (_isLoadingOlderMessages || !_hasMoreMessages) return;
+    
+    setState(() {
+      _isLoadingOlderMessages = true;
     });
+    
+    try {
+      final threadsState = context.read<ThreadsState>();
+      final currentMessages = threadsState.activeThreadMessages;
+      
+      if (currentMessages.isEmpty) {
+        setState(() {
+          _isLoadingOlderMessages = false;
+        });
+        return;
+      }
+      
+      // Get the oldest message timestamp to load messages before it
+      final oldestMessage = currentMessages.first;
+      
+      // TODO: Add API support for loading messages before a certain timestamp
+      // For now, we'll just mark as no more messages
+      // In a real implementation, you'd call:
+      // await threadsState.loadMessagesBefore(widget.threadId, oldestMessage.timestamp, limit: 30);
+      
+      debugPrint('📜 Would load older messages before ${oldestMessage.timestamp}');
+      
+      // For now, just mark as no more messages after one attempt
+      setState(() {
+        _hasMoreMessages = false;
+        _isLoadingOlderMessages = false;
+      });
+      
+      // Maintain scroll position after loading new messages at top
+      // WidgetsBinding.instance.addPostFrameCallback((_) {
+      //   if (_scrollController.hasClients) {
+      //     final newMaxScrollExtent = _scrollController.position.maxScrollExtent;
+      //     final scrollDelta = newMaxScrollExtent - currentMaxScrollExtent;
+      //     _scrollController.jumpTo(currentScrollPosition + scrollDelta);
+      //   }
+      // });
+      
+    } catch (e) {
+      debugPrint('❌ Failed to load older messages: $e');
+      setState(() {
+        _isLoadingOlderMessages = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildHeader(context),
-      backgroundColor: AppColors.menuPageBackground,
-      body: Consumer<ThreadsState>(
+    return WillPopScope(
+      onWillPop: () async {
+        // Stop audio playback when navigating back
+        try {
+          context.read<AudioPlayerState>().stop();
+        } catch (_) {}
+        return true;
+      },
+      child: Scaffold(
+        appBar: _buildHeader(context),
+        backgroundColor: AppColors.menuPageBackground,
+        body: Consumer<ThreadsState>(
         builder: (context, threadsState, child) {
         final thread = threadsState.activeThread;
         final messages = threadsState.activeThreadMessages;
@@ -141,6 +235,16 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
             );
           }
 
+          // Show loading spinner only if messages are empty AND still loading
+          if (messages.isEmpty && threadsState.isLoadingMessages(widget.threadId)) {
+            return Center(
+              child: CircularProgressIndicator(
+                color: AppColors.menuPrimaryButton,
+              ),
+            );
+          }
+
+          // Show empty state if no messages and not loading
           if (messages.isEmpty) {
             return Center(
               child: Column(
@@ -175,34 +279,67 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
             );
           }
 
+          // Check if all messages are from today
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final allMessagesToday = messages.every((msg) {
+            final msgDate = DateTime(msg.timestamp.year, msg.timestamp.month, msg.timestamp.day);
+            return msgDate == today;
+          });
+
           return ListView.builder(
             controller: _scrollController,
+            reverse: true, // Start at bottom (newest messages)
             padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            itemCount: messages.length,
+            itemCount: messages.length + (_isLoadingOlderMessages ? 1 : 0),
             itemBuilder: (context, index) {
-              final message = messages[index];
+              // Show loading indicator at the end (which appears at top due to reverse: true)
+              if (index == messages.length) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: CircularProgressIndicator(
+                      color: AppColors.menuPrimaryButton,
+                    ),
+                  ),
+                );
+              }
+              
+              // Reverse index because list is reversed
+              final reversedIndex = messages.length - 1 - index;
+              final message = messages[reversedIndex];
               final isCurrentUser = message.userId == threadsState.currentUserId;
-              final isNewest = index == messages.length - 1;
+              final isNewest = reversedIndex == messages.length - 1;
               final shouldHighlight = widget.highlightNewest && isNewest && _colorAnimation != null;
               final isTarget = widget.targetMessageId != null && widget.targetMessageId == message.id;
               final key = _messageKeys.putIfAbsent(message.id, () => GlobalKey());
 
               // Check if we need a day divider before this message
-              final bool needsDivider = index == 0 || _needsDayDivider(
-                messages[index - 1].timestamp,
-                message.timestamp,
+              // Don't show divider if all messages are from today
+              // In reverse list, we check the NEXT message (which appears ABOVE in visual order)
+              // Insert divider before the FIRST message of each day (in ascending order)
+              // With reverse: true, we compute using ascending index (reversedIndex)
+              final bool needsDivider = !allMessagesToday && (
+                reversedIndex == 0 || // very first (oldest) message
+                _needsDayDivider(
+                  messages[reversedIndex - 1].timestamp, // previous (older) message
+                  message.timestamp, // current message
+                )
               );
 
               Widget bubble = shouldHighlight
                   ? AnimatedBuilder(
-                      animation: _colorAnimation!,
+                      animation: Listenable.merge([_colorAnimation!, _slideAnimation!]),
                       builder: (context, child) {
-                        return _buildMessageBubble(
-                          context,
-                          thread,
-                          message,
-                          isCurrentUser,
-                          highlightColor: _colorAnimation!.value,
+                        return SlideTransition(
+                          position: _slideAnimation!,
+                          child: _buildMessageBubble(
+                            context,
+                            thread,
+                            message,
+                            isCurrentUser,
+                            highlightColor: _colorAnimation!.value,
+                          ),
                         );
                       },
                     )
@@ -224,11 +361,11 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                 bubble = Container(key: key, child: bubble);
               }
 
-              // Add day divider if needed
+              // Add day divider above the message in visual order (with reverse: true)
               if (needsDivider) {
                 return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (index > 0) const SizedBox(height: 8),
                     _buildDayDivider(message.timestamp),
                     const SizedBox(height: 8),
                     bubble,
@@ -240,6 +377,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
             },
           );
         },
+      ),
       ),
     );
   }
@@ -284,6 +422,15 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                   ),
                 ),
                 const Spacer(),
+                // Show error indicator if message failed to send
+                if (message.sendStatus == SendStatus.failed && isCurrentUser) ...[
+                  const Icon(
+                    Icons.error,
+                    color: Colors.redAccent,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 Text(
                   _formatTimestamp(message.timestamp),
                   style: GoogleFonts.sourceSans3(
@@ -300,52 +447,6 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               children: [
                 _buildMessagePreviewFromMetadata(message),
                 const SizedBox(height: 8),
-                // Show upload indicator if message has no renders but recording might be uploading
-                if (message.renders.isEmpty && message.sendStatus == SendStatus.sent && isCurrentUser)
-                  Consumer<ThreadsState>(
-                    builder: (context, threadsState, _) {
-                      // Try to get RecordingState if available
-                      final recordingState = context.read<RecordingState?>();
-                      
-                      // Check if recording is currently uploading (only for latest message from current user)
-                      final messages = threadsState.activeThreadMessages;
-                      final isLatestMessage = messages.isNotEmpty && messages.last.id == message.id;
-                      final isUploading = isLatestMessage && recordingState != null && recordingState.isUploading;
-                      
-                      if (!isUploading) return const SizedBox.shrink();
-                      
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        margin: const EdgeInsets.only(bottom: 8),
-                        decoration: BoxDecoration(
-                          color: AppColors.menuBorder.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            SizedBox(
-                              width: 12,
-                              height: 12,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 1.5,
-                                color: AppColors.menuLightText,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Uploading audio...',
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuLightText,
-                                fontSize: 11,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
                 // Show renders if they exist
                 if (message.renders.isNotEmpty)
                   Column(
@@ -430,175 +531,8 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     }
   }
 
-  Widget _buildMediaBar(Message message) {
-    final renders = (message.snapshot['audio']?['renders'] as List?) ?? const [];
-    final hasRenders = renders.isNotEmpty;
-    final durationSec = (message.snapshot['audio']?['duration'] ?? 0.0).toDouble();
-    return Container(
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: AppColors.menuButtonBackground,
-        borderRadius: BorderRadius.circular(2),
-        border: Border.all(
-          color: AppColors.menuBorder,
-          width: 0.5,
-        ),
-      ),
-      child: Row(
-        children: [
-          GestureDetector(
-            onTap: () => _playMessageRender(message),
-            child: Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: AppColors.menuOnlineIndicator,
-                borderRadius: BorderRadius.circular(2),
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                color: Colors.white,
-                size: 16,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Icon(Icons.schedule, size: 14, color: AppColors.menuLightText),
-          const SizedBox(width: 4),
-          Text(
-            _formatDuration(durationSec),
-            style: GoogleFonts.sourceSans3(
-              color: AppColors.menuLightText,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          const Spacer(),
-          if (hasRenders) ...[
-            Icon(Icons.audiotrack, size: 14, color: AppColors.menuLightText),
-            const SizedBox(width: 4),
-            Text(
-              '${renders.length}',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.menuLightText,
-                fontSize: 12,
-                fontWeight: FontWeight.w400,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
-  Widget _buildSoundGridPreview(Map<String, dynamic> snapshot) {
-    final audio = snapshot['audio'] as Map<String, dynamic>?;
-    final sources = (audio?['sources'] as List?) ?? const [];
-    final firstSource = sources.isNotEmpty ? sources.first as Map<String, dynamic>? : null;
-    final sections = (firstSource?['sections'] as List?) ?? const [];
-    final firstSection = sections.isNotEmpty ? sections.first as Map<String, dynamic>? : null;
-    final layers = (firstSection?['layers'] as List?) ?? const [];
 
-    if (sources.isEmpty || sections.isEmpty || layers.isEmpty) {
-      return Container(
-        height: 80,
-        decoration: BoxDecoration(
-          color: AppColors.menuBorder.withOpacity(0.3),
-          borderRadius: BorderRadius.circular(2),
-          border: Border.all(
-            color: AppColors.menuBorder,
-            width: 0.5,
-          ),
-        ),
-        child: Center(
-          child: Text(
-            'Empty Project',
-            style: GoogleFonts.sourceSans3(
-              color: AppColors.menuLightText,
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      height: 100,
-      decoration: BoxDecoration(
-        color: AppColors.menuBorder.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(2),
-        border: Border.all(
-          color: AppColors.menuBorder,
-          width: 0.5,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: Column(
-          children: [
-            Text(
-              'Sound Grid Preview',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.menuLightText,
-                fontSize: 10,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Expanded(
-              child: Row(
-                children: List.generate(layers.length.clamp(0, 4), (layerIndex) {
-                  final layer = layers[layerIndex] as Map<String, dynamic>;
-                  final rows = (layer['rows'] as List?) ?? const [];
-                  return Expanded(
-                    child: Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 1),
-                      decoration: BoxDecoration(
-                        color: _getLayerColor(layerIndex),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                      child: Column(
-                        children: List.generate(rows.length.clamp(0, 8), (rowIndex) {
-                          final row = rows[rowIndex] as Map<String, dynamic>;
-                          final cells = (row['cells'] as List?) ?? const [];
-                          final hasSample = cells.any((c) {
-                            final cell = c as Map<String, dynamic>;
-                            final sample = cell['sample'];
-                            return sample != null && (sample['sample_id'] != null && (sample['sample_id'] as String).isNotEmpty);
-                          });
-                          return Expanded(
-                            child: Container(
-                              margin: const EdgeInsets.all(0.5),
-                              decoration: BoxDecoration(
-                                color: hasSample ? Colors.white.withOpacity(0.8) : Colors.white.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(1),
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Color _getLayerColor(int layerIndex) {
-    final colors = [
-      const Color(0xFF3b82f6),
-      const Color(0xFF10b981),
-      const Color(0xFFf59e0b),
-      const Color(0xFFef4444),
-    ];
-    return colors[layerIndex % colors.length];
-  }
 
   Widget _buildMessagePreviewFromMetadata(Message message) {
     // Simplified: rely only on snapshotMetadata
@@ -744,40 +678,40 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     );
   }
 
-  String _formatDuration(double duration) {
-    final minutes = (duration / 60).floor();
-    final seconds = (duration % 60).floor();
-    return '$minutes:${seconds.toString().padLeft(2, '0')}';
-  }
+  // Removed unused _formatDuration
 
   Widget _buildRenderButton(BuildContext context, Message message, Render render, {required ThreadsState threadsState}) {
-    final isCurrentUser = message.userId == threadsState.currentUserId;
+    final isUploading = render.uploadStatus == RenderUploadStatus.uploading;
     
     return Consumer<AudioPlayerState>(
       builder: (context, audioPlayer, _) {
         final isPlaying = audioPlayer.isPlayingRender(message.id, render.id);
-        final isLoading = audioPlayer.isLoadingRender(message.id, render.id);
+        final isLoadingFromNetwork = audioPlayer.isLoadingRender(message.id, render.id);
         final isThisRender = audioPlayer.currentlyPlayingMessageId == message.id && 
                              audioPlayer.currentlyPlayingRenderId == render.id;
         
-        // Try to get RecordingState if available (might not be if not coming from sequencer)
-        final recordingState = context.read<RecordingState?>();
-        
-        // Check if audio is cached
+        // Don't check cache if render is still uploading
         return FutureBuilder<bool>(
-          future: AudioCacheService.isCached(render.url),
+          future: isUploading ? Future.value(false) : AudioCacheService.isCached(render.url),
           builder: (context, snapshot) {
-            final isCached = snapshot.data ?? false;
+            final renderKey = '${message.id}::${render.id}';
+            final bool isOptimistic = _optimisticRenderKey == renderKey;
             
-            // For current user, check if they have local file
-            String? localPath;
-            if (isCurrentUser && recordingState != null && recordingState.convertedMp3Path != null) {
-              // Check if this render URL matches the recently uploaded one
-              if (render.url == recordingState.uploadedRenderUrl) {
-                localPath = recordingState.convertedMp3Path;
+            // Clear optimistic flag once actual state catches up or switches to another render
+            if (isOptimistic) {
+              final shouldClear = (isThisRender && isPlaying) || (!isThisRender && !isLoadingFromNetwork);
+              if (shouldClear) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    setState(() { _optimisticRenderKey = null; });
+                  }
+                });
               }
             }
             
+            // Show spinner only for other renders; for the current render show pause immediately
+            final bool showLoading = isUploading || (isLoadingFromNetwork && !isThisRender && !isOptimistic);
+
             return Container(
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -793,38 +727,46 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                 children: [
                   // Play/Pause/Loading button
                   GestureDetector(
-                    onTap: () async {
-                      if (isLoading) return;
-                      
+                    onTap: isUploading ? null : () async {
                       final player = context.read<AudioPlayerState>();
-                      await player.playRender(
-                        messageId: message.id,
-                        render: render,
-                        localPathIfRecorded: localPath,
-                      );
+                      if (isThisRender && isPlaying) {
+                        // Pausing current render: clear optimistic flag so icon switches to play
+                        setState(() { _optimisticRenderKey = null; });
+                        await player.playRender(
+                          messageId: message.id,
+                          render: render,
+                        );
+                      } else {
+                        // Starting/resuming: show pause immediately while playback starts
+                        setState(() { _optimisticRenderKey = renderKey; });
+                        await player.playRender(
+                          messageId: message.id,
+                          render: render,
+                        );
+                      }
                     },
                     child: Container(
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: isLoading 
+                        color: showLoading
                             ? AppColors.menuBorder.withOpacity(0.5)
                             : AppColors.menuText.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: isLoading
+                      child: showLoading
                           ? Padding(
                               padding: const EdgeInsets.all(6),
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 color: AppColors.menuLightText,
-                                value: audioPlayer.downloadProgress > 0 
+                                value: isLoadingFromNetwork && audioPlayer.downloadProgress > 0 
                                     ? audioPlayer.downloadProgress 
                                     : null,
                               ),
                             )
                           : Icon(
-                              isPlaying ? Icons.pause : Icons.play_arrow,
+                              (isPlaying || (isOptimistic && isThisRender)) ? Icons.pause : Icons.play_arrow,
                               color: AppColors.menuPageBackground,
                               size: 16,
                             ),
@@ -832,38 +774,59 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                   ),
                   const SizedBox(width: 12),
                   
-                  // Seek bar
+                  // Seek bar or uploading indicator
                   Expanded(
-                    child: isThisRender
-                        ? SliderTheme(
-                            data: SliderThemeData(
-                              trackHeight: 2,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                              overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                              activeTrackColor: AppColors.menuText.withOpacity(0.6),
-                              inactiveTrackColor: AppColors.menuBorder.withOpacity(0.3),
-                              thumbColor: AppColors.menuText,
-                              overlayColor: AppColors.menuText.withOpacity(0.1),
-                            ),
-                            child: Slider(
-                              value: audioPlayer.duration.inMilliseconds > 0
-                                  ? audioPlayer.position.inMilliseconds.toDouble()
-                                  : 0.0,
-                              min: 0.0,
-                              max: audioPlayer.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
-                              onChanged: (value) async {
-                                final player = context.read<AudioPlayerState>();
-                                await player.seek(Duration(milliseconds: value.toInt()));
-                              },
-                            ),
+                    child: isUploading
+                        ? Row(
+                            children: [
+                              Text(
+                                'Uploading...',
+                                style: GoogleFonts.sourceSans3(
+                                  color: AppColors.menuLightText,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                height: 2,
+                                decoration: BoxDecoration(
+                                  color: AppColors.menuBorder.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(1),
+                                ),
+                              ),
+                            ],
                           )
-                        : Container(
-                            height: 2,
-                            decoration: BoxDecoration(
-                              color: AppColors.menuBorder.withOpacity(0.3),
-                              borderRadius: BorderRadius.circular(1),
-                            ),
-                          ),
+                        : isThisRender
+                            ? SliderTheme(
+                                data: SliderThemeData(
+                                  trackHeight: 2,
+                                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                                  overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
+                                  activeTrackColor: AppColors.menuText.withOpacity(0.6),
+                                  inactiveTrackColor: AppColors.menuBorder.withOpacity(0.3),
+                                  thumbColor: AppColors.menuText,
+                                  overlayColor: AppColors.menuText.withOpacity(0.1),
+                                ),
+                                child: Slider(
+                                  value: audioPlayer.duration.inMilliseconds > 0
+                                      ? audioPlayer.position.inMilliseconds.toDouble()
+                                      : 0.0,
+                                  min: 0.0,
+                                  max: audioPlayer.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
+                                  onChanged: (value) async {
+                                    final player = context.read<AudioPlayerState>();
+                                    await player.seek(Duration(milliseconds: value.toInt()));
+                                  },
+                                ),
+                              )
+                            : Container(
+                                height: 2,
+                                decoration: BoxDecoration(
+                                  color: AppColors.menuBorder.withOpacity(0.3),
+                                  borderRadius: BorderRadius.circular(1),
+                                ),
+                              ),
                   ),
                 ],
               ),
@@ -874,19 +837,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     );
   }
 
-  void _playMessageRender(Message message) {
-    // Legacy method - now handled by _buildRenderButton
-    if (message.renders.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No audio renders available for this message'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-  }
+  // Removed unused _playMessageRender
 
   Future<void> _addToPlaylist(BuildContext context, Render render) async {
     final auth = context.read<AuthService>();
@@ -963,6 +914,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
     } catch (_) {}
     _scrollController.dispose();
     _colorAnimationController?.dispose();
+    _slideAnimationController?.dispose();
     _timestampRefreshTimer?.cancel();
     super.dispose();
   }
@@ -1465,8 +1417,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
     }
 
 
-    int successCount = 0;
-    int failureCount = 0;
+    // Track invite send results silently (removed unused counters)
 
     for (final user in _selectedUsers) {
       try {
@@ -1475,9 +1426,7 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
           userId: user.id,
           userName: user.username,
         );
-        successCount++;
       } catch (_) {
-        failureCount++;
       }
     }
 

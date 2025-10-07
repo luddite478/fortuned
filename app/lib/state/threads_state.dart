@@ -26,6 +26,7 @@ class ThreadsState extends ChangeNotifier {
   final List<Thread> _threads = [];
   Thread? _activeThread;
   final Map<String, List<Message>> _messagesByThread = {};
+  final Map<String, bool> _messagesLoadingByThread = {};
   bool _isThreadViewActive = false;
 
   // UI state
@@ -72,6 +73,9 @@ class ThreadsState extends ChangeNotifier {
   String? get currentUserId => _currentUserId;
   String? get currentUserName => _currentUserName;
   bool get isThreadViewActive => _isThreadViewActive;
+  
+  bool isLoadingMessages(String threadId) => _messagesLoadingByThread[threadId] ?? false;
+  bool hasMessagesLoaded(String threadId) => _messagesByThread.containsKey(threadId);
 
   void setCurrentUser(String userId, [String? userName]) {
     _currentUserId = userId;
@@ -170,26 +174,73 @@ class ThreadsState extends ChangeNotifier {
 
   Future<void> loadMessages(
     String threadId, {
-    bool force = true,
+    bool force = false,
     int? limit,
     String? order,
     bool includeSnapshot = false,
   }) async {
+    // Skip if already loaded and not forcing refresh
+    if (!force && _messagesByThread.containsKey(threadId)) {
+      debugPrint('📬 [THREADS] Using cached messages for thread $threadId (${_messagesByThread[threadId]?.length} messages)');
+      return;
+    }
+    
     try {
+      _messagesLoadingByThread[threadId] = true;
       _setLoading(true);
       _setError(null);
+      notifyListeners();
+      
       final messages = await ThreadsApi.getMessages(
         threadId,
         limit: limit,
         order: order,
         includeSnapshot: includeSnapshot,
       );
-      _messagesByThread[threadId] = messages;
+      // Store in ascending (oldest -> newest) for UI
+      final List<Message> stored = (order == 'desc') ? messages.reversed.toList() : messages;
+      _messagesByThread[threadId] = stored;
+      debugPrint('📬 [THREADS] Loaded ${stored.length} messages for thread $threadId (stored ascending)');
     } catch (e) {
       _setError('Failed to load messages: $e');
+      debugPrint('❌ [THREADS] Error loading messages: $e');
       rethrow;
     } finally {
+      _messagesLoadingByThread[threadId] = false;
       _setLoading(false);
+      notifyListeners();
+    }
+  }
+
+  /// Preload recent messages in background (silent, without snapshots for speed)
+  /// This is called when opening sequencer to make thread screen navigation instant
+  /// Always reloads with the specified limit to ensure fresh data
+  Future<void> preloadRecentMessages(String threadId, {int limit = 30}) async {
+    // Skip if currently loading
+    if (_messagesLoadingByThread[threadId] == true) {
+      debugPrint('📬 [THREADS] Messages currently loading for thread $threadId, skipping preload');
+      return;
+    }
+    
+    try {
+      _messagesLoadingByThread[threadId] = true;
+      notifyListeners();
+      
+      debugPrint('📬 [THREADS] Preloading recent $limit messages in background for thread $threadId...');
+      final messages = await ThreadsApi.getMessages(
+        threadId,
+        limit: limit,
+        order: 'desc',
+        includeSnapshot: false, // Don't load snapshots for speed
+      );
+      // Store ascending for UI
+      _messagesByThread[threadId] = messages.reversed.toList();
+      debugPrint('✅ [THREADS] Preloaded ${messages.length} recent messages for thread $threadId');
+    } catch (e) {
+      debugPrint('⚠️ [THREADS] Failed to preload messages (non-critical): $e');
+      // Don't rethrow - this is a background operation
+    } finally {
+      _messagesLoadingByThread[threadId] = false;
       notifyListeners();
     }
   }
@@ -251,6 +302,23 @@ class ThreadsState extends ChangeNotifier {
     };
 
     final tempId = 'local_${DateTime.now().microsecondsSinceEpoch}';
+    
+    // Create optimistic render if there's audio to upload
+    final List<Render> optimisticRenders = [];
+    if (_recordingState != null && _recordingState!.convertedMp3Path != null) {
+      final optimisticRender = Render(
+        id: 'temp_${DateTime.now().microsecondsSinceEpoch}',
+        url: '', // Empty until uploaded
+        format: 'mp3',
+        bitrate: 320,
+        duration: _recordingState!.recordingDuration.inSeconds.toDouble(),
+        createdAt: DateTime.now(),
+        uploadStatus: RenderUploadStatus.uploading,
+      );
+      optimisticRenders.add(optimisticRender);
+      debugPrint('🎵 [THREADS] Created optimistic render for message');
+    }
+    
     final pending = Message(
       id: '',
       createdAt: DateTime.now(),
@@ -259,7 +327,7 @@ class ThreadsState extends ChangeNotifier {
       parentThread: threadId,
       snapshot: snapshotMap,
       snapshotMetadata: snapshotMetadata,
-      renders: [],
+      renders: optimisticRenders,
       localTempId: tempId,
       sendStatus: SendStatus.sending,
     );
@@ -277,11 +345,17 @@ class ThreadsState extends ChangeNotifier {
         timestamp: pending.timestamp,
       );
 
-      // Replace pending with saved
+      // Replace pending with saved (keep optimistic renders with uploading status)
       final list = _messagesByThread[threadId] ?? [];
       final idx = list.indexWhere((m) => m.localTempId == tempId);
       if (idx >= 0) {
-        final updated = saved.copyWith(sendStatus: SendStatus.sent, localTempId: null);
+        // Preserve optimistic renders from pending message
+        final optimisticRenders = list[idx].renders.where((r) => r.uploadStatus == RenderUploadStatus.uploading).toList();
+        final updated = saved.copyWith(
+          sendStatus: SendStatus.sent, 
+          localTempId: null,
+          renders: optimisticRenders, // Keep optimistic renders
+        );
         list[idx] = updated;
         _messagesByThread[threadId] = List<Message>.from(list);
         notifyListeners();
@@ -360,14 +434,17 @@ class ThreadsState extends ChangeNotifier {
       final idx = list.indexWhere((m) => m.id == messageId);
       if (idx >= 0) {
         final message = list[idx];
-        final updatedRenders = [...message.renders, render];
+        
+        // Replace optimistic renders with actual uploaded render
+        final nonOptimisticRenders = message.renders.where((r) => r.uploadStatus != RenderUploadStatus.uploading).toList();
+        final updatedRenders = [...nonOptimisticRenders, render.copyWith(uploadStatus: RenderUploadStatus.completed)];
         final updatedMessage = message.copyWith(renders: updatedRenders);
         
         list[idx] = updatedMessage;
         _messagesByThread[entry.key] = List<Message>.from(list);
         notifyListeners();
         
-        debugPrint('✅ [THREADS] Attached render to message $messageId locally');
+        debugPrint('✅ [THREADS] Replaced optimistic render with uploaded render for message $messageId');
         break;
       }
     }

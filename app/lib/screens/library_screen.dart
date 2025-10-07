@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../utils/app_colors.dart';
 import '../widgets/common_header_widget.dart';
 import '../models/playlist_item.dart';
@@ -16,14 +17,30 @@ class LibraryScreen extends StatefulWidget {
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateMixin {
+class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateMixin, AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   late TabController _tabController;
+  bool _isCallbackActive = false;
+  
+  @override
+  bool get wantKeepAlive => true;
   
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadPlaylist();
+    _setupAudioPlayerCallback();
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Handle app lifecycle changes
+    if (state == AppLifecycleState.resumed && mounted) {
+      _setupAudioPlayerCallback();
+    } else if (state == AppLifecycleState.paused) {
+      _clearAudioPlayerCallback();
+    }
   }
   
   Future<void> _loadPlaylist() async {
@@ -38,14 +55,71 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
     await libraryState.loadPlaylist(userId: userId);
   }
   
+  void _setupAudioPlayerCallback() {
+    if (_isCallbackActive) return; // Don't set up if already active
+    
+    // Set up callback for auto-advance when track completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final audioPlayer = context.read<AudioPlayerState>();
+      audioPlayer.setTrackCompletionCallback(() {
+        if (mounted && _isCallbackActive) {
+          _playNextTrack();
+        }
+      });
+      _isCallbackActive = true;
+    });
+  }
+  
+  void _clearAudioPlayerCallback() {
+    if (!_isCallbackActive) return;
+    
+    try {
+      final audioPlayer = context.read<AudioPlayerState>();
+      audioPlayer.setTrackCompletionCallback(null);
+      _isCallbackActive = false;
+    } catch (_) {}
+  }
+  
+  void _playNextTrack() {
+    final libraryState = context.read<LibraryState>();
+    final audioPlayer = context.read<AudioPlayerState>();
+    final playlist = libraryState.playlist;
+    
+    if (playlist.isEmpty) return;
+    
+    // Find current track index
+    final currentRenderId = audioPlayer.currentlyPlayingRenderId;
+    if (currentRenderId == null) return;
+    
+    final currentIndex = playlist.indexWhere((item) => item.id == currentRenderId);
+    if (currentIndex == -1) return;
+    
+    // Move to next track (or just pause at the end, don't close player)
+    final nextIndex = currentIndex + 1;
+    if (nextIndex >= playlist.length) {
+      // Just pause - keep the player visible
+      audioPlayer.pause();
+      return;
+    }
+    
+    // Play next track
+    final nextItem = playlist[nextIndex];
+    _playPlaylistItem(nextItem);
+  }
+  
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clearAudioPlayerCallback();
     _tabController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
+    
     return Scaffold(
       backgroundColor: AppColors.menuPageBackground,
       body: SafeArea(
@@ -68,7 +142,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
               child: TabBar(
                 controller: _tabController,
                 tabs: const [
-                  Tab(text: 'PLAYLISTS'),
+                  Tab(text: 'PLAYLIST'),
                   Tab(text: 'SAMPLES'),
                 ],
                 labelColor: AppColors.menuText,
@@ -148,69 +222,91 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
         }
         
         return ListView.builder(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           itemCount: libraryState.playlist.length,
           itemBuilder: (context, index) {
             final item = libraryState.playlist[index];
             final isPlaying = audioPlayer.currentlyPlayingRenderId == item.id && audioPlayer.isPlaying;
         
             return Container(
-              margin: const EdgeInsets.only(bottom: 8),
+              height: 60,
+              margin: const EdgeInsets.only(bottom: 2),
               decoration: BoxDecoration(
                 color: isPlaying 
                     ? AppColors.menuOnlineIndicator.withOpacity(0.1)
                     : AppColors.menuEntryBackground,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: isPlaying 
-                      ? AppColors.menuOnlineIndicator.withOpacity(0.5)
-                      : AppColors.menuBorder,
-                  width: isPlaying ? 1 : 0.5,
-                ),
-              ),
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                onTap: () => _playPlaylistItem(item),
-                title: Text(
-                  item.name,
-                  style: GoogleFonts.sourceSans3(
-                    color: AppColors.menuText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppColors.menuBorder,
+                    width: 0.5,
                   ),
                 ),
-                subtitle: item.duration != null
-                    ? Text(
-                        _formatDuration(item.duration!),
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuLightText,
-                          fontSize: 11,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _playPlaylistItem(item),
+                  onLongPress: () => _showRemoveDialog(item),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        // Static note icon (no circle background)
+                        Icon(
+                          Icons.music_note,
+                          color: AppColors.menuText,
+                          size: 22,
                         ),
-                      )
-                    : null,
-                trailing: PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: AppColors.menuText, size: 20),
-                  color: AppColors.menuEntryBackground,
-                  onSelected: (value) {
-                    if (value == 'remove') {
-                      _removeFromPlaylist(item);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'remove',
-                      child: Row(
-                        children: [
-                          Icon(Icons.delete_outline, size: 18, color: AppColors.menuText),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Remove from playlist',
-                            style: GoogleFonts.sourceSans3(color: AppColors.menuText),
+                        const SizedBox(width: 10),
+                        
+                        // Item info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                item.name,
+                                style: GoogleFonts.sourceSans3(
+                                  color: AppColors.menuText,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (item.duration != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatDuration(item.duration!),
+                                  style: GoogleFonts.sourceSans3(
+                                    color: AppColors.menuLightText,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        
+                        const SizedBox(width: 8),
+                        
+                        // Share button
+                        IconButton(
+                          icon: Icon(
+                            Icons.share,
+                            color: AppColors.menuLightText,
+                            size: 20,
+                          ),
+                          onPressed: () => _sharePlaylistItem(item),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ),
             );
@@ -246,6 +342,60 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
     );
   }
   
+  void _showRemoveDialog(PlaylistItem item) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: AppColors.menuPageBackground,
+          title: Text(
+            'Remove from Playlist',
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.menuText,
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: Text(
+            'Are you sure you want to remove "${item.name}" from your playlist?',
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.menuLightText,
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Cancel',
+                style: GoogleFonts.sourceSans3(
+                  color: AppColors.menuLightText,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _removeFromPlaylist(item);
+              },
+              child: Text(
+                'Remove',
+                style: GoogleFonts.sourceSans3(
+                  color: Colors.red,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+  
   Future<void> _removeFromPlaylist(PlaylistItem item) async {
     final auth = context.read<AuthService>();
     final userId = auth.currentUser?.id;
@@ -266,6 +416,27 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
           duration: const Duration(seconds: 1),
         ),
       );
+    }
+  }
+  
+  Future<void> _sharePlaylistItem(PlaylistItem item) async {
+    try {
+      // Share the URL of the audio file with the item name
+      await Share.share(
+        item.url,
+        subject: item.name,
+      );
+    } catch (e) {
+      debugPrint('❌ Failed to share playlist item: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to share: $e'),
+            backgroundColor: Colors.red.shade900,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     }
   }
 

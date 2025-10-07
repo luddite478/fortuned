@@ -23,23 +23,90 @@ class UserProfileWidget extends StatefulWidget {
   State<UserProfileWidget> createState() => _UserProfileWidgetState();
 }
 
-class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProviderStateMixin {
+class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   UserProfile? _userProfile;
   bool _isLoading = true;
   String? _error;
+  bool _isCallbackActive = false;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadUserProfile();
+    _setupAudioPlayerCallback();
+    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _clearAudioPlayerCallback();
     _tabController.dispose();
     super.dispose();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Clear callback when app goes to background
+    if (state == AppLifecycleState.paused) {
+      _clearAudioPlayerCallback();
+    } else if (state == AppLifecycleState.resumed && mounted) {
+      _setupAudioPlayerCallback();
+    }
+  }
+  
+  void _setupAudioPlayerCallback() {
+    if (_isCallbackActive) return; // Don't set up if already active
+    
+    // Set up callback for auto-advance when track completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final audioPlayer = context.read<AudioPlayerState>();
+      audioPlayer.setTrackCompletionCallback(() {
+        if (mounted && _isCallbackActive) {
+          _playNextTrack();
+        }
+      });
+      _isCallbackActive = true;
+    });
+  }
+  
+  void _clearAudioPlayerCallback() {
+    if (!_isCallbackActive) return;
+    
+    try {
+      final audioPlayer = context.read<AudioPlayerState>();
+      audioPlayer.setTrackCompletionCallback(null);
+      _isCallbackActive = false;
+    } catch (_) {}
+  }
+  
+  void _playNextTrack() {
+    final audioPlayer = context.read<AudioPlayerState>();
+    final playlist = _userProfile?.playlist ?? [];
+    
+    if (playlist.isEmpty) return;
+    
+    // Find current track index
+    final currentRenderId = audioPlayer.currentlyPlayingRenderId;
+    if (currentRenderId == null) return;
+    
+    final currentIndex = playlist.indexWhere((item) => item.id == currentRenderId);
+    if (currentIndex == -1) return;
+    
+    // Move to next track (or just pause at the end, don't close player)
+    final nextIndex = currentIndex + 1;
+    if (nextIndex >= playlist.length) {
+      // Just pause - keep the player visible
+      audioPlayer.pause();
+      return;
+    }
+    
+    // Play next track
+    final nextItem = playlist[nextIndex];
+    _playPlaylistItem(nextItem);
   }
 
   Future<void> _loadUserProfile() async {
@@ -138,7 +205,7 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
       child: TabBar(
         controller: _tabController,
         tabs: const [
-          Tab(text: 'PLAYLISTS'),
+          Tab(text: 'PLAYLIST'),
           Tab(text: 'SAMPLES'),
         ],
         labelColor: AppColors.menuText,
@@ -185,35 +252,75 @@ class _UserProfileWidgetState extends State<UserProfileWidget> with TickerProvid
     return Consumer<AudioPlayerState>(
       builder: (context, audioPlayer, _) {
         return ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           itemCount: playlist.length,
           itemBuilder: (context, index) {
             final item = playlist[index];
             final isPlaying = audioPlayer.currentlyPlayingRenderId == item.id && audioPlayer.isPlaying;
-            
-            return ListTile(
-              leading: Icon(
-                Icons.music_note,
-                color: AppColors.menuText,
-                size: 24,
-              ),
-              title: Text(
-                item.name,
-                style: GoogleFonts.sourceSans3(
-                  color: isPlaying ? AppColors.menuOnlineIndicator : AppColors.menuText,
-                  fontSize: 14,
-                  fontWeight: isPlaying ? FontWeight.w600 : FontWeight.w500,
+
+            return Container(
+              height: 60,
+              margin: const EdgeInsets.only(bottom: 2),
+              decoration: BoxDecoration(
+                color: isPlaying 
+                    ? AppColors.menuOnlineIndicator.withOpacity(0.1)
+                    : AppColors.menuEntryBackground,
+                border: Border(
+                  bottom: BorderSide(
+                    color: AppColors.menuBorder,
+                    width: 0.5,
+                  ),
                 ),
               ),
-              subtitle: item.duration != null
-                  ? Text(
-                      _formatDuration(item.duration!),
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.menuLightText,
-                        fontSize: 12,
-                      ),
-                    )
-                  : null,
-              onTap: () => _playPlaylistItem(item),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: () => _playPlaylistItem(item),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    child: Row(
+                      children: [
+                        // Static note icon (no circle background)
+                        Icon(
+                          Icons.music_note,
+                          color: AppColors.menuText,
+                          size: 22,
+                        ),
+                        const SizedBox(width: 10),
+                        
+                        // Item info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                item.name,
+                                style: GoogleFonts.sourceSans3(
+                                  color: AppColors.menuText,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              if (item.duration != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  _formatDuration(item.duration!),
+                                  style: GoogleFonts.sourceSans3(
+                                    color: AppColors.menuLightText,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             );
           },
         );

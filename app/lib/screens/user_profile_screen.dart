@@ -5,6 +5,7 @@ import '../utils/app_colors.dart';
 import '../services/users_service.dart';
 import '../services/auth_service.dart';
 import '../widgets/bottom_audio_player.dart';
+import '../state/audio_player_state.dart';
 
 class UserProfileScreen extends StatefulWidget {
   final String userId;
@@ -111,7 +112,12 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final currentUserId = authService.currentUser?.id;
     final isOwnProfile = currentUserId == widget.userId;
 
-    return Scaffold(
+    return WillPopScope(
+      onWillPop: () async {
+        try { context.read<AudioPlayerState>().stop(); } catch (_) {}
+        return true;
+      },
+      child: Scaffold(
       backgroundColor: AppColors.menuPageBackground,
       appBar: AppBar(
         backgroundColor: AppColors.menuEntryBackground,
@@ -122,7 +128,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             color: AppColors.menuText,
             size: 24,
           ),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            try { context.read<AudioPlayerState>().stop(); } catch (_) {}
+            Navigator.pop(context);
+          },
         ),
         title: Text(
           widget.userName,
@@ -210,9 +219,10 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
             ),
           ),
-          const BottomAudioPlayer(),
+          const BottomAudioPlayer(showLoopButton: true),
         ],
       ),
+    ),
     );
   }
 } 

@@ -307,7 +307,7 @@ class MessageBarWidget extends StatelessWidget {
     }
   }
 
-  void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) async {
+  void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) {
     // Stop playback if active before sending and navigating
     final playbackState = Provider.of<PlaybackState>(context, listen: false);
     if (playbackState.isPlaying) {
@@ -315,16 +315,15 @@ class MessageBarWidget extends StatelessWidget {
     }
 
     final activeThread = threadsState.activeThread;
-    try {
-      if (activeThread != null) {
-        await threadsState.sendMessageFromSequencer(threadId: activeThread.id);
-        if (context.mounted) {
-          _navigateToThreadWithHighlight(context, threadsState);
-        }
-      }
-    } catch (e) {
-      // Silent error handling - no popups
-      debugPrint('Error sending message: $e');
+    if (activeThread != null) {
+      // Start upload in background (don't await)
+      threadsState.sendMessageFromSequencer(threadId: activeThread.id).catchError((e) {
+        // Silent error handling - status will be shown in UI
+        debugPrint('Error sending message: $e');
+      });
+      
+      // Navigate immediately
+      _navigateToThreadWithHighlight(context, threadsState);
     }
   }
 }

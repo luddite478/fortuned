@@ -175,6 +175,15 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with WidgetsBindi
         // Not critical - user can still work and publish later
       }
     }
+    
+    // Preload recent messages in background for instant thread screen navigation
+    final activeThread = threadsState.activeThread;
+    if (activeThread != null) {
+      // Preload only recent 30 messages (not all) for faster loading and instant thread UI
+      threadsState.preloadRecentMessages(activeThread.id, limit: 30).catchError((e) {
+        debugPrint('⚠️ Background message preload failed (non-critical): $e');
+      });
+    }
   }
 
   Future<void> _bootstrapInitialLoad() async {

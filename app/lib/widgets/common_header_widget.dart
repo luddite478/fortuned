@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/auth_service.dart';
 import '../utils/app_colors.dart';
-import '../screens/app_settings_screen.dart';
 
 class CommonHeaderWidget extends StatelessWidget {
   final String? customTitle; // Optional custom title instead of current user name
@@ -62,27 +61,6 @@ class CommonHeaderWidget extends StatelessWidget {
                   ],
                 ),
               ),
-              
-              // Settings button (only show for current user, not for custom titles)
-              if (customTitle == null)
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const AppSettingsScreen(),
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.settings,
-                      size: 16,
-                      color: AppColors.menuText,
-                    ),
-                  ),
-                ),
             ],
           ),
         );
