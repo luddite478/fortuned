@@ -65,6 +65,10 @@ static ma_device g_device;
 static ma_node_graph g_nodeGraph;
 static int g_initialized = 0;
 
+// Volume smoothing settings (configurable)
+static float g_volume_rise_time_ms = DEFAULT_VOLUME_RISE_TIME_MS;
+static float g_volume_fall_time_ms = DEFAULT_VOLUME_FALL_TIME_MS;
+
 // A/B playback nodes per column (audio thread)
 static ColumnPlayback g_column_playback[MAX_SEQUENCER_COLS];
 
@@ -72,6 +76,9 @@ static ColumnPlayback g_column_playback[MAX_SEQUENCER_COLS];
 static pthread_t g_preloader_thread;
 static int g_preloader_running = 0;         // 0/1
 static AudioColumn g_audio_columns[MAX_SEQUENCER_COLS];
+
+// RAM preloading memory tracking
+static size_t g_preload_memory_used = 0;    // Current RAM usage by preloader (bytes)
 
 // Playback state
 static int g_sequencer_playing = 0;        // transient
@@ -154,6 +161,9 @@ int playback_init(void) {
     // Initialize sections loops with default values
     for (int i = 0; i < MAX_SECTIONS; i++) g_playback_state.sections_loops_num_storage[i] = DEFAULT_SECTION_LOOPS;
     
+    // Reset RAM preloading memory tracking
+    g_preload_memory_used = 0;
+    
     // Initialize column playback (A/B switching)
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
         g_column_playback[col].active_node = -1;  // No active node
@@ -167,6 +177,11 @@ int playback_init(void) {
         g_audio_columns[col].preloader.decoder = NULL;
         g_audio_columns[col].preloader.pitch_ds = NULL;
         g_audio_columns[col].preloader.pitch_ds_initialized = 0;
+        // Initialize RAM buffer fields
+        g_audio_columns[col].preloader.pcm_buffer = NULL;
+        g_audio_columns[col].preloader.buffer_frame_count = 0;
+        g_audio_columns[col].preloader.audio_buffer = NULL;
+        g_audio_columns[col].preloader.audio_buffer_initialized = 0;
         
         for (int i = 0; i < MA_NODES_PER_COLUMN; i++) {
             AudioColumnNode* node = &g_column_playback[col].nodes[i];
@@ -178,11 +193,16 @@ int playback_init(void) {
             node->node = NULL;
             node->pitch_ds = NULL;
             node->pitch_ds_initialized = 0;
+            // Initialize RAM buffer fields
+            node->pcm_buffer = NULL;
+            node->buffer_frame_count = 0;
+            node->audio_buffer = NULL;
+            node->audio_buffer_initialized = 0;
             node->user_volume = 1.0f;
             node->current_volume = 0.0f;
             node->target_volume = 0.0f;
-            node->volume_rise_coeff = calculate_smoothing_alpha(VOLUME_RISE_TIME_MS);
-            node->volume_fall_coeff = calculate_smoothing_alpha(VOLUME_FALL_TIME_MS);
+            node->volume_rise_coeff = calculate_smoothing_alpha(g_volume_rise_time_ms);
+            node->volume_fall_coeff = calculate_smoothing_alpha(g_volume_fall_time_ms);
             node->id = 0;
             node->pitch = 1.0f;
         }
@@ -275,6 +295,20 @@ void playback_cleanup(void) {
     // Cleanup preloader resources
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
         ColumnPreloader* preloader = &g_audio_columns[col].preloader;
+        // Cleanup RAM buffers
+        if (preloader->audio_buffer_initialized && preloader->audio_buffer) {
+            ma_audio_buffer_uninit((ma_audio_buffer*)preloader->audio_buffer);
+            free(preloader->audio_buffer);
+            preloader->audio_buffer = NULL;
+            preloader->audio_buffer_initialized = 0;
+        }
+        if (preloader->pcm_buffer) {
+            g_preload_memory_used -= (preloader->buffer_frame_count * CHANNELS * sizeof(float));
+            free(preloader->pcm_buffer);
+            preloader->pcm_buffer = NULL;
+            preloader->buffer_frame_count = 0;
+        }
+        // Cleanup legacy resources
         if (preloader->pitch_ds_initialized && preloader->pitch_ds) {
             pitch_ds_uninit((ma_pitch_data_source*)preloader->pitch_ds);
             free(preloader->pitch_ds);
@@ -300,6 +334,20 @@ void playback_cleanup(void) {
                     free(node->node);
                     node->node = NULL;
                 }
+                // Cleanup RAM buffers
+                if (node->audio_buffer_initialized && node->audio_buffer) {
+                    ma_audio_buffer_uninit((ma_audio_buffer*)node->audio_buffer);
+                    free(node->audio_buffer);
+                    node->audio_buffer = NULL;
+                    node->audio_buffer_initialized = 0;
+                }
+                if (node->pcm_buffer) {
+                    g_preload_memory_used -= (node->buffer_frame_count * CHANNELS * sizeof(float));
+                    free(node->pcm_buffer);
+                    node->pcm_buffer = NULL;
+                    node->buffer_frame_count = 0;
+                }
+                // Cleanup legacy resources
                 if (node->decoder) {
                     ma_decoder_uninit((ma_decoder*)node->decoder);
                     free(node->decoder);
@@ -783,67 +831,102 @@ static void play_samples_for_step(int step) {
             resolved_volume = sample_bank_get_sample(cell->sample_slot)->settings.volume;
         }
 
-        // Prefer preloaded resources (with safety checks)
-        // Note: pitch_ds can be NULL for already-pitched files
-        if (preloader->ready && preloader->target_step == step && preloader->decoder) {
+        // ============ TRY RAM PRELOAD FIRST ============
+        // Prefer preloaded RAM buffers for zero-latency playback
+        if (preloader->ready && 
+            preloader->target_step == step && 
+            preloader->audio_buffer_initialized &&
+            preloader->audio_buffer) {
+            
             // Mark as consuming to prevent preloader cleanup
             preloader->consuming = 1;
+            
             // Cleanup next node if previously initialized
             AudioColumnNode* node = &playback->nodes[next_node];
             if (node->node_initialized) {
-                if (node->node) { ma_node_uninit((ma_node_base*)node->node, NULL); free(node->node); node->node = NULL; }
-                if (node->decoder) { ma_decoder_uninit((ma_decoder*)node->decoder); free(node->decoder); node->decoder = NULL; }
-                if (node->pitch_ds_initialized && node->pitch_ds) { pitch_ds_uninit((ma_pitch_data_source*)node->pitch_ds); free(node->pitch_ds); node->pitch_ds = NULL; node->pitch_ds_initialized = 0; }
+                if (node->node) { 
+                    ma_node_uninit((ma_node_base*)node->node, NULL); 
+                    free(node->node); 
+                    node->node = NULL; 
+                }
+                // Cleanup RAM buffers
+                if (node->audio_buffer_initialized && node->audio_buffer) {
+                    ma_audio_buffer_uninit((ma_audio_buffer*)node->audio_buffer);
+                    free(node->audio_buffer);
+                    node->audio_buffer = NULL;
+                    node->audio_buffer_initialized = 0;
+                }
+                if (node->pcm_buffer) {
+                    g_preload_memory_used -= (node->buffer_frame_count * CHANNELS * sizeof(float));
+                    free(node->pcm_buffer);
+                    node->pcm_buffer = NULL;
+                    node->buffer_frame_count = 0;
+                }
+                // Cleanup legacy resources
+                if (node->decoder) { 
+                    ma_decoder_uninit((ma_decoder*)node->decoder); 
+                    free(node->decoder); 
+                    node->decoder = NULL; 
+                }
+                if (node->pitch_ds_initialized && node->pitch_ds) { 
+                    pitch_ds_uninit((ma_pitch_data_source*)node->pitch_ds); 
+                    free(node->pitch_ds); 
+                    node->pitch_ds = NULL; 
+                    node->pitch_ds_initialized = 0; 
+                }
                 node->node_initialized = 0;
             }
-            // Transfer ownership from preloader to playback node
-            node->decoder = preloader->decoder; preloader->decoder = NULL;
-            node->pitch_ds = preloader->pitch_ds; preloader->pitch_ds = NULL;
-            node->pitch_ds_initialized = 1;
+            
+            // Transfer ownership: preloader → node (RAM buffers)
+            node->pcm_buffer = preloader->pcm_buffer;
+            preloader->pcm_buffer = NULL;
+            
+            node->buffer_frame_count = preloader->buffer_frame_count;
+            
+            node->audio_buffer = preloader->audio_buffer;
+            preloader->audio_buffer = NULL;
+            
+            node->audio_buffer_initialized = 1;
             node->sample_slot = preloader->sample_slot;
             node->pitch = preloader->pitch;
             node->user_volume = preloader->volume;
             node->current_volume = 0.0f;
             node->target_volume = preloader->volume;
 
-            // Allocate node wrapper
+            // Create data source node from audio_buffer (RAM-backed)
             node->node = malloc(sizeof(ma_data_source_node));
             if (node->node) {
-                ma_data_source* ds;
-                if (node->pitch_ds) {
-                    // Use pitch data source (fallback case for original file with pitch processing)
-                    ds = (ma_data_source*)pitch_ds_as_data_source((ma_pitch_data_source*)node->pitch_ds);
-                } else {
-                    // Use decoder directly (already-pitched file case)
-                    ds = (ma_data_source*)node->decoder;
-                }
+                ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(
+                    (ma_data_source*)node->audio_buffer
+                );
                 
-                if (ds) {
-                    ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(ds);
-                    ma_result result = ma_data_source_node_init(&g_nodeGraph, &nodeConfig, NULL, (ma_data_source_node*)node->node);
+                ma_result result = ma_data_source_node_init(
+                    &g_nodeGraph, &nodeConfig, NULL, 
+                    (ma_data_source_node*)node->node
+                );
+                
                     if (result == MA_SUCCESS) {
-                        ma_node_attach_output_bus((ma_node_base*)node->node, 0, ma_node_graph_get_endpoint(&g_nodeGraph), 0);
+                    ma_node_attach_output_bus(
+                        (ma_node_base*)node->node, 0,
+                        ma_node_graph_get_endpoint(&g_nodeGraph), 0
+                    );
                         node->node_initialized = 1;
                         ma_node_set_state((ma_node_base*)node->node, ma_node_state_started);
-                    } else {
-                        free(node->node); node->node = NULL;
-                    }
-                } else {
-                    // Invalid data source - cleanup and fallback
-                    free(node->node); node->node = NULL;
-                }
-            }
-            
-            // Only continue if node was successfully initialized
-            if (node->node_initialized) {
-                // Mark preloader as consumed
+                    
+                    // Success! Mark consumed and continue
                 preloader->ready = 0;
                 preloader->consuming = 0;
                 preloader->target_step = -1;
+                    preloader->audio_buffer_initialized = 0;
                 switch_column_audio_node(playback);
-                continue;
+                    continue;  // Skip fallback, we're done!
+                } else {
+                    free(node->node);
+                    node->node = NULL;
             }
-            // If we reach here, preloaded resources were corrupted - fall back to sync setup
+            }
+            
+            // If we reach here, RAM path failed - cleanup and fall through to disk fallback
             preloader->ready = 0;
             preloader->consuming = 0;
             preloader->target_step = -1;
@@ -963,6 +1046,54 @@ int recording_is_active(void) {
     return g_is_output_recording;
 }
 
+// Volume smoothing configuration
+void playback_set_smoothing_rise_time(float ms) {
+    if (ms < MIN_VOLUME_SMOOTHING_MS || ms > MAX_VOLUME_SMOOTHING_MS) {
+        prnt_err("❌ [PLAYBACK] Invalid rise time: %.2f ms (must be %.1f-%.1f)", 
+                 ms, MIN_VOLUME_SMOOTHING_MS, MAX_VOLUME_SMOOTHING_MS);
+        return;
+    }
+    
+    g_volume_rise_time_ms = ms;
+    
+    // Update coefficients for all existing nodes
+    for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+        for (int i = 0; i < MA_NODES_PER_COLUMN; i++) {
+            AudioColumnNode* node = &g_column_playback[col].nodes[i];
+            node->volume_rise_coeff = calculate_smoothing_alpha(g_volume_rise_time_ms);
+        }
+    }
+    
+    prnt("🎚️ [PLAYBACK] Set smoothing rise time to %.1f ms", ms);
+}
+
+void playback_set_smoothing_fall_time(float ms) {
+    if (ms < MIN_VOLUME_SMOOTHING_MS || ms > MAX_VOLUME_SMOOTHING_MS) {
+        prnt_err("❌ [PLAYBACK] Invalid fall time: %.2f ms (must be %.1f-%.1f)", 
+                 ms, MIN_VOLUME_SMOOTHING_MS, MAX_VOLUME_SMOOTHING_MS);
+        return;
+    }
+    
+    g_volume_fall_time_ms = ms;
+    
+    // Update coefficients for all existing nodes
+    for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+        for (int i = 0; i < MA_NODES_PER_COLUMN; i++) {
+            AudioColumnNode* node = &g_column_playback[col].nodes[i];
+            node->volume_fall_coeff = calculate_smoothing_alpha(g_volume_fall_time_ms);
+        }
+    }
+    
+    prnt("🎚️ [PLAYBACK] Set smoothing fall time to %.1f ms", ms);
+}
+
+float playback_get_smoothing_rise_time(void) {
+    return g_volume_rise_time_ms;
+}
+
+float playback_get_smoothing_fall_time(void) {
+    return g_volume_fall_time_ms;
+}
 
 
 
@@ -989,6 +1120,8 @@ static int predict_preloader_next_step(void) {
 
 static void* preloader_thread_func(void* arg) {
     (void)arg;
+    static int fallback_warning_count = 0;  // Rate limit warnings
+    
     while (g_preloader_running) {
         int target = predict_preloader_next_step();
         int max_cols = table_get_max_cols();
@@ -1002,7 +1135,23 @@ static void* preloader_thread_func(void* arg) {
             // Skip cleanup if audio thread is consuming resources
             if (preloader->consuming) continue;
             
-            // Reset previous prepared resources
+            // ============ CLEANUP OLD PRELOAD ============
+            
+            // Cleanup RAM buffers
+            if (preloader->audio_buffer_initialized && preloader->audio_buffer) {
+                ma_audio_buffer_uninit((ma_audio_buffer*)preloader->audio_buffer);
+                free(preloader->audio_buffer);
+                preloader->audio_buffer = NULL;
+                preloader->audio_buffer_initialized = 0;
+            }
+            if (preloader->pcm_buffer) {
+                g_preload_memory_used -= (preloader->buffer_frame_count * CHANNELS * sizeof(float));
+                free(preloader->pcm_buffer);
+                preloader->pcm_buffer = NULL;
+                preloader->buffer_frame_count = 0;
+            }
+            
+            // Cleanup legacy resources (for fallback compatibility)
             if (preloader->pitch_ds_initialized && preloader->pitch_ds) { 
                 pitch_ds_uninit((ma_pitch_data_source*)preloader->pitch_ds); 
                 free(preloader->pitch_ds); 
@@ -1014,14 +1163,18 @@ static void* preloader_thread_func(void* arg) {
                 free(preloader->decoder); 
                 preloader->decoder = NULL; 
             }
+            
             preloader->ready = 0;
             preloader->target_step = -1;
+
+            // ============ GET CELL DATA ============
 
             Cell* cell = table_get_cell(target, col);
             if (!cell || cell->sample_slot == -1) {
                 continue;
             }
 
+            // Resolve pitch and volume
             float resolved_pitch = cell->settings.pitch;
             if (resolved_pitch == DEFAULT_CELL_PITCH) {
                 Sample* s = sample_bank_get_sample(cell->sample_slot);
@@ -1032,6 +1185,7 @@ static void* preloader_thread_func(void* arg) {
                 resolved_volume = sample_bank_get_sample(cell->sample_slot)->settings.volume;
             }
 
+            // ============ DETERMINE FILE PATH ============
 
             const char* file_path;
             
@@ -1061,33 +1215,113 @@ static void* preloader_thread_func(void* arg) {
             
             if (!file_path) continue;
             
-            ma_decoder* dec = (ma_decoder*)malloc(sizeof(ma_decoder));
-            if (!dec) continue;
-            ma_decoder_config decoderConfig = ma_decoder_config_init(ma_format_f32, CHANNELS, SAMPLE_RATE);
-            ma_result result = ma_decoder_init_file(file_path, &decoderConfig, dec);
-            if (result != MA_SUCCESS) { free(dec); continue; }
-
-            // For pitched files, we don't need pitch_ds since the file is already pitched
-            // For original files at pitch 1.0, we also don't need pitch processing
-            ma_pitch_data_source* pds = NULL;
-            if (fabsf(resolved_pitch - 1.0f) > 0.001f && file_path == sample_bank_get_file_path(cell->sample_slot)) {
-                // Only create pitch_ds if we're using original file with non-unity pitch (fallback case)
-                pds = pitch_ds_create((ma_data_source*)dec, resolved_pitch, CHANNELS, SAMPLE_RATE, cell->sample_slot);
-                if (!pds) { ma_decoder_uninit(dec); free(dec); continue; }
+            // ============ RAM DECODE LOGIC ============
+            
+            // 1. Open temporary decoder to inspect length
+            ma_decoder temp_dec;
+            ma_decoder_config dec_config = ma_decoder_config_init(ma_format_f32, CHANNELS, SAMPLE_RATE);
+            ma_result result = ma_decoder_init_file(file_path, &dec_config, &temp_dec);
+            if (result != MA_SUCCESS) {
+                continue; // Skip this sample
             }
-
-            // Store prepared resources in preloader
-            preloader->decoder = dec;
-            preloader->pitch_ds = pds;
-            preloader->pitch_ds_initialized = 1;
+            
+            // 2. Get total sample length
+            ma_uint64 total_frames;
+            ma_result length_result = ma_data_source_get_length_in_pcm_frames((ma_data_source*)&temp_dec, &total_frames);
+            if (length_result != MA_SUCCESS || total_frames == 0) {
+                ma_decoder_uninit(&temp_dec);
+                continue;
+            }
+            
+            // 3. Calculate preload size (SIMPLIFIED - single strategy for all samples)
+            ma_uint64 target_frames = (ma_uint64)(PRELOAD_HEAD_SIZE_SEC * SAMPLE_RATE);
+            ma_uint64 preload_frames = MIN(target_frames, total_frames);  // Handles short samples automatically
+            preload_frames = MAX(preload_frames, PRELOAD_MIN_HEAD_FRAMES);
+            preload_frames = MIN(preload_frames, total_frames);  // Ensure we don't exceed actual length
+            
+            // 4. Check memory budget
+            size_t buffer_size = preload_frames * CHANNELS * sizeof(float);
+            if (g_preload_memory_used + buffer_size > PRELOAD_MAX_TOTAL_MEMORY) {
+                // Rate-limited logging
+                if (fallback_warning_count < 10 || fallback_warning_count % 100 == 0) {
+                    prnt_err("⚠️ [PRELOAD] Memory limit hit: %.1f/%.1f MB (col %d, %.1f KB needed), falling back to disk read",
+                             g_preload_memory_used / (1024.0*1024.0),
+                             PRELOAD_MAX_TOTAL_MEMORY / (1024.0*1024.0),
+                             col,
+                             buffer_size / 1024.0);
+                }
+                fallback_warning_count++;
+                ma_decoder_uninit(&temp_dec);
+                continue;  // Skip preload, will fall back to disk read
+            }
+            
+            // 5. Allocate PCM buffer
+            float* pcm = (float*)malloc(buffer_size);
+            if (!pcm) {
+                // malloc() failed (device low on RAM) - fall back to disk read
+                prnt_err("⚠️ [PRELOAD] malloc() failed for %.1f KB (col %d), falling back to disk read",
+                         buffer_size / 1024.0, col);
+                ma_decoder_uninit(&temp_dec);
+                continue;
+            }
+            
+            // 6. Decode to RAM (DISK I/O happens here - SAFE on preloader thread)
+            ma_uint64 frames_read = 0;
+            result = ma_decoder_read_pcm_frames(&temp_dec, pcm, preload_frames, &frames_read);
+            ma_decoder_uninit(&temp_dec); // Close file immediately
+            
+            if (result != MA_SUCCESS || frames_read == 0) {
+                free(pcm);
+                continue;
+            }
+            
+            // 7. Create ma_audio_buffer from RAM
+            ma_audio_buffer* audio_buf = (ma_audio_buffer*)malloc(sizeof(ma_audio_buffer));
+            if (!audio_buf) {
+                free(pcm);
+                continue;
+            }
+            
+            ma_audio_buffer_config buf_config = ma_audio_buffer_config_init(
+                ma_format_f32,           // format
+                CHANNELS,                // channels
+                frames_read,             // frame count
+                pcm,                     // data pointer
+                NULL                     // allocation callbacks (NULL = use provided buffer)
+            );
+            
+            result = ma_audio_buffer_init(&buf_config, audio_buf);
+            if (result != MA_SUCCESS) {
+                free(audio_buf);
+                free(pcm);
+                continue;
+            }
+            
+            // 8. Store prepared resources
+            preloader->pcm_buffer = pcm;
+            preloader->buffer_frame_count = frames_read;
+            preloader->audio_buffer = audio_buf;
+            preloader->audio_buffer_initialized = 1;
             preloader->sample_slot = cell->sample_slot;
             preloader->volume = resolved_volume;
             preloader->pitch = resolved_pitch;
             preloader->target_step = target;
             preloader->ready = 1;
             
+            // 9. Update memory tracking
+            g_preload_memory_used += buffer_size;
+            
+            float duration_sec = (float)frames_read / SAMPLE_RATE;
+            int is_full = (frames_read >= total_frames);
+            prnt("✅ [PRELOAD] RAM decoded col %d: %.2fs (%s) → %llu frames, %.2f MB (total: %.1f MB)",
+                 col, duration_sec,
+                 is_full ? "full" : "head",
+                 (unsigned long long)frames_read,
+                 buffer_size / (1024.0 * 1024.0),
+                 g_preload_memory_used / (1024.0 * 1024.0));
         }
-        usleep(2000);
+        
+        usleep(2000); // 2ms sleep
     }
     return NULL;
 }

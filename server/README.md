@@ -34,8 +34,28 @@ docker-compose logs haproxy
 docker-compose logs certbot
 ```
 
+## Environment Configuration
+
+The server supports two environments via the `ENV` variable:
+
+### Production Environment (`ENV=prod`)
+- Normal startup behavior
+- Database initialization without dropping existing data
+
+### Stage Environment (`ENV=stage`)
+- Automatically drops and reinitializes database on startup
+- Cleans up S3 folder specified in `S3_FOLDER` (defaults to `stage/`)
+- Useful for testing with a clean slate
+
+Configure in your `.env` file:
+```bash
+ENV=stage
+S3_FOLDER=stage/  # Optional, defaults to stage/
+```
+
 ## Notes
 
 - Make sure your domain points to your server
 - Ports 80 and 443 must be open
 - First certificate generation may take a few minutes
+- **Warning**: Setting `ENV=stage` will delete all database data and S3 files in the configured folder on startup

@@ -11,15 +11,22 @@ extern "C" {
 // Constants for playback
 #define SAMPLE_RATE 48000
 #define CHANNELS 2
-#define VOLUME_RISE_TIME_MS 6.0f      // 6ms fade-in time
-#define VOLUME_FALL_TIME_MS 12.0f     // 12ms fade-out time  
-#define VOLUME_THRESHOLD 0.0001f      // Convergence threshold
+#define DEFAULT_VOLUME_RISE_TIME_MS 6.0f      // Default 6ms fade-in time
+#define DEFAULT_VOLUME_FALL_TIME_MS 12.0f     // Default 12ms fade-out time  
+#define MIN_VOLUME_SMOOTHING_MS 1.0f          // Min 1ms
+#define MAX_VOLUME_SMOOTHING_MS 100.0f        // Max 100ms
+#define VOLUME_THRESHOLD 0.0001f              // Convergence threshold
 #define DEFAULT_SECTION_LOOPS 4
 #define MIN_SECTION_LOOPS 1
 #define MAX_SECTION_LOOPS 1024
 #define MA_NODES_PER_COLUMN 2
 #define MIN_BPM 1
 #define MAX_BPM 300
+
+// RAM preloading configuration
+#define PRELOAD_HEAD_SIZE_SEC 1.5f                     // Load 1.5s head (or full sample if shorter)
+#define PRELOAD_MIN_HEAD_FRAMES (SAMPLE_RATE / 4)      // Minimum 250ms (12000 frames @ 48kHz)
+#define PRELOAD_MAX_TOTAL_MEMORY (100 * 1024 * 1024)   // 100 MB safety limit
 
 // A/B Node structure for smooth switching
 typedef struct {
@@ -28,7 +35,13 @@ typedef struct {
     int node_initialized;           // 1 when miniaudio node is created
     int sample_slot;                // Which sample this node plays (-1 = none)
     
-    // miniaudio components
+    // RAM-based resources (NEW)
+    float* pcm_buffer;              // Decoded PCM frames (owned, transferred from preloader)
+    uint64_t buffer_frame_count;    // Number of frames in pcm_buffer
+    void* audio_buffer;             // ma_audio_buffer* (RAM-backed data source)
+    int audio_buffer_initialized;   // 1 when using RAM buffer
+    
+    // Legacy file-based resources (fallback path)
     void* decoder;                  // ma_decoder* (cast to void* for C compatibility)
     void* node;                     // ma_data_source_node* (cast to void* for C compatibility)
     void* pitch_ds;                 // ma_pitch_data_source* (cast to void*)
@@ -60,6 +73,14 @@ typedef struct {
     int sample_slot;                // prepared sample slot
     float volume;                   // prepared volume
     float pitch;                    // prepared pitch
+    
+    // RAM-based resources (NEW)
+    float* pcm_buffer;              // Decoded PCM frames (owned by preloader until transfer)
+    uint64_t buffer_frame_count;    // Number of frames in pcm_buffer
+    void* audio_buffer;             // ma_audio_buffer* (RAM-backed data source)
+    int audio_buffer_initialized;   // 1 when audio_buffer is ready
+    
+    // Legacy file-based resources (fallback path - kept for compatibility)
     void* decoder;                  // ma_decoder*
     void* pitch_ds;                 // ma_pitch_data_source*
     int   pitch_ds_initialized;     // 0/1
@@ -126,6 +147,19 @@ void playback_set_section_loops_num(int section, int loops);
 // Section switching helper (stops and restarts playback at section start if needed)
 __attribute__((visibility("default"))) __attribute__((used))
 void switch_to_section(int section_index);
+
+// Volume smoothing configuration
+__attribute__((visibility("default"))) __attribute__((used))
+void playback_set_smoothing_rise_time(float ms);
+
+__attribute__((visibility("default"))) __attribute__((used))
+void playback_set_smoothing_fall_time(float ms);
+
+__attribute__((visibility("default"))) __attribute__((used))
+float playback_get_smoothing_rise_time(void);
+
+__attribute__((visibility("default"))) __attribute__((used))
+float playback_get_smoothing_fall_time(void);
 
 // Return a stable pointer to the native PlaybackState struct (prefix-mapped)
 __attribute__((visibility("default"))) __attribute__((used))

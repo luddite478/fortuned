@@ -38,8 +38,8 @@ using namespace soundtouch;
 
 // Global method (default to preprocessing as requested)
 static int g_pitch_method = PITCH_METHOD_SOUNDTOUCH_PREPROCESSING;
-// Global pitch quality (0..4, best..worst)
-static int g_pitch_quality = 0;
+// Global pitch quality (0..4, best..worst) - default to Medium (2)
+static int g_pitch_quality = 2;
 
 // Hash helper removed - no longer needed for memory cache
 
@@ -135,7 +135,7 @@ static void async_worker(int job_index, int source_slot, float ratio) {
         }
         memset(&g_async_jobs[job_index], 0, sizeof(async_preprocess_job_t));
     }
-    prnt("🏁 [PITCH] Async job finished (job=%d, slot=%d, ratio=%.3f, res=%d)", job_index, source_slot, ratio, result);
+    prnt("🏁 [PITCH] Async job finished (job=%d, slot=%d, ratio=%.3f, quality=%d, res=%d)", job_index, source_slot, ratio, g_pitch_quality, result);
     sample_bank_set_processing(source_slot, 0);
 }
 
@@ -516,7 +516,7 @@ int pitch_generate_file(int sample_slot, float pitch, const char* output_path) {
         return 0;
     }
     
-    prnt("🎵 [PITCH] Generating pitched file: slot=%d, pitch=%.3f → %s", sample_slot, pitch, output_path);
+    prnt("🎵 [PITCH] Generating pitched file: slot=%d, pitch=%.3f, quality=%d → %s", sample_slot, pitch, g_pitch_quality, output_path);
     
     // Prepare decoder
     ma_decoder tmp;
@@ -637,7 +637,7 @@ int pitch_generate_file(int sample_slot, float pitch, const char* output_path) {
         return -1;
     }
     
-    prnt("✅ [PITCH] Generated pitched file: %llu frames written to %s", (unsigned long long)total_written, output_path);
+    prnt("✅ [PITCH] Generated pitched file: %llu frames written (quality=%d) to %s", (unsigned long long)total_written, g_pitch_quality, output_path);
     return 0;
 }
 
