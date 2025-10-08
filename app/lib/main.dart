@@ -354,20 +354,6 @@ class _MainPageState extends State<MainPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const SizedBox(height: 60),
-                    
-                    // Logo/Title
-                    // Text(
-                    //   dotenv.env['APP_NAME']!.toUpperCase(),
-                    //   textAlign: TextAlign.center,
-                    //   style: const TextStyle(
-                    //     fontSize: 22,
-                    //     fontWeight: FontWeight.bold,
-                    //     color: Colors.black,
-                    //     letterSpacing: 2,
-                    //   ),
-                    // ),
-                    
                     const Spacer(),
                     
                     // Linear progress indicator

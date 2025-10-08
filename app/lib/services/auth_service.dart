@@ -98,6 +98,7 @@ class AuthService extends ChangeNotifier {
         notifyListeners();
         return AuthResult(success: true, message: response.message ?? 'Login successful');
       } else {
+        print('🚨 Login failed - message: ${response.message}');
         _isLoading = false;
         notifyListeners();
         return AuthResult(success: false, message: response.message ?? 'Login failed');

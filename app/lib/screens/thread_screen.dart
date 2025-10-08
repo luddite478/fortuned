@@ -682,6 +682,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
 
   Widget _buildRenderButton(BuildContext context, Message message, Render render, {required ThreadsState threadsState}) {
     final isUploading = render.uploadStatus == RenderUploadStatus.uploading;
+    final isFailed = render.uploadStatus == RenderUploadStatus.failed;
     
     return Consumer<AudioPlayerState>(
       builder: (context, audioPlayer, _) {
@@ -690,9 +691,9 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         final isThisRender = audioPlayer.currentlyPlayingMessageId == message.id && 
                              audioPlayer.currentlyPlayingRenderId == render.id;
         
-        // Don't check cache if render is still uploading
+        // Don't check cache if render is still uploading or failed
         return FutureBuilder<bool>(
-          future: isUploading ? Future.value(false) : AudioCacheService.isCached(render.url),
+          future: (isUploading || isFailed) ? Future.value(false) : AudioCacheService.isCached(render.url),
           builder: (context, snapshot) {
             final renderKey = '${message.id}::${render.id}';
             final bool isOptimistic = _optimisticRenderKey == renderKey;
@@ -716,18 +717,18 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
               margin: const EdgeInsets.only(bottom: 4),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
               decoration: BoxDecoration(
-                color: AppColors.menuButtonBackground,
+                color: isFailed ? Colors.red.withOpacity(0.1) : AppColors.menuButtonBackground,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: AppColors.menuBorder,
+                  color: isFailed ? Colors.redAccent : AppColors.menuBorder,
                   width: 0.5,
                 ),
               ),
               child: Row(
                 children: [
-                  // Play/Pause/Loading button
+                  // Play/Pause/Loading/Error button
                   GestureDetector(
-                    onTap: isUploading ? null : () async {
+                    onTap: (isUploading || isFailed) ? null : () async {
                       final player = context.read<AudioPlayerState>();
                       if (isThisRender && isPlaying) {
                         // Pausing current render: clear optimistic flag so icon switches to play
@@ -749,44 +750,61 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                       width: 28,
                       height: 28,
                       decoration: BoxDecoration(
-                        color: showLoading
-                            ? AppColors.menuBorder.withOpacity(0.5)
-                            : AppColors.menuText.withOpacity(0.7),
+                        color: isFailed
+                            ? Colors.redAccent
+                            : showLoading
+                                ? AppColors.menuBorder.withOpacity(0.5)
+                                : AppColors.menuText.withOpacity(0.7),
                         borderRadius: BorderRadius.circular(14),
                       ),
-                      child: showLoading
-                          ? Padding(
-                              padding: const EdgeInsets.all(6),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: AppColors.menuLightText,
-                                value: isLoadingFromNetwork && audioPlayer.downloadProgress > 0 
-                                    ? audioPlayer.downloadProgress 
-                                    : null,
-                              ),
-                            )
-                          : Icon(
-                              (isPlaying || (isOptimistic && isThisRender)) ? Icons.pause : Icons.play_arrow,
-                              color: AppColors.menuPageBackground,
+                      child: isFailed
+                          ? Icon(
+                              Icons.error,
+                              color: Colors.white,
                               size: 16,
-                            ),
+                            )
+                          : showLoading
+                              ? Padding(
+                                  padding: const EdgeInsets.all(6),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.menuLightText,
+                                    value: isLoadingFromNetwork && audioPlayer.downloadProgress > 0 
+                                        ? audioPlayer.downloadProgress 
+                                        : null,
+                                  ),
+                                )
+                              : Icon(
+                                  (isPlaying || (isOptimistic && isThisRender)) ? Icons.pause : Icons.play_arrow,
+                                  color: AppColors.menuPageBackground,
+                                  size: 16,
+                                ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   
-                  // Seek bar or uploading indicator
+                  // Seek bar, uploading indicator, or error message
                   Expanded(
-                    child: isUploading
-                        ? Row(
-                            children: [
-                              Text(
-                                'Uploading...',
-                                style: GoogleFonts.sourceSans3(
-                                  color: AppColors.menuLightText,
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
+                    child: isFailed
+                        ? Text(
+                            'Upload failed - file too large or network error',
+                            style: GoogleFonts.sourceSans3(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          )
+                        : isUploading
+                            ? Row(
+                                children: [
+                                  Text(
+                                    'Uploading...',
+                                    style: GoogleFonts.sourceSans3(
+                                      color: AppColors.menuLightText,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
                               const SizedBox(width: 8),
                               Container(
                                 height: 2,

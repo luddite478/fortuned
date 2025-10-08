@@ -199,7 +199,11 @@ class ThreadsState extends ChangeNotifier {
       );
       // Store in ascending (oldest -> newest) for UI
       final List<Message> stored = (order == 'desc') ? messages.reversed.toList() : messages;
-      _messagesByThread[threadId] = stored;
+      
+      // Merge with any existing optimistic uploads
+      final existingMessages = _messagesByThread[threadId] ?? [];
+      _messagesByThread[threadId] = _mergeMessagesPreservingUploads(existingMessages, stored);
+      
       debugPrint('📬 [THREADS] Loaded ${stored.length} messages for thread $threadId (stored ascending)');
     } catch (e) {
       _setError('Failed to load messages: $e');
@@ -234,7 +238,12 @@ class ThreadsState extends ChangeNotifier {
         includeSnapshot: false, // Don't load snapshots for speed
       );
       // Store ascending for UI
-      _messagesByThread[threadId] = messages.reversed.toList();
+      final stored = messages.reversed.toList();
+      
+      // Merge with any existing optimistic uploads
+      final existingMessages = _messagesByThread[threadId] ?? [];
+      _messagesByThread[threadId] = _mergeMessagesPreservingUploads(existingMessages, stored);
+      
       debugPrint('✅ [THREADS] Preloaded ${messages.length} recent messages for thread $threadId');
     } catch (e) {
       debugPrint('⚠️ [THREADS] Failed to preload messages (non-critical): $e');
@@ -410,11 +419,39 @@ class ThreadsState extends ChangeNotifier {
         debugPrint('❌ [THREADS] Upload failed');
         _recordingState?.setUploadError('Upload failed');
         _recordingState?.setUploading(false);
+        
+        // Mark render as failed in the message
+        _markRenderAsFailed(messageId);
       }
     } catch (e) {
       debugPrint('❌ [THREADS] Upload error: $e');
       _recordingState?.setUploadError('Upload error: $e');
       _recordingState?.setUploading(false);
+      
+      // Mark render as failed in the message
+      _markRenderAsFailed(messageId);
+    }
+  }
+  
+  void _markRenderAsFailed(String messageId) {
+    // Find the message and mark its optimistic renders as failed
+    for (final entry in _messagesByThread.entries) {
+      final list = entry.value;
+      final idx = list.indexWhere((m) => m.id == messageId);
+      if (idx >= 0) {
+        final message = list[idx];
+        final updatedRenders = message.renders.map((r) {
+          if (r.uploadStatus == RenderUploadStatus.uploading) {
+            return r.copyWith(uploadStatus: RenderUploadStatus.failed);
+          }
+          return r;
+        }).toList();
+        
+        list[idx] = message.copyWith(renders: updatedRenders);
+        _messagesByThread[entry.key] = List<Message>.from(list);
+        notifyListeners();
+        break;
+      }
     }
   }
 
@@ -602,13 +639,81 @@ class ThreadsState extends ChangeNotifier {
       final list = _messagesByThread[threadId] ?? [];
       final pendingIdx = list.indexWhere((m) => m.sendStatus != null && m.sendStatus != SendStatus.sent && _isSameMessageContent(m, message));
       if (pendingIdx >= 0) {
-        list[pendingIdx] = message.copyWith(sendStatus: SendStatus.sent, localTempId: null);
+        // Preserve local upload status when reconciling with server message
+        final localMessage = list[pendingIdx];
+        final mergedRenders = _mergeRenders(localMessage.renders, message.renders);
+        list[pendingIdx] = message.copyWith(
+          sendStatus: SendStatus.sent, 
+          localTempId: null,
+          renders: mergedRenders,
+        );
       } else if (!list.any((m) => m.id == message.id)) {
         list.add(message.copyWith(sendStatus: SendStatus.sent));
       }
       _messagesByThread[threadId] = List<Message>.from(list);
       notifyListeners();
     } catch (_) {}
+  }
+
+  /// Merge local renders (with uploadStatus) with server renders
+  /// Preserves local uploadStatus for ongoing uploads
+  List<Render> _mergeRenders(List<Render> localRenders, List<Render> serverRenders) {
+    if (localRenders.isEmpty) return serverRenders;
+    if (serverRenders.isEmpty) return localRenders;
+    
+    final result = <Render>[];
+    
+    // Add server renders first (they are the source of truth)
+    for (final serverRender in serverRenders) {
+      // Check if this render exists locally with upload status
+      final localRender = localRenders.firstWhere(
+        (r) => r.id == serverRender.id || (r.id.startsWith('temp_') && r.url.isEmpty && serverRender.url.isNotEmpty),
+        orElse: () => serverRender,
+      );
+      
+      // If local render is uploading and server render doesn't have uploadStatus, preserve local status
+      if (localRender.uploadStatus == RenderUploadStatus.uploading && serverRender.uploadStatus == null) {
+        result.add(serverRender.copyWith(uploadStatus: RenderUploadStatus.uploading));
+      } else {
+        result.add(serverRender);
+      }
+    }
+    
+    // Add any local optimistic renders that aren't in server renders yet
+    for (final localRender in localRenders) {
+      if (localRender.uploadStatus == RenderUploadStatus.uploading && 
+          !result.any((r) => r.id == localRender.id)) {
+        result.add(localRender);
+      }
+    }
+    
+    return result;
+  }
+
+  /// Merge existing local messages with server messages, preserving upload status
+  List<Message> _mergeMessagesPreservingUploads(List<Message> existingMessages, List<Message> serverMessages) {
+    if (existingMessages.isEmpty) return serverMessages;
+    
+    final result = <Message>[];
+    
+    // Process server messages and merge with local upload status if needed
+    for (final serverMsg in serverMessages) {
+      // Find corresponding local message
+      final localMsg = existingMessages.firstWhere(
+        (m) => m.id == serverMsg.id || (m.localTempId != null && _isSameMessageContent(m, serverMsg)),
+        orElse: () => serverMsg,
+      );
+      
+      // If local message has optimistic renders being uploaded, preserve them
+      if (localMsg.renders.any((r) => r.uploadStatus == RenderUploadStatus.uploading)) {
+        final mergedRenders = _mergeRenders(localMsg.renders, serverMsg.renders);
+        result.add(serverMsg.copyWith(renders: mergedRenders));
+      } else {
+        result.add(serverMsg);
+      }
+    }
+    
+    return result;
   }
 
   bool _isSameMessageContent(Message a, Message b) {

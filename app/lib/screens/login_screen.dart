@@ -75,10 +75,32 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
 
     if (mounted) {
       if (!result.success) {
+        print('🔴 Showing error SnackBar with message: ${result.message}');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(result.message),
-            backgroundColor: Colors.red,
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    result.message,
+                    style: const TextStyle(
+                      fontFamily: 'CrimsonPro',
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
           ),
         );
       }
@@ -103,37 +125,50 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                       const SizedBox(height: 60),
                       
                       // Logo/Title
-                      Text(
-                        dotenv.env['APP_NAME']!.toUpperCase(),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black,
-                          letterSpacing: 2,
-                        ),
-                      ),
-                      
-                      const SizedBox(height: 8),
-                      
-                      const SizedBox(height: 60),
-                      
-                      // Mode toggle
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
+                          Image.asset(
+                            'icons/app_icon.png',
+                            width: 140,
+                            height: 140,
+                          ),
+                          const SizedBox(height: 12),
                           Text(
-                            _isLoginMode ? 'Login' : 'Register',
+                            dotenv.env['APP_NAME']!.toUpperCase(),
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontFamily: 'CrimsonPro',
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
                               color: Colors.black,
+                              letterSpacing: 2,
                             ),
                           ),
                         ],
                       ),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 8),
+                      
+                      const SizedBox(height: 40),
+                      
+                      // Mode toggle
+                      // Row(
+                      //   mainAxisAlignment: MainAxisAlignment.center,
+                      //   children: [
+                      //     Text(
+                      //       _isLoginMode ? 'Login' : 'Register',
+                      //       style: const TextStyle(
+                      //         fontFamily: 'CrimsonPro',
+                      //         fontSize: 24,
+                      //         fontWeight: FontWeight.bold,
+                      //         color: Colors.black,
+                      //       ),
+                      //     ),
+                      //   ],
+                      // ),
+                      
+                      // const SizedBox(height: 32),
                       
                       // Form
                       Form(
@@ -146,19 +181,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 controller: _usernameController,
                                 decoration: InputDecoration(
                                   labelText: 'Username',
-                                  labelStyle: TextStyle(color: Colors.grey[600]),
+                                  labelStyle: TextStyle(color: Colors.grey[600], fontFamily: 'CrimsonPro'),
                                   filled: true,
                                   fillColor: Colors.grey[100],
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(4),
                                     borderSide: BorderSide(color: Colors.grey[300]!),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(4),
                                     borderSide: BorderSide(color: Colors.black),
                                   ),
                                 ),
-                                style: const TextStyle(color: Colors.black),
+                                style: const TextStyle(color: Colors.black, fontFamily: 'CrimsonPro'),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Username is required';
@@ -173,19 +208,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                 controller: _nameController,
                                 decoration: InputDecoration(
                                   labelText: 'Full Name',
-                                  labelStyle: TextStyle(color: Colors.grey[600]),
+                                  labelStyle: TextStyle(color: Colors.grey[600], fontFamily: 'CrimsonPro'),
                                   filled: true,
                                   fillColor: Colors.grey[100],
                                   border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(4),
                                     borderSide: BorderSide(color: Colors.grey[300]!),
                                   ),
                                   focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                    borderRadius: BorderRadius.circular(4),
                                     borderSide: BorderSide(color: Colors.black),
                                   ),
                                 ),
-                                style: const TextStyle(color: Colors.black),
+                                style: const TextStyle(color: Colors.black, fontFamily: 'CrimsonPro'),
                                 validator: (value) {
                                   if (value == null || value.isEmpty) {
                                     return 'Full name is required';
@@ -202,19 +237,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               keyboardType: TextInputType.emailAddress,
                               decoration: InputDecoration(
                                 labelText: 'Email',
-                                labelStyle: TextStyle(color: Colors.grey[600]),
+                                labelStyle: TextStyle(color: Colors.grey[600], fontFamily: 'CrimsonPro'),
                                 filled: true,
                                 fillColor: Colors.grey[100],
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(4),
                                   borderSide: BorderSide(color: Colors.grey[300]!),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(4),
                                   borderSide: BorderSide(color: Colors.black),
                                 ),
                               ),
-                              style: const TextStyle(color: Colors.black),
+                              style: const TextStyle(color: Colors.black, fontFamily: 'CrimsonPro'),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Email is required';
@@ -234,15 +269,15 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               obscureText: _obscurePassword,
                               decoration: InputDecoration(
                                 labelText: 'Password',
-                                labelStyle: TextStyle(color: Colors.grey[600]),
+                                labelStyle: TextStyle(color: Colors.grey[600], fontFamily: 'CrimsonPro'),
                                 filled: true,
                                 fillColor: Colors.grey[100],
                                 border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(4),
                                   borderSide: BorderSide(color: Colors.grey[300]!),
                                 ),
                                 focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
+                                  borderRadius: BorderRadius.circular(4),
                                   borderSide: BorderSide(color: Colors.black),
                                 ),
                                 suffixIcon: IconButton(
@@ -257,7 +292,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                                   },
                                 ),
                               ),
-                              style: const TextStyle(color: Colors.black),
+                              style: const TextStyle(color: Colors.black, fontFamily: 'CrimsonPro'),
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
                                   return 'Password is required';
@@ -272,7 +307,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                         ),
                       ),
                       
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 22),
                       
                       // Submit button
                       ElevatedButton(
@@ -282,7 +317,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(4),
                           ),
                           elevation: 0,
                         ),
@@ -298,6 +333,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                             : Text(
                                 _isLoginMode ? 'Login' : 'Register',
                                 style: const TextStyle(
+                                  fontFamily: 'CrimsonPro',
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                 ),
@@ -314,6 +350,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                               ? "Don't have an account? Register"
                               : "Already have an account? Login",
                           style: TextStyle(
+                            fontFamily: 'CrimsonPro',
                             color: Colors.grey[600],
                             fontSize: 14,
                           ),

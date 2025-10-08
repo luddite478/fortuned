@@ -246,7 +246,7 @@ class AuthResponse {
       username: json['username'],
       name: json['name'],
       email: json['email'],
-      message: json['message'],
+      message: json['message'] ?? json['detail'],
     );
   }
 }
