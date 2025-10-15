@@ -83,29 +83,51 @@ class SoundGridSideControlWidget extends StatelessWidget {
                       sectionSettings.toggleSectionControlOverlay();
                     },
                     tooltip: 'Section Settings',
-                    bottom: ValueListenableBuilder<int>(
-                      valueListenable: playbackState.currentSectionLoopNotifier,
-                      builder: (context, currentLoopZeroBased, __) {
-                        return ValueListenableBuilder<int>(
-                          valueListenable: playbackState.currentSectionLoopsNumNotifier,
-                          builder: (context, totalLoops, ___) {
-                            final displayCurrent = (currentLoopZeroBased + 1).clamp(1, totalLoops);
-                            final label = '$displayCurrent/$totalLoops';
-                            final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
-                            return Text(
-                              label,
-                              overflow: TextOverflow.fade,
-                              softWrap: false,
-                              style: TextStyle(
-                                color: color,
-                                fontSize: buttonWidth * 0.40,
-                                fontWeight: FontWeight.w600,
-                                height: 1.0,
-                                letterSpacing: 0.2,
-                              ),
-                            );
-                          },
-                        );
+                    bottom: ValueListenableBuilder<bool>(
+                      valueListenable: playbackState.songModeNotifier,
+                      builder: (context, isSongMode, __) {
+                        if (!isSongMode) {
+                          // Loop mode: show infinity symbol
+                          final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
+                          return Text(
+                            '∞',
+                            overflow: TextOverflow.fade,
+                            softWrap: false,
+                            style: TextStyle(
+                              color: color,
+                              fontSize: buttonWidth * 0.7,
+                              fontWeight: FontWeight.w600,
+                              height: 1.0,
+                            ),
+                          );
+                        } else {
+                          // Song mode: show loop counter
+                          return ValueListenableBuilder<int>(
+                            valueListenable: playbackState.currentSectionLoopNotifier,
+                            builder: (context, currentLoopZeroBased, __) {
+                              return ValueListenableBuilder<int>(
+                                valueListenable: playbackState.currentSectionLoopsNumNotifier,
+                                builder: (context, totalLoops, ___) {
+                                  final displayCurrent = (currentLoopZeroBased + 1).clamp(1, totalLoops);
+                                  final label = '$displayCurrent/$totalLoops';
+                                  final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
+                                  return Text(
+                                    label,
+                                    overflow: TextOverflow.fade,
+                                    softWrap: false,
+                                    style: TextStyle(
+                                      color: color,
+                                      fontSize: buttonWidth * 0.40,
+                                      fontWeight: FontWeight.w600,
+                                      height: 1.0,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        }
                       },
                     ),
                     backgroundColor: sectionSettings.isSectionControlOpen
@@ -347,7 +369,11 @@ class SoundGridSideControlWidget extends StatelessWidget {
                   ),
                   if (bottom != null) ...[
                     SizedBox(height: height * 0.08),
-                    bottom,
+                    Container(
+                      height: width * 0.7,
+                      alignment: Alignment.center,
+                      child: bottom,
+                    ),
                   ],
                 ],
               ),

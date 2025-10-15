@@ -1,11 +1,12 @@
 #include "table.h"
 #include "undo_redo.h"
+#include "sunvox_wrapper.h"  // For SunVox pattern sync
+#include "playback.h"         // For switch_to_section
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string>
 #include <math.h>
-#include "pitch.h"
 
 // Platform-specific logging
 #ifdef __APPLE__
@@ -73,6 +74,7 @@ void table_init(void) {
     
     prnt("✅ [TABLE] Table initialized successfully");
 
+    // Note: SunVox patterns will be created in playback_init() after SunVox is initialized
     // Do not seed undo/redo baseline here; a single baseline is recorded after all modules init
 }
 
@@ -105,7 +107,10 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
     prnt("🎵 [TABLE] Set cell [%d, %d]: slot=%d, vol=%.2f, pitch=%.2f", 
          step, col, sample_slot, volume, pitch);
 
-    pitch_run_preprocessing(sample_slot, pitch);
+    // Sync cell to SunVox pattern
+    if (sunvox_wrapper_is_initialized()) {
+        sunvox_wrapper_sync_cell(step, col);
+    }
 
     if (undo_record) {
         UndoRedoManager_record();
@@ -122,7 +127,11 @@ void table_set_cell_settings(int step, int col, float volume, float pitch, int u
     cell->settings.pitch = pitch;
     prnt("🎚️ [TABLE] Set settings [%d, %d]: vol=%.2f, pitch=%.2f", step, col, volume, pitch);
 
-    pitch_run_preprocessing(cell->sample_slot, pitch);
+    // Sync cell to SunVox pattern
+    if (sunvox_wrapper_is_initialized()) {
+        sunvox_wrapper_sync_cell(step, col);
+    }
+
     if (undo_record) {
         UndoRedoManager_record();
     }
@@ -138,6 +147,12 @@ void table_set_cell_sample_slot(int step, int col, int sample_slot, int undo_rec
     }
     cell->sample_slot = sample_slot;
     prnt("🎵 [TABLE] Set sample slot [%d, %d]: slot=%d", step, col, sample_slot);
+    
+    // Sync cell to SunVox pattern
+    if (sunvox_wrapper_is_initialized()) {
+        sunvox_wrapper_sync_cell(step, col);
+    }
+    
     if (undo_record) {
         UndoRedoManager_record();
     }
@@ -151,6 +166,11 @@ void table_clear_cell(int step, int col, int undo_record) {
     table_set_cell_defaults(cell);
     
     prnt("🧹 [TABLE] Cleared cell [%d, %d]", step, col);
+
+    // Sync cell to SunVox pattern
+    if (sunvox_wrapper_is_initialized()) {
+        sunvox_wrapper_sync_cell(step, col);
+    }
 
     if (undo_record) {
         UndoRedoManager_record();
@@ -193,6 +213,9 @@ void table_insert_step(int section_index, int at_step, int undo_record) {
     
     prnt("➕ [TABLE] Inserted step at %d in section %d (section steps: %d)", at_step, section_index, g_table_state.sections[section_index].num_steps);
 
+    // Recreate SunVox pattern with new size
+    sunvox_wrapper_create_section_pattern(section_index, g_table_state.sections[section_index].num_steps);
+
     if (undo_record) {
         UndoRedoManager_record();
     }
@@ -234,6 +257,9 @@ void table_delete_step(int section_index, int at_step, int undo_record) {
     state_write_end();
     
     prnt("➖ [TABLE] Deleted step at %d in section %d (section steps: %d)", at_step, section_index, g_table_state.sections[section_index].num_steps);
+
+    // Recreate SunVox pattern with new size
+    sunvox_wrapper_create_section_pattern(section_index, g_table_state.sections[section_index].num_steps);
 
     if (undo_record) {
         UndoRedoManager_record();
@@ -291,7 +317,9 @@ void table_set_section_step_count(int section_index, int steps, int undo_record)
         state_write_end();
         
         prnt("📏 [TABLE] Set section %d step count to %d", section_index, steps);
-
+        
+        // Recreate SunVox pattern with new size
+        sunvox_wrapper_create_section_pattern(section_index, steps);
         
         if (undo_record) {
             UndoRedoManager_record();
@@ -356,6 +384,28 @@ void table_append_section(int steps, int copy_from_section, int undo_record) {
     state_write_end();
 
     prnt("🆕 [TABLE] Appended section %d (steps=%d, start=%d)", new_index, new_steps, start);
+    
+    // Check if playback is active before we modify anything
+    const PlaybackState* pb_state = playback_get_state_ptr();
+    int was_playing = pb_state ? pb_state->is_playing : 0;
+    int bpm = pb_state ? pb_state->bpm : 120;
+    
+    // Stop playback first to prevent audio artifacts during section creation
+    if (was_playing) {
+        playback_stop();
+    }
+    
+    // Create SunVox pattern for this section (won't restart playback since we stopped it)
+    sunvox_wrapper_create_section_pattern(new_index, new_steps);
+    
+    // Switch to the new section (this will set up timeline and position)
+    switch_to_section(new_index);
+    
+    // Manually restart playback if it was active before
+    if (was_playing) {
+        int section_start_step = table_get_section_start_step(new_index);
+        playback_start(bpm, section_start_step);
+    }
 
     if (undo_record) {
         UndoRedoManager_record();
@@ -415,6 +465,14 @@ void table_delete_section(int section_index, int undo_record) {
     state_write_end();
 
     prnt("🗑️ [TABLE] Deleted section %d (steps=%d)", section_index, remove_steps);
+    
+    // Remove SunVox pattern (it was at the end before shift)
+    sunvox_wrapper_remove_section_pattern(g_table_state.sections_count); // old last index
+    
+    // Recreate all section patterns since they shifted
+    for (int i = 0; i < g_table_state.sections_count; i++) {
+        sunvox_wrapper_create_section_pattern(i, g_table_state.sections[i].num_steps);
+    }
 
     if (undo_record) {
         UndoRedoManager_record();

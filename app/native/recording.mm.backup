@@ -1,0 +1,147 @@
+#include "recording.h"
+#include <pthread.h>
+#include <unistd.h>
+
+// Include SunVox for audio capture
+#define SUNVOX_STATIC_LIB
+#include "sunvox.h"
+
+// Include miniaudio for WAV encoding (header only, no device needed)
+#define MA_NO_DEVICE_IO
+#include "miniaudio/miniaudio.h"
+
+// Platform-specific logging
+#ifdef __APPLE__
+    #include "log.h"
+    #undef LOG_TAG
+    #define LOG_TAG "RECORDING"
+#elif defined(__ANDROID__)
+    #include "log.h"
+    #undef LOG_TAG
+    #define LOG_TAG "RECORDING"
+#else
+    #include "log.h"
+    #undef LOG_TAG
+    #define LOG_TAG "RECORDING"
+#endif
+
+// Recording state
+static int g_is_output_recording = 0;
+static int g_output_encoder_initialized = 0;
+static ma_encoder g_output_encoder;
+static pthread_t g_recording_thread;
+static int g_recording_thread_running = 0;
+
+// Forward declarations
+static void* recording_thread_func(void* arg);
+
+// Recording thread function - captures SunVox audio output and writes to file
+static void* recording_thread_func(void* arg) {
+    (void)arg;
+    
+    prnt("🎙️ [RECORDING] Recording thread started");
+    
+    // Audio buffer for capturing SunVox output
+    // Use small chunks for low latency (~10ms at 48kHz)
+    const int FRAMES_PER_BUFFER = 512;
+    const int CHANNELS = 2;  // Stereo
+    float audio_buffer[FRAMES_PER_BUFFER * CHANNELS];
+    
+    while (g_recording_thread_running) {
+        if (!g_is_output_recording || !g_output_encoder_initialized) {
+            // Recording stopped, exit thread
+            break;
+        }
+        
+        // Get audio from SunVox
+        // sv_audio_callback(buf, frames, latency, out_time)
+        // We use latency=0 and out_time=current ticks for real-time capture
+        uint32_t out_time = sv_get_ticks();
+        int result = sv_audio_callback(audio_buffer, FRAMES_PER_BUFFER, 0, out_time);
+        
+        if (result < 0) {
+            prnt_err("❌ [RECORDING] sv_audio_callback failed: %d", result);
+            break;
+        }
+        
+        // Write to encoder
+        ma_uint64 frames_written = 0;
+        ma_result enc_result = ma_encoder_write_pcm_frames(&g_output_encoder, audio_buffer, FRAMES_PER_BUFFER, &frames_written);
+        
+        if (enc_result != MA_SUCCESS) {
+            prnt_err("❌ [RECORDING] Failed to write frames: %d", enc_result);
+            break;
+        }
+        
+        // Sleep briefly to avoid spinning (~10ms to match buffer size)
+        usleep(10000);
+    }
+    
+    prnt("🎙️ [RECORDING] Recording thread stopped");
+    return NULL;
+}
+
+// Start recording output to WAV file
+int recording_start(const char* file_path) {
+    if (g_is_output_recording) {
+        prnt_err("❌ [RECORDING] Already recording");
+        return -2;
+    }
+    
+    prnt("🎙️ [RECORDING] Starting recording to: %s", file_path);
+    
+    // Initialize encoder for WAV output
+    // Use float32 format to match SunVox output
+    ma_encoder_config encoder_config = ma_encoder_config_init(
+        ma_encoding_format_wav,  // WAV format
+        ma_format_f32,           // Float32 samples
+        2,                       // Stereo
+        48000                    // 48kHz (match SunVox)
+    );
+    
+    ma_result result = ma_encoder_init_file(file_path, &encoder_config, &g_output_encoder);
+    if (result != MA_SUCCESS) {
+        prnt_err("❌ [RECORDING] Failed to initialize encoder: %d", result);
+        return -3;
+    }
+    
+    g_output_encoder_initialized = 1;
+    g_is_output_recording = 1;
+    
+    // Start recording thread
+    g_recording_thread_running = 1;
+    pthread_create(&g_recording_thread, NULL, recording_thread_func, NULL);
+    
+    prnt("✅ [RECORDING] Recording started → %s", file_path);
+    return 0;
+}
+
+// Stop recording
+void recording_stop(void) {
+    if (!g_is_output_recording) return;
+    
+    prnt("⏹️ [RECORDING] Stopping recording");
+    
+    // Signal recording thread to stop
+    g_is_output_recording = 0;
+    
+    // Wait for recording thread to finish
+    if (g_recording_thread_running) {
+        g_recording_thread_running = 0;
+        pthread_join(g_recording_thread, NULL);
+    }
+    
+    // Close encoder
+    if (g_output_encoder_initialized) {
+        ma_encoder_uninit(&g_output_encoder);
+        g_output_encoder_initialized = 0;
+    }
+    
+    prnt("✅ [RECORDING] Recording stopped");
+}
+
+// Check if recording is active
+int recording_is_active(void) {
+    return g_is_output_recording;
+}
+

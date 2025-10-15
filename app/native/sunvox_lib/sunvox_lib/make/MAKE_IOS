@@ -1,0 +1,39 @@
+#!/bin/bash
+set -e
+
+MAKE_OPTIONS="TARGET_OS=ios MAKE_STATIC_LIB=true STYPE=PS_STYPE_FLOAT32"
+SIMULATOR_SDK="/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator17.5.sdk"
+
+echo "Building SunVox universal library for iOS simulator..."
+
+# Build for x86_64 simulator (Intel Macs)
+echo "Building for x86_64 (Intel Mac simulator)..."
+make clean
+make -j8 $MAKE_OPTIONS TARGET_ARCH=x86_64 IOS_SDK="$SIMULATOR_SDK" IOS_TARGET_SUFFIX="-simulator"
+make install $MAKE_OPTIONS TARGET_ARCH=x86_64 IOS_SDK="$SIMULATOR_SDK" IOS_TARGET_SUFFIX="-simulator"
+mv ../ios/sunvox_x86_64.a ../ios/sunvox_x86_64_simulator.a
+
+# Build for arm64 simulator (Apple Silicon Macs)
+echo "Building for arm64 (Apple Silicon simulator)..."
+make clean
+make -j8 $MAKE_OPTIONS TARGET_ARCH=arm64 IOS_SDK="$SIMULATOR_SDK" IOS_TARGET_SUFFIX="-simulator"
+make install $MAKE_OPTIONS TARGET_ARCH=arm64 IOS_SDK="$SIMULATOR_SDK" IOS_TARGET_SUFFIX="-simulator"
+mv ../ios/sunvox_arm64.a ../ios/sunvox_arm64_simulator.a
+
+# Combine into universal library
+echo "Creating universal library with lipo..."
+lipo -create \
+    ../ios/sunvox_x86_64_simulator.a \
+    ../ios/sunvox_arm64_simulator.a \
+    -output ../ios/sunvox.a
+
+# Verify the result
+echo ""
+echo "Universal library created successfully:"
+lipo -info ../ios/sunvox.a
+
+# Create copy as libsunvox.a
+cp ../ios/sunvox.a ../ios/libsunvox.a
+echo ""
+echo "Copied to libsunvox.a"
+echo "Done!"

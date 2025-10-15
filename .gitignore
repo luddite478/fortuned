@@ -1,4 +1,8 @@
 # Miscellaneous
+*.a
+*.o
+*.so
+*.dylib
 app/*.class
 app/*.log
 app/*.pyc

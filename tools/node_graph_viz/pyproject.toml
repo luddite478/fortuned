@@ -24,3 +24,4 @@ node-graph-viz = "node_graph_viz.__main__:main"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["node_graph_viz*"]
+

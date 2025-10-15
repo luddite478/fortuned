@@ -92,3 +92,4 @@ class NodeGraphBackend:
 				self.shutdown()
 		except Exception:
 			pass
+

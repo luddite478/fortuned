@@ -17,8 +17,7 @@ class EditButtonsWidget extends StatelessWidget {
 
   // V2 percent-based configuration
   static const double _v2ButtonHeightPercent = 0.7; // of container height
-  static const double _v2RightPaddingPercent = 0.01; // of container width
-  static const double _v2LeftChevronWidthPercent = 0.08; // of container width
+  static const double _v2RightPaddingPercent = 0.03; // of container width
   static const double _v2ButtonHorizontalPaddingPercent = 0.035; // of container height
   static const double _v2ButtonSpacingPercent = 0.015; // of container width
   static const double _v2TextFontScale = 0.23; // of button height
@@ -61,10 +60,6 @@ class EditButtonsWidget extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox(
-                      width: (panelWidth * _v2LeftChevronWidthPercent).clamp(16.0, buttonHeight),
-                      child: _buildChevronButton(size: (panelWidth * _v2LeftChevronWidthPercent).clamp(16.0, buttonHeight)),
-                    ),
                     const Spacer(),
                     SizedBox(
                       width: buttonWidth,
@@ -443,44 +438,6 @@ class EditButtonsWidget extends StatelessWidget {
                   color: textColor,
                   letterSpacing: 0.8,
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildChevronButton({
-    required double size,
-  }) {
-    return Container(
-      alignment: Alignment.centerLeft,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: AppColors.sequencerSurfaceRaised,
-          borderRadius: BorderRadius.circular(2),
-          border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.sequencerShadow,
-              blurRadius: 1.5,
-              offset: const Offset(0, 1),
-            ),
-          ],
-        ),
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: null, // inactive for now
-            borderRadius: BorderRadius.circular(2),
-            child: const Center(
-              child: Icon(
-                Icons.chevron_left,
-                size: 20,
-                color: Colors.white38,
               ),
             ),
           ),

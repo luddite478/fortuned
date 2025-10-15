@@ -73,7 +73,10 @@ set(LAME_SOURCES
 set(SEQUENCER_SOURCES
   conversion.mm
   table.mm
-  playback.mm
+  playback_sunvox.mm
+  sunvox_wrapper.mm
+  recording.mm
+  wav_writer.mm
   miniaudio_impl.mm
   sample_bank.mm
   pitch.mm
@@ -92,7 +95,9 @@ endif()
 set_source_files_properties(
   conversion.mm
   table.mm
-  playback.mm
+  playback_sunvox.mm
+  sunvox_wrapper.mm
+  recording.mm
   miniaudio_impl.mm
   sample_bank.mm
   pitch.mm
@@ -163,7 +168,8 @@ endif()
 
 include_directories(miniaudio)
 
- 
+# Add SunVox library header directory
+include_directories(sunvox_lib/sunvox_lib/headers)
 
 # Add SoundTouch include directory if enabled
 if(USE_SOUNDTOUCH_PITCH)
@@ -173,6 +179,14 @@ endif()
 # Create sequencer library (includes both sequencer and conversion functionality)
 add_library(sequencer SHARED ${SEQUENCER_SOURCES})
 
+# Link SunVox static library
 if(ANDROID)
+  # Android: Link Android-specific SunVox library
+  # TODO: Add Android SunVox libraries when available
   target_link_libraries(sequencer OpenSLES log android)
+elseif(APPLE)
+  # iOS/macOS: Link iOS static library
+  target_link_libraries(sequencer 
+    ${CMAKE_CURRENT_SOURCE_DIR}/sunvox_lib/sunvox_lib/ios/libsunvox.a
+  )
 endif()

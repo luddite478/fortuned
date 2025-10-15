@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'dart:ffi' as ffi;
 // removed unused json ffi imports
 import '../../ffi/table_bindings.dart';
-import '../../ffi/pitch_bindings.dart';
 import '../../ffi/playback_bindings.dart';
 // uses Cell/CellData types from table_bindings.dart
 
@@ -94,7 +93,6 @@ class TableState extends ChangeNotifier {
   static const int maxSections = 64;
   
   final TableBindings _table_ffi;
-  final PitchBindings _pitch_ffi;
   final PlaybackBindings _playback_ffi;
   
   // 2D array of ValueNotifiers for efficient cell updates (more efficient than string keys)
@@ -127,7 +125,7 @@ class TableState extends ChangeNotifier {
 
   int _activeSectionStepCount = defaultSectionSteps;
 
-  TableState() : _table_ffi = TableBindings(), _playback_ffi = PlaybackBindings(), _pitch_ffi = PitchBindings() {
+  TableState() : _table_ffi = TableBindings(), _playback_ffi = PlaybackBindings() {
     _initializeTable();
   }
   
@@ -193,7 +191,6 @@ class TableState extends ChangeNotifier {
   void setCell(int step, int col, int sampleSlot, double volume, double pitch, {bool undoRecord = true}) {
     _table_ffi.tableSetCell(step, col, sampleSlot, volume, pitch, undoRecord ? 1 : 0);
     // debugPrint('✏️ [TABLE_STATE] Set cell [$step, $col]: slot=$sampleSlot, vol=${volume.toStringAsFixed(2)}');
-    _maybeKickPitchPreprocessing(step, col, sampleSlot, pitch);
   }
   
   void clearCell(int step, int col, {bool undoRecord = true}) {
@@ -216,26 +213,8 @@ class TableState extends ChangeNotifier {
     
     _table_ffi.tableSetCell(step, col, current.sample_slot, nextVolume, nextPitch, undoRecord ? 1 : 0);
     debugPrint('🎚️ [TABLE_STATE] Set cell settings [$step, $col]: vol=${nextVolume.toStringAsFixed(2)}, pitch=${nextPitch.toStringAsFixed(2)}');
-    _maybeKickPitchPreprocessing(step, col, current.sample_slot, nextPitch);
   }
 
-  // If using preprocessing method and inputs are valid, trigger async preprocessing now.
-  void _maybeKickPitchPreprocessing(int step, int col, int sampleSlot, double pitch) {
-    if (sampleSlot < 0) return;
-    // Only for preprocessing method and meaningful pitch offsets
-    final method = _pitch_ffi.pitchGetMethod();
-    if (method != 2 /* PITCH_METHOD_SOUNDTOUCH_PREPROCESSING */) return;
-    // If cell uses default sentinel, let native playback handle preprocessing when needed
-    if (pitch <= 0.0 || pitch == -1.0) return;
-    if ((pitch - 1.0).abs() <= 0.001) return;
-    final res = _pitch_ffi.pitchStartAsyncPreprocessing(sampleSlot, pitch);
-    if (res == 0) {
-      debugPrint('⚙️ [TABLE_STATE] Preprocess queued for slot=$sampleSlot pitch=${pitch.toStringAsFixed(3)} at cell [$step,$col]');
-    } else if (res < 0) {
-      debugPrint('❌ [TABLE_STATE] Failed to queue preprocess for slot=$sampleSlot pitch=${pitch.toStringAsFixed(3)}');
-    }
-  }
-  
   void insertStep(int sectionIndex, int atStep, {bool undoRecord = true}) {
     _table_ffi.tableInsertStep(sectionIndex, atStep, undoRecord ? 1 : 0);
     debugPrint('➕ [TABLE_STATE] Inserted step at $atStep in section $sectionIndex');
