@@ -2,7 +2,6 @@
 #include "playback.h"
 #include "table.h"
 #include "sample_bank.h"
-#include "pitch.h"
 
 #include "miniaudio/miniaudio.h"
 
@@ -45,10 +44,10 @@ static void preview_cleanup_ctx(preview_context_t* ctx) {
         ctx->node = NULL;
         ctx->node_initialized = 0;
     }
-    if (ctx->pitch_ds_initialized && ctx->pitch_ds) {
-        pitch_ds_destroy((ma_pitch_data_source*)ctx->pitch_ds);
+    if (ctx->pitch_ds) {
+        ma_decoder_uninit((ma_decoder*)ctx->pitch_ds);
+        free(ctx->pitch_ds);
         ctx->pitch_ds = NULL;
-        ctx->pitch_ds_initialized = 0;
     }
     if (ctx->decoder) {
         ma_decoder_uninit((ma_decoder*)ctx->decoder);
@@ -81,46 +80,16 @@ static int start_preview_from_decoder(preview_context_t* ctx, ma_decoder* decode
 
     ctx->decoder = decoder;
 
-    // For pitched files, we don't need pitch_ds since the file is already pitched
-    // Only create pitch_ds if we need real-time pitch processing
-    if (fabsf(pitch - 1.0f) > 0.001f && slotForCache >= 0) {
-        // Check if we have a pitched file already
-        const char* pitched_path = pitch_get_file_path(slotForCache, pitch);
-        if (pitched_path) {
-            FILE* test = fopen(pitched_path, "rb");
-            if (test) {
-                fclose(test);
-                // Pitched file exists, we should be using it instead of pitch processing
-                // This shouldn't happen if caller is using the right file, but handle gracefully
-                prnt("ℹ️ [PREVIEW] Pitched file exists, should use disk file instead of pitch processing");
-            }
-        }
-    }
+    // Pitching is now handled by SunVox, this preview path is for miniaudio and can be simplified.
+    // We will just play the sample without pitch modifications for now.
+    ctx->pitch_ds = NULL;
+    ctx->pitch_ds_initialized = 0;
 
-    // Create pitch data source only if needed (for real-time pitch processing)
-    if (fabsf(pitch - 1.0f) > 0.001f) {
-        ctx->pitch_ds = pitch_ds_create((ma_data_source*)decoder, pitch, CHANNELS, SAMPLE_RATE, slotForCache);
-        if (!ctx->pitch_ds) {
-            prnt_err("❌ [PREVIEW] Failed to create pitch data source");
-            ma_decoder_uninit(decoder);
-            free(decoder);
-            ctx->decoder = NULL;
-            return -1;
-        }
-        ctx->pitch_ds_initialized = 1;
-    } else {
-        // No pitch processing needed
-        ctx->pitch_ds = NULL;
-        ctx->pitch_ds_initialized = 0;
-    }
 
     // Create node
     ctx->node = malloc(sizeof(ma_data_source_node));
     if (!ctx->node) {
         prnt_err("❌ [PREVIEW] Failed to allocate node");
-        pitch_ds_destroy((ma_pitch_data_source*)ctx->pitch_ds);
-        ctx->pitch_ds = NULL;
-        ctx->pitch_ds_initialized = 0;
         ma_decoder_uninit(decoder);
         free(decoder);
         ctx->decoder = NULL;
@@ -132,32 +101,19 @@ static int start_preview_from_decoder(preview_context_t* ctx, ma_decoder* decode
         prnt_err("❌ [PREVIEW] Node graph not available");
         free(ctx->node);
         ctx->node = NULL;
-        pitch_ds_destroy((ma_pitch_data_source*)ctx->pitch_ds);
-        ctx->pitch_ds = NULL;
-        ctx->pitch_ds_initialized = 0;
         ma_decoder_uninit(decoder);
         free(decoder);
         ctx->decoder = NULL;
         return -1;
     }
 
-    ma_data_source* ds;
-    if (ctx->pitch_ds) {
-        // Use pitch data source (for real-time pitch processing)
-        ds = pitch_ds_as_data_source((ma_pitch_data_source*)ctx->pitch_ds);
-    } else {
-        // Use decoder directly (for unity pitch or already-pitched files)
-        ds = (ma_data_source*)ctx->decoder;
-    }
+    ma_data_source* ds = (ma_data_source*)ctx->decoder;
     ma_data_source_node_config nodeConfig = ma_data_source_node_config_init(ds);
     ma_result res = ma_data_source_node_init(graph, &nodeConfig, NULL, (ma_data_source_node*)ctx->node);
     if (res != MA_SUCCESS) {
         prnt_err("❌ [PREVIEW] Failed to init data source node: %d", res);
         free(ctx->node);
         ctx->node = NULL;
-        pitch_ds_destroy((ma_pitch_data_source*)ctx->pitch_ds);
-        ctx->pitch_ds = NULL;
-        ctx->pitch_ds_initialized = 0;
         ma_decoder_uninit(decoder);
         free(decoder);
         ctx->decoder = NULL;
@@ -202,37 +158,8 @@ int preview_slot(int slot, float pitch, float volume) {
         return -1;
     }
     
-    const char* path;
-    float effective_pitch = pitch;
-    
-    // Use pitched file if pitch != 1.0, otherwise use original
-    if (fabsf(pitch - 1.0f) > 0.001f) {
-        path = pitch_get_file_path(slot, pitch);
-        
-        // Generate pitched file if it doesn't exist
-        if (path) {
-            FILE* test = fopen(path, "rb");
-            if (!test) {
-                // File doesn't exist, generate it
-                prnt("🎵 [PREVIEW] Generating pitched file for preview...");
-                pitch_generate_file(slot, pitch, path);
-            } else {
-                fclose(test);
-            }
-            // Use unity pitch since the file is already pitched
-            effective_pitch = 1.0f;
-        }
-        
-        if (!path) {
-            // Fallback to original file with real-time pitch processing
-            path = sample_bank_get_file_path(slot);
-            effective_pitch = pitch;
-        }
-    } else {
-        // Use original file for pitch 1.0
-        path = sample_bank_get_file_path(slot);
-        effective_pitch = 1.0f;
-    }
+    const char* path = sample_bank_get_file_path(slot);
+    float effective_pitch = 1.0f; // No pitching in this legacy path for now.
     
     if (!path || *path == '\0') {
         prnt_err("❌ [PREVIEW] No path for slot %d", slot);
@@ -281,37 +208,8 @@ int preview_cell(int step, int column, float pitch, float volume) {
         resolved_volume = (s && s->loaded) ? s->settings.volume : 1.0f;
     }
 
-    const char* file_path;
-    float effective_pitch = resolved_pitch;
-    
-    // Use pitched file if pitch != 1.0, otherwise use original
-    if (fabsf(resolved_pitch - 1.0f) > 0.001f) {
-        file_path = pitch_get_file_path(slot, resolved_pitch);
-        
-        // Generate pitched file if it doesn't exist
-        if (file_path) {
-            FILE* test = fopen(file_path, "rb");
-            if (!test) {
-                // File doesn't exist, generate it
-                prnt("🎵 [PREVIEW] Generating pitched file for cell preview...");
-                pitch_generate_file(slot, resolved_pitch, file_path);
-            } else {
-                fclose(test);
-            }
-            // Use unity pitch since the file is already pitched
-            effective_pitch = 1.0f;
-        }
-        
-        if (!file_path) {
-            // Fallback to original file with real-time pitch processing
-            file_path = path;
-            effective_pitch = resolved_pitch;
-        }
-    } else {
-        // Use original file for pitch 1.0
-        file_path = path;
-        effective_pitch = 1.0f;
-    }
+    const char* file_path = path;
+    float effective_pitch = 1.0f; // No pitching in this legacy path for now.
 
     ma_decoder* dec = (ma_decoder*)malloc(sizeof(ma_decoder));
     if (!dec) return -1;

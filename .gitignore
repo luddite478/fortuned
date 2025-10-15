@@ -1,4 +1,8 @@
 # Miscellaneous
+*.a
+*.o
+*.so
+*.dylib
 app/*.class
 app/*.log
 app/*.pyc
@@ -120,3 +124,5 @@ nginx/letsencrypt/*
 !nginx/letsencrypt/.gitkeep
 nginx/certbot-webroot/*
 !nginx/certbot-webroot/.gitkeep
+
+test

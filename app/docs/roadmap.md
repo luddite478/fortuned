@@ -13,22 +13,22 @@
     - send message bar icon pattern - done
 - contacts and all users search - done
 - undo many - done 
+- conversion - done 
+- remove default 0 renders for message - done
 
-- conversion 
-- remove default 0 renders for message
-- rename messages count project to checkpints
-- server schema validation
+- if deleting thread, check if renders are referenced, then decide delete renders or not 
+  add separate audio collection, reference renders this way
+- server schema validation 
 - pass token in body/query param for all requests
 - check schema validation client/server
 
-
+- delete sections button
+- cahgne section settings ui
 - ci create tags
 - smooth volume and pitch change ui
-- recording fix and ui change
 - mute/solo
     - layer
     - selection ?
-
 - comment(reply)-menu for chekpoints
 - pitch (optimize speed)
 - local project storage

@@ -3,14 +3,12 @@ import 'package:flutter/foundation.dart';
 import '../../state/sequencer/table.dart';
 import '../../state/sequencer/playback.dart';
 import '../../state/sequencer/sample_bank.dart';
-import '../../ffi/pitch_bindings.dart';
 
 /// Snapshot import service for sequencer state
 class SnapshotImporter {
   final TableState _tableState;
   final PlaybackState _playbackState;
   final SampleBankState _sampleBankState;
-  final PitchBindings _pitchBindings = PitchBindings();
 
   SnapshotImporter({
     required TableState tableState,
@@ -62,13 +60,6 @@ class SnapshotImporter {
           debugPrint('❌ [SNAPSHOT_IMPORT] Failed to import playback state');
           return false;
         }
-      }
-
-      // Generate all pitched files after import is complete
-      onProgress?.call('Generating pitched files...', 0.6);
-      final pitchGenerationSuccess = await _generateAllPitchedFiles(onProgress);
-      if (!pitchGenerationSuccess) {
-        debugPrint('⚠️ [SNAPSHOT_IMPORT] Some pitched files failed to generate, but import continues');
       }
 
       onProgress?.call('Import complete!', 1.0);
@@ -255,105 +246,6 @@ class SnapshotImporter {
 
     } catch (e) {
       debugPrint('❌ [SNAPSHOT_VALIDATE] Validation failed: $e');
-      return false;
-    }
-  }
-
-  /// Generate all pitched files for loaded samples with non-unity pitch
-  Future<bool> _generateAllPitchedFiles([Function(String, double)? onProgress]) async {
-    try {
-      // Collect all unique (sample_slot, pitch) combinations
-      final Set<String> uniquePitchRequests = <String>{};
-      
-      // 1. Collect from sample bank settings
-      for (int slot = 0; slot < 26; slot++) {
-        if (_sampleBankState.isSlotLoaded(slot)) {
-          final sampleData = _sampleBankState.getSampleData(slot);
-          final pitch = sampleData.pitch;
-          if ((pitch - 1.0).abs() > 0.001) {
-            uniquePitchRequests.add('${slot}_${pitch.toStringAsFixed(3)}');
-          }
-        }
-      }
-      
-      // 2. Collect from table cells - iterate through all sections
-      for (int sectionIndex = 0; sectionIndex < _tableState.sectionsCount; sectionIndex++) {
-        final sectionStartStep = _tableState.getSectionStartStep(sectionIndex);
-        final sectionStepCount = _tableState.getSectionStepCount(sectionIndex);
-        final sectionEndStep = sectionStartStep + sectionStepCount;
-        
-        for (int step = sectionStartStep; step < sectionEndStep; step++) {
-          for (int col = 0; col < _tableState.maxCols; col++) {
-            final cellData = _tableState.readCell(step, col);
-            if (cellData.sampleSlot >= 0 && _sampleBankState.isSlotLoaded(cellData.sampleSlot)) {
-              // Resolve pitch (use cell pitch or fall back to sample bank pitch)
-              double resolvedPitch = cellData.pitch;
-              if (resolvedPitch == -1.0) { // DEFAULT_CELL_PITCH
-                final sampleData = _sampleBankState.getSampleData(cellData.sampleSlot);
-                resolvedPitch = sampleData.pitch;
-              }
-              
-              if ((resolvedPitch - 1.0).abs() > 0.001) {
-                uniquePitchRequests.add('${cellData.sampleSlot}_${resolvedPitch.toStringAsFixed(3)}');
-              }
-            }
-          }
-        }
-      }
-
-      if (uniquePitchRequests.isEmpty) {
-        debugPrint('ℹ️ [SNAPSHOT_IMPORT] No pitched files needed');
-        return true;
-      }
-
-      debugPrint('🎵 [SNAPSHOT_IMPORT] Need to generate ${uniquePitchRequests.length} pitched files');
-      
-      int successCount = 0;
-      int totalCount = uniquePitchRequests.length;
-      int processedCount = 0;
-      
-      // Generate each pitched file
-      for (final request in uniquePitchRequests) {
-        final parts = request.split('_');
-        final sampleSlot = int.parse(parts[0]);
-        final pitch = double.parse(parts[1]);
-        
-        // Update progress
-        final progress = 0.6 + (0.4 * processedCount / totalCount);
-        onProgress?.call('Generating pitched file ${processedCount + 1}/$totalCount...', progress);
-        
-        try {
-          // Get the output path
-          final outputPath = _pitchBindings.getPitchFilePath(sampleSlot, pitch);
-          if (outputPath != null) {
-            // Generate the file
-            final result = _pitchBindings.generatePitchFile(sampleSlot, pitch, outputPath);
-            if (result == 0) {
-              successCount++;
-              debugPrint('✅ [SNAPSHOT_IMPORT] Generated: slot=$sampleSlot, pitch=${pitch.toStringAsFixed(3)}');
-            } else {
-              debugPrint('❌ [SNAPSHOT_IMPORT] Failed to generate: slot=$sampleSlot, pitch=${pitch.toStringAsFixed(3)}, result=$result');
-            }
-          } else {
-            debugPrint('❌ [SNAPSHOT_IMPORT] No output path for: slot=$sampleSlot, pitch=${pitch.toStringAsFixed(3)}');
-          }
-        } catch (e) {
-          debugPrint('❌ [SNAPSHOT_IMPORT] Exception generating pitched file: $e');
-        }
-        
-        processedCount++;
-        
-        // Small delay to prevent UI blocking and allow progress updates
-        if (totalCount > 5) {
-          await Future.delayed(const Duration(milliseconds: 50));
-        }
-      }
-      
-      debugPrint('🎵 [SNAPSHOT_IMPORT] Pitched file generation complete: $successCount/$totalCount successful');
-      return successCount > 0 || totalCount == 0;
-      
-    } catch (e) {
-      debugPrint('❌ [SNAPSHOT_IMPORT] Pitched file generation failed: $e');
       return false;
     }
   }

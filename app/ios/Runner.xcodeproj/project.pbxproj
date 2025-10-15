@@ -14,16 +14,19 @@
 		55433E352DF4040A00D2AA40 /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E342DF4040A00D2AA40 /* CoreAudio.framework */; };
 		55433E372DF4041800D2AA40 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E362DF4041800D2AA40 /* AudioToolbox.framework */; };
 		55433E3F2DF40A7F00D2AA40 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */; };
+		CAFE00032024010200000001 /* libsunvox.a in Frameworks */ = {isa = PBXBuildFile; fileRef = CAFE00042024010200000001 /* libsunvox.a */; };
 
 		5571F8C02DF776A00025EF91 /* conversion.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8BE2DF776980025EF91 /* conversion.mm */; };
 		5571F8E72DF77A000025EF91 /* table.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8E82DF77A000025EF91 /* table.mm */; };
-		5571F8E92DF77A010025EF91 /* playback.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8EA2DF77A010025EF91 /* playback.mm */; };
+		5571F8E92DF77A010025EF91 /* playback_sunvox.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8EA2DF77A010025EF91 /* playback_sunvox.mm */; };
 		BEEF00012DEFACED00000001 /* preview.mm in Sources */ = {isa = PBXBuildFile; fileRef = BEEF00002DEFACED00000001 /* preview.mm */; };
+		REC00012024120100000001 /* recording.mm in Sources */ = {isa = PBXBuildFile; fileRef = REC00002024120100000001 /* recording.mm */; };
+		WAV00012024120100000001 /* wav_writer.mm in Sources */ = {isa = PBXBuildFile; fileRef = WAV00002024120100000001 /* wav_writer.mm */; };
 		5571F8F02DF77A900025EF91 /* sample_bank.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8F12DF77A900025EF91 /* sample_bank.mm */; };
 		5571F8F22DF77B0A0025EF91 /* miniaudio_impl.mm in Sources */ = {isa = PBXBuildFile; fileRef = 5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */; };
 		A1B2C3D40000000100000001 /* undo_redo.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D30000000100000001 /* undo_redo.mm */; };
+		CAFE00012024010100000001 /* sunvox_wrapper.mm in Sources */ = {isa = PBXBuildFile; fileRef = CAFE00002024010100000001 /* sunvox_wrapper.mm */; };
 
-		AA11BB221234567800000001 /* pitch.mm in Sources */ = {isa = PBXBuildFile; fileRef = AA11BB211234567800000001 /* pitch.mm */; };
 		AA11BB231234567800000001 /* SoundTouch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = ED50771697404BA7AC634852 /* SoundTouch.cpp */; };
 		AA11BB241234567800000001 /* TDStretch.cpp in Sources */ = {isa = PBXBuildFile; fileRef = AA3AF4A3912A4ABDAD9E838A /* TDStretch.cpp */; };
 		AA11BB251234567800000001 /* RateTransposer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 3C4F1830049B42E0AFD95848 /* RateTransposer.cpp */; };
@@ -97,22 +100,25 @@
 		3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; name = AppFrameworkInfo.plist; path = Flutter/AppFrameworkInfo.plist; sourceTree = "<group>"; };
 		55433E342DF4040A00D2AA40 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		55433E362DF4041800D2AA40 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
-
-
-
 		55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
+		CAFE00042024010200000001 /* libsunvox.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libsunvox.a; path = ../native/sunvox_lib/sunvox_lib/ios/libsunvox.a; sourceTree = "<group>"; };
 
 
 		5571F8BE2DF776980025EF91 /* conversion.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = conversion.mm; path = ../native/conversion.mm; sourceTree = "<group>"; };
 		5571F8BF2DF776990025EF91 /* conversion.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = conversion.h; path = ../native/conversion.h; sourceTree = "<group>"; };
 		5571F8E82DF77A000025EF91 /* table.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = table.mm; path = ../native/table.mm; sourceTree = "<group>"; };
-		5571F8EA2DF77A010025EF91 /* playback.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = playback.mm; path = ../native/playback.mm; sourceTree = "<group>"; };
+		5571F8EA2DF77A010025EF91 /* playback_sunvox.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = playback_sunvox.mm; path = ../native/playback_sunvox.mm; sourceTree = "<group>"; };
 		BEEF00002DEFACED00000001 /* preview.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = preview.mm; path = ../native/preview.mm; sourceTree = "<group>"; };
 		BEEF00032DEFACED00000001 /* preview.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = preview.h; path = ../native/preview.h; sourceTree = "<group>"; };
+		REC00002024120100000001 /* recording.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = recording.mm; path = ../native/recording.mm; sourceTree = "<group>"; };
+		REC00012024120100000002 /* recording.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = recording.h; path = ../native/recording.h; sourceTree = "<group>"; };
+		WAV00002024120100000001 /* wav_writer.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = wav_writer.mm; path = ../native/wav_writer.mm; sourceTree = "<group>"; };
+		WAV00012024120100000002 /* wav_writer.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = wav_writer.h; path = ../native/wav_writer.h; sourceTree = "<group>"; };
 		5571F8F12DF77A900025EF91 /* sample_bank.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sample_bank.mm; path = ../native/sample_bank.mm; sourceTree = "<group>"; };
 		5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = miniaudio_impl.mm; path = ../native/miniaudio_impl.mm; sourceTree = "<group>"; };
+		CAFE00002024010100000001 /* sunvox_wrapper.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = sunvox_wrapper.mm; path = ../native/sunvox_wrapper.mm; sourceTree = "<group>"; };
+		CAFE00012024010100000002 /* sunvox_wrapper.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = sunvox_wrapper.h; path = ../native/sunvox_wrapper.h; sourceTree = "<group>"; };
 		AA11BB201234567800000001 /* cpu_detect_arm.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = cpu_detect_arm.cpp; path = ../native/soundtouch/cpu_detect_arm.cpp; sourceTree = "<group>"; };
-		AA11BB211234567800000001 /* pitch.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = pitch.mm; path = ../native/pitch.mm; sourceTree = "<group>"; };
 		A1B2C3D30000000100000001 /* undo_redo.mm */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.objcpp; name = undo_redo.mm; path = ../native/undo_redo.mm; sourceTree = "<group>"; };
 
 
@@ -240,14 +246,19 @@
 			children = (
 
 				5571F8E82DF77A000025EF91 /* table.mm */,
-				5571F8EA2DF77A010025EF91 /* playback.mm */,
+				5571F8EA2DF77A010025EF91 /* playback_sunvox.mm */,
+				CAFE00002024010100000001 /* sunvox_wrapper.mm */,
+				CAFE00012024010100000002 /* sunvox_wrapper.h */,
 				BEEF00002DEFACED00000001 /* preview.mm */,
+				REC00002024120100000001 /* recording.mm */,
+				REC00012024120100000002 /* recording.h */,
+				WAV00002024120100000001 /* wav_writer.mm */,
+				WAV00012024120100000002 /* wav_writer.h */,
 				5571F8F12DF77A900025EF91 /* sample_bank.mm */,
 				5571F8F32DF77B0A0025EF91 /* miniaudio_impl.mm */,
 				A1B2C3D30000000100000001 /* undo_redo.mm */,
 
 				AA11BB201234567800000001 /* cpu_detect_arm.cpp */,
-				AA11BB211234567800000001 /* pitch.mm */,
 				5571F8EB2DF77A020025EF91 /* table.h */,
 				5571F8EC2DF77A030025EF91 /* playback.h */,
 				BEEF00032DEFACED00000001 /* preview.h */,
@@ -312,6 +323,7 @@
 				55433E362DF4041800D2AA40 /* AudioToolbox.framework */,
 				55433E342DF4040A00D2AA40 /* CoreAudio.framework */,
 				55433E3E2DF40A7F00D2AA40 /* AVFoundation.framework */,
+				CAFE00042024010200000001 /* libsunvox.a */,
 				73E120A8D599DE8BD3ED5AE9 /* Pods_Runner.framework */,
 				0CC849E078AD7C896DE57656 /* Pods_RunnerTests.framework */,
 			);
@@ -532,8 +544,11 @@
 			files = (
 
 				5571F8E72DF77A000025EF91 /* table.mm in Sources */,
-				5571F8E92DF77A010025EF91 /* playback.mm in Sources */,
+				5571F8E92DF77A010025EF91 /* playback_sunvox.mm in Sources */,
+				CAFE00012024010100000001 /* sunvox_wrapper.mm in Sources */,
 				BEEF00012DEFACED00000001 /* preview.mm in Sources */,
+				REC00012024120100000001 /* recording.mm in Sources */,
+				WAV00012024120100000001 /* wav_writer.mm in Sources */,
 				5571F8F02DF77A900025EF91 /* sample_bank.mm in Sources */,
 				5571F8F22DF77B0A0025EF91 /* miniaudio_impl.mm in Sources */,
 				A1B2C3D40000000100000001 /* undo_redo.mm in Sources */,
@@ -549,7 +564,6 @@
 				AA11BB2B1234567800000001 /* InterpolateShannon.cpp in Sources */,
 				AA11BB2C1234567800000001 /* PeakFinder.cpp in Sources */,
 				AA11BB2D1234567800000001 /* cpu_detect_arm.cpp in Sources */,
-				AA11BB221234567800000001 /* pitch.mm in Sources */,
 				5571F8C02DF776A00025EF91 /* conversion.mm in Sources */,
 				5571F8D42DF777200025EF91 /* lame.c in Sources */,
 				5571F8D52DF777210025EF91 /* bitstream.c in Sources */,
@@ -651,11 +665,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
-				VALIDATE_PRODUCT = YES;
+			MTL_ENABLE_DEBUG_INFO = NO;
+			SDKROOT = iphoneos;
+			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+			TARGETED_DEVICE_FAMILY = "1,2";
+			VALIDATE_PRODUCT = YES;
 			};
 			name = Profile;
 		};
@@ -679,6 +693,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
+					"$(SRCROOT)/../native/sunvox_lib/sunvox_lib/headers",
 					
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -686,14 +701,14 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_CFLAGS = (
-					"-DHAVE_CONFIG_H",
-					"-DSOUNDTOUCH_FLOAT_SAMPLES",
-					"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
-					"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
-				);
-				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.fortuned;
+			OTHER_CFLAGS = (
+				"-DHAVE_CONFIG_H",
+				"-DSOUNDTOUCH_FLOAT_SAMPLES",
+				"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
+				"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
+			);
+			GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
+			PRODUCT_BUNDLE_IDENTIFIER = com.example.fortuned;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIP_STYLE = "non-global";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -854,11 +869,11 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 14.0;
-				MTL_ENABLE_DEBUG_INFO = NO;
-				SDKROOT = iphoneos;
-				SUPPORTED_PLATFORMS = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
-				SWIFT_OPTIMIZATION_LEVEL = "-O";
+			MTL_ENABLE_DEBUG_INFO = NO;
+			SDKROOT = iphoneos;
+			SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+			SWIFT_COMPILATION_MODE = wholemodule;
+			SWIFT_OPTIMIZATION_LEVEL = "-O";
 				TARGETED_DEVICE_FAMILY = "1,2";
 				VALIDATE_PRODUCT = YES;
 			};
@@ -884,6 +899,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
+					"$(SRCROOT)/../native/sunvox_lib/sunvox_lib/headers",
 					
 				);
 				INFOPLIST_FILE = Runner/Info.plist;
@@ -891,14 +907,14 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				OTHER_CFLAGS = (
-					"-DHAVE_CONFIG_H",
-					"-DSOUNDTOUCH_FLOAT_SAMPLES",
-					"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
-					"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
-				);
-				GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.fortuned;
+			OTHER_CFLAGS = (
+				"-DHAVE_CONFIG_H",
+				"-DSOUNDTOUCH_FLOAT_SAMPLES",
+				"-DSOUNDTOUCH_ALLOW_NONEXACT_SIMD_OPTIMIZATION",
+				"-DSOUNDTOUCH_DISABLE_X86_OPTIMIZATIONS",
+			);
+			GCC_PREFIX_HEADER = "$(SRCROOT)/../native/lame_prefix.h";
+			PRODUCT_BUNDLE_IDENTIFIER = com.example.fortuned;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRIP_STYLE = "non-global";
 				SWIFT_OBJC_BRIDGING_HEADER = "Runner/Runner-Bridging-Header.h";
@@ -928,6 +944,7 @@
 					"\"${PODS_CONFIGURATION_BUILD_DIR}/file_picker/file_picker.framework/Headers\"",
 					"$(SRCROOT)/../native",
 					"$(SRCROOT)/../native/lame_ios",
+					"$(SRCROOT)/../native/sunvox_lib/sunvox_lib/headers",
 					
 				);
 				INFOPLIST_FILE = Runner/Info.plist;

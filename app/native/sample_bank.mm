@@ -1,5 +1,6 @@
 #include "sample_bank.h"
-#include "pitch.h"  // For pitched file cleanup functions
+#include "sunvox_wrapper.h"  // For SunVox integration
+#include "table.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,7 +24,6 @@
 // Only include miniaudio as a header here (implementation lives elsewhere)
 #include "miniaudio/miniaudio.h"
 #include "undo_redo.h"
-#include "pitch.h"
 
 // Unified state (authoritative) and decoders
 static SampleBankState g_sample_bank_state;   // single source of truth
@@ -119,6 +119,11 @@ int sample_bank_load(int slot, const char* file_path) {
 
     prnt("✅ [SAMPLE_BANK] Sample loaded in slot %d: %s", slot, file_path);
 
+    // Load into SunVox sampler module
+    if (sunvox_wrapper_is_initialized()) {
+        sunvox_wrapper_load_sample(slot, file_path);
+    }
+
     // Update FFI-visible prefix
     state_write_begin();
     state_recompute_prefix();
@@ -157,8 +162,10 @@ void sample_bank_unload(int slot) {
 
     prnt("🗑️ [SAMPLE_BANK] Unloading sample from slot %d", slot);
 
-    // Clean up all pitched files for this sample
-    pitch_delete_all_files_for_sample(slot);
+    // Unload from SunVox sampler module
+    if (sunvox_wrapper_is_initialized()) {
+        sunvox_wrapper_unload_sample(slot);
+    }
 
     // Uninitialize decoder
     ma_decoder_uninit(&g_sample_decoders[slot]);
@@ -254,6 +261,17 @@ void sample_bank_set_sample_volume(int slot, float volume) {
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.volume = volume;
     state_write_end();
+
+    // Re-sync all cells using this sample with default volume
+    for (int i = 0; i < table_get_max_steps(); i++) {
+        for (int j = 0; j < table_get_max_cols(); j++) {
+            Cell* cell = table_get_cell(i, j);
+            if (cell && cell->sample_slot == slot && cell->settings.volume == DEFAULT_CELL_VOLUME) {
+                sunvox_wrapper_sync_cell(i, j);
+            }
+        }
+    }
+
     UndoRedoManager_record();
 }
 
@@ -265,17 +283,20 @@ void sample_bank_set_sample_pitch(int slot, float pitch) {
     if (pitch < 0.25f) pitch = 0.25f;
     if (pitch > 4.0f) pitch = 4.0f;
     
-    // Clean up all existing pitched files since sample pitch changed
-    pitch_delete_all_files_for_sample(slot);
-    
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
-    // Kick preprocessing for new default pitch so next triggers hit cache
-    if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
-        // Centralized processing toggles in pitch_start_async_preprocessing
-        pitch_start_async_preprocessing(slot, pitch);
+
+    // Re-sync all cells using this sample with default pitch
+    for (int i = 0; i < table_get_max_steps(); i++) {
+        for (int j = 0; j < table_get_max_cols(); j++) {
+            Cell* cell = table_get_cell(i, j);
+            if (cell && cell->sample_slot == slot && cell->settings.pitch == DEFAULT_CELL_PITCH) {
+                sunvox_wrapper_sync_cell(i, j);
+            }
+        }
     }
+
     UndoRedoManager_record();
 }
 
@@ -312,17 +333,21 @@ void sample_bank_set_sample_settings(int slot, float volume, float pitch) {
     if (pitch < 0.25f) pitch = 0.25f;
     if (pitch > 4.0f) pitch = 4.0f;
 
-    // Clean up all existing pitched files since sample pitch changed
-    pitch_delete_all_files_for_sample(slot);
-
     state_write_begin();
     g_sample_bank_state.samples[slot].settings.volume = volume;
     g_sample_bank_state.samples[slot].settings.pitch = pitch;
     state_write_end();
-    if (pitch_get_method() == PITCH_METHOD_SOUNDTOUCH_PREPROCESSING && fabsf(pitch - 1.0f) > 0.001f) {
-        // Centralized processing toggles in pitch_start_async_preprocessing
-        pitch_start_async_preprocessing(slot, pitch);
+
+    // Re-sync all cells using this sample with default pitch or volume
+    for (int i = 0; i < table_get_max_steps(); i++) {
+        for (int j = 0; j < table_get_max_cols(); j++) {
+            Cell* cell = table_get_cell(i, j);
+            if (cell && cell->sample_slot == slot && (cell->settings.pitch == DEFAULT_CELL_PITCH || cell->settings.volume == DEFAULT_CELL_VOLUME)) {
+                sunvox_wrapper_sync_cell(i, j);
+            }
+        }
     }
+
     UndoRedoManager_record();
 }
 

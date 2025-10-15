@@ -78,6 +78,56 @@ class S3Service:
         """Get public URL for a file"""
         # Construct public URL: https://BUCKET.REGION.digitaloceanspaces.com/FILE_KEY
         return f"https://{self.bucket_name}.{self.endpoint_url.replace('https://', '')}/{file_key}"
+    
+    def cleanup_folder(self, prefix: str) -> bool:
+        """
+        Delete all files in a folder (prefix) from S3
+        
+        Args:
+            prefix: The folder prefix to cleanup (e.g., 'stage/', 'test/')
+        
+        Returns:
+            bool: True if cleanup was successful, False otherwise
+        """
+        try:
+            logger.info(f"🧹 Starting S3 cleanup for folder: {prefix}")
+            
+            # List all objects with the given prefix
+            paginator = self.client.get_paginator('list_objects_v2')
+            pages = paginator.paginate(Bucket=self.bucket_name, Prefix=prefix)
+            
+            deleted_count = 0
+            for page in pages:
+                if 'Contents' not in page:
+                    logger.info(f"✅ No files found in {prefix}")
+                    return True
+                
+                # Prepare batch delete (max 1000 objects per request)
+                objects_to_delete = [{'Key': obj['Key']} for obj in page['Contents']]
+                
+                if objects_to_delete:
+                    response = self.client.delete_objects(
+                        Bucket=self.bucket_name,
+                        Delete={'Objects': objects_to_delete}
+                    )
+                    
+                    deleted_count += len(objects_to_delete)
+                    
+                    if 'Errors' in response:
+                        for error in response['Errors']:
+                            logger.error(f"❌ Failed to delete {error['Key']}: {error['Message']}")
+            
+            logger.info(f"✅ S3 cleanup complete! Deleted {deleted_count} files from {prefix}")
+            return True
+            
+        except ClientError as e:
+            logger.error(f"❌ S3 cleanup failed: {e}")
+            logger.error(f"   Error Code: {e.response.get('Error', {}).get('Code', 'Unknown')}")
+            logger.error(f"   Error Message: {e.response.get('Error', {}).get('Message', 'Unknown')}")
+            return False
+        except Exception as e:
+            logger.error(f"❌ Unexpected error during S3 cleanup: {e}")
+            return False
 
 # Global instance
 _s3_service: Optional[S3Service] = None

@@ -101,6 +101,32 @@ class MessageBarWidget extends StatelessWidget {
                     child: Row(
                       children: [
                         // Left button container
+                                                // Center button container
+                        Expanded(
+                          flex: (centerButtonContainerPercent * 100).round(),
+                          child: Container(
+                            height: barHeight,
+                            color: centerContainerBackgroundColor,
+                            child: Align(
+                              alignment: Alignment(centerButtonHorizontalPosition * 2 - 1, 0),
+                              child: Container(
+                                width: centerButtonWidth,
+                                height: centerButtonHeight,
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(255, 53, 53, 53),
+                                  borderRadius: BorderRadius.circular(leftBorderRadius),
+                                  border: Border.all(
+                                    color: const Color.fromARGB(255, 57, 57, 57),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: _buildSectionChain(tableState.sectionsCount),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                         Expanded(
                           flex: (leftButtonContainerPercent * 100).round(),
                           child: Container(
@@ -138,32 +164,7 @@ class MessageBarWidget extends StatelessWidget {
                           ),
                         ),
                         
-                        // Center button container
-                        Expanded(
-                          flex: (centerButtonContainerPercent * 100).round(),
-                          child: Container(
-                            height: barHeight,
-                            color: centerContainerBackgroundColor,
-                            child: Align(
-                              alignment: Alignment(centerButtonHorizontalPosition * 2 - 1, 0),
-                              child: Container(
-                                width: centerButtonWidth,
-                                height: centerButtonHeight,
-                                decoration: BoxDecoration(
-                                  color: const Color.fromARGB(255, 53, 53, 53),
-                                  borderRadius: BorderRadius.circular(leftBorderRadius),
-                                  border: Border.all(
-                                    color: const Color.fromARGB(255, 57, 57, 57),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: _buildSectionChain(tableState.sectionsCount),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+
                         
                         // Right button container
                         Expanded(
@@ -193,8 +194,9 @@ class MessageBarWidget extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(rightBorderRadius),
                                     onTap: () => _sendMessageAndNavigate(context, threadsState),
                                     child: Center(
-                                      child: AppIcons.buildSendIcon(
-                                        size: rightButtonSize,
+                                      child: Icon(
+                                        Icons.save,
+                                        size: rightButtonSize * 0.8,
                                         color: const Color.fromARGB(255, 197, 199, 199),
                                       ),
                                     ),

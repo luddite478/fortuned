@@ -14,6 +14,7 @@ from http_api.router import router as api_router
 from http_api.rate_limiter import RateLimitMiddleware
 from ws.router import start_websocket_server
 from db.init_collections import init_mongodb
+from storage.s3_service import get_s3_service
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -41,8 +42,22 @@ def init_database():
     try:
         logger.info("🗄️  Initializing database...")
         
+        # Check if this is a stage environment
+        env = os.getenv("ENV", "prod").lower()
+        s3_folder = os.getenv("S3_FOLDER", "stage/")
+        
         logger.info("🔄 Reinitializing database (drop existing collections)")
         init_mongodb(drop_existing=True, insert_samples=True)
+        
+        # Cleanup S3 folder if in stage environment
+        if env == "stage":
+            try:
+                logger.info(f"🧹 Stage environment detected - cleaning up S3 folder: {s3_folder}")
+                s3_service = get_s3_service()
+                s3_service.cleanup_folder(s3_folder)
+            except Exception as e:
+                logger.error(f"❌ S3 cleanup failed: {e}")
+                logger.warning("⚠️  Continuing with database initialization despite S3 cleanup failure")
             
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
