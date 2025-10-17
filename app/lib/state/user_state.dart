@@ -25,6 +25,14 @@ class UserState extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    // Check for a flag to clear storage on startup
+    const shouldClear = bool.fromEnvironment('CLEAR_STORAGE');
+    if (shouldClear) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_userKey);
+      debugPrint('🗑️ [USER] Storage cleared on startup.');
+    }
+
     const devUserId = String.fromEnvironment('DEV_USER_ID');
     UserProfile? localUser;
 

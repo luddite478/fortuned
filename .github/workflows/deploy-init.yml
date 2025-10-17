@@ -22,6 +22,7 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     with:
       environment: stage
+      branch: ${{ github.ref_name }}
     secrets: inherit
 
   deploy-manual:
@@ -29,4 +30,5 @@ jobs:
     uses: ./.github/workflows/deploy.yml
     with:
       environment: ${{ github.event.inputs.environment }}
+      branch: ${{ github.ref_name }}
     secrets: inherit

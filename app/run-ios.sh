@@ -6,6 +6,7 @@ ENVIRONMENT="$1"
 DEVICE_TYPE="$2"
 IPHONE_MODEL="$3"
 DEV_USER_ID_ARG="$4"
+CLEAR_STORAGE="$5"
 
 # Ensure system toolchain is used (avoid ccache)
 export CC="/usr/bin/clang"
@@ -62,19 +63,25 @@ cd native/sunvox_lib/sunvox_lib/ios
 cd ../../../..
 
 # Prepare Flutter command
-FLUTTER_CMD="flutter"
+FLUTTER_ARGS=()
 if [[ -n "$DEV_USER_ID_ARG" ]]; then
-  FLUTTER_CMD="$FLUTTER_CMD --dart-define=DEV_USER_ID=$DEV_USER_ID_ARG"
+  FLUTTER_ARGS+=(--dart-define=DEV_USER_ID=$DEV_USER_ID_ARG)
   echo "🔧 Running with developer user ID: $DEV_USER_ID_ARG"
+fi
+
+if [[ "$CLEAR_STORAGE" == "clear" ]]; then
+  FLUTTER_ARGS+=(--dart-define=CLEAR_STORAGE=true)
+  echo "🗑️ Clearing storage on next app launch."
 fi
 
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
-  $FLUTTER_CMD run -d "$IPHONE_MODEL" --debug
+  echo "flutter run "${FLUTTER_ARGS[@]}"  -d "$IPHONE_MODEL" --debug"
+  flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
-  $FLUTTER_CMD build ios --release
+  flutter build ios "${FLUTTER_ARGS[@]}" --release
 
   echo "Detecting first connected physical iPhone..."
   DEVICE_ID="00008030-001564DA14F9802E"
