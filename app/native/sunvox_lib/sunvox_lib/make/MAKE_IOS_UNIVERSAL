@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+echo "Building SunVox library for both iOS simulator and device..."
+
+# Build for simulator
+echo "Step 1/2: Building for simulator..."
+./MAKE_IOS
+
+# Build for device  
+echo "Step 2/2: Building for device..."
+./MAKE_IOS_DEVICE
+
+cd ../ios
+
+echo ""
+echo "✓ Build complete!"
+echo ""
+echo "Created libraries:"
+echo "  - sunvox_x86_64_simulator.a (Intel Mac simulator)"
+echo "  - sunvox_arm64_simulator.a (Apple Silicon simulator)" 
+echo "  - sunvox_arm64_device.a (Physical iPhone/iPad)"
+echo "  - sunvox.a (Universal simulator: x86_64 + arm64)"
+echo ""
+echo "Note: libsunvox.a will be automatically selected by Xcode based on build target"
+

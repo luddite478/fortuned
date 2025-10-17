@@ -54,6 +54,12 @@ yq eval '.flutter.assets += ["samples_manifest.json"]' -i pubspec.yaml
 # Clean up temp file
 rm "$TEMP_ASSETS"
 
+# Select appropriate SunVox library based on target
+echo "Selecting appropriate SunVox library..."
+cd native/sunvox_lib/sunvox_lib/ios
+./select_library.sh "$DEVICE_TYPE"
+cd ../../../..
+
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."

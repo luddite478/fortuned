@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+MAKE_OPTIONS="TARGET_OS=ios MAKE_STATIC_LIB=true STYPE=PS_STYPE_FLOAT32"
+DEVICE_SDK="/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
+
+echo "Building SunVox library for iOS device (physical device)..."
+
+# Build for arm64 device (iPhone/iPad)
+echo "Building for arm64 (iOS device)..."
+make clean
+make -j8 $MAKE_OPTIONS TARGET_ARCH=arm64 IOS_SDK="$DEVICE_SDK" IOS_TARGET_SUFFIX=""
+make install $MAKE_OPTIONS TARGET_ARCH=arm64 IOS_SDK="$DEVICE_SDK" IOS_TARGET_SUFFIX=""
+
+# Verify the result
+echo ""
+echo "iOS device library created successfully:"
+lipo -info ../ios/sunvox_arm64.a
+
+# Create device-specific library
+mv ../ios/sunvox_arm64.a ../ios/sunvox_arm64_device.a
+
+echo ""
+echo "Device library saved as sunvox_arm64_device.a"
+echo "Done!"
+

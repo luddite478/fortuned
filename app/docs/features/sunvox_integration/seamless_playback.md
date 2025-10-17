@@ -89,3 +89,5 @@ The entire switch happens between audio callbacks. SunVox's internal logic is de
 4.  The engine processes notes for the newly activated patterns.
 
 This all happens atomically within a single audio buffer (~5ms), resulting in a perfectly seamless transition.
+
+
