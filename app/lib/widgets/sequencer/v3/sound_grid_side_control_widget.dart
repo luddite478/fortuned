@@ -75,8 +75,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
                       builder: (context, _, __) {
                         final total = sequencer.getSectionLoopCount(sequencer.currentSectionIndex);
                         final current = (sequencer.currentSectionLoopCounter + 1).clamp(1, total);
-                        final isSongMode = sequencer.isSongMode;
-                        final label = isSongMode ? '$current/$total' : '∞';
+                        final label = '$current/$total';
                         final blended = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
                         return Text(
                           label,

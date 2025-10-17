@@ -144,21 +144,6 @@ static uint sunvox_check_speed( int offset, sunvox_engine* s )
 // ===== FORTUNED MODIFICATION: Helper function for pattern sequencing =====
 static int find_next_pattern_in_sequence( int current_pat, sunvox_engine* s )
 {
-    // ONE-TIME TEST: Verify logging from SunVox engine works
-    if( !g_sunvox_engine_logging_test_done )
-    {
-        g_sunvox_engine_logging_test_done = 1;
-        prnt("🚨🚨🚨 [SUNVOX_ENGINE] LOGGING TEST - THIS MESSAGE FROM SUNVOX ENGINE SOURCE 🚨🚨🚨");
-        prnt("🚨🚨🚨 [SUNVOX_ENGINE] If you see this, prnt() works from SunVox library! 🚨🚨🚨");
-    }
-    
-    prnt("🔍 [SUNVOX] find_next_pattern_in_sequence: current=%d, seq_count=%d", current_pat, s->pattern_sequence_count);
-    
-    // Debug: Show sequence
-    for( int i = 0; i < s->pattern_sequence_count; i++ )
-    {
-        prnt("    seq[%d] = %d", i, s->pattern_sequence[ i ]);
-    }
     
     // Find current pattern in sequence and return next one
     for( int i = 0; i < s->pattern_sequence_count - 1; i++ )

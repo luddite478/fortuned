@@ -105,3 +105,5 @@ The following components of the legacy pitch system have been completely removed
 - **FFI Bindings:** `app/lib/ffi/pitch_bindings.dart`.
 - **UI Settings:** The "Pitch Quality" section in the Sequencer Settings screen, which is no longer relevant.
 - **Snapshot Logic:** The step in the snapshot import process that generated pitched files has been removed.
+
+
