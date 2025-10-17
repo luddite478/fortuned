@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Query, Body, UploadFile, File, Form
+from fastapi import APIRouter, Request, Query, Body, UploadFile, File, Form, Response
 from typing import Optional
 from http_api.users import (
     login_handler, 
@@ -56,9 +56,9 @@ async def register(request: Request, register_data: RegisterRequest):
     return await register_handler(request, register_data)
 
 @router.post("/users/session")
-async def session(request: Request, user_data: UserSessionRequest):
+async def session(request: Request, response: Response, user_data: UserSessionRequest):
     """Get or create a user session"""
-    return await session_handler(request, user_data)
+    return await session_handler(request, response, user_data)
 
 # User endpoints (renamed from profile endpoints)
 @router.get("/users/user")

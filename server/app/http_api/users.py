@@ -2,7 +2,7 @@ import uuid
 import bcrypt
 import hashlib
 from datetime import datetime, timezone
-from fastapi import Request, Query, HTTPException
+from fastapi import Request, Query, HTTPException, Response
 from fastapi.responses import JSONResponse
 from typing import Optional, Dict, Any, List
 import os
@@ -195,7 +195,7 @@ async def register_handler(request: Request, register_data: RegisterRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
 
-async def session_handler(request: Request, user_data: UserSessionRequest):
+async def session_handler(request: Request, response: Response, user_data: UserSessionRequest):
     """Get or create a user session for anonymous, device-based authentication."""
     try:
         # Find user by ID
@@ -207,9 +207,9 @@ async def session_handler(request: Request, user_data: UserSessionRequest):
                 {"id": user_data.id},
                 {"$set": {"last_online": datetime.now(timezone.utc).isoformat()}}
             )
-            # Remove MongoDB's _id before returning
+            # Remove MongoDB's _id before returning, as it's not needed by client
             existing_user.pop('_id', None)
-            return JSONResponse(content=existing_user)
+            return existing_user
         
         else:
             # User doesn't exist, create a new one from the client-provided data
@@ -224,7 +224,8 @@ async def session_handler(request: Request, user_data: UserSessionRequest):
             
             db.users.insert_one(new_user_doc)
             
-            return JSONResponse(content=new_user_doc, status_code=201)
+            response.status_code = 201
+            return new_user_doc
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Session handling failed: {str(e)}")
