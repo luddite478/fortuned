@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/auth_service.dart';
+import '../state/user_state.dart';
 import '../state/library_state.dart';
 import '../utils/app_colors.dart';
 
@@ -50,54 +50,7 @@ class AppSettingsScreen extends StatelessWidget {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    // Logout button
-                    Container(
-                      width: double.infinity,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.menuEntryBackground,
-                        borderRadius: BorderRadius.circular(3),
-                        border: Border.all(
-                          color: AppColors.menuBorder,
-                          width: 1,
-                        ),
-                      ),
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: () async {
-                            final authService = Provider.of<AuthService>(context, listen: false);
-                            final libraryState = Provider.of<LibraryState>(context, listen: false);
-                            
-                            // Clear library data on logout
-                            libraryState.clear();
-                            
-                            await authService.logout();
-                            if (context.mounted) {
-                              Navigator.of(context).popUntil((route) => route.isFirst);
-                            }
-                          },
-                          borderRadius: BorderRadius.circular(12),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: Row(
-                              children: [
-                                const SizedBox(width: 12),
-                                Text(
-                                  'Logout',
-                                  style: GoogleFonts.sourceSans3(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.menuText,
-                                    letterSpacing: 0.5,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // The logout button has been removed.
                   ],
                 ),
               ),

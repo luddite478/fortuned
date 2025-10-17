@@ -8,7 +8,7 @@ import '../models/playlist_item.dart';
 import '../models/thread/message.dart';
 import '../state/audio_player_state.dart';
 import '../state/library_state.dart';
-import '../services/auth_service.dart';
+import '../state/user_state.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({Key? key}) : super(key: key);
@@ -44,8 +44,8 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
   }
   
   Future<void> _loadPlaylist() async {
-    final auth = context.read<AuthService>();
-    final userId = auth.currentUser?.id;
+    final userState = context.read<UserState>();
+    final userId = userState.currentUser?.id;
     
     if (userId == null) return;
     
@@ -397,8 +397,8 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
   }
   
   Future<void> _removeFromPlaylist(PlaylistItem item) async {
-    final auth = context.read<AuthService>();
-    final userId = auth.currentUser?.id;
+    final userState = context.read<UserState>();
+    final userId = userState.currentUser?.id;
     
     if (userId == null) return;
     

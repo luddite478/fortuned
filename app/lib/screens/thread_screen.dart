@@ -14,7 +14,7 @@ import '../models/thread/thread_user.dart';
 import '../services/users_service.dart';
 import '../services/audio_cache_service.dart';
 import '../widgets/sections_chain_squares.dart';
-import '../services/auth_service.dart';
+import '../state/user_state.dart';
 
 class ThreadScreen extends StatefulWidget {
   final String threadId;
@@ -858,8 +858,8 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   // Removed unused _playMessageRender
 
   Future<void> _addToPlaylist(BuildContext context, Render render) async {
-    final auth = context.read<AuthService>();
-    final userId = auth.currentUser?.id;
+    final userState = context.read<UserState>();
+    final userId = userState.currentUser?.id;
     
     if (userId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -944,13 +944,13 @@ class _ParticipantsIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<ThreadsState, AuthService>(
-      builder: (context, threadsState, auth, _) {
+    return Consumer2<ThreadsState, UserState>(
+      builder: (context, threadsState, userState, _) {
         final thread = threadsState.threads.firstWhere(
           (t) => t.id == threadId,
           orElse: () => threadsState.activeThread ?? Thread(id: threadId, name: ThreadNameGenerator.generate(threadId), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
         );
-        final me = auth.currentUser?.id;
+        final me = userState.currentUser?.id;
         final others = thread.users.where((u) => u.id != me).map((u) => u.name).toList();
         if (others.isEmpty) {
           return const SizedBox.shrink();

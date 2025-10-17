@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
+import '../state/user_state.dart';
 import '../models/thread/thread.dart';
 import '../services/threads_api.dart';
 
@@ -13,7 +14,6 @@ import '../widgets/common_header_widget.dart';
 import '../ffi/table_bindings.dart';
 import '../ffi/playback_bindings.dart';
 import '../ffi/sample_bank_bindings.dart';
-import '../services/auth_service.dart';
 import '../widgets/buttons/action_button.dart';
 
 class ProjectsScreen extends StatefulWidget {
@@ -40,7 +40,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Future<void> _loadProjects() async {
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
+      final userState = Provider.of<UserState>(context, listen: false);
       final threadsState = Provider.of<ThreadsState>(context, listen: false);
       
       // Load threads (returns cached data immediately if available)
@@ -49,10 +49,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       // Refresh in background if already loaded (collaborative data)
       if (threadsState.hasLoaded) {
         // Refresh user and threads in background
-        _refreshInBackground(authService, threadsState);
+        _refreshInBackground(userState, threadsState);
       } else {
         // First load - also fetch invites
-        await _loadInvites(authService, threadsState);
+        await _loadInvites(userState, threadsState);
       }
       
       setState(() {
@@ -65,24 +65,24 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
   
-  Future<void> _refreshInBackground(AuthService authService, ThreadsState threadsState) async {
+  Future<void> _refreshInBackground(UserState userState, ThreadsState threadsState) async {
     try {
       // Refresh current user to fetch pending_invites_to_threads
-      await authService.refreshCurrentUserFromServer();
+      await userState.refreshCurrentUserFromServer();
       
       // Refresh threads in background
       await threadsState.refreshThreadsInBackground();
       
       // Also load invite thread summaries
-      await _loadInvites(authService, threadsState);
+      await _loadInvites(userState, threadsState);
     } catch (e) {
       debugPrint('❌ [PROJECTS] Background refresh error: $e');
       // Don't show error to user for background refresh
     }
   }
   
-  Future<void> _loadInvites(AuthService authService, ThreadsState threadsState) async {
-    final invites = authService.currentUser?.pendingInvitesToThreads ?? const [];
+  Future<void> _loadInvites(UserState userState, ThreadsState threadsState) async {
+    final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
     for (final threadId in invites) {
       await threadsState.ensureThreadSummary(threadId);
     }
@@ -174,9 +174,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       // Invites section (if current user has pending invites)
-                                      Consumer2<AuthService, ThreadsState>(
-                                        builder: (context, auth, threadsState, _) {
-                                          final invites = auth.currentUser?.pendingInvitesToThreads ?? const [];
+                                      Consumer2<UserState, ThreadsState>(
+                                        builder: (context, userState, threadsState, _) {
+                                          final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
                                           if (invites.isEmpty) return const SizedBox.shrink();
                                           // Ensure missing invite thread summaries are loaded
                                           final existingIds = threadsState.threads.map((t) => t.id).toSet();
@@ -209,7 +209,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                                   (x) => x.id == id,
                                                   orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
                                                 );
-                                                return _buildInviteCard(t.users.isEmpty ? null : t, auth, id);
+                                                return _buildInviteCard(t.users.isEmpty ? null : t, userState, id);
                                               }).toList(),
                                             ],
                                           );
@@ -552,7 +552,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  Widget _buildInviteCard(Thread? thread, AuthService auth, String threadId) {
+  Widget _buildInviteCard(Thread? thread, UserState userState, String threadId) {
     // Same visual style as project list tile; only right side differs
     return Container(
       height: 60,
@@ -643,12 +643,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 fontSize: 12,
                 onTap: () async {
-                  await ThreadsApi.acceptInvite(threadId: threadId, userId: auth.currentUser!.id);
-                  final authSvc = context.read<AuthService>();
+                  await ThreadsApi.acceptInvite(threadId: threadId, userId: userState.currentUser!.id);
+                  final userSvc = context.read<UserState>();
                   final threadsState = context.read<ThreadsState>();
-                  await authSvc.refreshCurrentUserFromServer();
+                  await userSvc.refreshCurrentUserFromServer();
                   await threadsState.loadThreads();
-                  final invites = authSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                  final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
                   for (final id in invites) {
                     await threadsState.ensureThreadSummary(id);
                   }
@@ -665,12 +665,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 fontSize: 12,
                 onTap: () async {
-                  await ThreadsApi.declineInvite(threadId: threadId, userId: auth.currentUser!.id);
-                  final authSvc = context.read<AuthService>();
+                  await ThreadsApi.declineInvite(threadId: threadId, userId: userState.currentUser!.id);
+                  final userSvc = context.read<UserState>();
                   final threadsState = context.read<ThreadsState>();
-                  await authSvc.refreshCurrentUserFromServer();
+                  await userSvc.refreshCurrentUserFromServer();
                   await threadsState.loadThreads();
-                  final invites = authSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                  final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
                   for (final id in invites) {
                     await threadsState.ensureThreadSummary(id);
                   }
@@ -686,8 +686,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Widget _buildParticipantsChips(Thread project) {
-    final auth = context.read<AuthService>();
-    final me = auth.currentUser?.id;
+    final userState = context.read<UserState>();
+    final me = userState.currentUser?.id;
     final others = project.users.where((u) => u.id != me).map((u) => u.name).toList();
     if (others.isEmpty) return const SizedBox.shrink();
     final List<Widget> chips = [];

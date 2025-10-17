@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../widgets/user_profile_widget.dart';
 import '../utils/app_colors.dart';
 import '../services/users_service.dart';
-import '../services/auth_service.dart';
+import '../state/user_state.dart';
 import '../widgets/bottom_audio_player.dart';
 import '../state/audio_player_state.dart';
 
@@ -37,8 +37,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _checkIfFollowing() async {
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final currentUserId = authService.currentUser?.id;
+      final userState = Provider.of<UserState>(context, listen: false);
+      final currentUserId = userState.currentUser?.id;
       
       if (currentUserId == null) return;
       
@@ -58,8 +58,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   Future<void> _toggleFollow() async {
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
-      final currentUserId = authService.currentUser?.id;
+      final userState = Provider.of<UserState>(context, listen: false);
+      final currentUserId = userState.currentUser?.id;
       
       if (currentUserId == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -108,8 +108,8 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final currentUserId = authService.currentUser?.id;
+    final userState = Provider.of<UserState>(context, listen: false);
+    final currentUserId = userState.currentUser?.id;
     final isOwnProfile = currentUserId == widget.userId;
 
     return WillPopScope(

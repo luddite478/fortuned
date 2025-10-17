@@ -38,6 +38,7 @@ dependencies:
   share_plus: ^7.2.2
   shared_preferences: ^2.2.2
   just_audio: ^0.9.36
+  connectivity_plus: ^7.0.0
 name: fortuned
 publish_to: none
 dev_dependencies:

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../models/thread/thread.dart';
 import '../models/thread/message.dart';
@@ -24,6 +25,7 @@ class ThreadsState extends ChangeNotifier {
 
   // Data
   final List<Thread> _threads = [];
+  final List<Thread> _unsyncedThreads = [];
   Thread? _activeThread;
   final Map<String, List<Message>> _messagesByThread = {};
   final Map<String, bool> _messagesLoadingByThread = {};
@@ -60,7 +62,11 @@ class ThreadsState extends ChangeNotifier {
   }
 
   // Getters
-  List<Thread> get threads => List.unmodifiable(_threads);
+  List<Thread> get threads {
+    final all = [..._threads, ..._unsyncedThreads];
+    all.sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+    return List.unmodifiable(all);
+  }
   Thread? get activeThread => _activeThread;
   // Backward-compat alias for older call sites
   Thread? get currentThread => _activeThread;
@@ -130,6 +136,8 @@ class ThreadsState extends ChangeNotifier {
         ..clear()
         ..addAll(result);
       _hasLoaded = true;
+
+      await syncOfflineThreads();
       
       debugPrint('🧵 [THREADS] Loaded threads: ${_threads.length} items');
     } catch (e) {
@@ -259,6 +267,13 @@ class ThreadsState extends ChangeNotifier {
     required String name,
     Map<String, dynamic>? metadata,
   }) async {
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    final isOnline = connectivityResult != ConnectivityResult.none;
+
+    if (!isOnline) {
+      return _createThreadOffline(users: users, name: name, metadata: metadata);
+    }
+
     try {
       _setLoading(true);
       _setError(null);
@@ -290,6 +305,74 @@ class ThreadsState extends ChangeNotifier {
     } finally {
       _setLoading(false);
     }
+  }
+
+  String _createThreadOffline({
+    required List<ThreadUser> users,
+    required String name,
+    Map<String, dynamic>? metadata,
+  }) {
+    final tempId = 'local_${DateTime.now().microsecondsSinceEpoch}';
+    final newThread = Thread(
+      id: tempId,
+      name: name,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      users: users,
+      messageIds: const [],
+      invites: const [],
+      isLocal: true,
+    );
+    _unsyncedThreads.add(newThread);
+    _activeThread = newThread;
+    notifyListeners();
+    return tempId;
+  }
+
+  Future<void> syncOfflineThreads() async {
+    if (_unsyncedThreads.isEmpty) return;
+
+    final connectivityResult = await (Connectivity().checkConnectivity());
+    if (connectivityResult == ConnectivityResult.none) return;
+
+    debugPrint('🔄 [THREADS] Syncing ${_unsyncedThreads.length} offline threads...');
+    
+    final syncedThreads = <Thread>[];
+    for (final localThread in _unsyncedThreads) {
+      try {
+        final threadId = await ThreadsApi.createThread(
+          users: localThread.users,
+          name: localThread.name,
+          metadata: localThread.metadata,
+        );
+        final syncedThread = await ThreadsApi.getThread(threadId);
+        syncedThreads.add(syncedThread);
+        
+        // If the synced thread was active, update it
+        if (_activeThread?.id == localThread.id) {
+          _activeThread = syncedThread;
+        }
+      } catch (e) {
+        debugPrint('❌ [THREADS] Failed to sync thread ${localThread.id}: $e');
+        // Keep it in unsynced list to retry later
+        syncedThreads.add(localThread);
+      }
+    }
+
+    _unsyncedThreads.clear();
+    for (final thread in syncedThreads) {
+      if (thread.isLocal) {
+        _unsyncedThreads.add(thread);
+      } else {
+        final existingIndex = _threads.indexWhere((t) => t.id == thread.id);
+        if (existingIndex >= 0) {
+          _threads[existingIndex] = thread;
+        } else {
+          _threads.add(thread);
+        }
+      }
+    }
+    notifyListeners();
   }
 
   Future<void> sendMessageFromSequencer({

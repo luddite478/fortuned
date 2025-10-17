@@ -5,9 +5,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
 
 import 'screens/main_navigation_screen.dart';
-import 'screens/login_screen.dart';
 import 'screens/thread_screen.dart';
-import 'services/auth_service.dart';
 import 'services/threads_service.dart';
 import 'services/users_service.dart';
 import 'services/notifications.dart';
@@ -18,12 +16,12 @@ import 'models/thread/thread.dart';
 import 'models/thread/thread_user.dart';
 import 'utils/thread_name_generator.dart';
 
+import 'state/user_state.dart';
 import 'state/threads_state.dart';
 import 'state/audio_player_state.dart';
 import 'state/library_state.dart';
 import 'state/followed_state.dart';
 import 'services/ws_client.dart';
-// import 'state/patterns_state.dart';
 import 'state/sequencer/table.dart';
 import 'state/sequencer/playback.dart';
 import 'state/sequencer/sample_bank.dart';
@@ -48,7 +46,7 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => AuthService()),
+        ChangeNotifierProvider(create: (context) => UserState()),
         ChangeNotifierProvider(create: (context) => AudioPlayerState()),
         ChangeNotifierProvider(create: (context) => LibraryState()),
         ChangeNotifierProvider(create: (context) => FollowedState()),
@@ -106,34 +104,31 @@ class _MainPageState extends State<MainPage> {
   void initState() {
     super.initState();
     // Remove the immediate call to _syncCurrentUser() since it will be called
-    // reactively when AuthService completes loading
+    // reactively when UserState completes loading
   }
 
   void _syncCurrentUser() {
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final userState = Provider.of<UserState>(context, listen: false);
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
     final threadsService = Provider.of<ThreadsService>(context, listen: false);
     final wsClient = Provider.of<WebSocketClient>(context, listen: false);
     final libraryState = Provider.of<LibraryState>(context, listen: false);
     final followedState = Provider.of<FollowedState>(context, listen: false);
     
-    if (authService.currentUser != null) {
-      // Ensure we have latest user fields (e.g., pending_invites_to_threads)
-      authService.refreshCurrentUserFromServer();
+    if (userState.currentUser != null) {
       threadsState.setCurrentUser(
-        authService.currentUser!.id,
-        authService.currentUser!.name,
+        userState.currentUser!.id,
+        userState.currentUser!.name,
       );
       
       // Load data on startup (cached for session)
-      libraryState.loadPlaylist(userId: authService.currentUser!.id);
+      libraryState.loadPlaylist(userId: userState.currentUser!.id);
       threadsState.loadThreads();
-      followedState.loadFollowedUsers(userId: authService.currentUser!.id);
+      followedState.loadFollowedUsers(userId: userState.currentUser!.id);
       
       // Initialize single WebSocket connection for this user
-      _initializeThreadsService(threadsService, authService.currentUser!.id, context);
+      _initializeThreadsService(threadsService, userState.currentUser!.id, context);
       _setupNotifications(wsClient);
-    } else {
     }
   }
 
@@ -171,8 +166,11 @@ class _MainPageState extends State<MainPage> {
       // If an invitation arrives while on Projects, refresh user + load that thread summary so INVITES appears instantly
       if (event.type == AppNotificationType.invitationReceived) {
         try {
-          final auth = Provider.of<AuthService>(context, listen: false);
-          await auth.refreshCurrentUserFromServer();
+          // Re-sync user state to get new invites
+          final userState = Provider.of<UserState>(context, listen: false);
+          // This will re-trigger a sync and update the user object
+          await userState.refreshCurrentUserFromServer();
+
           if (event.threadId != null) {
             final threadsState = Provider.of<ThreadsState>(context, listen: false);
             await threadsState.ensureThreadSummary(event.threadId!);
@@ -231,8 +229,8 @@ class _MainPageState extends State<MainPage> {
           final userName = (event.raw['user_name'] as String?) ?? 'A collaborator';
           final acceptedUserId = event.raw['user_id'] as String?;
           try {
-            final auth = Provider.of<AuthService>(context, listen: false);
-            if (acceptedUserId != null && auth.currentUser?.id == acceptedUserId) {
+            final userState = Provider.of<UserState>(context, listen: false);
+            if (acceptedUserId != null && userState.currentUser?.id == acceptedUserId) {
               // Suppress for the user who accepted their own invite
               return;
             }
@@ -322,30 +320,16 @@ class _MainPageState extends State<MainPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show users screen as the initial view
-    return Consumer2<AuthService, ThreadsService>(
-      builder: (context, authService, threadsService, child) {
-        // 🔧 FIX: Sync current user when AuthService finishes loading and user is authenticated
-        if (!authService.isLoading && authService.isAuthenticated && authService.currentUser != null && !_hasInitializedUser) {
+    return Consumer<UserState>(
+      builder: (context, userState, child) {
+        if (!userState.isLoading && userState.isAuthenticated && userState.currentUser != null && !_hasInitializedUser) {
           _hasInitializedUser = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _syncCurrentUser();
           });
         }
         
-        // Reset flag if user logs out
-        if (!authService.isAuthenticated && _hasInitializedUser) {
-          _hasInitializedUser = false;
-        }
-        
-        // Handle logout - disconnect ThreadsService when user logs out
-        if (!authService.isAuthenticated && threadsService.isConnected) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            threadsService.dispose();
-          });
-        }
-        
-        if (authService.isLoading) {
+        if (userState.isLoading) {
           return Scaffold(
             backgroundColor: Colors.white,
             body: SafeArea(
@@ -356,7 +340,6 @@ class _MainPageState extends State<MainPage> {
                   children: [
                     const Spacer(),
                     
-                    // Linear progress indicator
                     ClipRRect(
                       borderRadius: BorderRadius.circular(2),
                       child: LinearProgressIndicator(
@@ -372,10 +355,6 @@ class _MainPageState extends State<MainPage> {
               ),
             ),
           );
-        }
-
-        if (!authService.isAuthenticated) {
-          return const LoginScreen();
         }
 
         return const MainNavigationScreen();

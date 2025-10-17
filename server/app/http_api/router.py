@@ -3,6 +3,7 @@ from typing import Optional
 from http_api.users import (
     login_handler, 
     register_handler, 
+    session_handler,
     get_user_handler, 
     get_users_handler,
     follow_user_handler,
@@ -13,7 +14,8 @@ from http_api.users import (
     remove_from_playlist_handler,
     get_playlist_handler,
     LoginRequest,
-    RegisterRequest
+    RegisterRequest,
+    UserSessionRequest,
 )
 from http_api.threads import (
     create_thread_handler,
@@ -52,6 +54,11 @@ async def login(request: Request, login_data: LoginRequest):
 async def register(request: Request, register_data: RegisterRequest):
     """User registration"""
     return await register_handler(request, register_data)
+
+@router.post("/users/session")
+async def session(request: Request, user_data: UserSessionRequest):
+    """Get or create a user session"""
+    return await session_handler(request, user_data)
 
 # User endpoints (renamed from profile endpoints)
 @router.get("/users/user")

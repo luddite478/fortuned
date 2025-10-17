@@ -4,10 +4,10 @@ import hashlib
 from datetime import datetime, timezone
 from fastapi import Request, Query, HTTPException
 from fastapi.responses import JSONResponse
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import os
 from pymongo import MongoClient
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from db.connection import get_database
 from bson import ObjectId
 
@@ -17,6 +17,44 @@ db = get_database()
 API_TOKEN = os.getenv("API_TOKEN")
 
 # Pydantic models for request/response
+class UserProfileInfo(BaseModel):
+    bio: str
+    location: str
+
+class UserStats(BaseModel):
+    total_plays: int
+
+class UserPreferences(BaseModel):
+    theme: str
+
+class PlaylistItem(BaseModel):
+    name: str
+    url: str
+    id: str
+    format: str
+    bitrate: Optional[int] = None
+    duration: Optional[float] = None
+    size_bytes: Optional[int] = Field(None, alias='sizeBytes')
+    created_at: str
+    type: str
+
+class UserSessionRequest(BaseModel):
+    id: str
+    username: str
+    name: str
+    email: str
+    created_at: str
+    last_login: str
+    last_online: str
+    is_active: bool
+    email_verified: bool
+    profile: UserProfileInfo
+    stats: UserStats
+    preferences: UserPreferences
+    threads: List[str] = []
+    pending_invites_to_threads: List[str] = []
+    playlist: List[PlaylistItem] = []
+
 class LoginRequest(BaseModel):
     email: str
     password: str
@@ -156,6 +194,40 @@ async def register_handler(request: Request, register_data: RegisterRequest):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+async def session_handler(request: Request, user_data: UserSessionRequest):
+    """Get or create a user session for anonymous, device-based authentication."""
+    try:
+        # Find user by ID
+        existing_user = db.users.find_one({"id": user_data.id})
+        
+        if existing_user:
+            # User exists, update last_online and return
+            db.users.update_one(
+                {"id": user_data.id},
+                {"$set": {"last_online": datetime.now(timezone.utc).isoformat()}}
+            )
+            # Remove MongoDB's _id before returning
+            existing_user.pop('_id', None)
+            return JSONResponse(content=existing_user)
+        
+        else:
+            # User doesn't exist, create a new one from the client-provided data
+            new_user_doc = user_data.dict(by_alias=True)
+            
+            # Ensure required fields for a new user are present, even if not sent
+            new_user_doc.setdefault("following", [])
+            
+            # We don't want to store password info for anonymous users
+            new_user_doc.pop("password_hash", None)
+            new_user_doc.pop("salt", None)
+            
+            db.users.insert_one(new_user_doc)
+            
+            return JSONResponse(content=new_user_doc, status_code=201)
+            
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Session handling failed: {str(e)}")
 
 async def get_user_handler(request: Request, id: str = Query(...), token: str = Query(...)):
     """Get user by ID (renamed from get_user_profile_handler)"""

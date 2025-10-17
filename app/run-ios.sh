@@ -5,6 +5,7 @@ set -e
 ENVIRONMENT="$1"
 DEVICE_TYPE="$2"
 IPHONE_MODEL="$3"
+DEV_USER_ID_ARG="$4"
 
 # Ensure system toolchain is used (avoid ccache)
 export CC="/usr/bin/clang"
@@ -60,13 +61,20 @@ cd native/sunvox_lib/sunvox_lib/ios
 ./select_library.sh "$DEVICE_TYPE"
 cd ../../../..
 
+# Prepare Flutter command
+FLUTTER_CMD="flutter"
+if [[ -n "$DEV_USER_ID_ARG" ]]; then
+  FLUTTER_CMD="$FLUTTER_CMD --dart-define=DEV_USER_ID=$DEV_USER_ID_ARG"
+  echo "🔧 Running with developer user ID: $DEV_USER_ID_ARG"
+fi
+
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
-  flutter run -d "$IPHONE_MODEL" --debug
+  $FLUTTER_CMD run -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
-  flutter build ios --release
+  $FLUTTER_CMD build ios --release
 
   echo "Detecting first connected physical iPhone..."
   DEVICE_ID="00008030-001564DA14F9802E"
