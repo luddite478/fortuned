@@ -703,6 +703,25 @@ class ThreadsState extends ChangeNotifier {
     }
   }
 
+  Future<bool> joinThread({required String threadId}) async {
+    if (_currentUserId == null || _currentUserName == null) {
+      throw Exception('User not authenticated');
+    }
+    try {
+      await ThreadsApi.joinThread(
+        threadId: threadId,
+        userId: _currentUserId!,
+        userName: _currentUserName!,
+      );
+      // Refresh thread list to include the newly joined thread
+      await loadThreads(silent: true);
+      return true;
+    } catch (e) {
+      debugPrint('❌ [THREADS] Failed to join thread: $e');
+      return false;
+    }
+  }
+
   // WebSocket integration
   void _registerWsHandlers() {
     _wsClient.registerMessageHandler('message_created', _onMessageCreated);

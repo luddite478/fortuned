@@ -15,6 +15,9 @@ import '../services/users_service.dart';
 import '../services/audio_cache_service.dart';
 import '../widgets/sections_chain_squares.dart';
 import '../state/user_state.dart';
+import '../services/http_client.dart';
+import 'dart:ui';
+import 'package:flutter/services.dart';
 
 class ThreadScreen extends StatefulWidget {
   final String threadId;
@@ -910,14 +913,14 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   }
 
   void _showInviteCollaboratorsModal(BuildContext context) {
+    final thread = context.read<ThreadsState>().activeThread;
+    if (thread == null) return;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.9,
-        child: const _InviteCollaboratorsModalBottomSheet(),
-      ),
+      builder: (context) => _InviteLinkModalBottomSheet(threadId: thread.id),
     );
   }
 
@@ -979,242 +982,15 @@ class _ParticipantsIndicator extends StatelessWidget {
   }
 }
 
-class _InviteCollaboratorsModalBottomSheet extends StatefulWidget {
-  const _InviteCollaboratorsModalBottomSheet();
+class _InviteLinkModalBottomSheet extends StatelessWidget {
+  final String threadId;
 
-  @override
-  State<_InviteCollaboratorsModalBottomSheet> createState() => _InviteCollaboratorsModalBottomSheetState();
-}
-
-class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaboratorsModalBottomSheet> {
-  final List<UserProfile> _selectedUsers = [];
-  final TextEditingController _searchController = TextEditingController();
-  List<UserProfile> _filteredUserProfiles = [];
-  List<UserProfile> _followedUsers = [];
-  bool _isLoading = true;
-  bool _isSearching = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _setupSearchListener();
-    _loadFollowedUsers();
-  }
-
-  void _setupSearchListener() {
-    _searchController.addListener(() {
-      _handleSearch(_searchController.text);
-    });
-  }
-
-  void _handleSearch(String query) async {
-    if (query.isEmpty) {
-      setState(() {
-        _isSearching = false;
-        _filteredUserProfiles = [];
-      });
-      return;
-    }
-
-    setState(() {
-      _isSearching = true;
-      _isLoading = false;
-    });
-
-    // First, check followed users for immediate matches
-    final threadsState = Provider.of<ThreadsState>(context, listen: false);
-    final currentUserId = threadsState.currentUserId;
-    
-    final followedMatches = _followedUsers
-        .where((user) => user.username.toLowerCase().contains(query.toLowerCase()))
-        .where((user) => user.id != currentUserId)
-        .where((user) => !_selectedUsers.any((selected) => selected.id == user.id))
-        .toList();
-
-    setState(() {
-      _filteredUserProfiles = followedMatches;
-    });
-
-    // If query is 4+ characters, also search all users
-    if (query.length >= 4) {
-      setState(() {
-        _isLoading = true;
-      });
-
-      try {
-        final searchResults = await UsersService.searchUsers(query, limit: 50);
-        
-        // Combine followed matches with search results, avoiding duplicates
-        final allResults = <UserProfile>[...followedMatches];
-        for (final user in searchResults.users) {
-          if (user.id != currentUserId && 
-              !allResults.any((existing) => existing.id == user.id) &&
-              !_selectedUsers.any((selected) => selected.id == user.id)) {
-            allResults.add(user);
-          }
-        }
-
-        setState(() {
-          _filteredUserProfiles = allResults;
-          _isLoading = false;
-        });
-      } catch (e) {
-        setState(() {
-          _error = 'Search failed: $e';
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _loadFollowedUsers() async {
-    try {
-      final threadsState = Provider.of<ThreadsState>(context, listen: false);
-      final currentUserId = threadsState.currentUserId;
-      
-      if (currentUserId == null) {
-        setState(() {
-          _error = 'Please log in to view followed users';
-          _isLoading = false;
-        });
-        return;
-      }
-
-      final response = await UsersService.getFollowedUsers(currentUserId);
-      setState(() {
-        _followedUsers = response.users;
-        _isLoading = false;
-        _error = null;
-      });
-    } catch (e) {
-      // If loading followed users fails, show empty state but don't show error
-      setState(() {
-        _followedUsers = [];
-        _isLoading = false;
-        _error = null;
-      });
-      print('Failed to load followed users: $e');
-    }
-  }
-
-  List<UserProfile> get _displayedUsers {
-    return _isSearching ? _filteredUserProfiles : _followedUsers;
-  }
-
-  Widget _buildSearchBarWithChips() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.menuPageBackground,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.menuBorder),
-      ),
-      child: Column(
-        children: [
-          // Selected users chips
-          if (_selectedUsers.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(8),
-              child: Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: _selectedUsers.map((user) => _buildUserChip(user)).toList(),
-              ),
-            ),
-          
-          // Search input
-          Row(
-            children: [
-              if (_isSearching)
-                IconButton(
-                  icon: Icon(Icons.arrow_back, color: AppColors.menuText, size: 20),
-                  onPressed: () {
-                    _searchController.clear();
-                    setState(() {
-                      _isSearching = false;
-                      _filteredUserProfiles = [];
-                    });
-                    // Dismiss keyboard
-                    FocusScope.of(context).unfocus();
-                  },
-                ),
-              
-              if (!_isSearching)
-                Padding(
-                  padding: const EdgeInsets.only(left: 12),
-                  child: Icon(Icons.search, color: AppColors.menuLightText, size: 20),
-                ),
-              
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  style: GoogleFonts.sourceSans3(
-                    color: AppColors.menuText,
-                    fontSize: 14,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Search',
-                    hintStyle: GoogleFonts.sourceSans3(
-                      color: AppColors.menuLightText,
-                      fontSize: 14,
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildUserChip(UserProfile user) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.menuBorder),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(width: 12),
-          Text(
-            user.username,
-            style: GoogleFonts.sourceSans3(
-              color: AppColors.menuText,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(width: 8),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedUsers.removeWhere((selected) => selected.id == user.id);
-              });
-              // Refresh search results to show the user again
-              _handleSearch(_searchController.text);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(6),
-              child: Icon(
-                Icons.close,
-                size: 16,
-                color: AppColors.menuLightText,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  const _InviteLinkModalBottomSheet({required this.threadId});
 
   @override
   Widget build(BuildContext context) {
+    final inviteLink = '${ApiHttpClient.publicBaseUrl}/to/$threadId';
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.menuEntryBackground,
@@ -1224,236 +1000,86 @@ class _InviteCollaboratorsModalBottomSheetState extends State<_InviteCollaborato
         ),
       ),
       child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: AppColors.menuBorder,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Invite Collaborators',
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.menuText,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Search bar with selected user chips
-                  _buildSearchBarWithChips(),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 32,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.menuBorder,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            Expanded(
-              child: _isLoading
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const CircularProgressIndicator(),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Loading users...',
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuLightText,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _error != null
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.error_outline, color: AppColors.menuLightText, size: 48),
-                              const SizedBox(height: 16),
-                              Text(
-                                _error!,
-                                style: GoogleFonts.sourceSans3(
-                                  color: AppColors.menuLightText,
-                                  fontSize: 14,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
-                              ElevatedButton(
-                                onPressed: _loadFollowedUsers,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: AppColors.menuButtonBackground,
-                                  side: BorderSide(color: AppColors.menuButtonBorder),
-                                ),
-                                child: Text(
-                                  'Retry',
-                                  style: GoogleFonts.sourceSans3(
-                                    color: AppColors.menuText,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _displayedUsers.isEmpty
-                          ? const SizedBox.shrink()
-                          : ListView.builder(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
-                              itemCount: _displayedUsers.length,
-                              itemBuilder: (context, index) {
-                                final user = _displayedUsers[index];
-                                final isOnline = user.isOnline;
-                                return Container(
-                                  margin: const EdgeInsets.only(bottom: 8),
-                                  child: GestureDetector(
-                                    onTap: () {
-                                      // Add user to selected chips
-                                      setState(() {
-                                        if (!_selectedUsers.any((selected) => selected.id == user.id)) {
-                                          _selectedUsers.add(user);
-                                        }
-                                      });
-                                      // Clear search and refresh results to hide selected user
-                                      _searchController.clear();
-                                      _handleSearch('');
-                                      // Dismiss keyboard
-                                      FocusScope.of(context).unfocus();
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.all(16),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.menuCheckpointBackground,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: AppColors.menuBorder,
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          Container(
-                                            width: 12,
-                                            height: 12,
-                                            decoration: BoxDecoration(
-                                              color: isOnline ? AppColors.menuOnlineIndicator : AppColors.menuLightText,
-                                              shape: BoxShape.circle,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 12),
-                                          Expanded(
-                                            child: Text(
-                                              user.username,
-                                              style: GoogleFonts.sourceSans3(
-                                                color: AppColors.menuText,
-                                                fontSize: 16,
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                              ),
-                            );
-                          },
-                        ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Row(
+              const SizedBox(height: 24),
+              Text(
+                'Invite',
+                style: GoogleFonts.sourceSans3(
+                  color: AppColors.menuText,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Anyone with this link can join this thread.',
+                textAlign: TextAlign.center,
+                style: GoogleFonts.sourceSans3(
+                  color: AppColors.menuLightText,
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 24),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.menuPageBackground,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.menuBorder),
+                ),
+                child: Text(
+                  inviteLink,
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.sourceCodePro(
+                    color: AppColors.menuText,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Row(
                 children: [
-                  Text(
-                    '${_selectedUsers.length} selected',
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.menuLightText,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: Text(
-                      'Cancel',
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.menuLightText,
-                        fontWeight: FontWeight.w500,
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.copy, size: 16),
+                      label: const Text('Copy Link'),
+                      onPressed: () {
+                        Clipboard.setData(ClipboardData(text: inviteLink));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: const Text('Link copied to clipboard'),
+                            backgroundColor: AppColors.menuOnlineIndicator,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.menuButtonBackground,
+                        foregroundColor: AppColors.menuText,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        side: BorderSide(color: AppColors.menuButtonBorder),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton(
-                    onPressed: _selectedUsers.isNotEmpty ? () => _inviteSelectedContacts() : null,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.menuButtonBackground,
-                      foregroundColor: AppColors.menuText,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      side: BorderSide(color: AppColors.menuButtonBorder),
-                    ),
-                    child: Text(
-                      'Invite',
-                      style: GoogleFonts.sourceSans3(fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
-  }
-
-  Future<void> _inviteSelectedContacts() async {
-    Navigator.of(context).pop();
-    if (_selectedUsers.isEmpty) return;
-
-    final threadsState = Provider.of<ThreadsState>(context, listen: false);
-    final currentThread = threadsState.activeThread;
-    final currentUserId = threadsState.currentUserId;
-
-    if (currentThread == null || currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Unable to send invitations at this time'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-
-
-    // Track invite send results silently (removed unused counters)
-
-    for (final user in _selectedUsers) {
-      try {
-        await threadsState.sendInvite(
-          threadId: currentThread.id,
-          userId: user.id,
-          userName: user.username,
-        );
-      } catch (_) {
-      }
-    }
-
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }
 

@@ -22,9 +22,13 @@ fi
 if [[ "$ENVIRONMENT" == "stage" ]]; then
   cp .stage.env .env
   echo "Using stage environment (.stage.env)"
+  cp ios/Runner/Runner.entitlements.stage ios/Runner/Runner.entitlements
+  echo "Using stage entitlements (devtest.4tnd.link)"
 elif [[ "$ENVIRONMENT" == "prod" ]]; then
   cp .prod.env .env
   echo "Using production environment (.prod.env)"
+  cp ios/Runner/Runner.entitlements.prod ios/Runner/Runner.entitlements
+  echo "Using production entitlements (4tnd.link)"
 fi
 
 # Step 1: Find all directories (including empty ones) in samples folder

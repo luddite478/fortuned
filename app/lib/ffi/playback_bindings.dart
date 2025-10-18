@@ -103,18 +103,6 @@ class PlaybackBindings {
     _previewStopCellPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('preview_stop_cell');
     previewStopCell = _previewStopCellPtr.asFunction<void Function()>();
 
-    // Volume smoothing configuration
-    _playbackSetSmoothingRiseTimePtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Float)>>('playback_set_smoothing_rise_time');
-    playbackSetSmoothingRiseTime = _playbackSetSmoothingRiseTimePtr.asFunction<void Function(double)>();
-
-    _playbackSetSmoothingFallTimePtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Float)>>('playback_set_smoothing_fall_time');
-    playbackSetSmoothingFallTime = _playbackSetSmoothingFallTimePtr.asFunction<void Function(double)>();
-
-    _playbackGetSmoothingRiseTimePtr = lib.lookup<ffi.NativeFunction<ffi.Float Function()>>('playback_get_smoothing_rise_time');
-    playbackGetSmoothingRiseTime = _playbackGetSmoothingRiseTimePtr.asFunction<double Function()>();
-
-    _playbackGetSmoothingFallTimePtr = lib.lookup<ffi.NativeFunction<ffi.Float Function()>>('playback_get_smoothing_fall_time');
-    playbackGetSmoothingFallTime = _playbackGetSmoothingFallTimePtr.asFunction<double Function()>();
   }
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _playbackInitPtr;
@@ -172,18 +160,6 @@ class PlaybackBindings {
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _previewStopCellPtr;
   late final void Function() previewStopCell;
 
-  // Volume smoothing configuration
-  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Float)>> _playbackSetSmoothingRiseTimePtr;
-  late final void Function(double) playbackSetSmoothingRiseTime;
-
-  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Float)>> _playbackSetSmoothingFallTimePtr;
-  late final void Function(double) playbackSetSmoothingFallTime;
-
-  late final ffi.Pointer<ffi.NativeFunction<ffi.Float Function()>> _playbackGetSmoothingRiseTimePtr;
-  late final double Function() playbackGetSmoothingRiseTime;
-
-  late final ffi.Pointer<ffi.NativeFunction<ffi.Float Function()>> _playbackGetSmoothingFallTimePtr;
-  late final double Function() playbackGetSmoothingFallTime;
 }
 
 

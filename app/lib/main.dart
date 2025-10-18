@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
+import 'package:uni_links/uni_links.dart';
 
 import 'screens/main_navigation_screen.dart';
 import 'screens/thread_screen.dart';
@@ -25,6 +26,7 @@ import 'services/ws_client.dart';
 import 'state/sequencer/table.dart';
 import 'state/sequencer/playback.dart';
 import 'state/sequencer/sample_bank.dart';
+
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -99,12 +101,79 @@ class _MainPageState extends State<MainPage> {
   NotificationsService? _notificationsService;
   OverlayEntry? _notifOverlay;
   Timer? _notifOverlayTimer;
+  StreamSubscription? _linkSub;
   
   @override
   void initState() {
     super.initState();
+    _handleIncomingLinks();
     // Remove the immediate call to _syncCurrentUser() since it will be called
     // reactively when UserState completes loading
+  }
+
+  Future<void> _handleIncomingLinks() async {
+    _linkSub = linkStream.listen((String? link) {
+      if (link != null) {
+        final uri = Uri.parse(link);
+        if (uri.path.startsWith('/to/')) {
+          final threadId = uri.pathSegments.last;
+          _showJoinConfirmation(threadId);
+        }
+      }
+    }, onError: (err) {
+      // Handle error by printing to console
+      debugPrint('Deep link error: $err');
+    });
+  }
+
+  void _showJoinConfirmation(String threadId) {
+    // Ensure we have a valid context that can show a dialog
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Join Thread'),
+          content: const Text('You have been invited to join a thread. Do you want to accept?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Decline'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+            TextButton(
+              child: const Text('Accept'),
+              onPressed: () async {
+                Navigator.of(context).pop();
+                try {
+                  final threadsState = context.read<ThreadsState>();
+                  final success = await threadsState.joinThread(threadId: threadId);
+                  if (success && mounted) {
+                    await threadsState.ensureThreadSummary(threadId);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ThreadScreen(threadId: threadId),
+                      ),
+                    );
+                  } else if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Failed to join thread.'), backgroundColor: Colors.red),
+                    );
+                  }
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('An error occurred: $e'), backgroundColor: Colors.red),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   void _syncCurrentUser() {
@@ -315,6 +384,7 @@ class _MainPageState extends State<MainPage> {
     _notifSub?.cancel();
     _notificationsService?.dispose();
     _removeOverlayNotification();
+    _linkSub?.cancel();
     super.dispose();
   }
 

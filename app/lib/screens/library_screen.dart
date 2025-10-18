@@ -3,7 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../utils/app_colors.dart';
-import '../widgets/common_header_widget.dart';
+import '../widgets/library_header_widget.dart';
 import '../models/playlist_item.dart';
 import '../models/thread/message.dart';
 import '../state/audio_player_state.dart';
@@ -125,8 +125,8 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
       body: SafeArea(
         child: Column(
           children: [
-            // User indicator at the top
-            const CommonHeaderWidget(),
+            // Library header with back button
+            const LibraryHeaderWidget(),
             
             // Tab bar
             Container(

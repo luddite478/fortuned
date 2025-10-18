@@ -9,8 +9,8 @@ import '../services/threads_api.dart';
 
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
-import 'sequencer_screen_v2.dart';
-import '../widgets/common_header_widget.dart';
+import 'sequencer_screen_v1.dart';
+import '../widgets/simplified_header_widget.dart';
 import '../ffi/table_bindings.dart';
 import '../ffi/playback_bindings.dart';
 import '../ffi/sample_bank_bindings.dart';
@@ -97,8 +97,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           SafeArea(
         child: Column(
           children: [
-            // User indicator at the top
-            const CommonHeaderWidget(),
+            // Simplified header with library icon
+            const SimplifiedHeaderWidget(),
             
             Consumer<ThreadsState>(
               builder: (context, threadsState, _) {
@@ -114,12 +114,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 return Expanded(
                   child: Column(
                     children: [
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.all(12),
-                child: _buildMySequencerButton(),
-              ),
-              
               // Projects List
               Expanded(
                 child: Column(
@@ -288,179 +282,44 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
               ),
             ),
+          // Custom positioned floating action button
+          Positioned(
+            right: 30,
+            bottom: 30,
+            child: FloatingActionButton(
+              onPressed: () async {
+                // Stop any playing audio from playlist/renders
+                context.read<AudioPlayerState>().stop();
+                // Clear active thread context for new project
+                context.read<ThreadsState>().setActiveThread(null);
+                // Initialize native subsystems (idempotent: init performs cleanup)
+                try {
+                  TableBindings().tableInit();
+                  PlaybackBindings().playbackInit();
+                  SampleBankBindings().sampleBankInit();
+                } catch (e) {
+                  debugPrint('❌ Failed to init native subsystems: $e');
+                }
+                // Navigate to V2 sequencer implementation
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const SequencerScreenV1(),
+                  ),
+                );
+              },
+              backgroundColor: Colors.white, // White background
+              foregroundColor: const Color(0xFF424242), // Dark gray cross
+              elevation: 4, // Add shadow for Google-style appearance
+              child: const Icon(Icons.add, size: 50),
+            ),
+          ),
         ],
       ),
     );
   }
 
 
-  Widget _buildMySequencerButton() {
-    // Single "NEW PATTERN" button styled like project list items
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.only(bottom: 0),
-      decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
-        border: Border(
-          left: BorderSide(
-            color: AppColors.menuLightText.withOpacity(0.3),
-            width: 2,
-          ),
-          bottom: BorderSide(
-            color: AppColors.menuBorder,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () async {
-            // Stop any playing audio from playlist/renders
-            context.read<AudioPlayerState>().stop();
-            // Clear active thread context for new project
-            context.read<ThreadsState>().setActiveThread(null);
-            // Initialize native subsystems (idempotent: init performs cleanup)
-            try {
-              TableBindings().tableInit();
-              PlaybackBindings().playbackInit();
-              SampleBankBindings().sampleBankInit();
-            } catch (e) {
-              debugPrint('❌ Failed to init native subsystems: $e');
-            }
-            // Navigate to V2 sequencer implementation
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SequencerScreenV2(),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Center(
-              child: Text(
-                'NEW PATTERN',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.menuText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    
-    // COMMENTED OUT: Continue button functionality - uncomment to restore
-    /*
-    return Consumer<ThreadsState>(
-      builder: (context, threadsState, child) {
-        final projects = [...threadsState.threads]
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        final mostRecentProject = projects.isNotEmpty ? projects.first : null;
-        
-        // If projects exist, show NEW + CONTINUE buttons (horizontal)
-        return Row(
-          children: [
-            // New button - LEFT (square)
-            Expanded(
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.menuSecondaryButton, // White secondary button
-                  borderRadius: BorderRadius.circular(4), // More square corners
-                  border: Border.all(
-                    color: AppColors.menuSecondaryButtonBorder, // Dark border
-                    width: 1,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () async {
-                      // Stop any playing audio from playlist/renders
-                      context.read<AudioPlayerState>().stop();
-                      // Clear active thread context for new project
-                      context.read<ThreadsState>().setActiveThread(null);
-                      // Initialize native subsystems (idempotent: init performs cleanup)
-                      try {
-                        TableBindings().tableInit();
-                        PlaybackBindings().playbackInit();
-                        SampleBankBindings().sampleBankInit();
-                      } catch (e) {
-                        debugPrint('❌ Failed to init native subsystems: $e');
-                      }
-                      // Navigate to V2 sequencer implementation
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SequencerScreenV2(),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Center(
-                      child: Text(
-                        'NEW',
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 6),
-
-            // Continue button - RIGHT (square)
-            Expanded(
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.menuSecondaryButton, // White secondary button
-                  borderRadius: BorderRadius.circular(4), // More square corners
-                  border: Border.all(
-                    color: AppColors.menuSecondaryButtonBorder, // Dark border
-                    width: 1,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () async {
-                      // Load project into sequencer and navigate
-                      await _loadProjectInSequencer(mostRecentProject);
-                    },
-                    borderRadius: BorderRadius.circular(2),
-                    child: Center(
-                      child: Text(
-                        'CONTINUE',
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    */
-  }
 
   Widget _buildProjectCard(Thread project) {
     return Container(
@@ -786,7 +645,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SequencerScreenV2(initialSnapshot: initialSnapshot),
+            builder: (context) => SequencerScreenV1(initialSnapshot: initialSnapshot),
           ),
         );
       }

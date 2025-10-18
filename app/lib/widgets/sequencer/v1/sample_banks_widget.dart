@@ -2,7 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/sample_bank.dart';
+import '../../../state/sequencer/sample_browser.dart';
+import '../../../state/sequencer/playback.dart';
+import '../../../state/sequencer/table.dart';
+import '../../../state/sequencer/multitask_panel.dart';
+import '../../../state/sequencer/ui_selection.dart';
 
 class SampleBanksWidget extends StatefulWidget {
   const SampleBanksWidget({super.key});
@@ -12,40 +17,33 @@ class SampleBanksWidget extends StatefulWidget {
 }
 
 class _SampleBanksWidgetState extends State<SampleBanksWidget> {
-  // Index of the first visible bank in the window
   int _startIndex = 0;
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencer, child) {
+    return Consumer5<SampleBankState, PlaybackState, SampleBrowserState, TableState, UiSelectionState>(
+      builder: (context, sampleBankState, playbackState, sampleBrowserState, tableState, uiSelection, child) {
         return LayoutBuilder(
           builder: (context, constraints) {
-            // Calculate responsive sizes based on available space - INHERIT from parent
             final panelHeight = constraints.maxHeight;
             final panelWidth = constraints.maxWidth;
 
-            // Preserve original sizing logic for sample tiles
-            final padding = panelHeight * 0.05; // 5% of given height (used for spacing only)
+            final padding = panelHeight * 0.05;
             final baseButtonsWidth = panelWidth; // container has zero padding
-            final preferredButtonWidth = baseButtonsWidth / 7.5; // preferred size baseline
-            final buttonHeight = panelHeight * 0.8; // Use 80% of given height
+            final preferredButtonWidth = baseButtonsWidth / 7.5; // baseline
+            final buttonHeight = panelHeight * 0.8;
             final letterSize = (buttonHeight * 0.35).clamp(10.0, double.infinity);
-            const borderRadius = 2.0; // Sharp corners for telephone book feel
+            const borderRadius = 2.0;
 
-            // Arrow tiles are slightly smaller than sample tiles
             final arrowWidth = preferredButtonWidth * 0.8;
             final arrowHeight = buttonHeight * 0.8;
-
-            // Margins
             final sampleMarginH = padding * 0.3;
-            // Arrow outer margins: no margin on container edges, inner margin equals sample margin
+            // Zero inner margin between arrows and tiles
             final leftArrowMarginLeft = 0.0;
-            final leftArrowMarginRight = 0.0; // zero inner gap next to first tile
-            final rightArrowMarginLeft = 0.0; // zero inner gap next to last tile
+            final leftArrowMarginRight = 0.0;
+            final rightArrowMarginLeft = 0.0;
             final rightArrowMarginRight = 0.0;
 
-            // Compute how many sample tiles fit between arrows (no overlap)
             final totalArrowMargins = leftArrowMarginLeft + leftArrowMarginRight + rightArrowMarginLeft + rightArrowMarginRight;
             final availableRowWidth = baseButtonsWidth - (arrowWidth * 2) - totalArrowMargins;
             final preferredTileWithMargins = preferredButtonWidth + 2 * sampleMarginH;
@@ -53,7 +51,6 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
                 ? (availableRowWidth / preferredTileWithMargins).floor().clamp(1, 16)
                 : 1;
             if (visibleCount < 1) visibleCount = 1;
-            // Recompute exact button width to perfectly fill available space (no gaps at edges)
             final totalInterTileMargins = (visibleCount - 1) * (2 * sampleMarginH);
             final buttonWidth = ((availableRowWidth - totalInterTileMargins) / visibleCount).floorToDouble();
 
@@ -82,7 +79,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
               padding: EdgeInsets.zero,
               decoration: BoxDecoration(
                 color: AppColors.sequencerSurfaceBase,
-                borderRadius: BorderRadius.circular(2), // Sharp corners
+                borderRadius: BorderRadius.circular(2),
                 border: Border.all(
                   color: AppColors.sequencerBorder,
                   width: 0.5,
@@ -111,7 +108,6 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
                       marginRight: leftArrowMarginRight,
                       borderRadius: borderRadius,
                     ),
-                    // Sample tiles window
                     Expanded(
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -120,7 +116,10 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
                           for (int i = 0; i < effectiveCount; i++)
                             _buildBankButton(
                               context: context,
-                              sequencer: sequencer,
+                              sampleBankState: sampleBankState,
+                              playbackState: playbackState,
+                              sampleBrowserState: sampleBrowserState,
+                              tableState: tableState,
                               bank: startIndex + i,
                               buttonHeight: buttonHeight,
                               buttonWidth: buttonWidth,
@@ -154,7 +153,10 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
 
   Widget _buildBankButton({
     required BuildContext context,
-    required SequencerState sequencer,
+    required SampleBankState sampleBankState,
+    required PlaybackState playbackState,
+    required SampleBrowserState sampleBrowserState,
+    required TableState tableState,
     required int bank,
     required double buttonHeight,
     required double buttonWidth,
@@ -163,23 +165,24 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
     required double borderRadius,
     required double letterSize,
   }) {
-    final isActive = sequencer.activeBank == bank;
-    final isSelected = sequencer.selectedSampleSlot == bank;
-    final hasFile = sequencer.fileNames[bank] != null;
-    final isPlaying = sequencer.slotPlaying[bank];
+    final isActive = sampleBankState.activeSlot == bank;
+    final isSelected = context.read<UiSelectionState>().isSampleBank && sampleBankState.activeSlot == bank;
+    final hasFile = sampleBankState.isSlotLoaded(bank);
 
     Widget sampleButton = Container(
       height: buttonHeight,
       width: buttonWidth,
       margin: EdgeInsets.only(left: leftMargin, right: rightMargin),
       decoration: BoxDecoration(
-        color: _getButtonColor(isSelected, isActive, hasFile, bank, sequencer),
+        color: _getButtonColor(isSelected, isActive, hasFile, bank, sampleBankState),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: _getBorderColor(isSelected, isActive, isPlaying),
-          width: _getBorderWidth(isSelected, isActive, isPlaying),
+          color: isSelected
+              ? AppColors.sequencerSelectionBorder
+              : _getButtonColor(isSelected, isActive, hasFile, bank, sampleBankState),
+          width: isSelected ? 2 : 0.5,
         ),
-        boxShadow: _getBoxShadow(isSelected, isActive, isPlaying),
+        boxShadow: _getBoxShadow(isSelected, isActive),
       ),
       child: Center(
         child: Column(
@@ -187,7 +190,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-              String.fromCharCode(65 + bank), // A, B, C, etc.
+              String.fromCharCode(65 + bank),
               style: GoogleFonts.sourceSans3(
                 color: _getTextColor(isSelected, isActive, hasFile),
                 fontWeight: FontWeight.w600,
@@ -207,7 +210,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
               width: buttonWidth * 0.9,
               height: buttonHeight,
               decoration: BoxDecoration(
-                color: _getButtonColorForBank(bank, sequencer).withOpacity(0.9),
+                color: _getButtonColorForBank(bank, sampleBankState).withOpacity(0.9),
                 borderRadius: BorderRadius.circular(borderRadius),
                 border: Border.all(color: AppColors.sequencerAccent, width: 2),
               ),
@@ -260,65 +263,56 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
               ),
             ),
             child: GestureDetector(
-              onTap: () => sequencer.handleBankChange(bank, context),
-              onLongPress: () => sequencer.pickFileForSlot(bank, context),
+              onTap: () {
+                sampleBankState.uiHandleBankChange(bank);
+                context.read<UiSelectionState>().selectSampleBank(bank);
+                // Open sample settings for filled slot
+                Provider.of<MultitaskPanelState>(context, listen: false).showSampleSettings();
+              },
+              onLongPress: () => sampleBankState.uiPickFileForSlot(bank),
               child: sampleButton,
             ),
           )
         : GestureDetector(
-            onTap: () => sequencer.handleBankChange(bank, context),
-            onLongPress: () => sequencer.pickFileForSlot(bank, context),
+            onTap: () {
+              sampleBankState.uiHandleBankChange(bank);
+              context.read<UiSelectionState>().selectSampleBank(bank);
+              // If the slot is empty, open sample browser
+              if (!sampleBankState.isSlotLoaded(bank)) {
+                sampleBrowserState.showForSlot(bank);
+              }
+            },
+            onLongPress: () => sampleBankState.uiPickFileForSlot(bank),
             child: sampleButton,
           );
   }
 
-  Color _getButtonColor(
-      bool isSelected, bool isActive, bool hasFile, int bank, SequencerState sequencer) {
+  Color _getButtonColor(bool isSelected, bool isActive, bool hasFile, int bank, SampleBankState sampleBankState) {
     if (hasFile) {
-      return _getButtonColorForBank(bank, sequencer); // Sample loaded - use bank color
+      return _getButtonColorForBank(bank, sampleBankState);
     } else {
-      return AppColors.sequencerSurfacePressed; // Empty slot
+      return AppColors.sequencerSurfacePressed;
     }
   }
 
-  Color _getButtonColorForBank(int bank, SequencerState sequencer) {
-    // Convert original bank colors to darker gray-beige variants
-    final originalColor = sequencer.bankColors[bank];
-    // Create a muted variant that fits the telephone book theme
-    return Color.lerp(originalColor, AppColors.sequencerSurfaceRaised, 0.7) ??
-        AppColors.sequencerSurfaceRaised;
+  Color _getButtonColorForBank(int bank, SampleBankState sampleBankState) {
+    final colors = sampleBankState.uiBankColors;
+    final originalColor = bank < colors.length ? colors[bank] : colors[0];
+    return Color.lerp(originalColor, AppColors.sequencerCellFilled, 0.3) ?? AppColors.sequencerCellFilled;
   }
 
-  Color _getBorderColor(bool isSelected, bool isActive, bool isPlaying) {
+  Color _getBorderColor(bool isSelected, bool isActive) {
+    return AppColors.sequencerBorder;
+  }
+
+  double _getBorderWidth(bool isSelected, bool isActive) {
+    return 0.5;
+  }
+
+  List<BoxShadow>? _getBoxShadow(bool isSelected, bool isActive) {
     if (isSelected) {
-      return AppColors.sequencerAccent; // Selected - brown accent
-    } else if (isPlaying) {
-      return AppColors.sequencerAccent.withOpacity(0.8); // Playing - muted accent
+      return null;
     } else {
-      return AppColors.sequencerBorder; // Default - subtle border
-    }
-  }
-
-  double _getBorderWidth(bool isSelected, bool isActive, bool isPlaying) {
-    if (isSelected || isPlaying) {
-      return 1.5; // Emphasized border for selected/playing
-    } else {
-      return 0.5; // Subtle border for default
-    }
-  }
-
-  List<BoxShadow>? _getBoxShadow(bool isSelected, bool isActive, bool isPlaying) {
-    if (isSelected) {
-      return [
-        BoxShadow(
-          color: AppColors.sequencerAccent.withOpacity(0.4),
-          blurRadius: 3,
-          spreadRadius: 0,
-          offset: const Offset(0, 1),
-        )
-      ];
-    } else {
-      // All buttons get protruding effect
       return [
         BoxShadow(
           color: AppColors.sequencerShadow,
@@ -335,7 +329,7 @@ class _SampleBanksWidgetState extends State<SampleBanksWidget> {
   }
 
   Color _getTextColor(bool isSelected, bool isActive, bool hasFile) {
-    return AppColors.sequencerText; // Light text for contrast
+    return AppColors.sequencerText;
   }
 }
 

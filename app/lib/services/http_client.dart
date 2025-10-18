@@ -22,6 +22,14 @@ class ApiHttpClient {
     return '$protocol://$serverHost$port/api/v1';
   }
 
+  static String get publicBaseUrl {
+    final serverHost = dotenv.env['SERVER_HOST'] ?? '';
+    final apiPort = dotenv.env['HTTPS_API_PORT'] ?? '443';
+    final protocol = 'https';
+    final port = apiPort == '443' ? '' : ':$apiPort';
+    return '$protocol://$serverHost$port';
+  }
+
   static String get _apiToken {
     return dotenv.env['API_TOKEN'] ?? '';
   }
