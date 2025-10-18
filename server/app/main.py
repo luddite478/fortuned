@@ -4,17 +4,14 @@ import os
 import threading
 import asyncio
 import uvicorn
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 import logging
-import traceback
 
 current_dir = os.path.dirname(__file__)
 sys.path.insert(0, current_dir)
 
 from http_api.router import router as api_router
 from http_api.rate_limiter import RateLimitMiddleware
-from http_api.logging_middleware import LoggingMiddleware
 from ws.router import start_websocket_server
 from db.init_collections import init_mongodb
 from storage.s3_service import get_s3_service
@@ -33,20 +30,6 @@ app = FastAPI(
     version="0.0.1"
 )
 
-# Add a custom exception handler to log detailed tracebacks
-@app.exception_handler(Exception)
-async def generic_exception_handler(request: Request, exc: Exception):
-    # Log the full traceback for any unhandled exception
-    tb_str = traceback.format_exc()
-    logger.error(f"Unhandled exception for {request.method} {request.url.path}:\n{tb_str}")
-    
-    # Return a generic 500 error response
-    return JSONResponse(
-        status_code=500,
-        content={"detail": "Internal Server Error"},
-    )
-
-app.add_middleware(LoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 app.include_router(api_router, prefix="/api/v1", tags=["API v1"])

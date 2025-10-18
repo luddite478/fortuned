@@ -199,8 +199,8 @@ async def register_handler(request: Request, register_data: RegisterRequest):
 async def session_handler(request: Request, user_data: UserSessionRequest):
     """Get or create a user session for anonymous, device-based authentication."""
     try:
-        # Find user by ID
-        existing_user = db.users.find_one({"id": user_data.id})
+        # Find user by ID (exclude MongoDB's _id field)
+        existing_user = db.users.find_one({"id": user_data.id}, {"_id": 0})
         
         if existing_user:
             # User exists, update last_online and return
@@ -208,8 +208,8 @@ async def session_handler(request: Request, user_data: UserSessionRequest):
                 {"id": user_data.id},
                 {"$set": {"last_online": datetime.now(timezone.utc).isoformat()}}
             )
-            # Remove MongoDB's _id and convert to JSON-serializable format
-            return JSONResponse(content=jsonable_encoder(existing_user, custom_encoder={ObjectId: str}))
+            # Return the user data (already has _id excluded)
+            return JSONResponse(content=existing_user)
         
         else:
             # User doesn't exist, create a new one from the client-provided data
@@ -223,6 +223,9 @@ async def session_handler(request: Request, user_data: UserSessionRequest):
             new_user_doc.pop("salt", None)
             
             db.users.insert_one(new_user_doc)
+            
+            # Remove the MongoDB _id field before returning
+            new_user_doc.pop("_id", None)
             
             return JSONResponse(content=new_user_doc, status_code=201)
             
