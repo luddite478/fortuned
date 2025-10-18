@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime, timezone
 from fastapi import Request, Query, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 from typing import Optional, Dict, Any, List
 import os
 from pymongo import MongoClient
@@ -207,9 +208,8 @@ async def session_handler(request: Request, user_data: UserSessionRequest):
                 {"id": user_data.id},
                 {"$set": {"last_online": datetime.now(timezone.utc).isoformat()}}
             )
-            # Remove MongoDB's _id before returning
-            existing_user.pop('_id', None)
-            return JSONResponse(content=existing_user)
+            # Remove MongoDB's _id and convert to JSON-serializable format
+            return JSONResponse(content=jsonable_encoder(existing_user, custom_encoder={ObjectId: str}))
         
         else:
             # User doesn't exist, create a new one from the client-provided data

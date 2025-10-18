@@ -64,6 +64,7 @@ cd ../../../..
 
 # Prepare Flutter command
 FLUTTER_ARGS=()
+echo "$FLUTTER_ARGS"
 if [[ -n "$DEV_USER_ID_ARG" ]]; then
   FLUTTER_ARGS+=(--dart-define=DEV_USER_ID=$DEV_USER_ID_ARG)
   echo "🔧 Running with developer user ID: $DEV_USER_ID_ARG"
@@ -77,7 +78,7 @@ fi
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
-  echo "flutter run "${FLUTTER_ARGS[@]}"  -d "$IPHONE_MODEL" --debug"
+  echo "flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug"
   flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
