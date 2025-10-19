@@ -135,7 +135,6 @@ SAMPLE_DATA_TEMPLATES = {
             "pending_invites_to_threads": []
         }
     ],
-    "threads": [],
     "samples": [
         {
             "schema_version": 1,
