@@ -25,6 +25,9 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    // Define flavor dimensions
+    flavorDimensions.add("environment")
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.fortuned"
@@ -46,6 +49,17 @@ android {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
+    productFlavors {
+        create("prod") {
+            dimension = "environment"
+            manifestPlaceholders["appHost"] = "4tnd.link"
+        }
+        create("stage") {
+            dimension = "environment"
+            manifestPlaceholders["appHost"] = "devtest.4tnd.link"
         }
     }
 

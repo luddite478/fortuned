@@ -176,9 +176,7 @@ int sunvox_wrapper_init(void) {
         result = sv_connect_module(SUNVOX_SLOT, mod_id, SUNVOX_OUTPUT_MODULE);
         if (result < 0) {
             prnt_err("❌ [SUNVOX] Failed to connect sampler %d to output: %d", i, result);
-        }
-        
-        prnt("✅ [SUNVOX] Created sampler %d (module %d)", i, mod_id);
+        }        
     }
     
     sv_unlock_slot(SUNVOX_SLOT);

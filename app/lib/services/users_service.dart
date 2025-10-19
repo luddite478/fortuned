@@ -560,6 +560,31 @@ class UsersService {
     }
   }
 
+  static Future<UserProfile> getOrCreateUser(UserProfile user) async {
+    try {
+      print('Attempting to get or create user: ${user.id}');
+
+      final response = await ApiHttpClient.post('/users/session',
+        body: user.toJson(),
+      );
+
+      print('Get-or-create response status: ${response.statusCode}');
+      print('Get-or-create response body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final jsonData = json.decode(response.body);
+        return UserProfile.fromJson(jsonData);
+      } else {
+        throw Exception('Failed to get or create user: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error during get-or-create user: $e');
+      // In case of network error, just return the local user profile
+      // The app can retry later.
+      return user;
+    }
+  }
+
   // Legacy methods for backward compatibility
   static Future<UsersResponse> getUserProfiles({int limit = 20, int offset = 0}) {
     return getUsers(limit: limit, offset: offset);

@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../services/threads_service.dart';
 import '../services/users_service.dart';
-import '../services/auth_service.dart';
+import '../state/user_state.dart';
 import '../state/threads_state.dart';
 import '../state/followed_state.dart';
 import '../utils/app_colors.dart';
@@ -74,9 +74,9 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
     });
 
     // First, check followed users for immediate matches
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final userState = Provider.of<UserState>(context, listen: false);
     final followedState = Provider.of<FollowedState>(context, listen: false);
-    final currentUserId = authService.currentUser?.id;
+    final currentUserId = userState.currentUser?.id;
     
     final followedMatches = followedState.followedUsers
         .where((user) => user.username.toLowerCase().contains(query.toLowerCase()))
@@ -186,9 +186,9 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
     
     // Refresh in background if already loaded
     final followedState = Provider.of<FollowedState>(context, listen: false);
-    final authService = Provider.of<AuthService>(context, listen: false);
-    if (followedState.hasLoaded && authService.currentUser?.id != null) {
-      followedState.refreshFollowedUsersInBackground(authService.currentUser!.id);
+    final userState = Provider.of<UserState>(context, listen: false);
+    if (followedState.hasLoaded && userState.currentUser?.id != null) {
+      followedState.refreshFollowedUsersInBackground(userState.currentUser!.id);
     }
     
     // Load threads to check for pending invitations
@@ -196,9 +196,9 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
   }
 
   Future<void> _loadFollowedUsers() async {
-    final authService = Provider.of<AuthService>(context, listen: false);
+    final userState = Provider.of<UserState>(context, listen: false);
     final followedState = Provider.of<FollowedState>(context, listen: false);
-    final currentUserId = authService.currentUser?.id;
+    final currentUserId = userState.currentUser?.id;
     
     if (currentUserId == null) {
       return;
@@ -227,8 +227,8 @@ class _NetworkScreenState extends State<NetworkScreen> with TickerProviderStateM
 
   void _checkPendingInvitations() {
     final threadsState = Provider.of<ThreadsState>(context, listen: false);
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final currentUserId = authService.currentUser?.id;
+    final userState = Provider.of<UserState>(context, listen: false);
+    final currentUserId = userState.currentUser?.id;
     
     if (currentUserId == null) return;
     

@@ -26,6 +26,7 @@ server {
         root /var/www/certbot;
     }
 
+    # This is a catch-all for any other traffic
     location / {
         proxy_pass http://api_backend;
         proxy_set_header Host $host;

@@ -112,8 +112,6 @@
         "username",
         "name",
         "email",
-        "password_hash",
-        "salt",
         "created_at",
         "email_verified",
         "preferences",
