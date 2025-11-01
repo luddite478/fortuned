@@ -384,11 +384,41 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
     if (!g_sunvox_initialized) return -1;
     if (section_index < 0 || section_index >= MAX_SECTIONS) return -1;
     
+    // Check if pattern already exists - if so, just resize it seamlessly
+    int existing_pat_id = g_section_patterns[section_index];
+    if (existing_pat_id >= 0) {
+        // Pattern exists - resize it instead of recreating
+        sv_lock_slot(SUNVOX_SLOT);
+        
+        int max_cols = table_get_max_cols();
+        int old_lines = sv_get_pattern_lines(SUNVOX_SLOT, existing_pat_id);
+        int result = sv_set_pattern_size(SUNVOX_SLOT, existing_pat_id, max_cols, section_length);
+        
+        if (result == 0) {
+            prnt("📏 [SUNVOX] Resized existing pattern %d for section %d from %d to %d lines (seamless)", 
+                 existing_pat_id, section_index, old_lines, section_length);
+            
+            // Sync the section data to the resized pattern
+            sunvox_wrapper_sync_section(section_index);
+            
+            sv_unlock_slot(SUNVOX_SLOT);
+            
+            // SEAMLESS FIX: Update timeline positions without stopping playback
+            sunvox_wrapper_update_timeline_seamless(section_index);
+            
+            return 0;
+        } else {
+            prnt_err("❌ [SUNVOX] Failed to resize pattern %d: %d, falling back to recreation", existing_pat_id, result);
+            sv_unlock_slot(SUNVOX_SLOT);
+            // Fall through to recreation logic
+        }
+    }
     
+    // Pattern doesn't exist or resize failed - create new one
     // Check if playback is active BEFORE any modifications
     int was_playing = (sv_end_of_song(SUNVOX_SLOT) == 0);
     
-    // If pattern already exists, remove it first
+    // If pattern already exists, remove it first (this is the fallback case)
     if (g_section_patterns[section_index] >= 0) {
         sunvox_wrapper_remove_section_pattern(section_index);
     }
@@ -460,8 +490,9 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
         sunvox_wrapper_update_timeline();
         
         // If playback was active, restart it to apply new timeline
+        // Note: This only happens when a pattern is recreated, not resized
         if (was_playing) {
-            prnt("🔄 [SUNVOX] Restarting playback to apply new pattern size");
+            prnt("🔄 [SUNVOX] Restarting playback to apply new pattern (pattern was recreated)");
             sv_stop(SUNVOX_SLOT);
             sv_rewind(SUNVOX_SLOT, 0);
             sv_play(SUNVOX_SLOT);
@@ -658,6 +689,107 @@ void sunvox_wrapper_set_playback_mode(int song_mode, int current_section, int cu
     }
 }
 
+// SEAMLESS timeline update for pattern size changes (add/remove steps)
+// Updates pattern positions and forces boundary recalculation WITHOUT stopping playback
+void sunvox_wrapper_update_timeline_seamless(int section_index) {
+    if (!g_sunvox_initialized || g_updating_timeline) return;
+    g_updating_timeline = 1;
+    
+    int sections_count = table_get_sections_count();
+    int was_playing = (sv_end_of_song(SUNVOX_SLOT) == 0);
+    int current_line = sv_get_current_line(SUNVOX_SLOT);
+    
+    // Find current section and local offset (before pattern positions change)
+    int target_section = -1;
+    int section_local_offset = 0;
+    if (was_playing) {
+        for (int i = 0; i < sections_count; i++) {
+            int pat_id = g_section_patterns[i];
+            if (pat_id < 0) continue;
+            int pat_x = sv_get_pattern_x(SUNVOX_SLOT, pat_id);
+            int pat_lines = sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
+            if (current_line >= pat_x && current_line < pat_x + pat_lines) {
+                target_section = i;
+                section_local_offset = current_line - pat_x;
+                break;
+            }
+        }
+    }
+    
+    // Save loop counter before refreshing (song mode only)
+    int saved_loop_counter = -1;
+    if (was_playing && g_song_mode && target_section >= 0) {
+        int pat_id = g_section_patterns[target_section];
+        if (pat_id >= 0) {
+            saved_loop_counter = sv_get_pattern_current_loop(SUNVOX_SLOT, pat_id);
+        }
+    }
+    
+    // Update pattern X positions and recalculate proj_lines atomically (within lock)
+    sv_lock_slot(SUNVOX_SLOT);
+    
+    int timeline_x = 0;
+    for (int i = 0; i < sections_count; i++) {
+        int pat_id = g_section_patterns[i];
+        if (pat_id < 0) continue;
+        sv_set_pattern_xy(SUNVOX_SLOT, pat_id, timeline_x, i);
+        timeline_x += sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
+    }
+    
+    // Calculate new playhead position
+    int new_line = 0;
+    if (target_section >= 0) {
+        int pat_id = g_section_patterns[target_section];
+        int new_pat_x = sv_get_pattern_x(SUNVOX_SLOT, pat_id);
+        int new_pat_lines = sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
+        // Clamp offset if pattern shrank
+        if (section_local_offset >= new_pat_lines) {
+            section_local_offset = new_pat_lines - 1;
+        }
+        new_line = new_pat_x + section_local_offset;
+    }
+    
+    // CRITICAL: Call sv_set_position() WHILE LOCK HELD to prevent race condition
+    // This forces proj_lines recalculation atomically with pattern position updates
+    // sv_set_position() -> sunvox_set_position() -> sunvox_sort_patterns() -> proj_lines updated
+    // Without atomic execution, audio callback can see stale proj_lines between updates
+    sv_set_position(SUNVOX_SLOT, new_line);
+    
+    sv_unlock_slot(SUNVOX_SLOT);
+    
+    // Refresh mode-specific settings
+    if (was_playing) {
+        if (g_song_mode && target_section >= 0) {
+            // Song mode: Refresh loop counts and restore counter
+            const PlaybackState* pb_state = playback_get_state_ptr();
+            for (int i = 0; i < sections_count; i++) {
+                int pat_id = g_section_patterns[i];
+                if (pat_id < 0) continue;
+                int loops = pb_state ? pb_state->sections_loops_num_storage[i] : 1;
+                sv_set_pattern_loop_count(SUNVOX_SLOT, pat_id, loops);
+            }
+            
+            // Restore loop counter for currently playing pattern
+            int current_pat_id = g_section_patterns[target_section];
+            if (current_pat_id >= 0 && saved_loop_counter >= 0) {
+                sv_set_pattern_current_loop(SUNVOX_SLOT, current_pat_id, saved_loop_counter);
+            }
+            
+            sv_set_pattern_loop(SUNVOX_SLOT, current_pat_id);
+            sv_set_autostop(SUNVOX_SLOT, 1);
+            
+        } else if (section_index == g_current_section && g_section_patterns[section_index] >= 0) {
+            // Loop mode: Refresh infinite loop on resized pattern
+            int loop_pat_id = g_section_patterns[section_index];
+            sv_set_pattern_loop_count(SUNVOX_SLOT, loop_pat_id, 0);  // 0 = infinite
+            sv_set_pattern_loop(SUNVOX_SLOT, loop_pat_id);
+            sv_set_autostop(SUNVOX_SLOT, 0);
+        }
+    }
+    
+    g_updating_timeline = 0;
+}
+
 // Update timeline with current section order
 // NEW: Always use song mode layout (all patterns + clones)
 // Mode switching handled by sv_set_pattern_loop(), NOT by rebuilding timeline!
@@ -777,14 +909,37 @@ void sunvox_wrapper_stop(void) {
 void sunvox_wrapper_set_bpm(int bpm) {
     if (!g_sunvox_initialized) return;
     
-    // SunVox BPM is set via the project's BPM controller
-    // We need to find the "BPM" module controller or send a BPM command
-    // For simplicity, we'll send it as an event to the output module
+    // Clamp BPM to valid SunVox range (1-16000)
+    if (bpm < 1) bpm = 1;
+    if (bpm > 16000) bpm = 16000;
     
     prnt("🎵 [SUNVOX] Setting BPM to %d", bpm);
     
-    // TODO: Set BPM properly via sv_set_module_ctl_value or by modifying project settings
-    // For now, this is a placeholder
+    // Set BPM using SunVox effect 0x1F
+    // sv_send_event(slot, track_num, note, vel, module, ctl, ctl_val)
+    // - slot: SUNVOX_SLOT (0)
+    // - track_num: 0 (first track)
+    // - note: 0 (no note)
+    // - vel: 0 (no velocity)
+    // - module: 0 (no specific module)
+    // - ctl: 0x1F (BPM effect code)
+    // - ctl_val: bpm (the BPM value)
+    
+    sv_lock_slot(SUNVOX_SLOT);
+    int result = sv_send_event(SUNVOX_SLOT, 0, 0, 0, 0, 0x1F, bpm);
+    sv_unlock_slot(SUNVOX_SLOT);
+    
+    if (result < 0) {
+        prnt_err("❌ [SUNVOX] Failed to set BPM: sv_send_event returned %d", result);
+    } else {
+        // Verify the BPM was actually set by reading it back
+        int actual_bpm = sv_get_song_bpm(SUNVOX_SLOT);
+        if (actual_bpm == bpm) {
+            prnt("✅ [SUNVOX] BPM set to %d successfully (verified)", bpm);
+        } else {
+            prnt("⚠️ [SUNVOX] BPM set command sent, but verification shows %d instead of %d", actual_bpm, bpm);
+        }
+    }
 }
 
 // Set playback region (loop range)
@@ -976,3 +1131,132 @@ int sunvox_wrapper_get_pattern_current_loop(int section_index) {
     return sv_get_pattern_current_loop(SUNVOX_SLOT, pat_id);
 }
 
+
+// ===== Live Preview (SunVox-based) =====
+// Plays short notes for sample slots or specific cells without touching patterns.
+// Always overlays current playback and sustains until the next change/end.
+// Track selection is derived from current table columns to remain valid if max columns changes.
+
+static int g_preview_active = 0;
+static int g_preview_module = -1; // sampler module id
+static int g_preview_track = 0;   // track used for preview note-on/off
+static int g_preview_note = 0;    // last note triggered
+
+static inline int preview_compute_track(void) {
+    int max_cols = table_get_max_cols();
+    if (max_cols <= 0) return 0;
+    // Use the last available track to avoid collisions with visible lanes
+    return max_cols - 1;
+}
+
+static inline int preview_velocity_from_volume(float volume01) {
+    if (volume01 <= 0.0f) return 0;
+    int velocity = (int)(volume01 * 128.0f);
+    if (velocity < 1) velocity = 1;
+    if (velocity > 128) velocity = 128;
+    return velocity;
+}
+
+static inline int preview_note_from_pitch(float ratio) {
+    if (ratio <= 0.0f) ratio = 1.0f;
+    float semitones = 12.0f * log2f(ratio);
+    int final_note = SUNVOX_BASE_NOTE + (int)roundf(semitones);
+    if (final_note < 0) final_note = 0;
+    if (final_note > 127) final_note = 127;
+    return final_note;
+}
+
+static void preview_stop_internal(void) {
+    if (!g_sunvox_initialized) return;
+    if (!g_preview_active || g_preview_module < 0) return;
+
+    int track = g_preview_track;
+    int module_plus = g_preview_module + 1;
+
+    // Send NOTE_OFF for the previous preview note on the same track/module
+    sv_send_event(SUNVOX_SLOT, track, 128 /* NOTE_OFF */, 0, module_plus, 0, 0);
+
+    g_preview_active = 0;
+    g_preview_module = -1;
+    g_preview_note = 0;
+}
+
+extern "C" void sunvox_preview_stop(void) {
+    preview_stop_internal();
+}
+
+extern "C" int sunvox_preview_slot(int slot, float pitch, float volume) {
+    if (!g_sunvox_initialized) return -1;
+    if (slot < 0 || slot >= MAX_SAMPLE_SLOTS) return -1;
+
+    // Volume 0 => stop preview, don't play
+    if (volume <= 0.0f) {
+        preview_stop_internal();
+        return 0;
+    }
+
+    int mod_id = g_sampler_modules[slot];
+    if (mod_id < 0) return -1;
+
+    // Stop previous preview (if any)
+    preview_stop_internal();
+
+    int track = preview_compute_track();
+    int note = preview_note_from_pitch(pitch);
+    int vel = preview_velocity_from_volume(volume);
+
+    int res = sv_send_event(SUNVOX_SLOT, track, note, vel, mod_id + 1, 0, 0);
+    if (res < 0) return res;
+
+    g_preview_active = 1;
+    g_preview_module = mod_id;
+    g_preview_track = track;
+    g_preview_note = note;
+    return 0;
+}
+
+extern "C" int sunvox_preview_cell(int step, int column, float pitch, float volume) {
+    if (!g_sunvox_initialized) return -1;
+    if (step < 0 || column < 0) return -1;
+
+    // Resolve cell
+    Cell* cell = table_get_cell(step, column);
+    if (!cell || cell->sample_slot < 0 || cell->sample_slot >= MAX_SAMPLE_SLOTS) return -1;
+
+    // Resolve effective volume
+    float resolved_volume = volume;
+    if (resolved_volume == DEFAULT_CELL_VOLUME) {
+        Sample* s = sample_bank_get_sample(cell->sample_slot);
+        resolved_volume = (s && s->loaded) ? s->settings.volume : 1.0f;
+    }
+    if (resolved_volume <= 0.0f) {
+        preview_stop_internal();
+        return 0;
+    }
+
+    // Resolve effective pitch
+    float resolved_pitch = pitch;
+    if (resolved_pitch == DEFAULT_CELL_PITCH) {
+        Sample* s = sample_bank_get_sample(cell->sample_slot);
+        resolved_pitch = (s && s->loaded) ? s->settings.pitch : 1.0f;
+    }
+
+    int mod_id = g_sampler_modules[cell->sample_slot];
+    if (mod_id < 0) return -1;
+
+    // Stop previous preview
+    preview_stop_internal();
+
+    int track = preview_compute_track();
+    int note = preview_note_from_pitch(resolved_pitch);
+    int vel = preview_velocity_from_volume(resolved_volume);
+
+    int res = sv_send_event(SUNVOX_SLOT, track, note, vel, mod_id + 1, 0, 0);
+    if (res < 0) return res;
+
+    g_preview_active = 1;
+    g_preview_module = mod_id;
+    g_preview_track = track;
+    g_preview_note = note;
+    return 0;
+}

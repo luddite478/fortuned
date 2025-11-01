@@ -115,7 +115,7 @@ class TableState extends ChangeNotifier {
   int _uiSelectedLayer = 0;    // Which layer UI is currently viewing
   
   // UI: sound grid view mode (stacked cards vs flat tabs)
-  SoundGridViewMode _uiSoundGridViewMode = SoundGridViewMode.stack;
+  SoundGridViewMode _uiSoundGridViewMode = SoundGridViewMode.flat;
   // UI: edit buttons layout mode (v1 classic, v2 right-aligned large)
   EditButtonsLayoutMode _uiEditButtonsLayoutMode = EditButtonsLayoutMode.v2;
   
@@ -557,6 +557,25 @@ class TableState extends ChangeNotifier {
     // Set active pad for UI highlighting
     debugPrint('🎵 [TABLE_STATE] Pad pressed: $flatIndex');
     // Could trigger sample preview in the future
+  }
+
+  /// Sync all sections to SunVox patterns
+  /// This ensures all table cells are properly synced to SunVox after bulk operations like import
+  void syncAllSectionsToSunVox() {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot sync sections - table not initialized');
+      return;
+    }
+    
+    try {
+      debugPrint('🔄 [TABLE_STATE] Syncing all $_sectionsCount sections to SunVox');
+      for (int i = 0; i < _sectionsCount; i++) {
+        _playback_ffi.sunvoxSyncSection(i);
+      }
+      debugPrint('✅ [TABLE_STATE] All sections synced to SunVox');
+    } catch (e) {
+      debugPrint('❌ [TABLE_STATE] Failed to sync sections: $e');
+    }
   }
 
   @override

@@ -24,6 +24,7 @@ For detailed information on specific features, please refer to the following doc
 ### 🚀 Core Implementation
 - **[no_clone.md](./no_clone.md)**: A comprehensive guide to the sample-accurate, no-clone pattern sequencing implementation. **This is the core of the sequencer logic.**
 - **[seamless_playback.md](./seamless_playback.md)**: Explains the engine modifications that enable seamless pattern looping and mode switching.
+- **[seamless_step_resize.md](./seamless_step_resize.md)**: Documents the seamless add/remove steps feature (no playback interruption).
 - **[pitch.md](./pitch.md)**: Details the real-time pitch shifting system that replaces the old file-based SoundTouch method.
 - **[recording.md](./recording.md)**: Describes the architecture for real-time audio recording to a WAV file.
 

@@ -20,11 +20,13 @@ This document lists **only the modifications made to the original SunVox library
 7. Added `sv_set_pattern_loop_count()` API - Set loop count per pattern
 8. Added `sv_set_pattern_sequence()` API - Define pattern playback order
 9. Added `sv_get_pattern_current_loop()` API - Query current loop iteration
+10. Added `sv_set_pattern_current_loop()` API - Set current loop iteration (for preserving loop state)
 
 **Bug Fixes:**
 - Fixed `sv_play()` to preserve `single_pattern_play` state (Oct 14)
 - Fixed loop counter reset on mode change (Oct 14)
 - Fixed loop counter preservation at sequence end (Oct 15)
+- Fixed loop counter preservation during pattern resize (Oct 22)
 
 ---
 
@@ -894,6 +896,97 @@ See `/app/docs/features/sunvox_integration/LOOP_MODE_FIX.md` for detailed explan
 
 ---
 
+## 10. Loop Counter Preservation API (October 22, 2025)
+
+### Problem
+
+When adding/removing steps during playback in song mode, we need to refresh pattern loop counts via `sv_set_pattern_loop_count()` to force boundary recalculation. However, this API always resets `pattern_current_loop[pat_num]` to 0, causing the loop counter to jump from "3/4" back to "1/4" when the user is in the middle of a loop.
+
+### Solution
+
+Added `sv_set_pattern_current_loop()` API to allow manual setting of the current loop iteration, enabling preservation of loop state during pattern updates.
+
+### Modified Files
+
+#### `sunvox_lib/headers/sunvox.h`
+
+**Location:** After line 297 (after `sv_get_pattern_current_loop` declaration)
+
+**Added:**
+```c
+/*
+   sv_set_pattern_current_loop() - set the current loop iteration for a pattern.
+   This is useful for preserving loop state when updating patterns during playback.
+   Parameters:
+     slot - slot number;
+     pat_num - pattern ID (0-255);
+     loop_num - loop iteration to set (0-indexed).
+   Return value: 0 on success, negative on error.
+*/
+int sv_set_pattern_current_loop( int slot, int pat_num, int loop_num ) SUNVOX_FN_ATTR;
+```
+
+#### `sunvox_lib/main/sunvox_lib.cpp`
+
+**Location:** After line 746 (after `sv_get_pattern_current_loop` implementation)
+
+**Added:**
+```cpp
+SUNVOX_EXPORT int sv_set_pattern_current_loop( int slot, int pat_num, int loop_num )
+{
+    if( check_slot( slot ) ) return -1;
+    sunvox_engine* s = g_sv[ slot ];
+    
+    // Validate pattern number
+    if( pat_num < 0 || pat_num >= 256 ) return -1;
+    if( (unsigned)pat_num >= (unsigned)s->pats_num || !s->pats[ pat_num ] )
+        return -1;
+    
+    // Validate loop number (can't be negative)
+    if( loop_num < 0 ) return -1;
+    
+    // Set the current loop iteration
+    s->pattern_current_loop[ pat_num ] = loop_num;
+    
+    return 0;
+}
+```
+
+### Usage in Application
+
+**Modified:** `app/native/sunvox_wrapper.mm` `sunvox_wrapper_update_timeline_seamless()` function
+
+**Pattern:**
+```cpp
+// 1. Find currently playing pattern BEFORE resetting counters
+int current_playing_pattern = /* find by position */;
+
+// 2. Save current loop counter
+int saved_loop_counter = -1;
+if (current_playing_pattern >= 0) {
+    saved_loop_counter = sv_get_pattern_current_loop(SUNVOX_SLOT, current_playing_pattern);
+}
+
+// 3. Refresh all pattern loop counts (this resets counters to 0)
+for (int i = 0; i < sections_count; i++) {
+    int pat_id = g_section_patterns[i];
+    sv_set_pattern_loop_count(SUNVOX_SLOT, pat_id, loops);
+}
+
+// 4. Restore loop counter for currently playing pattern
+if (current_playing_pattern >= 0 && saved_loop_counter >= 0) {
+    sv_set_pattern_current_loop(SUNVOX_SLOT, current_playing_pattern, saved_loop_counter);
+}
+```
+
+### Result
+
+✅ Loop counter preserved during pattern resize  
+✅ User stays on "3/4" instead of jumping to "1/4"  
+✅ Seamless experience when adding/removing steps during playback  
+
+---
+
 ## Bug Fixes
 
 ### Fix: `sv_play()` Preserves `single_pattern_play` State
@@ -1014,8 +1107,30 @@ if( s->pattern_current_loop[ pnum ] >= s->pattern_loop_counts[ pnum ] )
 
 ---
 
-**Last Updated:** October 15, 2025  
+**Last Updated:** October 22, 2025 (Pattern Resize Fix)  
 **SunVox Version:** 2.1.2b  
 **Status:** Production Ready ✅
 
 **Complete Documentation:** See `/app/docs/features/sunvox_integration/LOOP_COUNTING_GUIDE.md` for comprehensive loop counting guide.
+
+---
+
+**Last Updated:** October 22, 2025  
+**SunVox Version:** 2.1.2b  
+**Status:** Production Ready ✅
+
+---
+
+## References
+
+- **Original SunVox Library:** https://warmplace.ru/soft/sunvox/sunvox_lib.php
+- **License:** See `sunvox_lib/docs/license/`
+- **Application Integration:** See `/app/docs/features/sunvox_integration/`
+
+---
+
+## Application-Level Notes
+
+For details on how these SunVox library modifications are used in the application (seamless playback, step add/remove, etc.), see:
+- `/app/docs/features/sunvox_integration/playback_step_increase_decrease.md`
+- `/app/docs/features/sunvox_integration/seamless_playback.md`

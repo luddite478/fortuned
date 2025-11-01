@@ -12,7 +12,7 @@ def apple_app_site_association():
             "apps": [],
             "details": [{
                 "appID": f"{team_id}.{bundle_id}",
-                "paths": ["/to/*"]
+                "paths": ["/join/*"]
             }]
         }
     }

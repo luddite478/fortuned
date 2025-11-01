@@ -6,7 +6,7 @@ This document describes the implementation of the invite-via-link feature, which
 
 The system allows a user within a thread to generate a unique, permanent link that they can share with others. When another user clicks this link on a device with the app installed, the app opens directly and prompts them to join the thread.
 
-The invite link follows the format: `https://<your-domain>/to/<thread_id>`
+The invite link follows the format: `https://<your-domain>/join/<thread_id>`
 
 ## Client-Side Implementation (Flutter)
 

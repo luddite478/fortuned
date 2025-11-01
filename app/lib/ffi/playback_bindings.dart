@@ -79,6 +79,10 @@ class PlaybackBindings {
     _switchToSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>>('switch_to_section');
     switchToSection = _switchToSectionPtr.asFunction<void Function(int)>();
 
+    // Master volume
+    _playbackSetMasterVolumePtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Float)>>('playback_set_master_volume');
+    playbackSetMasterVolume = _playbackSetMasterVolumePtr.asFunction<void Function(double)>();
+
     // Recording
     _recordingStartPtr = lib.lookup<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<ffi.Char>)>>('recording_start');
     recordingStart = _recordingStartPtr.asFunction<int Function(ffi.Pointer<ffi.Char>)>();
@@ -102,6 +106,10 @@ class PlaybackBindings {
 
     _previewStopCellPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('preview_stop_cell');
     previewStopCell = _previewStopCellPtr.asFunction<void Function()>();
+
+    // SunVox section sync
+    _sunvoxSyncSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>>('sunvox_wrapper_sync_section');
+    sunvoxSyncSection = _sunvoxSyncSectionPtr.asFunction<void Function(int)>();
 
   }
 
@@ -136,6 +144,10 @@ class PlaybackBindings {
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>> _switchToSectionPtr;
   late final void Function(int) switchToSection;
 
+  // Master volume
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Float)>> _playbackSetMasterVolumePtr;
+  late final void Function(double) playbackSetMasterVolume;
+
   // Recording
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function(ffi.Pointer<ffi.Char>)>> _recordingStartPtr;
   late final int Function(ffi.Pointer<ffi.Char>) recordingStart;
@@ -159,6 +171,10 @@ class PlaybackBindings {
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _previewStopCellPtr;
   late final void Function() previewStopCell;
+
+  // SunVox section sync
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>> _sunvoxSyncSectionPtr;
+  late final void Function(int) sunvoxSyncSection;
 
 }
 

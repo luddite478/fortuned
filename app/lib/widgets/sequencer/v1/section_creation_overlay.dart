@@ -139,7 +139,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
           
           // Create From Label
           Text(
-            'Create From:',
+            'Copy:',
             style: GoogleFonts.sourceSans3(
               color: AppColors.sequencerLightText,
               fontSize: 14,

@@ -989,7 +989,7 @@ class _InviteLinkModalBottomSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final inviteLink = '${ApiHttpClient.publicBaseUrl}/to/$threadId';
+    final inviteLink = '${ApiHttpClient.publicBaseUrl}/join/$threadId';
 
     return Container(
       decoration: BoxDecoration(

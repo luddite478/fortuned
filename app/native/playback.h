@@ -148,6 +148,10 @@ void playback_set_section_loops_num(int section, int loops);
 __attribute__((visibility("default"))) __attribute__((used))
 void switch_to_section(int section_index);
 
+// Master volume control (0.0 .. 1.0)
+__attribute__((visibility("default"))) __attribute__((used))
+void playback_set_master_volume(float volume01);
+
 // Volume smoothing configuration
 __attribute__((visibility("default"))) __attribute__((used))
 void playback_set_smoothing_rise_time(float ms);

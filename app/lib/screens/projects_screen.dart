@@ -9,7 +9,7 @@ import '../services/threads_api.dart';
 
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
-import 'sequencer_screen_v1.dart';
+import 'sequencer_screen.dart';
 import '../widgets/simplified_header_widget.dart';
 import '../ffi/table_bindings.dart';
 import '../ffi/playback_bindings.dart';
@@ -300,11 +300,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 } catch (e) {
                   debugPrint('❌ Failed to init native subsystems: $e');
                 }
-                // Navigate to V2 sequencer implementation
+                // Navigate to sequencer using PatternScreen which handles version routing
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => const SequencerScreenV1(),
+                    builder: (context) => const PatternScreen(),
                   ),
                 );
               },
@@ -635,7 +635,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final latest = await ThreadsApi.getLatestMessage(project.id, includeSnapshot: true);
       Map<String, dynamic>? initialSnapshot = latest?.snapshot;
 
-      // Navigate to V2 sequencer screen
+      // Navigate to sequencer using PatternScreen which handles version routing
       if (mounted) {
         setState(() {
           _isOpeningProject = false;
@@ -645,7 +645,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SequencerScreenV1(initialSnapshot: initialSnapshot),
+            builder: (context) => PatternScreen(initialSnapshot: initialSnapshot),
           ),
         );
       }

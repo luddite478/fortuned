@@ -98,6 +98,7 @@ class PlaybackState extends ChangeNotifier {
   
   // Private state fields
   int _bpm = 120;
+  double _masterVolume = 1.0; // 0.0..1.0
   int _currentStep = 0;
   bool _isPlaying = false;
   bool _songMode = false;
@@ -110,6 +111,7 @@ class PlaybackState extends ChangeNotifier {
   final ValueNotifier<int> currentStepNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<int> bpmNotifier = ValueNotifier<int>(120);
+  final ValueNotifier<double> masterVolumeNotifier = ValueNotifier<double>(1.0);
   final ValueNotifier<bool> songModeNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<int> regionStartNotifier = ValueNotifier<int>(0);
   final ValueNotifier<int> regionEndNotifier = ValueNotifier<int>(16);
@@ -133,6 +135,10 @@ class PlaybackState extends ChangeNotifier {
     if (result == 0) {
       _initialized = true;
       debugPrint('✅ [PLAYBACK_STATE] Playback system initialized');
+      // Apply initial master volume to native engine
+      try {
+        _playback_ffi.playbackSetMasterVolume(_masterVolume);
+      } catch (_) {}
     } else {
       debugPrint('❌ [PLAYBACK_STATE] Failed to initialize playback system: $result');
     }
@@ -181,6 +187,42 @@ class PlaybackState extends ChangeNotifier {
     } else {
       debugPrint('❌ [PLAYBACK_STATE] Invalid BPM: $bpm (must be 60-300)');
     }
+  }
+
+  // Master volume 0.0..1.0
+  void setMasterVolume(double volume01) {
+    final v = volume01.clamp(0.0, 1.0);
+    _masterVolume = v;
+    masterVolumeNotifier.value = v;
+    if (_initialized) {
+      _playback_ffi.playbackSetMasterVolume(v);
+    }
+  }
+
+  // ===== Live preview helpers (UI wires these with debounce) =====
+  void previewSampleSlot(int slot, {required double pitchRatio, required double volume01}) {
+    if (!_initialized) return;
+    // vol==0 => stop preview; otherwise start/restart
+    if (volume01 <= 0.0) {
+      _playback_ffi.previewStopSample();
+      return;
+    }
+    _playback_ffi.previewSlot(slot, pitchRatio, volume01);
+  }
+
+  void previewCell({required int step, required int colAbs, required double pitchRatio, required double volume01}) {
+    if (!_initialized) return;
+    if (volume01 <= 0.0) {
+      _playback_ffi.previewStopCell();
+      return;
+    }
+    _playback_ffi.previewCell(step, colAbs, pitchRatio, volume01);
+  }
+
+  void stopPreview() {
+    if (!_initialized) return;
+    _playback_ffi.previewStopSample();
+    _playback_ffi.previewStopCell();
   }
   
   void setSongMode(bool songMode) {
@@ -385,6 +427,7 @@ class PlaybackState extends ChangeNotifier {
     currentSectionNotifier.dispose();
     currentSectionLoopNotifier.dispose();
     currentSectionLoopsNumNotifier.dispose();
+    masterVolumeNotifier.dispose();
 
     super.dispose();
   }

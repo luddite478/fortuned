@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:provider/provider.dart';
-import 'package:uni_links/uni_links.dart';
+import 'package:app_links/app_links.dart';
 
 import 'screens/main_navigation_screen.dart';
 import 'screens/thread_screen.dart';
@@ -26,6 +26,7 @@ import 'services/ws_client.dart';
 import 'state/sequencer/table.dart';
 import 'state/sequencer/playback.dart';
 import 'state/sequencer/sample_bank.dart';
+import 'state/sequencer_version_state.dart';
 
 
 void main() async {
@@ -52,6 +53,7 @@ class App extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => AudioPlayerState()),
         ChangeNotifierProvider(create: (context) => LibraryState()),
         ChangeNotifierProvider(create: (context) => FollowedState()),
+        ChangeNotifierProvider(create: (context) => SequencerVersionState()),
         Provider(create: (context) => WebSocketClient()),
         ChangeNotifierProvider(create: (context) => TableState()),
         ChangeNotifierProvider(create: (context) => PlaybackState(Provider.of<TableState>(context, listen: false))),
@@ -101,28 +103,44 @@ class _MainPageState extends State<MainPage> {
   NotificationsService? _notificationsService;
   OverlayEntry? _notifOverlay;
   Timer? _notifOverlayTimer;
-  StreamSubscription? _linkSub;
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSub;
   
   @override
   void initState() {
     super.initState();
-    _handleIncomingLinks();
+    _initDeepLinks();
     // Remove the immediate call to _syncCurrentUser() since it will be called
     // reactively when UserState completes loading
   }
 
-  Future<void> _handleIncomingLinks() async {
-    _linkSub = linkStream.listen((String? link) {
-      if (link != null) {
-        final uri = Uri.parse(link);
-        if (uri.path.startsWith('/to/')) {
-          final threadId = uri.pathSegments.last;
-          _showJoinConfirmation(threadId);
+  Future<void> _initDeepLinks() async {
+    _appLinks = AppLinks();
+
+    // Handle initial link if app was opened from a deep link (cold start)
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) {
+        debugPrint('Got initial deep link: $initialUri');
+        if (initialUri.path.startsWith('/join/')) {
+          final threadId = initialUri.pathSegments.last;
+          // Delay showing confirmation until after build completes
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _showJoinConfirmation(threadId);
+          });
         }
       }
-    }, onError: (err) {
-      // Handle error by printing to console
-      debugPrint('Deep link error: $err');
+    } catch (e) {
+      debugPrint('Error getting initial link: $e');
+    }
+
+    // Listen for incoming app links while app is running
+    _linkSub = _appLinks.uriLinkStream.listen((uri) {
+      debugPrint('Got deep link: $uri');
+      if (uri.path.startsWith('/join/')) {
+        final threadId = uri.pathSegments.last;
+        _showJoinConfirmation(threadId);
+      }
     });
   }
 
