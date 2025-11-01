@@ -1,38 +1,56 @@
 import 'package:flutter/material.dart';
-import '../../../utils/app_colors.dart';
 import 'package:provider/provider.dart';
+import '../../../utils/app_colors.dart';
+import '../../../state/sequencer/playback.dart';
 import '../../../state/threads_state.dart';
-import '../../../screens/thread_screen.dart';
 import '../../../state/sequencer/table.dart';
+import '../../../screens/thread_screen.dart';
+import '../../../utils/app_icons.dart';
 
 class MessageBarWidget extends StatelessWidget {
-  static const double leftButtonContainerPercent = 0.15;
-  static const double centerButtonContainerPercent = 0.7;
-  static const double rightButtonContainerPercent = 0.15;
-  static const double leftButtonHorizontalPosition = 0.8;
-  static const double centerButtonHorizontalPosition = 0.5;
-  static const double rightButtonHorizontalPosition = 0.5;
-  static const double leftButtonWidthPercent = 0.9;
-  static const double leftButtonHeightPercent = 0.7;
-  static const double centerButtonWidthPercent = 1;
-  static const double centerButtonHeightPercent = 0.7;
-  static const double rightButtonSizePercent = 0.5;
-  static const double leftButtonsBorderRadiusPercent = 0.1;
-  static const double rightButtonBorderRadiusPercent = 0.5;
+  // Configuration variables for easy control
+  // Container space allocation (must sum to 1.0 or less)
+  static const double leftButtonContainerPercent = 0.15; // 15% of bar width
+  static const double centerButtonContainerPercent = 0.7; // 65% of bar width  
+  static const double rightButtonContainerPercent = 0.15; // 20% of bar width
+  
+  // Button positioning within containers (0.0 = left/top, 1.0 = right/bottom)
+  static const double leftButtonHorizontalPosition = 0.8; // Center horizontally
+  static const double centerButtonHorizontalPosition = 0.5; // Center horizontally
+  static const double rightButtonHorizontalPosition = 0.5; // Center horizontally
+  
+  // Button sizes (as percentage of container size)
+  static const double leftButtonWidthPercent = 0.9; // 80% of container width
+  static const double leftButtonHeightPercent = 0.7; // 80% of container height
+  static const double centerButtonWidthPercent = 1; // 90% of container width
+  static const double centerButtonHeightPercent = 0.7; // 80% of container height
+  static const double rightButtonSizePercent = 0.5; // 80% of container size (square)
+  
+  // Border radius controls
+  static const double leftButtonsBorderRadiusPercent = 0.1; // 0.0 = square, 0.5 = fully round
+  static const double rightButtonBorderRadiusPercent = 0.5; // 50% for perfect circle
+  
+  // Container background colors
+  // static const Color leftContainerBackgroundColor = Color.fromARGB(255, 168, 168, 45);
+  // static const Color centerContainerBackgroundColor = Color.fromARGB(255, 154, 14, 14);
+  // static const Color rightContainerBackgroundColor = Color.fromARGB(255, 82, 11, 104);
+
   static const Color leftContainerBackgroundColor = AppColors.sequencerCellEmpty;
   static const Color centerContainerBackgroundColor = AppColors.sequencerCellEmpty;
   static const Color rightContainerBackgroundColor = Color.fromARGB(255, 67, 65, 65);
-  static const double parentContainerWidthPercent = 0.975;
-  static const double parentContainerHeightPercent = 1;
+  
+  // Parent container settings
+  static const double parentContainerWidthPercent = 0.975; // 90% of bar width
+  static const double parentContainerHeightPercent = 1; // 100% of bar height
   static const Color parentContainerBackgroundColor = Color.fromARGB(255, 255, 3, 3);
-  static const double parentContainerBorderRadiusPercent = 0.5;
-
+  static const double parentContainerBorderRadiusPercent = 0.5; // 0.0 = square, 0.5 = fully round
+  
   const MessageBarWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 4), // Removed horizontal padding
       decoration: BoxDecoration(
         color: AppColors.sequencerSurfaceBase,
         border: Border(
@@ -44,26 +62,34 @@ class MessageBarWidget extends StatelessWidget {
       ),
       child: SafeArea(
         top: false,
-        child: Consumer2<TableState, ThreadsState>(
-          builder: (context, tableState, threadsState, child) {
+        child: Consumer3<ThreadsState, TableState, PlaybackState>(
+          builder: (context, threadsState, tableState, playbackState, child) {
             return LayoutBuilder(
               builder: (context, constraints) {
                 final barHeight = constraints.maxHeight;
                 final barWidth = constraints.maxWidth;
+                
+                // Calculate container sizes
                 final leftContainerWidth = barWidth * leftButtonContainerPercent;
                 final centerContainerWidth = barWidth * centerButtonContainerPercent;
                 final rightContainerWidth = barWidth * rightButtonContainerPercent;
+                
+                // Calculate button sizes
                 final leftButtonWidth = leftContainerWidth * leftButtonWidthPercent;
                 final leftButtonHeight = barHeight * leftButtonHeightPercent;
                 final centerButtonWidth = centerContainerWidth * centerButtonWidthPercent;
                 final centerButtonHeight = barHeight * centerButtonHeightPercent;
                 final rightButtonSize = rightContainerWidth * rightButtonSizePercent;
+                
+                // Calculate border radius
                 final leftBorderRadius = leftButtonHeight * leftButtonsBorderRadiusPercent;
                 final rightBorderRadius = rightButtonSize * rightButtonBorderRadiusPercent;
+                
+                // Calculate parent container size
                 final parentContainerWidth = barWidth * parentContainerWidthPercent;
                 final parentContainerHeight = barHeight * parentContainerHeightPercent;
                 final parentBorderRadius = parentContainerHeight * parentContainerBorderRadiusPercent;
-
+                
                 return Center(
                   child: Container(
                     width: parentContainerWidth,
@@ -74,6 +100,33 @@ class MessageBarWidget extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
+                        // Left button container
+                                                // Center button container
+                        Expanded(
+                          flex: (centerButtonContainerPercent * 100).round(),
+                          child: Container(
+                            height: barHeight,
+                            color: centerContainerBackgroundColor,
+                            child: Align(
+                              alignment: Alignment(centerButtonHorizontalPosition * 2 - 1, 0),
+                              child: Container(
+                                width: centerButtonWidth,
+                                height: centerButtonHeight,
+                                decoration: BoxDecoration(
+                                  color: const Color.fromARGB(255, 53, 53, 53),
+                                  borderRadius: BorderRadius.circular(leftBorderRadius),
+                                  border: Border.all(
+                                    color: const Color.fromARGB(255, 57, 57, 57),
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: _buildSectionChain(tableState.sectionsCount),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                         Expanded(
                           flex: (leftButtonContainerPercent * 100).round(),
                           child: Container(
@@ -110,31 +163,10 @@ class MessageBarWidget extends StatelessWidget {
                             ),
                           ),
                         ),
-                        Expanded(
-                          flex: (centerButtonContainerPercent * 100).round(),
-                          child: Container(
-                            height: barHeight,
-                            color: centerContainerBackgroundColor,
-                            child: Align(
-                              alignment: Alignment(centerButtonHorizontalPosition * 2 - 1, 0),
-                              child: Container(
-                                width: centerButtonWidth,
-                                height: centerButtonHeight,
-                                decoration: BoxDecoration(
-                                  color: const Color.fromARGB(255, 53, 53, 53),
-                                  borderRadius: BorderRadius.circular(leftBorderRadius),
-                                  border: Border.all(
-                                    color: const Color.fromARGB(255, 57, 57, 57),
-                                    width: 1,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: _buildSectionChain(tableState.sectionsCount),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
+                        
+
+                        
+                        // Right button container
                         Expanded(
                           flex: (rightButtonContainerPercent * 100).round(),
                           child: Container(
@@ -146,7 +178,7 @@ class MessageBarWidget extends StatelessWidget {
                                 width: rightButtonSize,
                                 height: rightButtonSize,
                                 decoration: BoxDecoration(
-                                  color: const Color.fromARGB(255, 90, 111, 114),
+                                  color: const Color.fromARGB(255, 88, 88, 88),
                                   borderRadius: BorderRadius.circular(rightBorderRadius),
                                   boxShadow: [
                                     BoxShadow(
@@ -162,9 +194,10 @@ class MessageBarWidget extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(rightBorderRadius),
                                     onTap: () => _sendMessageAndNavigate(context, threadsState),
                                     child: Center(
-                                      child: CustomPaint(
-                                        size: Size(rightButtonSize * 0.4, rightButtonSize * 0.4),
-                                        painter: TrianglePainter(),
+                                      child: Icon(
+                                        Icons.save,
+                                        size: rightButtonSize * 0.8,
+                                        color: const Color.fromARGB(255, 197, 199, 199),
                                       ),
                                     ),
                                   ),
@@ -190,12 +223,13 @@ class MessageBarWidget extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.center,
       children: List.generate(numSections * 2 - 1, (index) {
         if (index.isEven) {
+          // Square representing a section
           return Container(
             width: 12,
             height: 12,
             margin: const EdgeInsets.symmetric(horizontal: 2),
             decoration: BoxDecoration(
-              color: const Color.fromARGB(255, 90, 111, 114),
+              color: const Color.fromARGB(255, 121, 121, 121),
               borderRadius: BorderRadius.circular(2),
               border: Border.all(
                 color: AppColors.sequencerBorder,
@@ -204,6 +238,7 @@ class MessageBarWidget extends StatelessWidget {
             ),
           );
         } else {
+          // Horizontal line connecting sections
           return Container(
             width: 8,
             height: 2,
@@ -219,16 +254,30 @@ class MessageBarWidget extends StatelessWidget {
   }
 
   void _navigateToThread(BuildContext context, ThreadsState threadsState) {
+    // Stop playback if active before navigating
+    final playbackState = Provider.of<PlaybackState>(context, listen: false);
+    if (playbackState.isPlaying) {
+      playbackState.stop();
+    }
+
+    // Same logic as in app_header_widget.dart
     final thread = threadsState.activeThread;
+    
     if (thread != null) {
+      // Set the active thread in ThreadsState
       threadsState.setActiveThread(thread);
+      
+      // Navigate to thread screen for this thread
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ThreadScreen(threadId: thread.id),
+          builder: (context) => ThreadScreen(
+            threadId: thread.id,
+          ),
         ),
       );
     } else {
+      // No active thread - show message that user needs to publish first
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Publish your project first to create checkpoints'),
@@ -240,48 +289,43 @@ class MessageBarWidget extends StatelessWidget {
   }
 
   void _navigateToThreadWithHighlight(BuildContext context, ThreadsState threadsState) {
+    // Same as _navigateToCheckpoints but with highlight for newest checkpoint
     final thread = threadsState.activeThread;
+    
     if (thread != null) {
+      // Set the active thread in ThreadsState
       threadsState.setActiveThread(thread);
+      
+      // Navigate to thread screen with highlight for newest message
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (context) => ThreadScreen(threadId: thread.id, highlightNewest: true),
+          builder: (context) => ThreadScreen(
+            threadId: thread.id,
+            highlightNewest: true,
+          ),
         ),
       );
     }
   }
 
-  void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) async {
+  void _sendMessageAndNavigate(BuildContext context, ThreadsState threadsState) {
+    // Stop playback if active before sending and navigating
+    final playbackState = Provider.of<PlaybackState>(context, listen: false);
+    if (playbackState.isPlaying) {
+      playbackState.stop();
+    }
+
     final activeThread = threadsState.activeThread;
-    try {
-      if (activeThread != null) {
-        await threadsState.sendMessageFromSequencer(threadId: activeThread.id);
-        if (context.mounted) {
-          _navigateToThreadWithHighlight(context, threadsState);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error sending message: $e');
+    if (activeThread != null) {
+      // Start upload in background (don't await)
+      threadsState.sendMessageFromSequencer(threadId: activeThread.id).catchError((e) {
+        // Silent error handling - status will be shown in UI
+        debugPrint('Error sending message: $e');
+      });
+      
+      // Navigate immediately
+      _navigateToThreadWithHighlight(context, threadsState);
     }
   }
 }
-
-class TrianglePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = const Color.fromARGB(255, 209, 246, 245)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.0;
-
-    final path = Path();
-    path.moveTo(size.width * 0.0, size.height * 0.0);
-    path.lineTo(size.width * 1, size.height * 0.5);
-    path.lineTo(size.width * 0.0, size.height * 1);
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-} 

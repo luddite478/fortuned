@@ -31,7 +31,8 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
 // Remove a pattern for a section
 void sunvox_wrapper_remove_section_pattern(int section_index);
 
-// Sync entire section to its SunVox pattern
+// Sync entire section to its SunVox patter
+__attribute__((visibility("default"))) __attribute__((used))
 void sunvox_wrapper_sync_section(int section_index);
 
 // Sync single cell to SunVox pattern
@@ -44,6 +45,11 @@ void sunvox_wrapper_set_playback_mode(int song_mode, int current_section, int cu
 
 // Update the timeline/playback order of sections (uses internally stored mode)
 void sunvox_wrapper_update_timeline(void);
+
+// Seamless timeline update for pattern size changes (add/remove steps)
+// This updates pattern X positions WITHOUT stopping playback
+// section_index: which section was resized (for loop mode refresh)
+void sunvox_wrapper_update_timeline_seamless(int section_index);
 
 // Start playback
 // Returns 0 on success, negative on error
@@ -85,6 +91,12 @@ int sunvox_wrapper_is_initialized(void);
 void sunvox_wrapper_debug_dump_patterns(const char* context);
 
 int sunvox_wrapper_get_pattern_current_loop(int section_index);
+
+// Live preview (SunVox-based)
+// Play/stop preview for a sample slot or specific cell without altering patterns
+int sunvox_preview_slot(int slot, float pitch, float volume);
+int sunvox_preview_cell(int step, int column, float pitch, float volume);
+void sunvox_preview_stop(void);
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,8 @@ set -e
 ENVIRONMENT="$1"
 DEVICE_TYPE="$2"
 IPHONE_MODEL="$3"
+DEV_USER_ID_ARG="$4"
+CLEAR_STORAGE="$5"
 
 # Ensure system toolchain is used (avoid ccache)
 export CC="/usr/bin/clang"
@@ -20,9 +22,13 @@ fi
 if [[ "$ENVIRONMENT" == "stage" ]]; then
   cp .stage.env .env
   echo "Using stage environment (.stage.env)"
+  cp ios/Runner/Runner.entitlements.stage ios/Runner/Runner.entitlements
+  echo "Using stage entitlements (devtest.4tnd.link)"
 elif [[ "$ENVIRONMENT" == "prod" ]]; then
   cp .prod.env .env
   echo "Using production environment (.prod.env)"
+  cp ios/Runner/Runner.entitlements.prod ios/Runner/Runner.entitlements
+  echo "Using production entitlements (4tnd.link)"
 fi
 
 # Step 1: Find all directories (including empty ones) in samples folder
@@ -60,13 +66,27 @@ cd native/sunvox_lib/sunvox_lib/ios
 ./select_library.sh "$DEVICE_TYPE"
 cd ../../../..
 
+# Prepare Flutter command
+FLUTTER_ARGS=()
+echo "$FLUTTER_ARGS"
+if [[ -n "$DEV_USER_ID_ARG" ]]; then
+  FLUTTER_ARGS+=(--dart-define=DEV_USER_ID=$DEV_USER_ID_ARG)
+  echo "🔧 Running with developer user ID: $DEV_USER_ID_ARG"
+fi
+
+if [[ "$CLEAR_STORAGE" == "clear" ]]; then
+  FLUTTER_ARGS+=(--dart-define=CLEAR_STORAGE=true)
+  echo "🗑️ Clearing storage on next app launch."
+fi
+
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
-  flutter run -d "$IPHONE_MODEL" --debug
+  echo "flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug"
+  flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
-  flutter build ios --release
+  flutter build ios "${FLUTTER_ARGS[@]}" --release
 
   echo "Detecting first connected physical iPhone..."
   DEVICE_ID="00008030-001564DA14F9802E"

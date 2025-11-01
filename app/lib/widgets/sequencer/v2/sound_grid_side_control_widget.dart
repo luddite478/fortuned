@@ -211,7 +211,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
                       }
                     },
                     tooltip: tableState.uiSelectedSection == tableState.sectionsCount - 1 
-                        ? 'Create New Section'
+                        ? 'New Section'
                         : 'Next Section (${tableState.uiSelectedSection + 2}/${tableState.sectionsCount})',
                   ),
                   SizedBox(height: buttonSpacing),

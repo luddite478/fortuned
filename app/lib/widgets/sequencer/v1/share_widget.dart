@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/recording.dart';
+import '../../../state/sequencer/multitask_panel.dart';
 import '../../../state/threads_state.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class ShareWidget extends StatelessWidget {
   const ShareWidget({super.key});
@@ -18,8 +19,8 @@ class ShareWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer2<SequencerState, ThreadsState>(
-      builder: (context, sequencer, threadsState, child) {
+    return Consumer3<RecordingState, ThreadsState, MultitaskPanelState>(
+      builder: (context, recording, threadsState, panelState, child) {
         return Container(
           decoration: BoxDecoration(
             color: Colors.black,
@@ -36,12 +37,8 @@ class ShareWidget extends StatelessWidget {
               final padding = panelHeight * 0.05; // 5% of given height
               final borderRadius = contentHeight * 0.08; // Scale with content height
               
-              // Show publish button if available
-              final activeThread = threadsState.activeThread;
-              final canPublish = activeThread == null || 
-                                (activeThread.users.length == 1 && 
-                                 activeThread.users.first.id == threadsState.currentUserId &&
-                                 !(activeThread.metadata['is_public'] ?? false));
+              // Publish flow removed in new model; hide publish button
+              final canPublish = false;
               
               // Calculate layout: top button row + spacing + recordings area
               final buttonRowHeight = contentHeight * 0.25; // 25% of content for button row
@@ -73,7 +70,7 @@ class ShareWidget extends StatelessWidget {
                               child: Container(
                                 height: buttonRowHeight,
                                 child: ElevatedButton(
-                                  onPressed: () => _publishProject(context, sequencer),
+                                  onPressed: () => _publishProject(context),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.orangeAccent,
                                     shape: RoundedRectangleBorder(
@@ -103,7 +100,7 @@ class ShareWidget extends StatelessWidget {
                           
                           // Close button with proper proportions
                           GestureDetector(
-                            onTap: () => sequencer.setShowShareWidget(false),
+                            onTap: () => panelState.showPlaceholder(),
                             child: Container(
                               width: closeButtonSize,
                               height: closeButtonSize,
@@ -133,7 +130,7 @@ class ShareWidget extends StatelessWidget {
                     // Recordings area
                     Container(
                       height: recordingsHeight,
-                      child: _buildRecordingsList(context, sequencer, recordingsHeight, panelWidth - (padding * 2)),
+                      child: _buildRecordingsList(context, recording, recordingsHeight, panelWidth - (padding * 2)),
                     ),
                   ],
                 ),
@@ -145,8 +142,8 @@ class ShareWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildRecordingsList(BuildContext context, SequencerState sequencer, double availableHeight, double availableWidth) {
-    if (sequencer.localRecordings.isEmpty) {
+  Widget _buildRecordingsList(BuildContext context, RecordingState recording, double availableHeight, double availableWidth) {
+    if (recording.localRecordings.isEmpty) {
       // Empty state with proportional sizing
       final emptyIconSize = availableHeight * 0.25;
       final emptyFontSize = availableHeight * 0.08;
@@ -184,7 +181,7 @@ class ShareWidget extends StatelessWidget {
     // Horizontal scrollable layout following sample_banks_widget pattern
     return LayoutBuilder(
       builder: (context, constraints) {
-        final recordingCount = sequencer.localRecordings.length;
+        final recordingCount = recording.localRecordings.length;
         
         // Use same pattern as sample_banks_widget: calculate item width to show 2.5 items
         final itemWidth = availableWidth / 2.5; // Show 2.5 items for scrolling hint
@@ -194,9 +191,9 @@ class ShareWidget extends StatelessWidget {
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(
-            children: sequencer.localRecordings.asMap().entries.map((entry) {
+            children: recording.localRecordings.asMap().entries.map((entry) {
               final index = entry.key;
-              final recording = entry.value;
+              final recordingPath = entry.value;
               
               return Container(
                 width: itemWidth,
@@ -212,7 +209,7 @@ class ShareWidget extends StatelessWidget {
                     width: 1,
                   ),
                 ),
-                child: _buildRecordingItem(context, sequencer, recording, index, availableHeight, itemPadding),
+                child: _buildRecordingItem(context, recording, recordingPath, index, availableHeight, itemPadding),
               );
             }).toList(),
           ),
@@ -221,7 +218,7 @@ class ShareWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildRecordingItem(BuildContext context, SequencerState sequencer, String recording, int index, double availableHeight, double itemPadding) {
+  Widget _buildRecordingItem(BuildContext context, RecordingState recordingState, String recording, int index, double availableHeight, double itemPadding) {
     return LayoutBuilder(
       builder: (context, itemConstraints) {
         // Use same pattern as sample_banks_widget: 80% content height, proper spacing
@@ -378,10 +375,10 @@ class ShareWidget extends StatelessWidget {
     );
   }
 
-  void _publishProject(BuildContext context, SequencerState sequencer) async {
+  void _publishProject(BuildContext context) async {
     try {
-      // Close share widget
-      sequencer.setShowShareWidget(false);
+      // Close share panel
+      Provider.of<MultitaskPanelState>(context, listen: false).showPlaceholder();
       
       // Show loading indicator
       if (!context.mounted) return;
@@ -400,22 +397,20 @@ class ShareWidget extends StatelessWidget {
       final activeThread = threadsState.activeThread;
       
       print('📋 Active thread before publish: ${activeThread?.id}');
-      print('📋 Active thread checkpoints count: ${activeThread?.checkpoints.length ?? 0}');
+      print('📋 Active thread messages count: ${activeThread?.messageIds.length ?? 0}');
       print('👤 Current user ID: ${threadsState.currentUserId}');
       print('👤 Current user name: ${threadsState.currentUserName}');
 
       // Publish to database (title will be auto-generated as 6-char ID)
-      final success = await sequencer.publishToDatabase(
-        description: 'Published from mobile app',
-        isPublic: true,
-      );
+      // Migrate to explicit publish flow handled elsewhere; stub here
+      final success = true;
       
       print('✅ Publish result: $success');
       
       // Check active thread after publishing
       final activeThreadAfter = threadsState.activeThread;
       print('📋 Active thread after publish: ${activeThreadAfter?.id}');
-      print('📋 Active thread checkpoints count after: ${activeThreadAfter?.checkpoints.length ?? 0}');
+      print('📋 Active thread messages count after: ${activeThreadAfter?.messageIds.length ?? 0}');
       
       if (!context.mounted) return;
       

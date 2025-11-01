@@ -48,6 +48,21 @@ class ThreadsApi {
     return data['id'] ?? data['thread_id'];
   }
 
+  static Future<void> joinThread({
+    required String threadId,
+    required String userId,
+    required String userName,
+  }) async {
+    final body = {
+      'user_id': userId,
+      'user_name': userName,
+    };
+    final res = await ApiHttpClient.post('/threads/$threadId/join', body: body);
+    if (res.statusCode != 200) {
+      throw Exception('Failed to join thread: ${res.statusCode} ${res.body}');
+    }
+  }
+
   // Messages
   static Future<List<Message>> getMessages(
     String threadId, {

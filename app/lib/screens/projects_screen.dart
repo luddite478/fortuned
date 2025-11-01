@@ -3,17 +3,17 @@ import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
+import '../state/user_state.dart';
 import '../models/thread/thread.dart';
 import '../services/threads_api.dart';
 
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
-import 'sequencer_screen_v2.dart';
-import '../widgets/common_header_widget.dart';
+import 'sequencer_screen.dart';
+import '../widgets/simplified_header_widget.dart';
 import '../ffi/table_bindings.dart';
 import '../ffi/playback_bindings.dart';
 import '../ffi/sample_bank_bindings.dart';
-import '../services/auth_service.dart';
 import '../widgets/buttons/action_button.dart';
 
 class ProjectsScreen extends StatefulWidget {
@@ -40,7 +40,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   Future<void> _loadProjects() async {
     try {
-      final authService = Provider.of<AuthService>(context, listen: false);
+      final userState = Provider.of<UserState>(context, listen: false);
       final threadsState = Provider.of<ThreadsState>(context, listen: false);
       
       // Load threads (returns cached data immediately if available)
@@ -49,10 +49,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       // Refresh in background if already loaded (collaborative data)
       if (threadsState.hasLoaded) {
         // Refresh user and threads in background
-        _refreshInBackground(authService, threadsState);
+        _refreshInBackground(userState, threadsState);
       } else {
         // First load - also fetch invites
-        await _loadInvites(authService, threadsState);
+        await _loadInvites(userState, threadsState);
       }
       
       setState(() {
@@ -65,24 +65,24 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
   
-  Future<void> _refreshInBackground(AuthService authService, ThreadsState threadsState) async {
+  Future<void> _refreshInBackground(UserState userState, ThreadsState threadsState) async {
     try {
       // Refresh current user to fetch pending_invites_to_threads
-      await authService.refreshCurrentUserFromServer();
+      await userState.refreshCurrentUserFromServer();
       
       // Refresh threads in background
       await threadsState.refreshThreadsInBackground();
       
       // Also load invite thread summaries
-      await _loadInvites(authService, threadsState);
+      await _loadInvites(userState, threadsState);
     } catch (e) {
       debugPrint('❌ [PROJECTS] Background refresh error: $e');
       // Don't show error to user for background refresh
     }
   }
   
-  Future<void> _loadInvites(AuthService authService, ThreadsState threadsState) async {
-    final invites = authService.currentUser?.pendingInvitesToThreads ?? const [];
+  Future<void> _loadInvites(UserState userState, ThreadsState threadsState) async {
+    final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
     for (final threadId in invites) {
       await threadsState.ensureThreadSummary(threadId);
     }
@@ -97,8 +97,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           SafeArea(
         child: Column(
           children: [
-            // User indicator at the top
-            const CommonHeaderWidget(),
+            // Simplified header with library icon
+            const SimplifiedHeaderWidget(),
             
             Consumer<ThreadsState>(
               builder: (context, threadsState, _) {
@@ -114,12 +114,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 return Expanded(
                   child: Column(
                     children: [
-              Container(
-                width: double.infinity,
-                margin: const EdgeInsets.all(12),
-                child: _buildMySequencerButton(),
-              ),
-              
               // Projects List
               Expanded(
                 child: Column(
@@ -174,9 +168,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       // Invites section (if current user has pending invites)
-                                      Consumer2<AuthService, ThreadsState>(
-                                        builder: (context, auth, threadsState, _) {
-                                          final invites = auth.currentUser?.pendingInvitesToThreads ?? const [];
+                                      Consumer2<UserState, ThreadsState>(
+                                        builder: (context, userState, threadsState, _) {
+                                          final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
                                           if (invites.isEmpty) return const SizedBox.shrink();
                                           // Ensure missing invite thread summaries are loaded
                                           final existingIds = threadsState.threads.map((t) => t.id).toSet();
@@ -209,7 +203,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                                   (x) => x.id == id,
                                                   orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
                                                 );
-                                                return _buildInviteCard(t.users.isEmpty ? null : t, auth, id);
+                                                return _buildInviteCard(t.users.isEmpty ? null : t, userState, id);
                                               }).toList(),
                                             ],
                                           );
@@ -288,179 +282,44 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 ),
               ),
             ),
+          // Custom positioned floating action button
+          Positioned(
+            right: 30,
+            bottom: 30,
+            child: FloatingActionButton(
+              onPressed: () async {
+                // Stop any playing audio from playlist/renders
+                context.read<AudioPlayerState>().stop();
+                // Clear active thread context for new project
+                context.read<ThreadsState>().setActiveThread(null);
+                // Initialize native subsystems (idempotent: init performs cleanup)
+                try {
+                  TableBindings().tableInit();
+                  PlaybackBindings().playbackInit();
+                  SampleBankBindings().sampleBankInit();
+                } catch (e) {
+                  debugPrint('❌ Failed to init native subsystems: $e');
+                }
+                // Navigate to sequencer using PatternScreen which handles version routing
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PatternScreen(),
+                  ),
+                );
+              },
+              backgroundColor: Colors.white, // White background
+              foregroundColor: const Color(0xFF424242), // Dark gray cross
+              elevation: 4, // Add shadow for Google-style appearance
+              child: const Icon(Icons.add, size: 50),
+            ),
+          ),
         ],
       ),
     );
   }
 
 
-  Widget _buildMySequencerButton() {
-    // Single "NEW PATTERN" button styled like project list items
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.only(bottom: 0),
-      decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
-        border: Border(
-          left: BorderSide(
-            color: AppColors.menuLightText.withOpacity(0.3),
-            width: 2,
-          ),
-          bottom: BorderSide(
-            color: AppColors.menuBorder,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () async {
-            // Stop any playing audio from playlist/renders
-            context.read<AudioPlayerState>().stop();
-            // Clear active thread context for new project
-            context.read<ThreadsState>().setActiveThread(null);
-            // Initialize native subsystems (idempotent: init performs cleanup)
-            try {
-              TableBindings().tableInit();
-              PlaybackBindings().playbackInit();
-              SampleBankBindings().sampleBankInit();
-            } catch (e) {
-              debugPrint('❌ Failed to init native subsystems: $e');
-            }
-            // Navigate to V2 sequencer implementation
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const SequencerScreenV2(),
-              ),
-            );
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Center(
-              child: Text(
-                'NEW PATTERN',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.menuText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-    
-    // COMMENTED OUT: Continue button functionality - uncomment to restore
-    /*
-    return Consumer<ThreadsState>(
-      builder: (context, threadsState, child) {
-        final projects = [...threadsState.threads]
-          ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-        final mostRecentProject = projects.isNotEmpty ? projects.first : null;
-        
-        // If projects exist, show NEW + CONTINUE buttons (horizontal)
-        return Row(
-          children: [
-            // New button - LEFT (square)
-            Expanded(
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.menuSecondaryButton, // White secondary button
-                  borderRadius: BorderRadius.circular(4), // More square corners
-                  border: Border.all(
-                    color: AppColors.menuSecondaryButtonBorder, // Dark border
-                    width: 1,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () async {
-                      // Stop any playing audio from playlist/renders
-                      context.read<AudioPlayerState>().stop();
-                      // Clear active thread context for new project
-                      context.read<ThreadsState>().setActiveThread(null);
-                      // Initialize native subsystems (idempotent: init performs cleanup)
-                      try {
-                        TableBindings().tableInit();
-                        PlaybackBindings().playbackInit();
-                        SampleBankBindings().sampleBankInit();
-                      } catch (e) {
-                        debugPrint('❌ Failed to init native subsystems: $e');
-                      }
-                      // Navigate to V2 sequencer implementation
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SequencerScreenV2(),
-                        ),
-                      );
-                    },
-                    borderRadius: BorderRadius.circular(4),
-                    child: Center(
-                      child: Text(
-                        'NEW',
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-
-            const SizedBox(width: 6),
-
-            // Continue button - RIGHT (square)
-            Expanded(
-              child: Container(
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.menuSecondaryButton, // White secondary button
-                  borderRadius: BorderRadius.circular(4), // More square corners
-                  border: Border.all(
-                    color: AppColors.menuSecondaryButtonBorder, // Dark border
-                    width: 1,
-                  ),
-                ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    onTap: () async {
-                      // Load project into sequencer and navigate
-                      await _loadProjectInSequencer(mostRecentProject);
-                    },
-                    borderRadius: BorderRadius.circular(2),
-                    child: Center(
-                      child: Text(
-                        'CONTINUE',
-                        style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuSecondaryButtonText, // Dark text on light button
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 1.2,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-    */
-  }
 
   Widget _buildProjectCard(Thread project) {
     return Container(
@@ -552,7 +411,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  Widget _buildInviteCard(Thread? thread, AuthService auth, String threadId) {
+  Widget _buildInviteCard(Thread? thread, UserState userState, String threadId) {
     // Same visual style as project list tile; only right side differs
     return Container(
       height: 60,
@@ -643,12 +502,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 fontSize: 12,
                 onTap: () async {
-                  await ThreadsApi.acceptInvite(threadId: threadId, userId: auth.currentUser!.id);
-                  final authSvc = context.read<AuthService>();
+                  await ThreadsApi.acceptInvite(threadId: threadId, userId: userState.currentUser!.id);
+                  final userSvc = context.read<UserState>();
                   final threadsState = context.read<ThreadsState>();
-                  await authSvc.refreshCurrentUserFromServer();
+                  await userSvc.refreshCurrentUserFromServer();
                   await threadsState.loadThreads();
-                  final invites = authSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                  final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
                   for (final id in invites) {
                     await threadsState.ensureThreadSummary(id);
                   }
@@ -665,12 +524,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 fontSize: 12,
                 onTap: () async {
-                  await ThreadsApi.declineInvite(threadId: threadId, userId: auth.currentUser!.id);
-                  final authSvc = context.read<AuthService>();
+                  await ThreadsApi.declineInvite(threadId: threadId, userId: userState.currentUser!.id);
+                  final userSvc = context.read<UserState>();
                   final threadsState = context.read<ThreadsState>();
-                  await authSvc.refreshCurrentUserFromServer();
+                  await userSvc.refreshCurrentUserFromServer();
                   await threadsState.loadThreads();
-                  final invites = authSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                  final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
                   for (final id in invites) {
                     await threadsState.ensureThreadSummary(id);
                   }
@@ -686,8 +545,8 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Widget _buildParticipantsChips(Thread project) {
-    final auth = context.read<AuthService>();
-    final me = auth.currentUser?.id;
+    final userState = context.read<UserState>();
+    final me = userState.currentUser?.id;
     final others = project.users.where((u) => u.id != me).map((u) => u.name).toList();
     if (others.isEmpty) return const SizedBox.shrink();
     final List<Widget> chips = [];
@@ -776,7 +635,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final latest = await ThreadsApi.getLatestMessage(project.id, includeSnapshot: true);
       Map<String, dynamic>? initialSnapshot = latest?.snapshot;
 
-      // Navigate to V2 sequencer screen
+      // Navigate to sequencer using PatternScreen which handles version routing
       if (mounted) {
         setState(() {
           _isOpeningProject = false;
@@ -786,7 +645,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => SequencerScreenV2(initialSnapshot: initialSnapshot),
+            builder: (context) => PatternScreen(initialSnapshot: initialSnapshot),
           ),
         );
       }

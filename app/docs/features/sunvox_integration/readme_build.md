@@ -4,8 +4,6 @@
 
 This document explains how to build the SunVox library for iOS (both simulator and physical devices).
 
-> **📖 For troubleshooting and detailed problem analysis, see [iOS_BUILD_FIX.md](../../docs/iOS_BUILD_FIX.md)**
-
 ## The Problem
 
 iOS requires different library builds for:

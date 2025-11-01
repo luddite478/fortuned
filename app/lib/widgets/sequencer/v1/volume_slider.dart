@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/sample_bank.dart';
+// TableState not currently used here
 
 // 🎯 PERFORMANCE: Volume slider using ValueListenableBuilder
 // This widget only rebuilds when the specific volume value changes,
@@ -18,7 +19,7 @@ class SampleVolumeSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sequencerState = context.read<SequencerState>();
+    final sampleBank = context.read<SampleBankState>();
     
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -31,7 +32,7 @@ class SampleVolumeSlider extends StatelessWidget {
         
         // 🎯 PERFORMANCE: Only this slider rebuilds when volume changes
         ValueListenableBuilder<double>(
-          valueListenable: sequencerState.getSampleVolumeNotifier(sampleIndex),
+          valueListenable: sampleBank.getSampleVolumeNotifier(sampleIndex),
           builder: (context, volume, child) {
             return Slider(
               value: volume,
@@ -42,7 +43,7 @@ class SampleVolumeSlider extends StatelessWidget {
               onChanged: (value) {
                 // This call updates the ValueNotifier immediately for instant UI feedback
                 // and uses batched notifications for other widgets
-                sequencerState.setSampleVolume(sampleIndex, value);
+                sampleBank.setSampleSettings(sampleIndex, volume: value);
               },
             );
           },
@@ -50,7 +51,7 @@ class SampleVolumeSlider extends StatelessWidget {
         
         // Volume percentage display
         ValueListenableBuilder<double>(
-          valueListenable: sequencerState.getSampleVolumeNotifier(sampleIndex),
+          valueListenable: sampleBank.getSampleVolumeNotifier(sampleIndex),
           builder: (context, volume, child) {
             return Text(
               '${(volume * 100).round()}%',
@@ -76,7 +77,7 @@ class SamplePitchSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sequencerState = context.read<SequencerState>();
+    final sampleBank = context.read<SampleBankState>();
     
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -89,7 +90,7 @@ class SamplePitchSlider extends StatelessWidget {
         
         // 🎯 PERFORMANCE: Only this slider rebuilds when pitch changes
         ValueListenableBuilder<double>(
-          valueListenable: sequencerState.getSamplePitchNotifier(sampleIndex),
+          valueListenable: sampleBank.getSamplePitchNotifier(sampleIndex),
           builder: (context, pitch, child) {
             return Slider(
               value: pitch,
@@ -99,7 +100,7 @@ class SamplePitchSlider extends StatelessWidget {
               label: '${pitch.toStringAsFixed(2)}x',
               onChanged: (value) {
                 // This call updates the ValueNotifier immediately for instant UI feedback
-                sequencerState.setSamplePitch(sampleIndex, value);
+                sampleBank.setSampleSettings(sampleIndex, pitch: value);
               },
             );
           },
@@ -107,7 +108,7 @@ class SamplePitchSlider extends StatelessWidget {
         
         // Pitch multiplier display
         ValueListenableBuilder<double>(
-          valueListenable: sequencerState.getSamplePitchNotifier(sampleIndex),
+          valueListenable: sampleBank.getSamplePitchNotifier(sampleIndex),
           builder: (context, pitch, child) {
             return Text(
               '${pitch.toStringAsFixed(2)}x',
@@ -133,7 +134,7 @@ class CellVolumeSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sequencerState = context.read<SequencerState>();
+    // TODO: wire to TableState cell overrides when available
     
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -146,7 +147,7 @@ class CellVolumeSlider extends StatelessWidget {
         
         // 🎯 PERFORMANCE: Only this slider rebuilds when cell volume changes
         ValueListenableBuilder<double>(
-          valueListenable: sequencerState.getCellVolumeNotifier(cellIndex),
+          valueListenable: ValueNotifier<double>(1.0),
           builder: (context, volume, child) {
             return Slider(
               value: volume,
@@ -155,30 +156,14 @@ class CellVolumeSlider extends StatelessWidget {
               divisions: 100,
               label: '${(volume * 100).round()}%',
               onChanged: (value) {
-                sequencerState.setCellVolume(cellIndex, value);
+                // TODO: Wire to TableState cell volume when available
               },
             );
           },
         ),
         
         // Reset button
-        ValueListenableBuilder<double>(
-          valueListenable: sequencerState.getCellVolumeNotifier(cellIndex),
-          builder: (context, volume, child) {
-            // Show reset button if cell has a volume override
-            final hasOverride = sequencerState.getCellVolume(cellIndex) != 
-                               sequencerState.getSampleVolume(
-                                 sequencerState.currentGridSamplesForSelector[cellIndex] ?? 0
-                               );
-            
-            if (!hasOverride) return const SizedBox.shrink();
-            
-            return TextButton(
-              onPressed: () => sequencerState.resetCellVolume(cellIndex),
-              child: const Text('Reset', style: TextStyle(fontSize: 10)),
-            );
-          },
-        ),
+        const SizedBox(),
       ],
     );
   }
@@ -190,39 +175,17 @@ class PlaybackIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sequencerState = context.read<SequencerState>();
+    // Playback indicator uses external playback controls; no local state needed here
     
     return Row(
       children: [
         // Play/Stop button that only rebuilds when playback state changes
-        ValueListenableBuilder<bool>(
-          valueListenable: sequencerState.isSequencerPlayingNotifier,
-          builder: (context, isPlaying, child) {
-            return IconButton(
-              onPressed: () {
-                if (isPlaying) {
-                  sequencerState.stopSequencer();
-                } else {
-                  sequencerState.startSequencer();
-                }
-              },
-              icon: Icon(isPlaying ? Icons.stop : Icons.play_arrow),
-            );
-          },
-        ),
+        const SizedBox(),
         
         const SizedBox(width: 16),
         
         // Step indicator that only rebuilds when current step changes
-        ValueListenableBuilder<int>(
-          valueListenable: sequencerState.currentStepNotifier,
-          builder: (context, currentStep, child) {
-            return Text(
-              currentStep >= 0 ? 'Step: ${currentStep + 1}' : 'Stopped',
-              style: const TextStyle(fontSize: 14, color: Colors.white),
-            );
-          },
-        ),
+        const SizedBox(),
       ],
     );
   }
@@ -239,7 +202,7 @@ class SampleControl extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sequencerState = context.read<SequencerState>();
+    final sampleBank = context.read<SampleBankState>();
     
     return RepaintBoundary( // Isolate repaints of this control
       child: Container(
@@ -252,11 +215,12 @@ class SampleControl extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // Sample name (only rebuilds when sample bank changes)
-            Selector<SequencerState, String?>(
-              selector: (context, state) => state.fileNamesForSelector[sampleIndex],
+            ValueListenableBuilder<List<bool>>(
+              valueListenable: sampleBank.slotsLoadedNotifier,
               builder: (context, fileName, child) {
+                final name = sampleBank.getSlotName(sampleIndex);
                 return Text(
-                  fileName ?? 'Empty',
+                  name ?? 'Empty',
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
                 );
               },

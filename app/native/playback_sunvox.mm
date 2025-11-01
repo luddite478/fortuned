@@ -91,6 +91,9 @@ static void update_current_step_from_sunvox(void);
 static int sunvox_is_actually_playing(void);
 static void audio_callback(ma_device* device, void* output, const void* input, ma_uint32 frameCount);
 
+// Forward for master volume
+extern "C" int sv_volume(int slot, int vol);
+
 // Initialize playback system
 int playback_init(void) {
     if (g_initialized) {
@@ -566,6 +569,21 @@ static int sunvox_is_actually_playing(void) {
     }
     
     return 1;  // SunVox is playing
+}
+
+// Master volume control (0.0 .. 1.0)
+void playback_set_master_volume(float volume01) {
+    if (!g_initialized || !sunvox_wrapper_is_initialized()) return;
+    // Clamp 0..1
+    if (volume01 < 0.0f) volume01 = 0.0f;
+    if (volume01 > 1.0f) volume01 = 1.0f;
+    int vol256 = (int)(volume01 * 256.0f);
+    if (vol256 < 0) vol256 = 0;
+    if (vol256 > 256) vol256 = 256;
+    // SunVox slot is 0
+    int prev = sv_volume(0, vol256);
+    (void)prev; // previous volume is not used currently
+    prnt("🔊 [PLAYBACK] Master volume set to %d/256 (%.3f)", vol256, volume01);
 }
 
 // Polling thread function - just updates state from SunVox

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../services/auth_service.dart';
+import '../state/user_state.dart';
 import '../utils/app_colors.dart';
 
 class CommonHeaderWidget extends StatelessWidget {
@@ -14,9 +14,9 @@ class CommonHeaderWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthService>(
-      builder: (context, authService, child) {
-        final currentUser = authService.currentUser;
+    return Consumer<UserState>(
+      builder: (context, userState, child) {
+        final currentUser = userState.currentUser;
         if (currentUser == null && customTitle == null) return const SizedBox();
         
         return Container(

@@ -8,7 +8,6 @@ import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/sample_bank.dart';
 import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/playback.dart';
-import '../../../ffi/playback_bindings.dart';
 import '../../../ffi/table_bindings.dart' show CellData;
 // musical notes handled elsewhere if needed
 import 'generic_slider.dart';
@@ -71,6 +70,7 @@ class SoundSettingsWidget extends StatefulWidget {
       closeAction: _noop,
       noDataMessage: 'Tap a cell with a sample to configure',
       noDataIcon: Icons.grid_off,
+      showCloseButton: false,
     );
   }
 
@@ -82,6 +82,7 @@ class SoundSettingsWidget extends StatefulWidget {
       closeAction: _noop,
       noDataMessage: 'Select a sample to configure',
       noDataIcon: Icons.music_off,
+      showCloseButton: false,
     );
   }
 
@@ -89,7 +90,7 @@ class SoundSettingsWidget extends StatefulWidget {
     return const SoundSettingsWidget(
       type: SettingsType.master,
       title: 'Master Settings',
-      headerButtons: ['BPM', 'MASTER'],
+      headerButtons: ['VOL', 'BPM'],
       closeAction: _noop,
       noDataMessage: 'Master controls not available',
       noDataIcon: Icons.settings,
@@ -114,6 +115,8 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
   
   // Simple variables for slider components heights (within the slider tile)
   // Reserved for future layout tuning
+  // Preview debounce (ms) for live sound during slider drag (single control point)
+  static const int _previewDebounceMs = 40;
 
   // Debounce timers for pitch changes
   Timer? _cellPitchDebounceTimer;
@@ -124,6 +127,8 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
   // Debounce timers for volume
   Timer? _sampleVolumeDebounceTimer;
   Timer? _cellVolumeDebounceTimer;
+  // Live preview debounce (single timer for both sliders)
+  Timer? _previewDebounceTimer;
 
   @override
   void initState() {
@@ -146,6 +151,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     _processingPollTimer?.cancel();
     _sampleVolumeDebounceTimer?.cancel();
     _cellVolumeDebounceTimer?.cancel();
+    _previewDebounceTimer?.cancel();
     super.dispose();
   }
 
@@ -205,7 +211,11 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                   // Header buttons area - controllable via _headerButtonsHeight
                   Expanded(
                     flex: (_headerButtonsHeight * 100).round(),
-                    child: _buildScrollableHeader(headerHeight, labelFontSize, tableState, sampleBankState, editState, currentIndex),
+                    child: LayoutBuilder(
+                      builder: (context, headerConstraints) {
+                        return _buildScrollableHeader(headerHeight, labelFontSize, headerConstraints.maxWidth, tableState, sampleBankState, editState, currentIndex);
+                      },
+                    ),
                   ),
                   
                   // Top spacer - controllable via _spacingHeight
@@ -241,20 +251,63 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     );
   }
 
-  Widget _buildScrollableHeader(double headerHeight, double labelFontSize, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Row(
-        children: [
-          // Preview button (speaker) for cell/sample settings, placed left of VOL
-          if (widget.type != SettingsType.master)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: SizedBox(
-                width: 48,
-                child: _buildPreviewButton(headerHeight * 0.7, tableState, sampleBankState, editState, currentIndex),
+  String _getContextLabel(TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
+    switch (widget.type) {
+      case SettingsType.cell:
+        if (currentIndex != null) {
+          final visibleCols = tableState.getVisibleCols().length;
+          final row = currentIndex ~/ visibleCols;
+          final col = currentIndex % visibleCols;
+          final rowDisplay = row + 1;
+          final colDisplay = col + 1;
+          return 'Cell $rowDisplay:$colDisplay';
+        }
+        return 'Cell';
+      case SettingsType.sample:
+        if (currentIndex != null) {
+          final letter = sampleBankState.getSlotLetter(currentIndex);
+          return 'Sample $letter';
+        }
+        return 'Sample';
+      case SettingsType.master:
+        return 'Master';
+    }
+  }
+
+  Widget _buildScrollableHeader(double headerHeight, double labelFontSize, double availableWidth, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+          // Context label tile showing which menu is opened
+          Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: Container(
+              width: availableWidth * 0.25, // 25% of available width
+              height: headerHeight * 0.7,
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+              decoration: BoxDecoration(
+                color: AppColors.sequencerSurfaceBase,
+                borderRadius: BorderRadius.circular(2),
+                border: Border.all(color: AppColors.sequencerBorder, width: 1),
+              ),
+              child: Center(
+                child: Text(
+                  _getContextLabel(tableState, sampleBankState, editState, currentIndex),
+                  style: TextStyle(
+                    color: AppColors.sequencerLightText,
+                    fontSize: labelFontSize,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ),
             ),
+          ),
           // Header buttons from the configuration
           ...widget.headerButtons.map((buttonName) {
             return Padding(
@@ -318,6 +371,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
             ),
         ],
       ),
+      ),
     );
   }
 
@@ -348,8 +402,8 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     switch (controlType) {
       case 'BPM':
         return _buildBPMControl(sequencer, height, padding, fontSize);
-      case 'MASTER':
-        return _buildPlaceholderControl('MASTER', 'Master volume and effects', height, padding, fontSize);
+      case 'VOL':
+        return _buildMasterVolumeControl(sequencer, height, padding, fontSize);
       // case 'COMP':
       //   return _buildPlaceholderControl('COMP', 'Compression settings', height, padding, fontSize);
       // case 'EQ':
@@ -365,6 +419,49 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
       default:
         return _buildBPMControl(sequencer, height, padding, fontSize);
     }
+  }
+
+  Widget _buildMasterVolumeControl(PlaybackState sequencer, double height, double padding, double fontSize) {
+    return Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: padding * 0.5,
+        vertical: padding * 0.3,
+      ),
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceRaised,
+        borderRadius: BorderRadius.circular(2),
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.sequencerShadow,
+            blurRadius: 2,
+            offset: const Offset(0, 1),
+          ),
+          BoxShadow(
+            color: AppColors.sequencerSurfaceRaised,
+            blurRadius: 1,
+            offset: const Offset(0, -0.5),
+          ),
+        ],
+      ),
+      child: ValueListenableBuilder<double>(
+        valueListenable: sequencer.masterVolumeNotifier,
+        builder: (context, vol, _) => GenericSlider(
+          value: vol,
+          min: 0.0,
+          max: 1.0,
+          divisions: 100,
+          type: SliderType.volume,
+          onChanged: (value) => sequencer.setMasterVolume(value),
+          height: height,
+          sliderOverlay: context.read<SliderOverlayState>(),
+          contextLabel: 'Master',
+        ),
+      ),
+    );
   }
 
   Widget _buildBPMControl(PlaybackState sequencer, double height, double padding, double fontSize) {
@@ -483,9 +580,36 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                     _sampleVolumeDebounceTimer = Timer(const Duration(milliseconds: 200), () {
                       sampleBankState.setSampleSettings(index, volume: value);
                     });
+
+                    // Live preview: debounce and restart note
+                    final playback = context.read<PlaybackState>();
+                    _previewDebounceTimer?.cancel();
+                    _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
+                      if (value <= 0.0) {
+                        playback.stopPreview();
+                        return;
+                      }
+                      final pitch = sampleBankState.getSamplePitchNotifier(index).value;
+                      playback.previewSampleSlot(index, pitchRatio: pitch, volume01: value);
+                    });
                   },
                   height: height,
                   sliderOverlay: context.read<SliderOverlayState>(),
+                  onChangeStart: (v) {
+                    // Immediate preview start on drag begin
+                    final playback = context.read<PlaybackState>();
+                    if (v <= 0.0) {
+                      playback.stopPreview();
+                      return;
+                    }
+                    final pitch = sampleBankState.getSamplePitchNotifier(index).value;
+                    playback.previewSampleSlot(index, pitchRatio: pitch, volume01: v);
+                  },
+                  onChangeEnd: (_) {
+                    // Stop sustaining when user ends interaction
+                    final playback = context.read<PlaybackState>();
+                    playback.stopPreview();
+                  },
                   contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
                 ),
               )
@@ -540,9 +664,37 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                           final ratio = PitchConversion.uiValueToPitchRatio(value);
                           sampleBankState.setSampleSettings(index, pitch: ratio);
                         });
+
+                        // Live preview: debounce and restart note
+                        final playback = context.read<PlaybackState>();
+                        final vol = sampleBankState.getSampleVolumeNotifier(index).value;
+                        _previewDebounceTimer?.cancel();
+                        _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
+                          if (vol <= 0.0) {
+                            playback.stopPreview();
+                            return;
+                          }
+                          final ratio = PitchConversion.uiValueToPitchRatio(value);
+                          playback.previewSampleSlot(index, pitchRatio: ratio, volume01: vol);
+                        });
                       },
                       height: height,
                       sliderOverlay: overlay,
+                      onChangeStart: (v) {
+                        // immediate preview on drag start
+                        final playback = context.read<PlaybackState>();
+                        final vol = sampleBankState.getSampleVolumeNotifier(index).value;
+                        if (vol <= 0.0) {
+                          playback.stopPreview();
+                          return;
+                        }
+                        final ratio = PitchConversion.uiValueToPitchRatio(v);
+                        playback.previewSampleSlot(index, pitchRatio: ratio, volume01: vol);
+                      },
+                      onChangeEnd: (_) {
+                        final playback = context.read<PlaybackState>();
+                        playback.stopPreview();
+                      },
                       processingSource: sampleBankState.getSampleProcessingNotifier(index),
                       contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
                     );
@@ -554,56 +706,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     );
   }
 
-  Widget _buildPlaceholderControl(String title, String description, double height, double padding, double fontSize) {
-    return Container(
-      padding: EdgeInsets.symmetric(
-        horizontal: padding * 0.5, 
-        vertical: padding * 0.3
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised,
-        borderRadius: BorderRadius.circular(2),
-        border: Border.all(
-          color: AppColors.sequencerBorder,
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.sequencerShadow,
-            blurRadius: 2,
-            offset: const Offset(0, 1),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              title,
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerAccent,
-                fontSize: fontSize * 1.8,
-                fontWeight: FontWeight.bold,
-                letterSpacing: 0.5,
-              ),
-            ),
-            SizedBox(height: height * 0.05),
-            Text(
-              description,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerLightText,
-                fontSize: fontSize * 1.1,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.3,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  
 
   Widget _buildNoDataMessage(double height, double fontSize) {
     return Container(
@@ -686,84 +789,6 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     );
   }
 
-  Widget _buildPreviewButton(double height, TableState tableState, SampleBankState sampleBankState, EditState editState, int? currentIndex) {
-    final isEnabled = () {
-      if (widget.type == SettingsType.sample) {
-        final idx = sampleBankState.activeSlot;
-        return sampleBankState.isSlotLoaded(idx);
-      } else if (widget.type == SettingsType.cell) {
-        final sel = _resolveSelectedCell(editState);
-        if (sel == null) return false;
-        final visibleCols = tableState.getVisibleCols().length;
-        final row = sel ~/ visibleCols;
-        final col = sel % visibleCols;
-        final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
-        final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
-        final cell = CellData.fromPointer(tableState.getCellPointer(step, colAbs));
-        return cell.isNotEmpty && cell.sampleSlot >= 0;
-      }
-      return false;
-    }();
-
-    return GestureDetector(
-      onTap: !isEnabled ? null : () => _triggerPreview(tableState, sampleBankState, editState),
-      child: Opacity(
-        opacity: isEnabled ? 1.0 : 0.4,
-        child: Container(
-          height: height,
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceRaised,
-            borderRadius: BorderRadius.circular(2),
-            border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-            boxShadow: const [
-              BoxShadow(color: AppColors.sequencerShadow, blurRadius: 1, offset: Offset(0, 0.5)),
-            ],
-          ),
-          child: const Center(
-            child: Icon(
-              Icons.volume_up,
-              color: AppColors.sequencerText,
-              size: 18,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _triggerPreview(TableState tableState, SampleBankState sampleBankState, EditState editState) {
-    final bindings = PlaybackBindings();
-    if (widget.type == SettingsType.sample) {
-      final idx = sampleBankState.activeSlot;
-      if (!sampleBankState.isSlotLoaded(idx)) return;
-      final vol = sampleBankState.getSampleVolumeNotifier(idx).value;
-      final pitch = sampleBankState.getSamplePitchNotifier(idx).value;
-      bindings.previewSlot(idx, pitch, vol);
-      return;
-    }
-    // Cell preview
-    final sel = _resolveSelectedCell(editState);
-    if (sel == null) return;
-    final visibleCols = tableState.getVisibleCols().length;
-    final row = sel ~/ visibleCols;
-    final col = sel % visibleCols;
-    final step = tableState.getSectionStartStep(tableState.uiSelectedSection) + row;
-    final colAbs = tableState.getLayerStartCol(tableState.uiSelectedLayer) + col;
-    final cell = CellData.fromPointer(tableState.getCellPointer(step, colAbs));
-    if (!cell.isNotEmpty || cell.sampleSlot < 0) return;
-    // Resolve effective settings
-    double effVol = cell.volume;
-    if (effVol < 0.0) {
-      final sd = sampleBankState.getSampleData(cell.sampleSlot);
-      effVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
-    }
-    double effPitch = cell.pitch;
-    if (effPitch < 0.0) {
-      final sd = sampleBankState.getSampleData(cell.sampleSlot);
-      effPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
-    }
-    bindings.previewCell(step, colAbs, effPitch, effVol);
-  }
 
   // Helpers
   static int? _resolveSelectedCell(EditState editState) {
@@ -824,10 +849,48 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
               _cellVolumeDebounceTimer = Timer(const Duration(milliseconds: 150), () {
                 tableState.setCellSettings(step, colAbs, volume: value);
               });
+
+              // Live preview: debounce and restart note
+              final playback = context.read<PlaybackState>();
+              _previewDebounceTimer?.cancel();
+              _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
+                if (value <= 0.0) {
+                  playback.stopPreview();
+                  return;
+                }
+                // Resolve effective pitch from cell/sample for preview semantics
+                final sampleBank = context.read<SampleBankState>();
+                double defaultPitch = 1.0;
+                if (cell.sampleSlot >= 0) {
+                  final sd = sampleBank.getSampleData(cell.sampleSlot);
+                  defaultPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
+                }
+                final effPitch = (cell.pitch < 0.0) ? defaultPitch : cell.pitch;
+                playback.previewCell(step: step, colAbs: colAbs, pitchRatio: effPitch, volume01: value);
+              });
             }
           },
           height: height,
           sliderOverlay: context.read<SliderOverlayState>(),
+          onChangeStart: (v) {
+            final playback = context.read<PlaybackState>();
+            if (v <= 0.0 || !cell.isNotEmpty || cell.sampleSlot == -1) {
+              playback.stopPreview();
+              return;
+            }
+            final sampleBank = context.read<SampleBankState>();
+            double defaultPitch = 1.0;
+            if (cell.sampleSlot >= 0) {
+              final sd = sampleBank.getSampleData(cell.sampleSlot);
+              defaultPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
+            }
+            final effPitch = (cell.pitch < 0.0) ? defaultPitch : cell.pitch;
+            playback.previewCell(step: step, colAbs: colAbs, pitchRatio: effPitch, volume01: v);
+          },
+          onChangeEnd: (_) {
+            final playback = context.read<PlaybackState>();
+            playback.stopPreview();
+          },
           contextLabel: 'Cell ${row + 1}:${col + 1}',
         );
       },
@@ -874,10 +937,52 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
                       final ratio = PitchConversion.uiValueToPitchRatio(value);
                       tableState.setCellSettings(step, colAbs, pitch: ratio);
                     });
+
+                    // Live preview: debounce 120ms and restart note
+                    final playback = context.read<PlaybackState>();
+                    final sampleBank = context.read<SampleBankState>();
+                    // Resolve effective volume
+                    double defaultVol = 1.0;
+                    if (cell.sampleSlot >= 0) {
+                      final sd = sampleBank.getSampleData(cell.sampleSlot);
+                      defaultVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
+                    }
+                    final effVol = (cell.volume < 0.0) ? defaultVol : cell.volume;
+                    _previewDebounceTimer?.cancel();
+                    _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
+                      if (effVol <= 0.0) {
+                        playback.stopPreview();
+                        return;
+                      }
+                      final ratio = PitchConversion.uiValueToPitchRatio(value);
+                      playback.previewCell(step: step, colAbs: colAbs, pitchRatio: ratio, volume01: effVol);
+                    });
                   }
                 },
                 height: height,
                 sliderOverlay: overlay,
+                onChangeStart: (v) {
+                  if (!cell.isNotEmpty || cell.sampleSlot == -1) return;
+                  final playback = context.read<PlaybackState>();
+                  final sampleBank = context.read<SampleBankState>();
+                  // Resolve effective volume
+                  double defaultVol = 1.0;
+                  if (cell.sampleSlot >= 0) {
+                    final sd = sampleBank.getSampleData(cell.sampleSlot);
+                    defaultVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
+                  }
+                  final effVol = (cell.volume < 0.0) ? defaultVol : cell.volume;
+                  if (effVol <= 0.0) {
+                    playback.stopPreview();
+                    return;
+                  }
+                  final ratio = PitchConversion.uiValueToPitchRatio(v);
+                  playback.previewCell(step: step, colAbs: colAbs, pitchRatio: ratio, volume01: effVol);
+                },
+                onChangeEnd: (_) {
+                  final playback = context.read<PlaybackState>();
+                  playback.stopPreview();
+                },
                 processingSource: sampleBank.getSampleProcessingNotifier(sampleSlot),
                 contextLabel: 'Cell ${row + 1}:${col + 1}',
               );

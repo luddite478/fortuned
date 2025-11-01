@@ -51,6 +51,9 @@ class SnapshotImporter {
           debugPrint('❌ [SNAPSHOT_IMPORT] Failed to import table state');
           return false;
         }
+        // Sync all sections to SunVox after table import to ensure all cells are properly synced
+        // This fixes the issue where imported cells are visible but don't play
+        _tableState.syncAllSectionsToSunVox();
       }
 
       onProgress?.call('Loading playback settings...', 0.5);

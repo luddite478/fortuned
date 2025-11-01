@@ -9,6 +9,8 @@ class Thread {
   final List<ThreadUser> users;
   final List<String> messageIds;
   final List<ThreadInvite> invites;
+  final bool isLocal;
+  final Map<String, dynamic>? metadata;
 
   const Thread({
     required this.id,
@@ -18,6 +20,8 @@ class Thread {
     required this.users,
     required this.messageIds,
     required this.invites,
+    this.isLocal = false,
+    this.metadata,
   });
 
   factory Thread.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,7 @@ class Thread {
       invites: (json['invites'] as List<dynamic>? ?? [])
           .map((i) => ThreadInvite.fromJson(i))
           .toList(),
+      metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
 
@@ -46,6 +51,7 @@ class Thread {
         'users': users.map((u) => u.toJson()).toList(),
         'messages': messageIds,
         'invites': invites.map((i) => i.toJson()).toList(),
+        if (metadata != null) 'metadata': metadata,
       };
 
   Thread copyWith({
@@ -56,6 +62,8 @@ class Thread {
     List<ThreadUser>? users,
     List<String>? messageIds,
     List<ThreadInvite>? invites,
+    bool? isLocal,
+    Map<String, dynamic>? metadata,
   }) {
     return Thread(
       id: id ?? this.id,
@@ -65,6 +73,8 @@ class Thread {
       users: users ?? this.users,
       messageIds: messageIds ?? this.messageIds,
       invites: invites ?? this.invites,
+      isLocal: isLocal ?? this.isLocal,
+      metadata: metadata ?? this.metadata,
     );
   }
 }

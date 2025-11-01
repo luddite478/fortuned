@@ -22,6 +22,8 @@
 - pass token in body/query param for all requests
 - check schema validation client/server
 
+- remove sound settings if clking on empty cell after master/sample settings opend
+- set up android deeplink
 - delete sections button
 - cahgne section settings ui
 - ci create tags
@@ -30,7 +32,6 @@
     - layer
     - selection ?
 - comment(reply)-menu for chekpoints
-- pitch (optimize speed)
 - local project storage
 - on app startup check invites of the user
 - on nthread open check pending invites

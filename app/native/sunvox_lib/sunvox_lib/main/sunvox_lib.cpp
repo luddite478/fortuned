@@ -744,6 +744,25 @@ SUNVOX_EXPORT int sv_get_pattern_current_loop( int slot, int pat_num )
         
     return s->pattern_current_loop[ pat_num ];
 }
+
+SUNVOX_EXPORT int sv_set_pattern_current_loop( int slot, int pat_num, int loop_num )
+{
+    if( check_slot( slot ) ) return -1;
+    sunvox_engine* s = g_sv[ slot ];
+    
+    // Validate pattern number
+    if( pat_num < 0 || pat_num >= 256 ) return -1;
+    if( (unsigned)pat_num >= (unsigned)s->pats_num || !s->pats[ pat_num ] )
+        return -1;
+    
+    // Validate loop number (can't be negative)
+    if( loop_num < 0 ) return -1;
+    
+    // Set the current loop iteration
+    s->pattern_current_loop[ pat_num ] = loop_num;
+    
+    return 0;
+}
 // ===== END MODIFICATION =====
 
 SUNVOX_EXPORT int sv_end_of_song( int slot )

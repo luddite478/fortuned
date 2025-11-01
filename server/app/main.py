@@ -4,13 +4,15 @@ import os
 import threading
 import asyncio
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 import logging
+from string import Template
 
 current_dir = os.path.dirname(__file__)
 sys.path.insert(0, current_dir)
 
 from http_api.router import router as api_router
+from http_api.deep_links import router as deep_links_router
 from http_api.rate_limiter import RateLimitMiddleware
 from ws.router import start_websocket_server
 from db.init_collections import init_mongodb
@@ -33,6 +35,8 @@ app = FastAPI(
 app.add_middleware(RateLimitMiddleware)
 
 app.include_router(api_router, prefix="/api/v1", tags=["API v1"])
+app.include_router(deep_links_router, tags=["Deep Linking"])
+
 
 def run_ws_server():
     asyncio.run(start_websocket_server())

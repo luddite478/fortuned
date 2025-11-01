@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/table.dart';
 
 class SectionCreationOverlay extends StatefulWidget {
-  const SectionCreationOverlay({super.key});
+  final VoidCallback? onBack;
+  const SectionCreationOverlay({super.key, this.onBack});
 
   @override
   State<SectionCreationOverlay> createState() => _SectionCreationOverlayState();
@@ -15,8 +16,8 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
+    return Consumer<TableState>(
+      builder: (context, tableState, child) {
         return Container(
           decoration: BoxDecoration(
             color: AppColors.sequencerSurfaceBase,
@@ -42,11 +43,11 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
           child: Column(
             children: [
               // Header
-              _buildHeader(context, sequencerState),
+              _buildHeader(context),
               
               // Content
               Expanded(
-                child: _buildContent(context, sequencerState),
+                child: _buildContent(context, tableState),
               ),
             ],
           ),
@@ -55,7 +56,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, SequencerState sequencerState) {
+  Widget _buildHeader(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final headerHeight = screenSize.height * 0.08;
     
@@ -74,26 +75,16 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
         padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.02),
         child: Row(
           children: [
-            // Title
-            Expanded(
-              child: Text(
-                'Create New Section',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.sequencerLightText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            
-            // Close button
+            // Back arrow to return to previous section
             GestureDetector(
               onTap: () {
-                sequencerState.closeSectionCreationOverlay();
+                if (widget.onBack != null) {
+                  widget.onBack!();
+                }
               },
               child: Container(
-                width: screenSize.width * 0.06,
-                height: screenSize.width * 0.06,
+                width: screenSize.width * 0.08,
+                height: screenSize.width * 0.08,
                 decoration: BoxDecoration(
                   color: AppColors.sequencerSurfacePressed,
                   borderRadius: BorderRadius.circular(2),
@@ -103,62 +94,71 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
                   ),
                 ),
                 child: Icon(
-                  Icons.close,
+                  Icons.arrow_back_ios_new,
                   color: AppColors.sequencerLightText,
-                  size: screenSize.width * 0.03,
+                  size: screenSize.width * 0.045,
                 ),
               ),
             ),
+            const Spacer(),
+            // Title centered
+            Text(
+              'Create New Section',
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.sequencerLightText,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const Spacer(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildContent(BuildContext context, SequencerState sequencerState) {
-    return Expanded(
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: MediaQuery.of(context).size.width * 0.04,
-          vertical: MediaQuery.of(context).size.height * 0.02,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // Create Blank Button
-            _buildSimpleButton(
-              context,
-              text: 'Create Empty',
-              onPressed: () {
-                sequencerState.createEmptySection();
+  Widget _buildContent(BuildContext context, TableState tableState) {
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: MediaQuery.of(context).size.width * 0.04,
+        vertical: MediaQuery.of(context).size.height * 0.02,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Create Blank Button
+          _buildSimpleButton(
+            context,
+            text: 'Create Empty',
+            onPressed: () {
+              tableState.appendSection();
+            },
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).size.height * 0.02),
+          
+          // Create From Label
+          Text(
+            'Copy:',
+            style: GoogleFonts.sourceSans3(
+              color: AppColors.sequencerLightText,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          
+          SizedBox(height: MediaQuery.of(context).size.height * 0.01),
+          
+          // Scrollable list of sections
+          Expanded(
+            child: ListView.builder(
+              itemCount: tableState.sectionsCount,
+              itemBuilder: (context, index) {
+                return _buildSectionCopyButton(context, tableState, index);
               },
             ),
-            
-            SizedBox(height: MediaQuery.of(context).size.height * 0.02),
-            
-            // Create From Label
-            Text(
-              'Create From:',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerLightText,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            
-            SizedBox(height: MediaQuery.of(context).size.height * 0.01),
-            
-            // Scrollable list of sections
-            Expanded(
-              child: ListView.builder(
-                itemCount: sequencerState.numSections,
-                itemBuilder: (context, index) {
-                  return _buildSectionCopyButton(context, sequencerState, index);
-                },
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -193,12 +193,12 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
     );
   }
 
-  Widget _buildSectionCopyButton(BuildContext context, SequencerState sequencerState, int sectionIndex) {
+  Widget _buildSectionCopyButton(BuildContext context, TableState tableState, int sectionIndex) {
     return Container(
       margin: EdgeInsets.only(bottom: MediaQuery.of(context).size.height * 0.01),
       child: GestureDetector(
         onTap: () {
-          sequencerState.createSectionCopyFrom(sectionIndex);
+          tableState.appendSection(copyFrom: sectionIndex);
         },
         child: Container(
           width: double.infinity,
@@ -226,4 +226,5 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
       ),
     );
   }
+ 
 } 

@@ -2,62 +2,40 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
-import '../../../state/sequencer_state.dart';
+import '../../../state/sequencer/playback.dart';
 
 class SectionControlOverlay extends StatelessWidget {
   const SectionControlOverlay({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<SequencerState>(
-      builder: (context, sequencerState, child) {
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceBase,
-            borderRadius: BorderRadius.circular(2), // Sharp corners
-            border: Border.all(
-              color: AppColors.sequencerBorder,
-              width: 1,
-            ),
-            boxShadow: [
-              // Protruding effect
-              BoxShadow(
-                color: AppColors.sequencerShadow,
-                blurRadius: 3,
-                offset: const Offset(0, 2),
-              ),
-              BoxShadow(
-                color: AppColors.sequencerSurfaceRaised,
-                blurRadius: 1,
-                offset: const Offset(0, -1),
-              ),
-            ],
-          ),
-          child: Column(
+    return Consumer<PlaybackState>(
+      builder: (context, playbackState, child) {
+        return Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               // Header
-              _buildHeader(context, sequencerState),
+              _buildHeader(context),
               
               // Current section settings
-              _buildCurrentSectionSettings(context, sequencerState),
+              _buildCurrentSectionSettings(context, playbackState),
               
               // Footer with controls
-              _buildFooter(context, sequencerState),
+              _buildFooter(context),
             ],
-          ),
         );
       },
     );
   }
 
-  Widget _buildHeader(BuildContext context, SequencerState sequencerState) {
+  Widget _buildHeader(BuildContext context) {
     final screenSize = MediaQuery.of(context).size;
     final headerHeight = screenSize.height * 0.08;
     
     return Container(
       height: headerHeight,
       decoration: BoxDecoration(
+        // Header should be fully opaque so controls never appear translucent
         color: AppColors.sequencerSurfaceRaised,
         border: Border(
           bottom: BorderSide(
@@ -70,68 +48,40 @@ class SectionControlOverlay extends StatelessWidget {
         padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.02),
         child: Row(
           children: [
-            // Title
-            Expanded(
-              child: Text(
-                'Section Settings',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.sequencerLightText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
+            const Spacer(),
+            Text(
+              'Section Settings',
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.sequencerLightText,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
             ),
-            
-                         // Close button
-             GestureDetector(
-               onTap: () {
-                 sequencerState.closeSectionControlOverlay();
-               },
-              child: Container(
-                width: screenSize.width * 0.06,
-                height: screenSize.width * 0.06,
-                decoration: BoxDecoration(
-                  color: AppColors.sequencerSurfacePressed,
-                  borderRadius: BorderRadius.circular(2),
-                  border: Border.all(
-                    color: AppColors.sequencerBorder,
-                    width: 0.5,
-                  ),
-                ),
-                child: Icon(
-                  Icons.close,
-                  color: AppColors.sequencerLightText,
-                  size: screenSize.width * 0.03,
-                ),
-              ),
-            ),
+            const Spacer(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildCurrentSectionSettings(BuildContext context, SequencerState sequencerState) {
+  Widget _buildCurrentSectionSettings(BuildContext context, PlaybackState playbackState) {
     final screenSize = MediaQuery.of(context).size;
-    final currentSectionIndex = sequencerState.currentSectionIndex;
     
     return Container(
+      // Opaque surface behind buttons to avoid any bleed-through from semi-transparent overlay
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceBase,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.sequencerBorder,
+            width: 1,
+          ),
+        ),
+      ),
       padding: EdgeInsets.all(screenSize.width * 0.04),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Current section title
-          Container(
-            padding: EdgeInsets.symmetric(vertical: screenSize.height * 0.02),
-            child: Text(
-              'Section ${currentSectionIndex + 1}',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerAccent,
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
           
           // Loop count controls
           Container(
@@ -159,12 +109,13 @@ class SectionControlOverlay extends StatelessWidget {
                       context,
                       icon: Icons.chevron_left,
                       onTap: () {
-                        final currentCount = sequencerState.getSectionLoopCount(currentSectionIndex);
-                        if (currentCount > 1) {
-                          sequencerState.setSectionLoopCount(currentSectionIndex, currentCount - 1);
+                        final currentIndex = playbackState.currentSection;
+                        final currentCount = playbackState.currentSectionLoopsNum;
+                        if (currentCount > PlaybackState.minLoopsPerSection) {
+                          playbackState.setSectionLoopsNum(currentIndex, currentCount - 1);
                         }
                       },
-                      enabled: sequencerState.getSectionLoopCount(currentSectionIndex) > 1,
+                      enabled: playbackState.currentSectionLoopsNum > PlaybackState.minLoopsPerSection,
                     ),
                     
                     SizedBox(width: screenSize.width * 0.06),
@@ -183,7 +134,7 @@ class SectionControlOverlay extends StatelessWidget {
                       ),
                       child: Center(
                         child: Text(
-                          '${sequencerState.getSectionLoopCount(currentSectionIndex)}',
+                          '${playbackState.currentSectionLoopsNum}',
                           style: GoogleFonts.sourceSans3(
                             color: AppColors.sequencerAccent,
                             fontSize: 18,
@@ -200,12 +151,13 @@ class SectionControlOverlay extends StatelessWidget {
                       context,
                       icon: Icons.chevron_right,
                       onTap: () {
-                        final currentCount = sequencerState.getSectionLoopCount(currentSectionIndex);
-                        if (currentCount < 16) {
-                          sequencerState.setSectionLoopCount(currentSectionIndex, currentCount + 1);
+                        final currentIndex = playbackState.currentSection;
+                        final currentCount = playbackState.currentSectionLoopsNum;
+                        if (currentCount < PlaybackState.maxLoopsPerSection) {
+                          playbackState.setSectionLoopsNum(currentIndex, currentCount + 1);
                         }
                       },
-                      enabled: sequencerState.getSectionLoopCount(currentSectionIndex) < 16,
+                      enabled: playbackState.currentSectionLoopsNum < PlaybackState.maxLoopsPerSection,
                     ),
                   ],
                 ),
@@ -261,39 +213,7 @@ class SectionControlOverlay extends StatelessWidget {
     );
   }
 
-  Widget _buildFooter(BuildContext context, SequencerState sequencerState) {
-    final screenSize = MediaQuery.of(context).size;
-    final footerHeight = screenSize.height * 0.08;
-    
-    return Container(
-      height: footerHeight,
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.sequencerBorder,
-            width: 1,
-          ),
-        ),
-      ),
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: screenSize.width * 0.02),
-        child: Row(
-          children: [
-            const Spacer(),
-            
-            // Current mode indicator
-            Text(
-              sequencerState.sectionPlaybackMode == SectionPlaybackMode.loop ? 'Loop Mode' : 'Song Mode',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.sequencerAccent,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget _buildFooter(BuildContext context) {
+    return const SizedBox.shrink();
   }
 } 

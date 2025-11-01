@@ -103,7 +103,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
             const Spacer(),
             // Title centered
             Text(
-              'Create New Section',
+              'New Section',
               style: GoogleFonts.sourceSans3(
                 color: AppColors.sequencerLightText,
                 fontSize: 16,
@@ -139,7 +139,7 @@ class _SectionCreationOverlayState extends State<SectionCreationOverlay> {
           
           // Create From Label
           Text(
-            'Create From:',
+            'Copy:',
             style: GoogleFonts.sourceSans3(
               color: AppColors.sequencerLightText,
               fontSize: 14,

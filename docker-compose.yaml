@@ -19,7 +19,7 @@ services:
       dockerfile: Dockerfile
     ports:
       - "${HTTP_API_PORT}:${HTTP_API_PORT}"
-      - "${HTTPS_API_PORT}:${HTTPS_API_PORT}"
+      - "443:${HTTPS_API_PORT}"
       - "${WEBSOCKET_PORT}:${WEBSOCKET_PORT}"
     env_file:
       - nginx/.env

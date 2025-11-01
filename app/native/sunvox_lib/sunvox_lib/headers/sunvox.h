@@ -295,6 +295,17 @@ int sv_set_pattern_sequence( int slot, int* pattern_ids, int count ) SUNVOX_FN_A
    Return value: current loop number (0-indexed) or negative on error.
 */
 int sv_get_pattern_current_loop( int slot, int pat_num ) SUNVOX_FN_ATTR;
+
+/*
+   sv_set_pattern_current_loop() - set the current loop iteration for a pattern.
+   This is useful for preserving loop state when updating patterns during playback.
+   Parameters:
+     slot - slot number;
+     pat_num - pattern ID (0-255);
+     loop_num - loop iteration to set (0-indexed).
+   Return value: 0 on success, negative on error.
+*/
+int sv_set_pattern_current_loop( int slot, int pat_num, int loop_num ) SUNVOX_FN_ATTR;
 /* ===== END MODIFICATION ===== */
 
 /*
