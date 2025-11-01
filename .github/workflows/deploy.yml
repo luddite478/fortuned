@@ -65,7 +65,7 @@ jobs:
         run: |
           echo "Waiting for ${{ inputs.environment }} server..."
           timeout=180
-          while ! curl -s http://${{ secrets.SERVER_HOST }}:${{ secrets.HTTPS_API_PORT }}/get_sound_series > /dev/null; do
+          while ! curl -s http://${{ secrets.SERVER_HOST }}:${{ secrets.HTTPS_API_PORT }}/api/v1/health > /dev/null; do
             sleep 1
             timeout=$((timeout-1))
             if [ "$timeout" -le 0 ]; then
