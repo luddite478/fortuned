@@ -26,13 +26,16 @@ class ProjectsScreen extends StatefulWidget {
 class _ProjectsScreenState extends State<ProjectsScreen> {
   String? _error;
   bool _isOpeningProject = false;
+  final Set<String> _deletingThreadIds = {}; // Prevent double deletion
 
   @override
   void initState() {
     super.initState();
-    // Defer to next frame to avoid setState during build
+    // Stop any playing audio when ProjectsScreen becomes visible
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final audioPlayer = context.read<AudioPlayerState>();
+        audioPlayer.stop();
         _loadProjects();
       }
     });
@@ -631,21 +634,32 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       final threadsState = context.read<ThreadsState>();
       threadsState.setActiveThread(project);
 
-      // Load latest message only for CONTINUE
-      final latest = await ThreadsApi.getLatestMessage(project.id, includeSnapshot: true);
-      Map<String, dynamic>? initialSnapshot = latest?.snapshot;
+      // Stop any playing audio from playlist/renders
+      context.read<AudioPlayerState>().stop();
+      
+      // Use unified loader (handles initialization, caching, and import)
+      // This will:
+      // 1. Check and initialize native systems if needed (one-time)
+      // 2. Check cache first, fetch from API if needed
+      // 3. Import snapshot with proper resets (surgical, not full reinit)
+      // 4. Clear undo/redo history for fresh start
+      debugPrint('📂 [PROJECTS] Loading project ${project.id} via unified loader');
+      final success = await threadsState.loadProjectIntoSequencer(project.id);
+      
+      if (!success) {
+        debugPrint('⚠️ [PROJECTS] Project has no snapshot - will start empty');
+      }
 
-      // Navigate to sequencer using PatternScreen which handles version routing
+      // Navigate to sequencer using PatternScreen
+      // Pass null snapshot since import already loaded everything
       if (mounted) {
         setState(() {
           _isOpeningProject = false;
         });
-        // Stop any playing audio from playlist/renders
-        context.read<AudioPlayerState>().stop();
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => PatternScreen(initialSnapshot: initialSnapshot),
+            builder: (context) => const PatternScreen(initialSnapshot: null),
           ),
         );
       }
@@ -715,7 +729,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Future<void> _deleteProject(Thread project) async {
+    // Prevent double deletion
+    if (_deletingThreadIds.contains(project.id)) {
+      return;
+    }
+    
+    final threadsState = context.read<ThreadsState>();
+    final isOfflineThread = project.isLocal == true;
+    Thread? removedThread;
+    
     try {
+      _deletingThreadIds.add(project.id);
+      
+      // Optimistically remove the thread immediately from the UI
+      removedThread = threadsState.removeThreadOptimistically(project.id);
+      
       // Show loading indicator
       if (mounted) {
         setState(() {
@@ -723,11 +751,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         });
       }
 
-      // Delete the thread via API
-      await ThreadsApi.deleteThread(project.id);
+      // Skip API call for offline threads (they don't exist on server)
+      if (!isOfflineThread) {
+        await ThreadsApi.deleteThread(project.id);
+      }
 
-      // Refresh the projects list
-      final threadsState = context.read<ThreadsState>();
+      // Refresh the projects list to ensure consistency
       await threadsState.loadThreads();
 
       if (mounted) {
@@ -735,48 +764,21 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           _isOpeningProject = false;
         });
       }
-
-      // Show success message
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Project deleted successfully',
-              style: GoogleFonts.sourceSans3(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
     } catch (e) {
       debugPrint('❌ Failed to delete project: $e');
+      
+      // If optimistic removal happened, restore the thread by refreshing
+      if (removedThread != null) {
+        await threadsState.loadThreads();
+      }
       
       if (mounted) {
         setState(() {
           _isOpeningProject = false;
         });
-        
-        // Show error message
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Failed to delete project: $e',
-              style: GoogleFonts.sourceSans3(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
       }
+    } finally {
+      _deletingThreadIds.remove(project.id);
     }
   }
 } 

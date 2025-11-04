@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'projects_screen.dart';
 import '../utils/app_colors.dart';
-import '../widgets/bottom_audio_player.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({Key? key}) : super(key: key);
@@ -17,7 +16,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return Scaffold(
       backgroundColor: AppColors.menuPageBackground,
       body: const ProjectsScreen(),
-      bottomNavigationBar: const BottomAudioPlayer(showLoopButton: true),
     );
   }
 } 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
+import '../state/audio_player_state.dart';
 
 class LibraryHeaderWidget extends StatelessWidget {
   const LibraryHeaderWidget({Key? key}) : super(key: key);
@@ -22,7 +24,10 @@ class LibraryHeaderWidget extends StatelessWidget {
         children: [
           // Left side - Back button
           IconButton(
-            onPressed: () {
+            onPressed: () async {
+              // Stop audio when navigating back to ProjectsScreen
+              final audioPlayer = context.read<AudioPlayerState>();
+              await audioPlayer.stop();
               Navigator.pop(context);
             },
             icon: Icon(

@@ -5,6 +5,7 @@ import '../../ffi/sample_bank_bindings.dart';
 import '../../state/sequencer/table.dart';
 import '../../state/sequencer/playback.dart';
 import '../../state/sequencer/sample_bank.dart';
+import 'debug_snapshot.dart';
 
 /// Snapshot export service for sequencer state
 class SnapshotExporter {
@@ -26,6 +27,11 @@ class SnapshotExporter {
     String? id,
     String? description,
   }) {
+    debugPrint('📋 [SNAPSHOT_EXPORT] === STATE BEFORE EXPORT ===');
+    SnapshotDebugger.printTableState(_tableState);
+    SnapshotDebugger.printSampleBankState(_sampleBankState);
+    SnapshotDebugger.printPlaybackState(_playbackState);
+    
     final snapshot = {
       'schema_version': 1,
       'id': id ?? _generateSnapshotId(),

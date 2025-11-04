@@ -4,10 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
 import '../../../state/sequencer/sample_browser.dart';
 import '../../../state/sequencer/sample_bank.dart';
-import '../../../ffi/playback_bindings.dart';
-import 'package:ffi/ffi.dart';
-import 'package:flutter/services.dart' show rootBundle;
-import 'dart:io';
+import '../../../state/sequencer/playback.dart';
 
 // Main sizing control variables for easy adjustment
 class SampleBrowserSizing {
@@ -313,27 +310,13 @@ class SampleSelectionWidget extends StatelessWidget {
                                         ),
                                         GestureDetector(
                                           onTap: () async {
-                                            // Preview asset by dumping it to a temp file, then calling native preview
-                                            final bindings = PlaybackBindings();
-                                            final assetPath = item.path;
-                                            if (assetPath.isNotEmpty) {
-                                              try {
-                                                final data = await rootBundle.load(assetPath);
-                                                final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-                                                final safeName = assetPath.replaceAll('/', '_');
-                                                final tmpFile = File('${Directory.systemTemp.path}/preview_$safeName');
-                                                await tmpFile.writeAsBytes(bytes, flush: true);
-                                                final cPath = tmpFile.path.toNativeUtf8();
-                                                try {
-                                                  bindings.previewSamplePath(cPath, 1.0, 1.0);
-                                                } finally {
-                                                  malloc.free(cPath);
-                                                }
-                                              } catch (_) {}
-                                            }
+                                            // Preview using the new preview method that loads into slot and uses PlaybackState
+                                            final browserState = context.read<SampleBrowserState>();
+                                            final playbackState = context.read<PlaybackState>();
+                                            await browserState.previewSample(item, sampleBankState, playbackState);
                                           },
                                           child: Container(
-                                            width: (screenWidth * 0.10).clamp(40.0, 56.0),
+                                            width: (screenWidth * 0.14).clamp(56.0, 72.0),
                                             height: (screenWidth * 0.10).clamp(40.0, 56.0),
                                             decoration: BoxDecoration(
                                               color: AppColors.sequencerAccent.withOpacity(0.15),
@@ -343,6 +326,7 @@ class SampleSelectionWidget extends StatelessWidget {
                                             child: Icon(
                                               Icons.play_arrow,
                                               color: AppColors.sequencerAccent,
+                                              size: (screenWidth * 0.06).clamp(24.0, 32.0),
                                             ),
                                           ),
                                         ),
@@ -449,23 +433,11 @@ class SampleSelectionWidget extends StatelessWidget {
                                           flex: (SampleBrowserSizing.playButtonAreaRatio * 100).round(),
                                           child: GestureDetector(
                                             onTap: () async {
-                                              final bindings = PlaybackBindings();
-                                              final assetPath = item.path;
-                                              if (assetPath.isNotEmpty) {
-                                                try {
-                                                  final data = await rootBundle.load(assetPath);
-                                                  final bytes = data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
-                                                  final safeName = assetPath.replaceAll('/', '_');
-                                                  final tmpFile = File('${Directory.systemTemp.path}/preview_$safeName');
-                                                  await tmpFile.writeAsBytes(bytes, flush: true);
-                                                  final cPath = tmpFile.path.toNativeUtf8();
-                                                  try {
-                                                    bindings.previewSamplePath(cPath, 1.0, 1.0);
-                                                  } finally {
-                                                    malloc.free(cPath);
-                                                  }
-                                                } catch (_) {}
-                                              }
+                                              // Preview using the new preview method that loads into slot and uses PlaybackState
+                                              final browserState = context.read<SampleBrowserState>();
+                                              final sampleBankState = context.read<SampleBankState>();
+                                              final playbackState = context.read<PlaybackState>();
+                                              await browserState.previewSample(item, sampleBankState, playbackState);
                                             },
                                             child: Container(
                                               width: double.infinity,
@@ -484,7 +456,7 @@ class SampleSelectionWidget extends StatelessWidget {
                                               ),
                                               child: Center(
                                                 child: Container(
-                                                  width: tileConstraints.maxHeight * 0.25,
+                                                  width: tileConstraints.maxHeight * 0.35,
                                                   height: tileConstraints.maxHeight * 0.25,
                                                   decoration: BoxDecoration(
                                                     color: AppColors.sequencerAccent.withOpacity(0.9),
@@ -504,7 +476,7 @@ class SampleSelectionWidget extends StatelessWidget {
                                                   child: Icon(
                                                     Icons.play_arrow,
                                                     color: AppColors.sequencerPageBackground,
-                                                    size: (tileConstraints.maxHeight * 0.15).clamp(12.0, 20.0),
+                                                    size: (tileConstraints.maxHeight * 0.18).clamp(14.0, 24.0),
                                                   ),
                                                 ),
                                               ),

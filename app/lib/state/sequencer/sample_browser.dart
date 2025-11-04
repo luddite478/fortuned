@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:convert';
+import 'sample_bank.dart';
+import 'playback.dart';
 
 // Temporary sample browser state for the new sequencer implementation
 // This integrates the existing sample browser logic with our new sequencer
@@ -99,6 +101,57 @@ class SampleBrowserState extends ChangeNotifier {
     
     debugPrint('📁 Selected sample: ${item.path}');
     return item.path; // Path is already complete from manifest
+  }
+  
+  // Preview slot constant - use slot 25 (Z) as dedicated preview slot
+  static const int _previewSlot = 25;
+  
+  // Current preview sample ID (if any)
+  String? _previewSampleId;
+  
+  /// Preview a sample by loading it temporarily into preview slot and playing it
+  /// Similar to how sound settings preview works
+  Future<void> previewSample(SampleItem item, SampleBankState sampleBankState, PlaybackState playbackState) async {
+    if (item.isFolder || item.sampleId == null) return;
+    
+    try {
+      // Stop any existing preview first
+      playbackState.stopPreview();
+      
+      // If same sample is already loaded in preview slot, just play it
+      if (_previewSampleId == item.sampleId && sampleBankState.isSlotLoaded(_previewSlot)) {
+        debugPrint('▶️ [SAMPLE_BROWSER] Reusing preview slot for sample: ${item.sampleId}');
+        playbackState.previewSampleSlot(_previewSlot, pitchRatio: 1.0, volume01: 1.0);
+        return;
+      }
+      
+      // Load sample into preview slot
+      debugPrint('📥 [SAMPLE_BROWSER] Loading sample into preview slot: ${item.sampleId}');
+      final success = await sampleBankState.loadSample(_previewSlot, item.sampleId!);
+      
+      if (success) {
+        _previewSampleId = item.sampleId;
+        // Wait a tiny bit for sample to be ready, then preview
+        await Future.delayed(const Duration(milliseconds: 50));
+        playbackState.previewSampleSlot(_previewSlot, pitchRatio: 1.0, volume01: 1.0);
+        debugPrint('▶️ [SAMPLE_BROWSER] Preview started for sample: ${item.sampleId}');
+      } else {
+        debugPrint('❌ [SAMPLE_BROWSER] Failed to load sample for preview: ${item.sampleId}');
+      }
+    } catch (e) {
+      debugPrint('❌ [SAMPLE_BROWSER] Error previewing sample: $e');
+    }
+  }
+  
+  /// Stop preview and optionally clean up preview slot
+  void stopPreview(PlaybackState playbackState, {bool unload = false}) {
+    playbackState.stopPreview();
+    if (unload) {
+      _previewSampleId = null;
+      debugPrint('🛑 [SAMPLE_BROWSER] Preview stopped and slot cleared');
+    } else {
+      debugPrint('🛑 [SAMPLE_BROWSER] Preview stopped (slot kept for reuse)');
+    }
   }
   
   // Refresh current items based on current path

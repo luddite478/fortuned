@@ -521,20 +521,75 @@ void sunvox_wrapper_remove_section_pattern(int section_index) {
     sunvox_wrapper_update_timeline();
 }
 
+// Reset ALL SunVox patterns (used before import to ensure clean state)
+void sunvox_wrapper_reset_all_patterns(void) {
+    if (!g_sunvox_initialized) return;
+    
+    prnt("🔄 [SUNVOX] === RESETTING ALL PATTERNS ===");
+    
+    // Stop playback first
+    sv_stop(SUNVOX_SLOT);
+    sv_rewind(SUNVOX_SLOT, 0);
+    
+    // Lock before removing all patterns
+    sv_lock_slot(SUNVOX_SLOT);
+    
+    // Get number of pattern slots
+    int num_pattern_slots = sv_get_number_of_patterns(SUNVOX_SLOT);
+    prnt("🔍 [SUNVOX] Found %d pattern slots", num_pattern_slots);
+    
+    // Remove all existing patterns
+    int removed_count = 0;
+    for (int i = 0; i < num_pattern_slots; i++) {
+        int lines = sv_get_pattern_lines(SUNVOX_SLOT, i);
+        if (lines > 0) {
+            prnt("🗑️ [SUNVOX] Removing pattern %d (%d lines)", i, lines);
+            sv_remove_pattern(SUNVOX_SLOT, i);
+            removed_count++;
+        }
+    }
+    
+    sv_unlock_slot(SUNVOX_SLOT);
+    
+    // Clear all section pattern mappings
+    for (int i = 0; i < MAX_SECTIONS; i++) {
+        g_section_patterns[i] = -1;
+    }
+    
+    // Reset SunVox state variables
+    g_song_mode = 0; // Loop mode
+    g_current_section = 0;
+    
+    prnt("✅ [SUNVOX] Reset complete: removed %d patterns, cleared all mappings", removed_count);
+}
+
 // Sync entire section to its pattern
 void sunvox_wrapper_sync_section(int section_index) {
-    if (!g_sunvox_initialized) return;
-    if (section_index < 0 || section_index >= MAX_SECTIONS) return;
+    if (!g_sunvox_initialized) {
+        prnt_err("❌ [SUNVOX] Cannot sync section %d - SunVox not initialized", section_index);
+        return;
+    }
+    if (section_index < 0 || section_index >= MAX_SECTIONS) {
+        prnt_err("❌ [SUNVOX] Invalid section index: %d", section_index);
+        return;
+    }
     
     int pat_id = g_section_patterns[section_index];
-    if (pat_id < 0) return; // Pattern doesn't exist
+    if (pat_id < 0) {
+        prnt_err("❌ [SUNVOX] Cannot sync section %d - pattern doesn't exist (pat_id=%d)", 
+                 section_index, pat_id);
+        return; // Pattern doesn't exist
+    }
     
     int section_start = table_get_section_start_step(section_index);
     int section_length = table_get_section_step_count(section_index);
     int max_cols = table_get_max_cols();
     
-    prnt("🔄 [SUNVOX] Syncing section %d (start=%d, length=%d)", 
-         section_index, section_start, section_length);
+    prnt("🔄 [SUNVOX] Syncing section %d (start=%d, length=%d, pat_id=%d)", 
+         section_index, section_start, section_length, pat_id);
+    
+    int synced_cells = 0;
+    int empty_cells = 0;
     
     for (int local_line = 0; local_line < section_length; local_line++) {
         int global_step = section_start + local_line;
@@ -548,10 +603,12 @@ void sunvox_wrapper_sync_section(int section_index) {
                 // Empty cell - clear pattern event
                 sv_set_pattern_event(SUNVOX_SLOT, pat_id, col, local_line, 
                                     0, 0, 0, 0, 0);
+                empty_cells++;
             } else {
                 // Set note event
                 int mod_id = g_sampler_modules[cell->sample_slot];
                 if (mod_id >= 0) {
+                    synced_cells++;
                     float volume = (cell->settings.volume == DEFAULT_CELL_VOLUME) 
                         ? sample_bank_get_sample(cell->sample_slot)->settings.volume 
                         : cell->settings.volume;
@@ -585,6 +642,10 @@ void sunvox_wrapper_sync_section(int section_index) {
                         0,                 // no controller
                         0                  // no controller value
                     );
+                } else {
+                    // Cell has data but module doesn't exist
+                    prnt_err("⚠️ [SUNVOX] Cell [%d, %d] slot=%d but module doesn't exist (mod_id=%d)", 
+                             global_step, col, cell->sample_slot, mod_id);
                 }
             }
             
@@ -592,7 +653,8 @@ void sunvox_wrapper_sync_section(int section_index) {
         }
     }
     
-    prnt("✅ [SUNVOX] Section %d sync complete", section_index);
+    prnt("✅ [SUNVOX] Section %d sync complete: %d notes synced, %d cells cleared", 
+         section_index, synced_cells, empty_cells);
 }
 
 // Set playback mode and update timeline

@@ -114,6 +114,9 @@ class TableState extends ChangeNotifier {
   int _uiSelectedSection = 0;  // Which section UI is currently viewing
   int _uiSelectedLayer = 0;    // Which layer UI is currently viewing
   
+  // ValueNotifier for selected layer to ensure UI always updates
+  final ValueNotifier<int> uiSelectedLayerNotifier = ValueNotifier<int>(0);
+  
   // UI: sound grid view mode (stacked cards vs flat tabs)
   SoundGridViewMode _uiSoundGridViewMode = SoundGridViewMode.flat;
   // UI: edit buttons layout mode (v1 classic, v2 right-aligned large)
@@ -151,9 +154,19 @@ class TableState extends ChangeNotifier {
   void setUiSelectedLayer(int layer) {
     final layers = totalLayers;
     if (layer >= 0 && layer < layers) {
+      final oldLayer = _uiSelectedLayer;
       _uiSelectedLayer = layer;
+      uiSelectedLayerNotifier.value = layer; // Update ValueNotifier for reliable UI updates
+      
+      if (oldLayer != layer) {
+        debugPrint('🎨 [TABLE_STATE] ✅ Switched UI layer from $oldLayer to $layer / totalLayers=$layers');
+      } else {
+        debugPrint('🎨 [TABLE_STATE] Layer $layer reselected (forcing UI update)');
+      }
+      
+      // Always call notifyListeners to ensure UI updates, even if layer didn't change
+      // This handles cases where the UI state might be out of sync
       notifyListeners();
-      debugPrint('🎨 [TABLE_STATE] Set UI selected layer to $layer / totalLayers=$layers');
     } else {
       debugPrint('⚠️ [TABLE_STATE] Ignored setUiSelectedLayer($layer) out of range [0, ${layers - 1}]');
     }
@@ -195,7 +208,40 @@ class TableState extends ChangeNotifier {
   
   void clearCell(int step, int col, {bool undoRecord = true}) {
     _table_ffi.tableClearCell(step, col, undoRecord ? 1 : 0);
-    debugPrint('🧹 [TABLE_STATE] Cleared cell [$step, $col]');
+    // debugPrint('🧹 [TABLE_STATE] Cleared cell [$step, $col]');  // Commented out to reduce log spam
+  }
+
+  /// Bulk clear all cells in the table (efficient for import/reset operations)
+  /// This clears all cells without syncing to SunVox (patterns are managed separately)
+  void clearAllCells() {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot clear cells - table not initialized');
+      return;
+    }
+    
+    debugPrint('🧹 [TABLE_STATE] Bulk clearing all cells');
+    _table_ffi.tableClearAllCells();
+    debugPrint('✅ [TABLE_STATE] Bulk clear complete');
+  }
+
+  /// Disable automatic SunVox sync (for bulk operations like import)
+  void disableSunvoxSync() {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot disable sync - table not initialized');
+      return;
+    }
+    
+    _table_ffi.tableDisableSunvoxSync();
+  }
+
+  /// Re-enable automatic SunVox sync
+  void enableSunvoxSync() {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot enable sync - table not initialized');
+      return;
+    }
+    
+    _table_ffi.tableEnableSunvoxSync();
   }
 
   /// Update cell audio settings (volume, pitch) while preserving sample slot
@@ -559,6 +605,26 @@ class TableState extends ChangeNotifier {
     // Could trigger sample preview in the future
   }
 
+  /// Sync a single section to its SunVox pattern
+  /// This ensures all cells in the section are properly synced to SunVox
+  void syncSectionToSunVox(int sectionIndex) {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot sync section - table not initialized');
+      return;
+    }
+    
+    if (sectionIndex < 0 || sectionIndex >= _sectionsCount) {
+      debugPrint('⚠️ [TABLE_STATE] Invalid section index: $sectionIndex (have $_sectionsCount sections)');
+      return;
+    }
+    
+    try {
+      _playback_ffi.sunvoxSyncSection(sectionIndex);
+    } catch (e) {
+      debugPrint('❌ [TABLE_STATE] Failed to sync section $sectionIndex: $e');
+    }
+  }
+
   /// Sync all sections to SunVox patterns
   /// This ensures all table cells are properly synced to SunVox after bulk operations like import
   void syncAllSectionsToSunVox() {
@@ -578,6 +644,23 @@ class TableState extends ChangeNotifier {
     }
   }
 
+  /// Reset ALL SunVox patterns (used before import to ensure clean state)
+  /// This completely removes all existing patterns and clears all mappings
+  void resetAllSunVoxPatterns() {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot reset patterns - table not initialized');
+      return;
+    }
+    
+    try {
+      debugPrint('🔄 [TABLE_STATE] Resetting all SunVox patterns');
+      _playback_ffi.sunvoxResetAllPatterns();
+      debugPrint('✅ [TABLE_STATE] All SunVox patterns reset');
+    } catch (e) {
+      debugPrint('❌ [TABLE_STATE] Failed to reset patterns: $e');
+    }
+  }
+
   @override
   void dispose() {
     debugPrint('🧹 [TABLE_STATE] Disposing state and notifiers');
@@ -588,6 +671,8 @@ class TableState extends ChangeNotifier {
         notifier?.dispose();
       }
     }
+    
+    uiSelectedLayerNotifier.dispose();
     
     super.dispose();
   }
