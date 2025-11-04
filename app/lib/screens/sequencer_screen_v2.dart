@@ -37,6 +37,7 @@ import '../state/sequencer/section_settings.dart';
 import '../state/sequencer/slider_overlay.dart';
 import '../state/sequencer/undo_redo.dart';
 import '../state/sequencer/ui_selection.dart';
+import '../services/thread_draft_service.dart';
 import 'sequencer_settings_screen.dart';
 
 enum _SequencerView { sequencer, thread }
@@ -67,6 +68,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   late final SectionSettingsState _sectionSettingsState;
   late final SliderOverlayState _sliderOverlayState;
   late final UndoRedoState _undoRedoState;
+  late final ThreadDraftService _draftService;
   
   bool _isInitialLoading = false;
   
@@ -80,6 +82,9 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   bool _hasMoreMessages = true;
   String? _optimisticRenderKey;
   static const int _initialMessageCount = 30;
+  final GlobalKey<AnimatedListState> _animatedListKey = GlobalKey<AnimatedListState>();
+  List<Message> _displayedMessages = [];
+  bool _hasPerformedInitialLoad = false;
   
   @override
   void initState() {
@@ -114,6 +119,13 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       playbackState: _playbackState,
       sampleBankState: _sampleBankState,
       undoRedoState: _undoRedoState,
+    );
+    
+    // Initialize draft service for thread-specific draft saving
+    _draftService = ThreadDraftService(
+      tableState: _tableState,
+      playbackState: _playbackState,
+      sampleBankState: _sampleBankState,
     );
     
     // Use the global ThreadsService from Provider instead of creating a new one
@@ -224,7 +236,22 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       _timerState.start();
       _sampleBrowserState.initialize();
       await _ensureActiveThread();
+      
+      // Draft functionality disabled - only manual checkpoints are saved
+      // Start tracking draft for active thread
+      // final threadsState = Provider.of<ThreadsState>(context, listen: false);
+      // final activeThread = threadsState.activeThread;
+      // if (activeThread != null) {
+      //   _draftService.startTracking(activeThread.id);
+      // }
+      
+      // Load server snapshot first (if provided), then draft if no snapshot
+      // Draft is only used when there are no saved messages
       await _importInitialSnapshotIfAny();
+      // Draft loading disabled
+      // if (widget.initialSnapshot == null) {
+      //   await _loadDraftIfAny();
+      // }
     } catch (e) {
       debugPrint('❌ Initial sequencer bootstrap failed: $e');
     } finally {
@@ -235,9 +262,39 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       }
     }
   }
+  
+  // Draft loading disabled - only manual checkpoints are saved
+  // Future<void> _loadDraftIfAny() async {
+  //   final threadsState = Provider.of<ThreadsState>(context, listen: false);
+  //   final activeThread = threadsState.activeThread;
+  //   
+  //   if (activeThread == null) return;
+  //   
+  //   try {
+  //     final draft = await _draftService.loadDraft(activeThread.id);
+  //     if (draft != null) {
+  //       final service = SnapshotService(
+  //         tableState: _tableState,
+  //         playbackState: _playbackState,
+  //         sampleBankState: _sampleBankState,
+  //       );
+  //       await service.importFromJson(json.encode(draft));
+  //       debugPrint('✅ Loaded draft for thread: ${activeThread.id}');
+  //     }
+  //   } catch (e) {
+  //     debugPrint('❌ Failed to load draft: $e');
+  //   }
+  // }
 
   void _switchView(_SequencerView newView) {
     if (_currentView == newView) return;
+    
+    // Stop audio playback when switching FROM thread view (audio is only played in thread view)
+    if (_currentView == _SequencerView.thread) {
+      try {
+        context.read<AudioPlayerState>().stop();
+      } catch (_) {}
+    }
     
     setState(() {
       _currentView = newView;
@@ -252,13 +309,13 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     
     // Load thread messages when switching to thread view
     if (newView == _SequencerView.thread) {
+      // Mark initial load as complete on first switch to thread view
+      // This prevents existing messages from animating, but allows new ones to animate
+      if (!_hasPerformedInitialLoad) {
+        _hasPerformedInitialLoad = true;
+      }
       _loadThreadMessages();
     }
-    
-    // Stop audio playback when switching views
-    try {
-      context.read<AudioPlayerState>().stop();
-    } catch (_) {}
   }
 
   Future<void> _loadThreadMessages() async {
@@ -344,6 +401,10 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       final audioPlayer = context.read<AudioPlayerState>();
       audioPlayer.stop();
     } catch (_) {}
+    
+    // Draft saving disabled - only manual checkpoints are saved
+    // _draftService.saveDraft();
+    _draftService.stopTracking();
     
     _timerState.dispose();
     _sampleBrowserState.dispose();
@@ -435,6 +496,12 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             if (_playbackState.isPlaying) {
               _playbackState.stop();
             }
+            // Stop audio player (for render playback from thread view)
+            try {
+              context.read<AudioPlayerState>().stop();
+            } catch (_) {}
+            // Draft saving disabled - only manual checkpoints are saved
+            // _draftService.saveDraft();
             Navigator.of(context).pop();
           },
         iconSize: 20,
@@ -565,110 +632,271 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
 
           if (thread == null) {
             return Center(
-              child:                 Text(
-                  'No active thread',
-                  style: GoogleFonts.sourceSans3(
-                    color: AppColors.sequencerText,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
+              child: Text(
+                'No active thread',
+                style: GoogleFonts.sourceSans3(
+                  color: AppColors.sequencerText,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
                 ),
+              ),
             );
           }
 
-        if (messages.isEmpty && threadsState.isLoadingMessages(thread.id)) {
-          return Center(
-            child: CircularProgressIndicator(color: AppColors.sequencerAccent),
-          );
-        }
-
-        if (messages.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-           
-                Text(
-                  'No checkpoints yet',
-                  style: GoogleFonts.sourceSans3(
-                    color: AppColors.sequencerText,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Press save button to create checkpoint',
-                  style: GoogleFonts.sourceSans3(
-                    color: AppColors.sequencerLightText,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
-            ),
-          );
-        }
-
-        final now = DateTime.now();
-        final today = DateTime(now.year, now.month, now.day);
-        final allMessagesToday = messages.every((msg) {
-          final msgDate = DateTime(msg.timestamp.year, msg.timestamp.month, msg.timestamp.day);
-          return msgDate == today;
-        });
-
-        return ListView.builder(
-          controller: _threadScrollController,
-          reverse: true,
-          padding: EdgeInsets.only(
-            top: 8,
-            left: 12,
-            right: 12,
-            bottom: 52, // Extra space for floating bar
-          ),
-          itemCount: messages.length + (_isLoadingOlderMessages ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index == messages.length) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                    child: CircularProgressIndicator(color: AppColors.sequencerAccent),
-                ),
-              );
-            }
-            
-            final reversedIndex = messages.length - 1 - index;
-            final message = messages[reversedIndex];
-            final isCurrentUser = message.userId == threadsState.currentUserId;
-
-            final bool needsDivider = !allMessagesToday && (
-              reversedIndex == 0 ||
-              _needsDayDivider(
-                messages[reversedIndex - 1].timestamp,
-                message.timestamp,
-              )
+          if (messages.isEmpty && threadsState.isLoadingMessages(thread.id)) {
+            return Center(
+              child: CircularProgressIndicator(color: AppColors.sequencerAccent),
             );
+          }
 
-            Widget bubble = _buildMessageBubble(context, thread, message, isCurrentUser);
+          // Reset displayed messages when empty
+          if (messages.isEmpty && _displayedMessages.isNotEmpty) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _displayedMessages = [];
+                  // Don't reset _hasPerformedInitialLoad - we want new messages to animate
+                });
+              }
+            });
+          }
 
-            if (needsDivider) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _buildDayDivider(message.timestamp),
-                  const SizedBox(height: 8),
-                  bubble,
-                ],
+          // Detect new messages and animate them in
+          _updateDisplayedMessages(messages);
+
+          final now = DateTime.now();
+          final today = DateTime(now.year, now.month, now.day);
+          final allMessagesToday = _displayedMessages.isEmpty || _displayedMessages.every((msg) {
+            final msgDate = DateTime(msg.timestamp.year, msg.timestamp.month, msg.timestamp.day);
+            return msgDate == today;
+          });
+
+          return Stack(
+            children: [
+              // Always render AnimatedList, even when empty
+              AnimatedList(
+            key: _animatedListKey,
+            controller: _threadScrollController,
+            reverse: true,
+            padding: EdgeInsets.only(
+              top: 8,
+              left: 12,
+              right: 12,
+              bottom: 52, // Extra space for floating bar
+            ),
+            initialItemCount: _displayedMessages.length + (_isLoadingOlderMessages ? 1 : 0),
+            itemBuilder: (context, index, animation) {
+              if (index == _displayedMessages.length) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: CircularProgressIndicator(color: AppColors.sequencerAccent),
+                  ),
+                );
+              }
+
+              // In a reversed list, index 0 is at bottom (newest)
+              // Our _displayedMessages is in normal order (oldest first), so we need to reverse
+              final reversedIndex = _displayedMessages.length - 1 - index;
+              final message = _displayedMessages[reversedIndex];
+              final isCurrentUser = message.userId == threadsState.currentUserId;
+
+              final bool needsDivider = !allMessagesToday && (
+                reversedIndex == 0 ||
+                _needsDayDivider(
+                  _displayedMessages[reversedIndex - 1].timestamp,
+                  message.timestamp,
+                )
               );
-            }
 
-            return bubble;
-          },
-        );
+              Widget bubble = _buildMessageBubble(context, thread, message, isCurrentUser);
+
+              if (needsDivider) {
+                bubble = Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _buildDayDivider(message.timestamp),
+                    const SizedBox(height: 8),
+                    bubble,
+                  ],
+                );
+              }
+
+              // Animate new messages sliding up from bottom
+              // Only animate for messages at the bottom (index close to 0)
+              return _buildMessageAnimation(bubble, animation, isNewMessage: index == 0);
+            },
+          ),
+              // Show "No checkpoints yet" overlay when empty
+              if (_displayedMessages.isEmpty)
+                Positioned.fill(
+                  child: Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'No checkpoints yet',
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerText,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          );
         },
       ),
     );
+  }
+
+  Widget _buildMessageAnimation(Widget child, Animation<double> animation, {bool isNewMessage = false}) {
+    // Only apply slide animation to new messages at the bottom
+    if (!isNewMessage) {
+      return child;
+    }
+    
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(0, 0.3),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      )),
+      child: FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeIn,
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  void _updateDisplayedMessages(List<Message> newMessages) {
+    // Detect new messages that need to be animated
+    if (_displayedMessages.isEmpty && newMessages.isNotEmpty && !_hasPerformedInitialLoad) {
+      // Initial load when first opening thread view - no animation
+      _displayedMessages = List.from(newMessages);
+      _hasPerformedInitialLoad = true;
+    } else if (_displayedMessages.length < newMessages.length) {
+      // New messages added - animate them
+      final animatedList = _animatedListKey.currentState;
+      
+      if (animatedList != null && _currentView == _SequencerView.thread) {
+        // Get the new messages that were added (they're at the end of newMessages list)
+        final List<Message> newlyAdded = newMessages.sublist(_displayedMessages.length);
+        
+        // Add new messages one by one with animation
+        // Since list is reversed, new messages (at end of data) appear at bottom (index 0)
+        for (int i = 0; i < newlyAdded.length; i++) {
+          final message = newlyAdded[i];
+          _displayedMessages.add(message); // Add to end of data list
+          
+          // In reversed AnimatedList, index 0 is the visual bottom (where new messages appear)
+          // The itemBuilder will use reversedIndex to get the last item from _displayedMessages
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              // Insert at index 0 which is the visual bottom in a reversed list
+              animatedList.insertItem(0, duration: const Duration(milliseconds: 350));
+            }
+          });
+        }
+      } else {
+        // AnimatedList not ready yet or not in thread view, just update the list
+        _displayedMessages = List.from(newMessages);
+      }
+    } else if (_displayedMessages.length > newMessages.length) {
+      // Messages removed (e.g., deleted) - need to properly remove from AnimatedList
+      final animatedList = _animatedListKey.currentState;
+      
+      if (animatedList != null && _currentView == _SequencerView.thread) {
+        // Get thread info before removal
+        final threadsState = Provider.of<ThreadsState>(context, listen: false);
+        final thread = threadsState.activeThread;
+        final currentUserId = threadsState.currentUserId;
+        
+        if (thread != null) {
+          // Find which message(s) were removed
+          final removedIndices = <int>[];
+          for (int i = 0; i < _displayedMessages.length; i++) {
+            final msg = _displayedMessages[i];
+            if (!newMessages.any((m) => m.id == msg.id)) {
+              removedIndices.add(i);
+            }
+          }
+          
+          // Remove items from AnimatedList (in reverse order to maintain indices)
+          for (int i = removedIndices.length - 1; i >= 0; i--) {
+            final removedIndex = removedIndices[i];
+            final removedMessage = _displayedMessages[removedIndex];
+            final isCurrentUser = removedMessage.userId == currentUserId;
+            
+            // Remove from AnimatedList with animation
+            animatedList.removeItem(
+              removedIndex,
+              (context, animation) => SizeTransition(
+                sizeFactor: animation,
+                child: FadeTransition(
+                  opacity: animation,
+                  child: _buildMessageBubble(
+                    context,
+                    thread,
+                    removedMessage,
+                    isCurrentUser,
+                  ),
+                ),
+              ),
+              duration: const Duration(milliseconds: 250),
+            );
+          }
+        }
+        
+        // Update our displayed messages list
+        _displayedMessages = List.from(newMessages);
+      } else {
+        // AnimatedList not ready or not in thread view, just update the list
+        _displayedMessages = List.from(newMessages);
+      }
+    } else {
+      // Check if messages are different (e.g., updated renders, changed content)
+      bool isDifferent = false;
+      for (int i = 0; i < newMessages.length; i++) {
+        final oldMsg = _displayedMessages[i];
+        final newMsg = newMessages[i];
+        
+        // Check if message ID changed
+        if (oldMsg.id != newMsg.id) {
+          isDifferent = true;
+          break;
+        }
+        
+        // Check if renders changed (count or content)
+        if (oldMsg.renders.length != newMsg.renders.length) {
+          isDifferent = true;
+          break;
+        }
+        
+        // Check if any render uploadStatus changed
+        for (int j = 0; j < oldMsg.renders.length; j++) {
+          if (oldMsg.renders[j].uploadStatus != newMsg.renders[j].uploadStatus ||
+              oldMsg.renders[j].id != newMsg.renders[j].id ||
+              oldMsg.renders[j].url != newMsg.renders[j].url) {
+            isDifferent = true;
+            break;
+          }
+        }
+        if (isDifferent) break;
+      }
+      
+      if (isDifferent) {
+        _displayedMessages = List.from(newMessages);
+      }
+    }
   }
 
   Widget _buildFloatingPlaybackBar() {
@@ -990,6 +1218,8 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     
     if (activeThread != null) {
       threadsState.sendMessageFromSequencer(threadId: activeThread.id).then((_) {
+        // Clear draft when message is successfully saved
+        _draftService.clearDraft(activeThread.id);
         // Success: no popup per request
       }).catchError((e) {
         debugPrint('Error sending message: $e');
@@ -1478,11 +1708,26 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
 
   void _applyMessage(BuildContext context, Message message) async {
     final threadsState = context.read<ThreadsState>();
-    final ok = await threadsState.applyMessage(message);
+    final thread = threadsState.activeThread;
+    
+    if (thread == null) {
+      debugPrint('❌ [SEQUENCER] Cannot apply message - no active thread');
+      return;
+    }
+    
+    // Use unified loader (handles initialization, caching, and import)
+    // Pass the message's snapshot as override to avoid refetching
+    final ok = await threadsState.loadProjectIntoSequencer(
+      thread.id,
+      snapshotOverride: message.snapshot.isNotEmpty ? message.snapshot : null,
+    );
+    
     if (!mounted) return;
     if (ok) {
       // Switch back to sequencer view after loading
       _switchView(_SequencerView.sequencer);
+    } else {
+      debugPrint('❌ [SEQUENCER] Failed to load checkpoint');
     }
   }
 

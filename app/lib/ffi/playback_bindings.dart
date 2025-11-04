@@ -111,6 +111,10 @@ class PlaybackBindings {
     _sunvoxSyncSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>>('sunvox_wrapper_sync_section');
     sunvoxSyncSection = _sunvoxSyncSectionPtr.asFunction<void Function(int)>();
 
+    // SunVox reset all patterns
+    _sunvoxResetAllPatternsPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('sunvox_wrapper_reset_all_patterns');
+    sunvoxResetAllPatterns = _sunvoxResetAllPatternsPtr.asFunction<void Function()>();
+
   }
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _playbackInitPtr;
@@ -175,6 +179,10 @@ class PlaybackBindings {
   // SunVox section sync
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>> _sunvoxSyncSectionPtr;
   late final void Function(int) sunvoxSyncSection;
+
+  // SunVox reset all patterns
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _sunvoxResetAllPatternsPtr;
+  late final void Function() sunvoxResetAllPatterns;
 
 }
 

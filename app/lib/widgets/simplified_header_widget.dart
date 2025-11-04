@@ -20,8 +20,18 @@ class SimplifiedHeaderWidget extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Left side - empty for now, could add title or other elements
+          // Left side - App icon
+          Image.asset(
+            'icons/app_icon.png',
+            width: 40,
+            height: 40,
+            fit: BoxFit.contain,
+          ),
+          const SizedBox(width: 8),
+          
+          // Spacer
           const Expanded(
             child: SizedBox(),
           ),
@@ -38,8 +48,8 @@ class SimplifiedHeaderWidget extends StatelessWidget {
             },
             icon: Icon(
               Icons.folder_outlined,
-              color: AppColors.menuText,
-              size: 24,
+              color: const Color.fromARGB(255, 61, 61, 61),
+              size: 28,
             ),
             padding: const EdgeInsets.all(8),
             constraints: const BoxConstraints(minWidth: 40, minHeight: 40),

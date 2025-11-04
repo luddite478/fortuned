@@ -90,6 +90,10 @@ void table_set_cell_sample_slot(int step, int col, int sample_slot, int undo_rec
 __attribute__((visibility("default"))) __attribute__((used))
 void table_clear_cell(int step, int col, int undo_record);
 
+// Bulk clear all cells at once (efficient for import/reset operations)
+__attribute__((visibility("default"))) __attribute__((used))
+void table_clear_all_cells(void);
+
 __attribute__((visibility("default"))) __attribute__((used))
 void table_insert_step(int section_index, int at_step, int undo_record);
 
@@ -146,6 +150,13 @@ const TableState* table_state_get_ptr(void);
 // Apply a full table state (used by Undo/Redo and imports)
 __attribute__((visibility("default"))) __attribute__((used))
 void table_apply_state(const TableState* state);
+
+// Disable/enable automatic SunVox sync (for bulk operations like import)
+__attribute__((visibility("default"))) __attribute__((used))
+void table_disable_sunvox_sync(void);
+
+__attribute__((visibility("default"))) __attribute__((used))
+void table_enable_sunvox_sync(void);
 
 
 #ifdef __cplusplus

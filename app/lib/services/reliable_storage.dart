@@ -2,9 +2,11 @@ import 'dart:io';
 import 'dart:convert';
 import 'package:path/path.dart' as path;
 import 'package:docman/docman.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Reliable cross-platform storage that uses DocMan for Android app directories
+/// and path_provider for iOS (DocMan has plugin registration issues on iOS)
 /// Avoids SharedPreferences pigeon channel issues on Android
 class ReliableStorage {
   
@@ -48,24 +50,18 @@ class ReliableStorage {
     }
   }
 
-  /// Get a safe iOS documents path using DocMan fallbacks
+  /// Get a safe iOS documents path using path_provider (more reliable than DocMan on iOS)
+  /// DocMan has MissingPluginException issues on iOS, so we use path_provider instead
   static Future<String> _getIOSDocumentsPath() async {
     final appName = dotenv.env['APP_NAME']!;
     try {
-      // Prefer internal app files directory (sandboxed, always writable)
-      final filesDir = await DocMan.dir.files();
-      if (filesDir != null) {
-        return filesDir.path;
-      }
-
-      final cacheDir = await DocMan.dir.cache();
-      if (cacheDir != null) {
-        return cacheDir.path;
-      }
-
-      return '/tmp/$appName';
+      // Use path_provider for iOS - it's well-maintained and reliable
+      // Prefer applicationDocumentsDirectory (persistent, backed up by iCloud)
+      final appDocDir = await getApplicationDocumentsDirectory();
+      return appDocDir.path;
     } catch (e) {
-      print('⚠️ DocMan iOS failed, using /tmp fallback: $e');
+      print('⚠️ path_provider iOS failed, using /tmp fallback: $e');
+      // Fallback to /tmp if path_provider fails (shouldn't happen normally)
       return '/tmp/$appName';
     }
   }

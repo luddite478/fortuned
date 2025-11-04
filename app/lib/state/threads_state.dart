@@ -30,6 +30,9 @@ class ThreadsState extends ChangeNotifier {
   final Map<String, List<Message>> _messagesByThread = {};
   final Map<String, bool> _messagesLoadingByThread = {};
   bool _isThreadViewActive = false;
+  
+  // Track deleted thread IDs to prevent restoration during refresh
+  final Set<String> _deletedThreadIds = {};
 
   // UI state
   bool _isLoading = false;
@@ -132,9 +135,11 @@ class ThreadsState extends ChangeNotifier {
       _error = null;
       
       final result = await ThreadsApi.getThreads(userId: _currentUserId);
+      // Filter out threads that were deleted locally to prevent restoration
+      final filtered = result.where((t) => !_deletedThreadIds.contains(t.id)).toList();
       _threads
         ..clear()
-        ..addAll(result);
+        ..addAll(filtered);
       _hasLoaded = true;
 
       await syncOfflineThreads();
@@ -164,9 +169,18 @@ class ThreadsState extends ChangeNotifier {
   }
 
   Future<void> ensureThreadSummary(String threadId) async {
+    // Don't restore deleted threads
+    if (_deletedThreadIds.contains(threadId)) {
+      return;
+    }
+    
     try {
       _setError(null);
       final thread = await ThreadsApi.getThread(threadId);
+      // Double-check thread wasn't deleted while fetching
+      if (_deletedThreadIds.contains(threadId)) {
+        return;
+      }
       final existingIndex = _threads.indexWhere((t) => t.id == threadId);
       if (existingIndex >= 0) {
         _threads[existingIndex] = thread;
@@ -335,10 +349,14 @@ class ThreadsState extends ChangeNotifier {
     final connectivityResult = await (Connectivity().checkConnectivity());
     if (connectivityResult == ConnectivityResult.none) return;
 
-    debugPrint('🔄 [THREADS] Syncing ${_unsyncedThreads.length} offline threads...');
+    // Filter out deleted threads before syncing
+    final threadsToSync = _unsyncedThreads.where((t) => !_deletedThreadIds.contains(t.id)).toList();
+    if (threadsToSync.isEmpty) return;
+
+    debugPrint('🔄 [THREADS] Syncing ${threadsToSync.length} offline threads...');
     
     final syncedThreads = <Thread>[];
-    for (final localThread in _unsyncedThreads) {
+    for (final localThread in threadsToSync) {
       try {
         final threadId = await ThreadsApi.createThread(
           users: localThread.users,
@@ -570,6 +588,40 @@ class ThreadsState extends ChangeNotifier {
     }
   }
 
+  /// Optimistically remove a thread from the local state
+  /// Returns the removed thread if found, null otherwise
+  Thread? removeThreadOptimistically(String threadId) {
+    // Track as deleted to prevent restoration during refresh
+    _deletedThreadIds.add(threadId);
+    
+    // Clean up cached messages
+    _messagesByThread.remove(threadId);
+    
+    final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+    if (threadIndex >= 0) {
+      final removed = _threads.removeAt(threadIndex);
+      // Also clear active thread if it was the deleted one
+      if (_activeThread?.id == threadId) {
+        _activeThread = null;
+      }
+      notifyListeners();
+      return removed;
+    }
+    
+    final unsyncedIndex = _unsyncedThreads.indexWhere((t) => t.id == threadId);
+    if (unsyncedIndex >= 0) {
+      final removed = _unsyncedThreads.removeAt(unsyncedIndex);
+      // Also clear active thread if it was the deleted one
+      if (_activeThread?.id == threadId) {
+        _activeThread = null;
+      }
+      notifyListeners();
+      return removed;
+    }
+    
+    return null;
+  }
+
   Future<bool> deleteMessage(String threadId, String messageId) async {
     try {
       await ThreadsApi.deleteMessage(messageId);
@@ -638,6 +690,127 @@ class ThreadsState extends ChangeNotifier {
       final ok = await service.importFromJson(jsonString);
       return ok;
     } catch (_) {
+      return false;
+    }
+  }
+
+  // === UNIFIED PROJECT LOADING ===
+  
+  /// Load project snapshot from cache or API (cache-aware)
+  /// Returns snapshot map or null if not available
+  Future<Map<String, dynamic>?> loadProjectSnapshot(
+    String threadId, {
+    bool forceRefresh = false,
+  }) async {
+    debugPrint('📂 [PROJECT_LOAD] Loading snapshot for thread $threadId (forceRefresh: $forceRefresh)');
+    
+    // 1. Check cache first (if not forcing refresh)
+    if (!forceRefresh) {
+      final cachedMessages = _messagesByThread[threadId];
+      if (cachedMessages != null && cachedMessages.isNotEmpty) {
+        final latestCached = cachedMessages.last;
+        if (latestCached.snapshot.isNotEmpty) {
+          debugPrint('📦 [PROJECT_LOAD] Using cached snapshot from message ${latestCached.id}');
+          return latestCached.snapshot;
+        }
+      }
+    }
+    
+    // 2. Fetch from API with snapshot
+    debugPrint('📥 [PROJECT_LOAD] Fetching latest message with snapshot from API');
+    try {
+      final latest = await ThreadsApi.getLatestMessage(threadId, includeSnapshot: true);
+      
+      if (latest == null) {
+        debugPrint('⚠️ [PROJECT_LOAD] No messages found for thread $threadId');
+        return null;
+      }
+      
+      // 3. Update cache
+      _updateMessageCache(threadId, latest);
+      
+      return latest.snapshot;
+    } catch (e) {
+      debugPrint('❌ [PROJECT_LOAD] Failed to fetch snapshot: $e');
+      return null;
+    }
+  }
+  
+  /// Update message cache with a message (preserves existing snapshot if new one is empty)
+  void _updateMessageCache(String threadId, Message message) {
+    final messages = _messagesByThread[threadId] ?? [];
+    final existingIndex = messages.indexWhere((m) => m.id == message.id);
+    
+    if (existingIndex >= 0) {
+      // Update existing message (preserve snapshot if new message lacks it)
+      final existing = messages[existingIndex];
+      messages[existingIndex] = message.snapshot.isNotEmpty 
+        ? message 
+        : message.copyWith(snapshot: existing.snapshot);
+      debugPrint('🔄 [PROJECT_LOAD] Updated cached message ${message.id}');
+    } else {
+      // Add new message
+      messages.add(message);
+      debugPrint('➕ [PROJECT_LOAD] Added message ${message.id} to cache');
+    }
+    
+    _messagesByThread[threadId] = messages;
+    notifyListeners();
+  }
+  
+  /// Unified project loader - handles initialization, caching, and import
+  /// This is the single entry point for loading projects from both:
+  /// - Projects screen (initial load)
+  /// - Thread view (checkpoint loading)
+  Future<bool> loadProjectIntoSequencer(
+    String threadId, {
+    Map<String, dynamic>? snapshotOverride,
+    bool forceRefresh = false,
+  }) async {
+    try {
+      debugPrint('📂 [PROJECT_LOAD] === LOADING PROJECT $threadId ===');
+      
+      // 1. Get snapshot (from override, cache, or API)
+      Map<String, dynamic>? snapshot = snapshotOverride;
+      if (snapshot == null || snapshot.isEmpty) {
+        snapshot = await loadProjectSnapshot(threadId, forceRefresh: forceRefresh);
+      }
+      
+      if (snapshot == null || snapshot.isEmpty) {
+        debugPrint('⚠️ [PROJECT_LOAD] No snapshot available for thread $threadId');
+        return false;
+      }
+      
+      // 2. Import snapshot (this handles ALL necessary resets internally)
+      //    Note: The import process in import.dart handles:
+      //    - Stops playback
+      //    - Resets SunVox patterns (surgical, not full reinit)
+      //    - Clears sample bank, table, sections
+      //    - Imports fresh data
+      //    - Recreates SunVox patterns and syncs
+      //    - Clears undo/redo history
+      //
+      //    The native systems (table, playback, sample_bank) are already
+      //    initialized by their state constructors, so no manual init needed.
+      final service = SnapshotService(
+        tableState: _tableState,
+        playbackState: _playbackState,
+        sampleBankState: _sampleBankState,
+      );
+      
+      final jsonString = json.encode(snapshot);
+      final ok = await service.importFromJson(jsonString);
+      
+      if (ok) {
+        debugPrint('✅ [PROJECT_LOAD] Successfully loaded project $threadId');
+      } else {
+        debugPrint('❌ [PROJECT_LOAD] Failed to import project $threadId');
+      }
+      
+      return ok;
+    } catch (e, stackTrace) {
+      debugPrint('❌ [PROJECT_LOAD] Failed to load project: $e');
+      debugPrint('📋 [PROJECT_LOAD] Stack trace: $stackTrace');
       return false;
     }
   }
@@ -741,16 +914,30 @@ class ThreadsState extends ChangeNotifier {
       final list = _messagesByThread[threadId] ?? [];
       final pendingIdx = list.indexWhere((m) => m.sendStatus != null && m.sendStatus != SendStatus.sent && _isSameMessageContent(m, message));
       if (pendingIdx >= 0) {
-        // Preserve local upload status when reconciling with server message
+        // Preserve local upload status and snapshot when reconciling with server message
         final localMessage = list[pendingIdx];
         final mergedRenders = _mergeRenders(localMessage.renders, message.renders);
+        final mergedSnapshot = message.snapshot.isEmpty && localMessage.snapshot.isNotEmpty
+          ? localMessage.snapshot
+          : message.snapshot;
+        
         list[pendingIdx] = message.copyWith(
           sendStatus: SendStatus.sent, 
           localTempId: null,
           renders: mergedRenders,
+          snapshot: mergedSnapshot,
         );
       } else if (!list.any((m) => m.id == message.id)) {
-        list.add(message.copyWith(sendStatus: SendStatus.sent));
+        // Check if we have a cached version with snapshot
+        final existing = list.firstWhere((m) => m.id == message.id, orElse: () => message);
+        final preservedSnapshot = message.snapshot.isEmpty && existing.snapshot.isNotEmpty
+          ? existing.snapshot
+          : message.snapshot;
+        
+        list.add(message.copyWith(
+          sendStatus: SendStatus.sent,
+          snapshot: preservedSnapshot,
+        ));
       }
       _messagesByThread[threadId] = List<Message>.from(list);
       notifyListeners();

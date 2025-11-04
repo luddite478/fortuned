@@ -22,3 +22,4 @@ linux/flutter/ephemeral
 pubspec.lock
 testkey.jks
 windows/flutter/ephemeral
+normalize_samples.sh

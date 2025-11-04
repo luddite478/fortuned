@@ -127,6 +127,11 @@ async def create_thread_new(request: Request, thread_data: dict):
 async def join_thread(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
     return await join_thread_handler(request, thread_id, user_data)
 
+@router.post("/threads/{thread_id}/join")
+async def join_thread_via_link(request: Request, thread_id: str, user_data: Dict[str, Any] = Body(...)):
+    """Join thread via invite link (alias for /users endpoint)"""
+    return await join_thread_handler(request, thread_id, user_data)
+
 @router.put("/threads/{thread_id}")
 async def update_thread(request: Request, thread_id: str, update_data: Dict[str, Any] = Body(...)):
     return await update_thread_handler(request, thread_id, update_data)

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../utils/app_colors.dart';
 import '../widgets/library_header_widget.dart';
+import '../widgets/bottom_audio_player.dart';
 import '../models/playlist_item.dart';
 import '../models/thread/message.dart';
 import '../state/audio_player_state.dart';
@@ -120,60 +121,77 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
   Widget build(BuildContext context) {
     super.build(context); // Required for AutomaticKeepAliveClientMixin
     
-    return Scaffold(
-      backgroundColor: AppColors.menuPageBackground,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Library header with back button
-            const LibraryHeaderWidget(),
-            
-            // Tab bar
-            Container(
-              decoration: BoxDecoration(
-                color: AppColors.menuEntryBackground,
-                border: Border(
-                  bottom: BorderSide(
-                    color: AppColors.menuBorder,
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'PLAYLIST'),
-                  Tab(text: 'SAMPLES'),
-                ],
-                labelColor: AppColors.menuText,
-                unselectedLabelColor: AppColors.menuLightText,
-                labelStyle: GoogleFonts.sourceSans3(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.5,
-                ),
-                unselectedLabelStyle: GoogleFonts.sourceSans3(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 1.5,
-                ),
-                indicatorColor: AppColors.menuText,
-                indicatorWeight: 2,
-              ),
-            ),
-            
-            // Tab content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
+    return WillPopScope(
+      onWillPop: () async {
+        // Stop audio when navigating back to ProjectsScreen (handles system back button/swipe)
+        try {
+          context.read<AudioPlayerState>().stop();
+        } catch (_) {}
+        return true;
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.menuPageBackground,
+        body: Column(
+        children: [
+          Expanded(
+            child: SafeArea(
+              child: Column(
                 children: [
-                  _buildPlaylistsTab(),
-                  _buildSamplesTab(),
+                  // Library header with back button
+                  const LibraryHeaderWidget(),
+                  
+                  // Tab bar
+                  Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.menuEntryBackground,
+                      border: Border(
+                        bottom: BorderSide(
+                          color: AppColors.menuBorder,
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: TabBar(
+                      controller: _tabController,
+                      tabs: const [
+                        Tab(text: 'PLAYLIST'),
+                        Tab(text: 'SAMPLES'),
+                      ],
+                      labelColor: AppColors.menuText,
+                      unselectedLabelColor: AppColors.menuLightText,
+                      labelStyle: GoogleFonts.sourceSans3(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 1.5,
+                      ),
+                      unselectedLabelStyle: GoogleFonts.sourceSans3(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.5,
+                      ),
+                      indicatorColor: AppColors.menuText,
+                      indicatorWeight: 2,
+                    ),
+                  ),
+                  
+                  // Tab content
+                  Expanded(
+                    child: TabBarView(
+                      controller: _tabController,
+                      children: [
+                        _buildPlaylistsTab(),
+                        _buildSamplesTab(),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          // Audio player at the bottom
+          const BottomAudioPlayer(showLoopButton: true),
+        ],
+      ),
       ),
     );
   }

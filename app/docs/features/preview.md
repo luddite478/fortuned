@@ -60,16 +60,22 @@ Bindings are exposed in `app/lib/ffi/playback_bindings.dart`:
 
 ### UI Integration
 
-1) Sample Browser (preview by file path)
+1) Sample Browser (preview via dedicated slot)
 
-- File entries in `app/lib/widgets/sequencer/v2/sample_selection_widget.dart` preview on tap.
-- Since Flutter assets are not true files on disk, the widget loads the asset bytes via `rootBundle.load(...)`, writes to a temporary file (e.g., `/tmp/preview_<name>`), and then calls `previewSamplePath(tempPath, 1.0, 1.0)`.
+- File entries in `app/lib/widgets/sequencer/v2/sample_selection_widget.dart` have play buttons for preview.
+- Preview implementation:
+  - Samples are temporarily loaded into slot 25 (Z), which serves as a dedicated preview slot
+  - `SampleBrowserState.previewSample()` loads the sample via manifest ID using `SampleBankState.loadSample()`
+  - Once loaded, `PlaybackState.previewSampleSlot()` is called to play the preview
+  - The preview slot is reused if the same sample is already loaded, avoiding unnecessary reloads
+  - This approach ensures compatibility with SunVox since samples are loaded into a real slot before previewing
+- Integration: Uses `PlaybackState` from Provider, same as sound settings preview
 
 2) Sound Settings (preview current configuration)
 
-- `app/lib/widgets/sequencer/v2/sound_settings.dart` adds a speaker icon to the header (left of VOL/KEY) for both cell and sample modes.
-- Sample settings: calls `previewSlot(activeSlot, pitch, volume)` using the current sample-bank settings.
-- Cell settings: computes absolute `step`/`col` from the selected UI cell; resolves effective pitch/volume (cell override or inherited from sample) and calls `previewCell(step, col, effPitch, effVol)`.
+- `app/lib/widgets/sequencer/v2/sound_settings.dart` provides live preview during slider interaction.
+- Sample settings: calls `PlaybackState.previewSampleSlot(activeSlot, pitch, volume)` using the current sample-bank settings with debounced updates.
+- Cell settings: computes absolute `step`/`col` from the selected UI cell; resolves effective pitch/volume (cell override or inherited from sample) and calls `PlaybackState.previewCell(step, col, effPitch, effVol)`.
 
 ### Pitch/Volume Semantics
 
@@ -78,22 +84,28 @@ Bindings are exposed in `app/lib/ffi/playback_bindings.dart`:
   - If cell volume is default, it inherits sample-bank volume
   - If cell pitch is default, it inherits sample-bank pitch
 
-### Filesystem vs Assets
+### Simplified Approach
 
-- `ma_decoder_init_file(...)` requires an actual filesystem path.
-- For bundled assets, write bytes to a temp file and pass that path to `preview_sample_path(...)`.
-- Symptom if skipped: decoder init fails (e.g., `-7`), because the path is not a real file.
+- **Sample Browser Preview**: Instead of using `preview_sample_path()` with temporary files, samples are loaded into slot 25 (the dedicated preview slot) and then previewed using `preview_slot()`.
+- **Benefits**: 
+  - Consistent with sound settings preview behavior
+  - Reuses existing sample loading infrastructure
+  - Ensures samples are properly loaded into SunVox modules before preview
+  - Avoids temporary file management overhead
+- **Implementation**: `SampleBrowserState.previewSample()` handles the loading and preview coordination
 
 ### Error Handling & Troubleshooting
 
-- Decoder init failed (`-7`/`MA_DOES_NOT_EXIST`):
-  - Ensure the path points to an existing on-disk file
-  - For assets, write to a temp file first (as done in the sample browser)
+- Sample loading failed:
+  - Check that the sample manifest ID exists in `samples_manifest.json`
+  - Verify the asset path in the manifest is correct
+  - Ensure slot 25 (preview slot) is available (it may be overwritten during preview, which is acceptable)
 
 - No audio heard:
   - Confirm device is initialized (`playback_init` was successful)
-  - Confirm the sample-bank slot is loaded (when using `preview_slot`/`preview_cell`)
+  - Confirm the sample-bank slot is loaded (required for `preview_slot`/`preview_cell`)
   - Verify volume is non-zero and the node graph is running
+  - Check that `PlaybackState` is properly initialized before calling preview methods
 
 ### Performance Notes
 
@@ -116,22 +128,36 @@ preview_slot(2, 2.0f, 0.5f);
 preview_cell(10, 3, 0.5f, 0.8f);
 ```
 
-Dart (FFI):
+Dart (High-level API via PlaybackState):
 
+```dart
+// Sample browser preview (via SampleBrowserState)
+final browserState = context.read<SampleBrowserState>();
+final playbackState = context.read<PlaybackState>();
+final sampleBankState = context.read<SampleBankState>();
+await browserState.previewSample(item, sampleBankState, playbackState);
+
+// Sound settings preview (direct PlaybackState usage)
+playbackState.previewSampleSlot(activeSlot, pitchRatio: 1.0, volume01: 1.0);
+playbackState.previewCell(step: step, colAbs: colAbs, pitchRatio: effPitch, volume01: effVol);
+
+// Stop preview
+playbackState.stopPreview();
 ```
+
+Dart (Low-level FFI - for direct control):
+
+```dart
 final bindings = PlaybackBindings();
-final tmpPath = file.path.toNativeUtf8();
-try {
-  bindings.previewSamplePath(tmpPath, 1.0, 1.0);
-} finally {
-  malloc.free(tmpPath);
-}
 
-// Preview active slot with current sample settings
-bindings.previewSlot(activeSlot, samplePitch, sampleVolume);
+// Preview loaded slot (preferred method)
+bindings.previewSlot(slot, pitch, volume);
 
-// Preview current cell with resolved settings
+// Preview cell with resolved settings
 bindings.previewCell(step, colAbs, effPitch, effVol);
+
+// Stop preview
+bindings.previewStopSample();
 ```
 
 ### Future Extensions

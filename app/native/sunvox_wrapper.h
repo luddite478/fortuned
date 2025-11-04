@@ -31,6 +31,10 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
 // Remove a pattern for a section
 void sunvox_wrapper_remove_section_pattern(int section_index);
 
+// Reset ALL SunVox patterns (used before import to ensure clean state)
+__attribute__((visibility("default"))) __attribute__((used))
+void sunvox_wrapper_reset_all_patterns(void);
+
 // Sync entire section to its SunVox patter
 __attribute__((visibility("default"))) __attribute__((used))
 void sunvox_wrapper_sync_section(int section_index);

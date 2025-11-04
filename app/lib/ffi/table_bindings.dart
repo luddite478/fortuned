@@ -135,6 +135,15 @@ class TableBindings {
     _tableClearCellPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32)>>('table_clear_cell');
     tableClearCell = _tableClearCellPtr.asFunction<void Function(int, int, int)>();
 
+    _tableClearAllCellsPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('table_clear_all_cells');
+    tableClearAllCells = _tableClearAllCellsPtr.asFunction<void Function()>();
+
+    _tableDisableSunvoxSyncPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('table_disable_sunvox_sync');
+    tableDisableSunvoxSync = _tableDisableSunvoxSyncPtr.asFunction<void Function()>();
+
+    _tableEnableSunvoxSyncPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('table_enable_sunvox_sync');
+    tableEnableSunvoxSync = _tableEnableSunvoxSyncPtr.asFunction<void Function()>();
+
     _tableInsertStepPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32)>>('table_insert_step');
     tableInsertStep = _tableInsertStepPtr.asFunction<void Function(int, int, int)>();
 
@@ -199,6 +208,15 @@ class TableBindings {
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32)>> _tableClearCellPtr;
   late final void Function(int, int, int) tableClearCell;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _tableClearAllCellsPtr;
+  late final void Function() tableClearAllCells;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _tableDisableSunvoxSyncPtr;
+  late final void Function() tableDisableSunvoxSync;
+
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _tableEnableSunvoxSyncPtr;
+  late final void Function() tableEnableSunvoxSync;
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32)>> _tableInsertStepPtr;
   late final void Function(int, int, int) tableInsertStep;

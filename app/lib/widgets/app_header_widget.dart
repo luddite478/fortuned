@@ -10,6 +10,7 @@ import '../utils/app_colors.dart';
 enum HeaderMode {
   checkpoints,
   sequencer,
+  sequencerSettings,
   thread,
 }
 
@@ -40,7 +41,7 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   bool get _isPhoneBookMode => mode == HeaderMode.checkpoints;
-  bool get _isSequencerMode => mode == HeaderMode.sequencer;
+  bool get _isSequencerMode => mode == HeaderMode.sequencer || mode == HeaderMode.sequencerSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -101,6 +102,17 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
       case HeaderMode.sequencer:
         // No title for sequencer mode to save space
         return const SizedBox.shrink();
+      case HeaderMode.sequencerSettings:
+        // Show title for settings screen
+        return Text(
+          title ?? 'Settings',
+          style: GoogleFonts.sourceSans3(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.sequencerText,
+            letterSpacing: 0.5,
+          ),
+        );
       case HeaderMode.checkpoints:
       case HeaderMode.thread:
         return Consumer<ThreadsState>(
@@ -146,6 +158,9 @@ class AppHeaderWidget extends StatelessWidget implements PreferredSizeWidget {
     switch (mode) {
       case HeaderMode.sequencer:
         return _buildSequencerActions(context);
+      case HeaderMode.sequencerSettings:
+        // No actions for settings screen (just back button)
+        return [];
       case HeaderMode.checkpoints:
       case HeaderMode.thread:
         return _buildThreadActions(context);

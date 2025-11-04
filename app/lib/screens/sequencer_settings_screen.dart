@@ -28,7 +28,7 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     return Scaffold(
       backgroundColor: AppColors.sequencerPageBackground,
       appBar: AppHeaderWidget(
-        mode: HeaderMode.sequencer,
+        mode: HeaderMode.sequencerSettings,
         title: 'Sequencer Settings',
         onBack: () => Navigator.of(context).pop(),
       ),

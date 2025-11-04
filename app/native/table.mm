@@ -26,6 +26,9 @@
 // Global table state consolidated into a single struct
 static TableState g_table_state; // zero-initialized
 
+// Flag to disable automatic SunVox sync during bulk operations (import/undo/redo)
+static int g_disable_sunvox_sync = 0;
+
 // Seqlock helper functions for unified state
 static inline void state_write_begin() {
     g_table_state.version++; // odd = write in progress
@@ -107,8 +110,8 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
     prnt("🎵 [TABLE] Set cell [%d, %d]: slot=%d, vol=%.2f, pitch=%.2f", 
          step, col, sample_slot, volume, pitch);
 
-    // Sync cell to SunVox pattern
-    if (sunvox_wrapper_is_initialized()) {
+    // Sync cell to SunVox pattern (unless sync is disabled for bulk operations)
+    if (sunvox_wrapper_is_initialized() && !g_disable_sunvox_sync) {
         sunvox_wrapper_sync_cell(step, col);
     }
 
@@ -127,8 +130,8 @@ void table_set_cell_settings(int step, int col, float volume, float pitch, int u
     cell->settings.pitch = pitch;
     prnt("🎚️ [TABLE] Set settings [%d, %d]: vol=%.2f, pitch=%.2f", step, col, volume, pitch);
 
-    // Sync cell to SunVox pattern
-    if (sunvox_wrapper_is_initialized()) {
+    // Sync cell to SunVox pattern (unless sync is disabled for bulk operations)
+    if (sunvox_wrapper_is_initialized() && !g_disable_sunvox_sync) {
         sunvox_wrapper_sync_cell(step, col);
     }
 
@@ -148,8 +151,8 @@ void table_set_cell_sample_slot(int step, int col, int sample_slot, int undo_rec
     cell->sample_slot = sample_slot;
     prnt("🎵 [TABLE] Set sample slot [%d, %d]: slot=%d", step, col, sample_slot);
     
-    // Sync cell to SunVox pattern
-    if (sunvox_wrapper_is_initialized()) {
+    // Sync cell to SunVox pattern (unless sync is disabled for bulk operations)
+    if (sunvox_wrapper_is_initialized() && !g_disable_sunvox_sync) {
         sunvox_wrapper_sync_cell(step, col);
     }
     
@@ -165,16 +168,41 @@ void table_clear_cell(int step, int col, int undo_record) {
     
     table_set_cell_defaults(cell);
     
-    prnt("🧹 [TABLE] Cleared cell [%d, %d]", step, col);
+    // prnt("🧹 [TABLE] Cleared cell [%d, %d]", step, col);  // Commented out to reduce log spam
 
-    // Sync cell to SunVox pattern
-    if (sunvox_wrapper_is_initialized()) {
+    // Sync cell to SunVox pattern (unless sync is disabled for bulk operations)
+    if (sunvox_wrapper_is_initialized() && !g_disable_sunvox_sync) {
         sunvox_wrapper_sync_cell(step, col);
     }
 
     if (undo_record) {
         UndoRedoManager_record();
     }
+}
+
+// Bulk clear all cells (efficient for import/reset operations)
+// This clears all cells in the table without syncing to SunVox
+// Used during import when SunVox patterns are reset separately
+void table_clear_all_cells(void) {
+    prnt("🧹 [TABLE] Bulk clearing all cells (%d x %d = %d cells)", 
+         MAX_SEQUENCER_STEPS, MAX_SEQUENCER_COLS, MAX_SEQUENCER_STEPS * MAX_SEQUENCER_COLS);
+    
+    state_write_begin();
+    
+    // Clear all cells in one pass
+    for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
+        for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+            table_set_cell_defaults(&g_table_state.table[step][col]);
+        }
+    }
+    
+    state_write_end();
+    
+    prnt("✅ [TABLE] Bulk clear complete");
+    
+    // Note: We do NOT sync to SunVox here as this is used during import
+    // when patterns are being reset separately. The caller is responsible
+    // for syncing after the import is complete.
 }
 
 // Insert step at given position
@@ -537,6 +565,18 @@ const TableState* table_get_state_ptr(void) { return &g_table_state; }
 
 // Expose live state for read
 const TableState* table_state_get_ptr(void) { return &g_table_state; }
+
+// Disable automatic SunVox sync (for bulk operations like import/undo/redo)
+void table_disable_sunvox_sync(void) {
+    g_disable_sunvox_sync = 1;
+    prnt("🔇 [TABLE] Disabled automatic SunVox sync");
+}
+
+// Re-enable automatic SunVox sync
+void table_enable_sunvox_sync(void) {
+    g_disable_sunvox_sync = 0;
+    prnt("🔊 [TABLE] Enabled automatic SunVox sync");
+}
 
 // Apply a native snapshot used by Undo/Redo
 void table_apply_state(const TableState* snap) {

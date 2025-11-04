@@ -547,51 +547,67 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
       children: [
         SizedBox(
           height: 34,
-          child: Row(
-            children: List.generate(numSoundGrids, (i) {
-              final isActive = tableState.uiSelectedLayer == i;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () {
-                    tableState.setUiSelectedLayer(i);
-                    tableState.uiBringGridToFront(i);
-                  },
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isActive ? AppColors.sequencerSurfaceRaised : AppColors.sequencerSurfaceBase,
-                      borderRadius: BorderRadius.circular(2),
-                      border: Border.all(
-                        color: isActive ? AppColors.sequencerAccent : AppColors.sequencerBorder,
-                        width: isActive ? 1.0 : 0.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: AppColors.sequencerShadow,
-                          blurRadius: isActive ? 2 : 1,
-                          offset: Offset(0, isActive ? 1 : 0.5),
+          child: ValueListenableBuilder<int>(
+            valueListenable: tableState.uiSelectedLayerNotifier,
+            builder: (context, selectedLayer, _) {
+              return Row(
+                children: List.generate(numSoundGrids, (i) {
+                  final isActive = selectedLayer == i;
+                  return Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        debugPrint('🎨 [SOUND_GRID] Layer tab L${i + 1} tapped, current layer: $selectedLayer');
+                        tableState.setUiSelectedLayer(i);
+                        tableState.uiBringGridToFront(i);
+                        debugPrint('🎨 [SOUND_GRID] After tap, layer should be: $i');
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.sequencerSurfaceRaised : AppColors.sequencerSurfaceBase,
+                          borderRadius: BorderRadius.circular(2),
+                          border: Border.all(
+                            color: isActive ? AppColors.sequencerAccent : AppColors.sequencerBorder,
+                            width: isActive ? 1.0 : 0.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.sequencerShadow,
+                              blurRadius: isActive ? 2 : 1,
+                              offset: Offset(0, isActive ? 1 : 0.5),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                    child: Center(
-                      child: Text(
-                        'L${i + 1}',
-                        style: GoogleFonts.sourceSans3(
-                          color: isActive ? AppColors.sequencerText : AppColors.sequencerLightText,
-                          fontSize: 12,
-                          fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
-                          letterSpacing: 1,
+                        child: Center(
+                          child: Text(
+                            'L${i + 1}',
+                            style: GoogleFonts.sourceSans3(
+                              color: isActive ? AppColors.sequencerText : AppColors.sequencerLightText,
+                              fontSize: 12,
+                              fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                              letterSpacing: 1,
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                }),
               );
-            }),
+            },
           ),
         ),
         Expanded(
-          child: _buildGridContent(tableState),
+          child: ValueListenableBuilder<int>(
+            valueListenable: tableState.uiSelectedLayerNotifier,
+            builder: (context, selectedLayer, _) {
+              // Force grid rebuild when layer changes by using selectedLayer as key
+              return KeyedSubtree(
+                key: ValueKey<int>(selectedLayer),
+                child: _buildGridContent(tableState),
+              );
+            },
+          ),
         ),
       ],
     );
@@ -815,63 +831,69 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
     required double tabWidth,
     required TableState tableState,
   }) {
-    return GestureDetector(
-      onTap: () {
-        // Bring this grid to front and switch UI-visible layer
-        tableState.uiBringGridToFront(gridIndex);
-        tableState.setUiSelectedLayer(gridIndex);
-      },
-      child: Container(
-        width: tabWidth,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-        decoration: BoxDecoration(
-          color: isFrontCard 
-              ? AppColors.sequencerSurfaceRaised // Active tab protruding
-              : AppColors.sequencerSurfaceBase, // Inactive tabs recessed
-          borderRadius: BorderRadius.circular(2), // Sharp corners
-          border: Border.all(
-            color: isFrontCard 
-                ? AppColors.sequencerAccent // Brown accent for active
-                : AppColors.sequencerBorder, // Subtle border for inactive
-            width: isFrontCard ? 1.0 : 0.5,
-          ),
-          boxShadow: isFrontCard 
-              ? [
-                  BoxShadow(
-                    color: AppColors.sequencerShadow,
-                    blurRadius: 2,
-                    offset: const Offset(0, 1),
-                  ),
-                  // Extra highlight for protruding effect
-                  BoxShadow(
-                    color: AppColors.sequencerSurfaceRaised,
-                    blurRadius: 1,
-                    offset: const Offset(0, -0.5),
-                  ),
-                ]
-              : [
-                  BoxShadow(
-                    color: AppColors.sequencerShadow,
-                    blurRadius: 1,
-                    offset: const Offset(0, 0.5),
-                  ),
-                ],
-        ),
-        child: Center(
-          child: Text(
-            'L${gridIndex + 1}',
-            style: GoogleFonts.sourceSans3(
-              color: isFrontCard 
-                  ? AppColors.sequencerText // Light text for active tab
-                  : AppColors.sequencerLightText, // Muted text for inactive tab
-              fontSize: 12,
-              fontWeight: isFrontCard ? FontWeight.bold : FontWeight.w600,
-              letterSpacing: 1,
+    return ValueListenableBuilder<int>(
+      valueListenable: tableState.uiSelectedLayerNotifier,
+      builder: (context, selectedLayer, _) {
+        final bool isActive = selectedLayer == gridIndex;
+        return GestureDetector(
+          onTap: () {
+            // Bring this grid to front and switch UI-visible layer
+            tableState.uiBringGridToFront(gridIndex);
+            tableState.setUiSelectedLayer(gridIndex);
+          },
+          child: Container(
+            width: tabWidth,
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            decoration: BoxDecoration(
+              color: isActive 
+                  ? AppColors.sequencerSurfaceRaised // Active tab protruding
+                  : AppColors.sequencerSurfaceBase, // Inactive tabs recessed
+              borderRadius: BorderRadius.circular(2), // Sharp corners
+              border: Border.all(
+                color: isActive 
+                    ? AppColors.sequencerAccent // Brown accent for active
+                    : AppColors.sequencerBorder, // Subtle border for inactive
+                width: isActive ? 1.0 : 0.5,
+              ),
+              boxShadow: isActive 
+                  ? [
+                      BoxShadow(
+                        color: AppColors.sequencerShadow,
+                        blurRadius: 2,
+                        offset: const Offset(0, 1),
+                      ),
+                      // Extra highlight for protruding effect
+                      BoxShadow(
+                        color: AppColors.sequencerSurfaceRaised,
+                        blurRadius: 1,
+                        offset: const Offset(0, -0.5),
+                      ),
+                    ]
+                  : [
+                      BoxShadow(
+                        color: AppColors.sequencerShadow,
+                        blurRadius: 1,
+                        offset: const Offset(0, 0.5),
+                      ),
+                    ],
             ),
-            textAlign: TextAlign.center,
+            child: Center(
+              child: Text(
+                'L${gridIndex + 1}',
+                style: GoogleFonts.sourceSans3(
+                  color: isActive 
+                      ? AppColors.sequencerText // Light text for active tab
+                      : AppColors.sequencerLightText, // Muted text for inactive tab
+                  fontSize: 12,
+                  fontWeight: isActive ? FontWeight.bold : FontWeight.w600,
+                  letterSpacing: 1,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1027,7 +1049,16 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             const SizedBox(height: 8),
             // Sound grid
             Expanded(
-              child: _buildGridContent(tableState),
+              child: ValueListenableBuilder<int>(
+                valueListenable: tableState.uiSelectedLayerNotifier,
+                builder: (context, selectedLayer, _) {
+                  // Force grid rebuild when layer changes
+                  return KeyedSubtree(
+                    key: ValueKey<int>(selectedLayer),
+                    child: _buildGridContent(tableState),
+                  );
+                },
+              ),
             ),
           ],
         ),
