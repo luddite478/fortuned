@@ -75,26 +75,28 @@ class _UsernameCreationDialogState extends State<UsernameCreationDialog> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final dialogWidth = (size.width * 0.85).clamp(280.0, 400.0);
+    final dialogWidth = (size.width * 0.8).clamp(280.0, size.width);
+    final dialogHeight = (size.height * 0.42).clamp(240.0, size.height);
 
     return Material(
       type: MaterialType.transparency,
       child: Center(
-        child: Container(
-          width: dialogWidth,
-          constraints: const BoxConstraints(maxHeight: 400),
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceRaised,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-          ),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+        child: ConstrainedBox(
+          constraints: BoxConstraints.tightFor(width: dialogWidth, height: dialogHeight),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.sequencerSurfaceRaised,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   // Title
                   Row(
                     children: [
@@ -109,26 +111,27 @@ class _UsernameCreationDialogState extends State<UsernameCreationDialog> {
                       const Spacer(),
                       if (!_isSubmitting)
                         IconButton(
-                          icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 24),
+                          icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 28),
+                          splashRadius: 22,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
 
                   // Message
                   Text(
                     widget.message,
+                    textAlign: TextAlign.left,
                     style: GoogleFonts.sourceSans3(
                       color: AppColors.sequencerLightText,
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
-                      height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
 
                   // Username input field
                   TextField(
@@ -185,17 +188,6 @@ class _UsernameCreationDialogState extends State<UsernameCreationDialog> {
                   ),
                   const SizedBox(height: 8),
 
-                  // Format hint
-                  Text(
-                    'Min 3 characters, letters, numbers, _ and -',
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.sequencerLightText.withOpacity(0.7),
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-
                   // Submit button
                   SizedBox(
                     height: 44,
@@ -236,6 +228,7 @@ class _UsernameCreationDialogState extends State<UsernameCreationDialog> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

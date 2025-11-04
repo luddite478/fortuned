@@ -433,6 +433,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         }
 
         Future<void> handleAccept() async {
+          // If username is needed, validate first
           if (needsUsername) {
             final username = usernameController.text.trim();
             final error = validateUsername(username);
@@ -472,8 +473,6 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           }
           if (mounted) setState(() {});
         }
-
-        final canAccept = !needsUsername || (usernameController.text.trim().length >= 3 && usernameError == null);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 2),
@@ -623,19 +622,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     children: [
                       ActionButton(
                         label: 'ACCEPT',
-                        background: canAccept
-                            ? AppColors.menuPrimaryButton
-                            : AppColors.menuBorder,
-                        border: canAccept
-                            ? AppColors.menuPrimaryButton
-                            : AppColors.menuBorder,
-                        textColor: canAccept
-                            ? AppColors.menuPrimaryButtonText
-                            : AppColors.menuLightText,
+                        background: AppColors.menuPrimaryButton,
+                        border: AppColors.menuPrimaryButton,
+                        textColor: AppColors.menuPrimaryButtonText,
                         height: 32,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         fontSize: 12,
-                        onTap: canAccept ? () => handleAccept() : null,
+                        onTap: () => handleAccept(),
                       ),
                       const SizedBox(width: 8),
                       ActionButton(
