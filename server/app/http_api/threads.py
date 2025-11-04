@@ -34,6 +34,7 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         name = thread_data.get("name")
 
         # Ensure users array items have required fields (id, name, joined_at)
+        # Allow empty username (anonymous users)
         normalized_users: List[Dict[str, Any]] = []
         for u in users:
             if not isinstance(u, dict):
@@ -41,7 +42,10 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
             user_id = u.get("id")
             user_name = u.get("name")
             joined_at = u.get("joined_at") or now
-            if not user_id or not user_name:
+            # Allow empty username, but require fields to be present
+            if user_id is None or user_name is None:
+                continue
+            if not user_id:  # user_id cannot be empty
                 continue
             normalized_users.append({
                 "id": user_id,
@@ -63,6 +67,16 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         }
 
         db.threads.insert_one(thread_doc)
+        
+        # Update each user's threads array
+        for user in normalized_users:
+            user_id = user.get("id")
+            if user_id:
+                db.users.update_one(
+                    {"id": user_id},
+                    {"$addToSet": {"threads": thread_id}}  # $addToSet prevents duplicates
+                )
+        
         return {"thread_id": thread_id, "status": "created"}
     except Exception as e:
         if isinstance(e, HTTPException): raise e
@@ -83,8 +97,11 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
         
         user_id = user_data.get("user_id")
         user_name = user_data.get("user_name")
-        if not user_id or not user_name:
+        # Allow empty username (anonymous users), but require the fields to be present
+        if user_id is None or user_name is None:
             raise HTTPException(status_code=400, detail="user_id and user_name are required")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id cannot be empty")
         
         existing_users = [u["id"] for u in thread.get("users", [])]
         if user_id in existing_users:
@@ -113,6 +130,12 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
                 "$push": {"users": new_user},
                 "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
             }
+        )
+        
+        # Update the user's threads array
+        db.users.update_one(
+            {"id": user_id},
+            {"$addToSet": {"threads": thread_id}}  # $addToSet prevents duplicates
         )
         
         # Also update the user's name in the users collection if it was modified
@@ -539,6 +562,9 @@ async def delete_thread_handler(request: Request, thread_id: str, token: str = Q
         if not thread:
             raise HTTPException(status_code=404, detail="Thread not found")
         
+        # Get all users in the thread before deleting
+        thread_users = [u.get("id") for u in thread.get("users", [])]
+        
         # Delete all messages associated with this thread
         db.messages.delete_many({"parent_thread": thread_id})
         
@@ -547,6 +573,14 @@ async def delete_thread_handler(request: Request, thread_id: str, token: str = Q
         
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Thread not found")
+        
+        # Remove thread from all users' threads arrays
+        for user_id in thread_users:
+            if user_id:
+                db.users.update_one(
+                    {"id": user_id},
+                    {"$pull": {"threads": thread_id}}
+                )
         
         return {"status": "thread_deleted", "thread_id": thread_id}
     
