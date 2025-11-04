@@ -6,7 +6,7 @@ class ActionButton extends StatelessWidget {
   final Color background;
   final Color border;
   final Color textColor;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final double height;
   final EdgeInsets padding;
   final double fontSize;
@@ -17,7 +17,7 @@ class ActionButton extends StatelessWidget {
     required this.background,
     required this.border,
     required this.textColor,
-    required this.onTap,
+    this.onTap,
     this.height = 28,
     this.padding = const EdgeInsets.symmetric(horizontal: 10),
     this.fontSize = 11,

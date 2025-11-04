@@ -89,13 +89,39 @@ class UserState extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateUsername(String newUsername) async {
+    try {
+      if (_currentUser == null) return false;
+      
+      debugPrint('🔧 [USER] Updating username to: $newUsername');
+      
+      // Call API to update username
+      final updatedUser = await UsersService.updateUsername(_currentUser!.id, newUsername);
+      
+      // Update local state
+      _currentUser = updatedUser;
+      
+      // Save to local storage
+      await _saveUser(_currentUser!);
+      
+      // Notify listeners
+      notifyListeners();
+      
+      debugPrint('✅ [USER] Username updated successfully: $newUsername');
+      return true;
+    } catch (e) {
+      debugPrint('❌ [USER] Failed to update username: $e');
+      return false;
+    }
+  }
+
   UserProfile _createAnonymousUser({String? id, String? name}) {
     final newId = id ?? _generateHexId(24);
     
     return UserProfile(
       id: newId,
-      username: name ?? 'User-${newId.substring(0, 6)}',
-      name: name ?? 'Anonymous User',
+      username: name ?? '',  // Empty string for new anonymous users
+      name: name ?? '',  // Empty string for new anonymous users
       email: '$newId@anonymous.com',
       createdAt: DateTime.now(),
       lastLogin: DateTime.now(),

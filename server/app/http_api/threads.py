@@ -90,9 +90,21 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
         if user_id in existing_users:
             return {"status": "already_member"}
         
+        # Handle username collision by adding number suffix if needed
+        existing_names = [u["name"] for u in thread.get("users", [])]
+        final_user_name = user_name
+        
+        if user_name in existing_names:
+            # Username collision detected, find a unique suffix
+            counter = 1
+            while f"{user_name}_{counter}" in existing_names:
+                counter += 1
+            final_user_name = f"{user_name}_{counter}"
+            print(f"Username collision detected. Changed '{user_name}' to '{final_user_name}'")
+        
         new_user = {
             "id": user_id,
-            "name": user_name,
+            "name": final_user_name,
             "joined_at": datetime.utcnow().isoformat() + "Z"
         }
         db.threads.update_one(
@@ -102,7 +114,21 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
                 "$set": {"updated_at": datetime.utcnow().isoformat() + "Z"}
             }
         )
-        return {"status": "user_added"}
+        
+        # Also update the user's name in the users collection if it was modified
+        if final_user_name != user_name:
+            db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "name": final_user_name,
+                    "username": final_user_name
+                }}
+            )
+        
+        return {
+            "status": "user_added",
+            "username": final_user_name  # Return the final username (possibly modified)
+        }
     except Exception as e:
         if isinstance(e, HTTPException): raise e
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")

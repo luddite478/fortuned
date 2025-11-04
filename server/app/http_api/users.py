@@ -494,3 +494,43 @@ async def get_playlist_handler(request: Request, token: str = Query(...), user_i
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get playlist: {str(e)}")
+
+class UpdateUsernameRequest(BaseModel):
+    username: str
+
+async def update_username_handler(request: Request, user_id: str, username_data: UpdateUsernameRequest):
+    """Update user's username"""
+    try:
+        username = username_data.username.strip()
+        
+        # Validate username format: min 3 chars, alphanumeric + underscore + hyphen
+        if len(username) < 3:
+            raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
+        
+        import re
+        if not re.match(r'^[a-zA-Z0-9_-]+$', username):
+            raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, underscores, and hyphens")
+        
+        # Check if user exists
+        user = db.users.find_one({"id": user_id})
+        if not user:
+            raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
+        
+        # Update username
+        db.users.update_one(
+            {"id": user_id},
+            {"$set": {
+                "username": username,
+                "name": username,  # Also update name to match username
+                "last_online": datetime.now(timezone.utc).isoformat()
+            }}
+        )
+        
+        # Return updated user (exclude sensitive fields)
+        updated_user = db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "salt": 0})
+        return JSONResponse(content=updated_user, status_code=200)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update username: {str(e)}")

@@ -415,135 +415,259 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   }
 
   Widget _buildInviteCard(Thread? thread, UserState userState, String threadId) {
-    // Same visual style as project list tile; only right side differs
-    return Container(
-      height: 60,
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
-        border: Border(
-          left: BorderSide(
-            color: AppColors.menuLightText.withOpacity(0.3),
-            width: 2,
+    final currentUsername = userState.currentUser?.username ?? '';
+    final needsUsername = currentUsername.isEmpty;
+
+    return StatefulBuilder(
+      builder: (context, setLocalState) {
+        final TextEditingController usernameController = TextEditingController();
+        String? usernameError;
+        bool isUpdatingUsername = false;
+
+        String? validateUsername(String username) {
+          if (username.isEmpty) return 'Username required';
+          if (username.length < 3) return 'Min 3 characters';
+          final validPattern = RegExp(r'^[a-zA-Z0-9_-]+$');
+          if (!validPattern.hasMatch(username)) return 'Only letters, numbers, _ and -';
+          return null;
+        }
+
+        Future<void> handleAccept() async {
+          if (needsUsername) {
+            final username = usernameController.text.trim();
+            final error = validateUsername(username);
+            if (error != null) {
+              setLocalState(() => usernameError = error);
+              return;
+            }
+
+            setLocalState(() => isUpdatingUsername = true);
+            try {
+              final success = await userState.updateUsername(username);
+              if (!success) {
+                setLocalState(() {
+                  usernameError = 'Failed to create username';
+                  isUpdatingUsername = false;
+                });
+                return;
+              }
+            } catch (e) {
+              setLocalState(() {
+                usernameError = e.toString().replaceFirst('Exception: ', '');
+                isUpdatingUsername = false;
+              });
+              return;
+            }
+          }
+
+          // Accept invite
+          await ThreadsApi.acceptInvite(threadId: threadId, userId: userState.currentUser!.id);
+          final userSvc = context.read<UserState>();
+          final threadsState = context.read<ThreadsState>();
+          await userSvc.refreshCurrentUserFromServer();
+          await threadsState.loadThreads();
+          final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
+          for (final id in invites) {
+            await threadsState.ensureThreadSummary(id);
+          }
+          if (mounted) setState(() {});
+        }
+
+        final canAccept = !needsUsername || (usernameController.text.trim().length >= 3 && usernameError == null);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 2),
+          decoration: BoxDecoration(
+            color: AppColors.menuEntryBackground,
+            border: Border(
+              left: BorderSide(
+                color: AppColors.menuLightText.withOpacity(0.3),
+                width: 2,
+              ),
+              bottom: BorderSide(
+                color: AppColors.menuBorder,
+                width: 0.5,
+              ),
+            ),
           ),
-          bottom: BorderSide(
-            color: AppColors.menuBorder,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              // Middle info (same structure as project row)
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    // Emojis
-                    ColorFiltered(
-                      colorFilter: const ColorFilter.matrix(<double>[
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0.2126, 0.7152, 0.0722, 0, 0,
-                        0,      0,      0,      1, 0,
-                      ]),
-                      child: Text(
-                        thread?.name ?? '',
-                        style: GoogleFonts.sourceSans3(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 2.0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Checkpoint counter to the right of emojis
-                    Text(
-                      '${thread?.messageIds.length ?? 0}',
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.menuLightText,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const Spacer(),
-                    // Participant chips (or invited username)
-                    if (thread != null)
-                      _buildParticipantsChips(thread)
-                    else
-                      Container(
-                        margin: const EdgeInsets.only(left: 6),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.menuBorder.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
+          child: Material(
+            color: Colors.transparent,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // Row 1: Project info
+                  Row(
+                    children: [
+                      // Emojis
+                      ColorFiltered(
+                        colorFilter: const ColorFilter.matrix(<double>[
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0.2126, 0.7152, 0.0722, 0, 0,
+                          0,      0,      0,      1, 0,
+                        ]),
                         child: Text(
-                          'invite',
+                          thread?.name ?? '',
                           style: GoogleFonts.sourceSans3(
-                            color: AppColors.menuLightText,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 2.0,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      // Checkpoint counter
+                      Text(
+                        '${thread?.messageIds.length ?? 0}',
+                        style: GoogleFonts.sourceSans3(
+                          color: AppColors.menuLightText,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const Spacer(),
+                      // Participant chips
+                      if (thread != null)
+                        _buildParticipantsChips(thread)
+                      else
+                        Container(
+                          margin: const EdgeInsets.only(left: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.menuBorder.withOpacity(0.5),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(
+                            'invite',
+                            style: GoogleFonts.sourceSans3(
+                              color: AppColors.menuLightText,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+
+                  // Row 2 (conditional): Username creation field
+                  if (needsUsername) ...[
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.menuPrimaryButton.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(4),
+                        border: Border.all(
+                          color: AppColors.menuPrimaryButton,
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.person, color: AppColors.menuPrimaryButton, size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: TextField(
+                              controller: usernameController,
+                              style: GoogleFonts.sourceSans3(
+                                color: AppColors.menuText,
+                                fontSize: 14,
+                              ),
+                              decoration: InputDecoration(
+                                hintText: 'Create username to accept',
+                                hintStyle: GoogleFonts.sourceSans3(
+                                  color: AppColors.menuLightText,
+                                  fontSize: 14,
+                                ),
+                                errorText: usernameError,
+                                errorStyle: GoogleFonts.sourceSans3(
+                                  color: AppColors.menuErrorColor,
+                                  fontSize: 11,
+                                ),
+                                border: InputBorder.none,
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              onChanged: (value) {
+                                setLocalState(() {
+                                  usernameError = null;
+                                });
+                              },
+                            ),
+                          ),
+                          if (isUpdatingUsername)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.menuPrimaryButton,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
-                ),
+
+                  // Row 3: Action buttons
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      ActionButton(
+                        label: 'ACCEPT',
+                        background: canAccept
+                            ? AppColors.menuPrimaryButton
+                            : AppColors.menuBorder,
+                        border: canAccept
+                            ? AppColors.menuPrimaryButton
+                            : AppColors.menuBorder,
+                        textColor: canAccept
+                            ? AppColors.menuPrimaryButtonText
+                            : AppColors.menuLightText,
+                        height: 32,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        fontSize: 12,
+                        onTap: canAccept ? () => handleAccept() : null,
+                      ),
+                      const SizedBox(width: 8),
+                      ActionButton(
+                        label: 'DENY',
+                        background: AppColors.menuSecondaryButton,
+                        border: AppColors.menuSecondaryButtonBorder,
+                        textColor: AppColors.menuSecondaryButtonText,
+                        height: 32,
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        fontSize: 12,
+                        onTap: () async {
+                          await ThreadsApi.declineInvite(threadId: threadId, userId: userState.currentUser!.id);
+                          final userSvc = context.read<UserState>();
+                          final threadsState = context.read<ThreadsState>();
+                          await userSvc.refreshCurrentUserFromServer();
+                          await threadsState.loadThreads();
+                          final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
+                          for (final id in invites) {
+                            await threadsState.ensureThreadSummary(id);
+                          }
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                      const SizedBox(width: 4),
+                    ],
+                  ),
+                ],
               ),
-              // Right actions instead of timestamp (match right spacing of Recent: timer + chevron ~ 56px)
-              const SizedBox(width: 8),
-              ActionButton(
-                label: 'ACCEPT',
-                background: AppColors.menuPrimaryButton,
-                border: AppColors.menuPrimaryButton,
-                textColor: AppColors.menuPrimaryButtonText,
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                fontSize: 12,
-                onTap: () async {
-                  await ThreadsApi.acceptInvite(threadId: threadId, userId: userState.currentUser!.id);
-                  final userSvc = context.read<UserState>();
-                  final threadsState = context.read<ThreadsState>();
-                  await userSvc.refreshCurrentUserFromServer();
-                  await threadsState.loadThreads();
-                  final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
-                  for (final id in invites) {
-                    await threadsState.ensureThreadSummary(id);
-                  }
-                  if (mounted) setState(() {});
-                },
-              ),
-              const SizedBox(width: 8),
-              ActionButton(
-                label: 'DENY',
-                background: AppColors.menuSecondaryButton,
-                border: AppColors.menuSecondaryButtonBorder,
-                textColor: AppColors.menuSecondaryButtonText,
-                height: 32,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                fontSize: 12,
-                onTap: () async {
-                  await ThreadsApi.declineInvite(threadId: threadId, userId: userState.currentUser!.id);
-                  final userSvc = context.read<UserState>();
-                  final threadsState = context.read<ThreadsState>();
-                  await userSvc.refreshCurrentUserFromServer();
-                  await threadsState.loadThreads();
-                  final invites = userSvc.currentUser?.pendingInvitesToThreads ?? const [];
-                  for (final id in invites) {
-                    await threadsState.ensureThreadSummary(id);
-                  }
-                  if (mounted) setState(() {});
-                },
-              ),
-              const SizedBox(width: 4),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

@@ -39,6 +39,7 @@ import '../state/sequencer/undo_redo.dart';
 import '../state/sequencer/ui_selection.dart';
 import '../services/thread_draft_service.dart';
 import 'sequencer_settings_screen.dart';
+import '../widgets/username_creation_dialog.dart';
 
 enum _SequencerView { sequencer, thread }
 
@@ -1256,10 +1257,15 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       (u) => u.id == message.userId,
       orElse: () => ThreadUser(
         id: message.userId,
-        name: 'User ${message.userId.substring(0, 6)}',
+        name: '',
         joinedAt: DateTime.now(),
       ),
     ).name;
+
+    // Show username only if:
+    // 1. Username is not empty AND
+    // 2. Thread has multiple participants (not solo)
+    final shouldShowUsername = userName.isNotEmpty && thread.users.length > 1;
 
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
@@ -1280,16 +1286,19 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             children: [
               Row(
                 children: [
-                  Text(
-                    userName,
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.sequencerText,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      letterSpacing: 0.3,
+                  if (shouldShowUsername) ...[
+                    Text(
+                      userName,
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.sequencerText,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.3,
+                      ),
                     ),
-                  ),
-                  const Spacer(),
+                    const Spacer(),
+                  ] else
+                    const Spacer(),
                   if (message.sendStatus == SendStatus.failed && isCurrentUser) ...[
                     Icon(Icons.error, color: AppColors.sequencerAccent, size: 16),
                     const SizedBox(width: 6),
@@ -1304,7 +1313,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              if (shouldShowUsername) const SizedBox(height: 8),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1734,11 +1743,46 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   void _showInviteCollaboratorsModal(BuildContext context) {
     final thread = context.read<ThreadsState>().activeThread;
     if (thread == null) return;
+    
+    final userState = context.read<UserState>();
+    final currentUsername = userState.currentUser?.username ?? '';
+    
+    // Check if user needs to create a username first
+    if (currentUsername.isEmpty) {
+      showDialog(
+        context: context,
+        barrierDismissible: true,
+        barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
+        builder: (context) => UsernameCreationDialog(
+          title: 'Share',
+          message: 'You need to create username before you can share pattern.',
+          onSubmit: (username) async {
+            // Update username via UserState
+            final success = await userState.updateUsername(username);
+            if (success) {
+              // Close dialog and show invite link
+              if (context.mounted) {
+                Navigator.pop(context);
+                _showInviteLinkDialog(context, thread.id);
+              }
+            } else {
+              throw Exception('Failed to create username. Please try again.');
+            }
+          },
+        ),
+      );
+    } else {
+      // User already has username, show invite link directly
+      _showInviteLinkDialog(context, thread.id);
+    }
+  }
+
+  void _showInviteLinkDialog(BuildContext context, String threadId) {
     showDialog(
       context: context,
       barrierDismissible: true,
       barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
-      builder: (context) => _InviteLinkDialog(threadId: thread.id),
+      builder: (context) => _InviteLinkDialog(threadId: threadId),
     );
   }
 }

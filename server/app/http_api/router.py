@@ -13,9 +13,11 @@ from http_api.users import (
     add_to_playlist_handler,
     remove_from_playlist_handler,
     get_playlist_handler,
+    update_username_handler,
     LoginRequest,
     RegisterRequest,
     UserSessionRequest,
+    UpdateUsernameRequest,
 )
 from http_api.threads import (
     create_thread_handler,
@@ -106,6 +108,11 @@ async def remove_from_playlist(request: Request, playlist_data: Dict[str, Any] =
 async def get_playlist(request: Request, token: str = Query(...), user_id: str = Query(...)):
     """Get user's playlist"""
     return await get_playlist_handler(request, token, user_id)
+
+@router.put("/users/{user_id}/username")
+async def update_username(request: Request, user_id: str, username_data: UpdateUsernameRequest):
+    """Update user's username"""
+    return await update_username_handler(request, user_id, username_data)
 
 # Threads endpoints (new paths)
 @router.get("/threads")

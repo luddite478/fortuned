@@ -585,6 +585,32 @@ class UsersService {
     }
   }
 
+  static Future<UserProfile> updateUsername(String userId, String newUsername) async {
+    try {
+      print('Updating username for user: $userId to: $newUsername');
+
+      final response = await ApiHttpClient.put('/users/$userId/username',
+        body: {'username': newUsername},
+      );
+
+      print('Update username response status: ${response.statusCode}');
+      print('Update username response body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final jsonData = json.decode(response.body);
+        return UserProfile.fromJson(jsonData);
+      } else if (response.statusCode == 400) {
+        final jsonData = json.decode(response.body);
+        throw Exception(jsonData['detail'] ?? 'Invalid username');
+      } else {
+        throw Exception('Failed to update username: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error updating username: $e');
+      rethrow;
+    }
+  }
+
   // Legacy methods for backward compatibility
   static Future<UsersResponse> getUserProfiles({int limit = 20, int offset = 0}) {
     return getUsers(limit: limit, offset: offset);
