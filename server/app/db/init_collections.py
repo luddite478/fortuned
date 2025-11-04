@@ -65,7 +65,7 @@ COLLECTIONS_CONFIG = {
         "indexes": [
             {"fields": "id", "unique": True},
             {"fields": "email", "unique": True},
-            {"fields": "username", "unique": True},
+            {"fields": "username", "unique": False},  # Allow duplicate usernames (including empty)
             {"fields": "created_at", "unique": False},
             {"fields": "last_login", "unique": False}
         ],
