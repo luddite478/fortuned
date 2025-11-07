@@ -1,15 +1,25 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
 import '../models/thread/message.dart';
 
-/// Service for caching and managing audio files
-/// Downloads from S3 and caches locally to avoid repeated downloads
+/// Service for caching and managing audio files with LRU eviction
+/// 
+/// Features:
+/// - Downloads from S3 and caches locally
+/// - Size-based eviction (default 1GB limit)
+/// - LRU eviction (least recently used files deleted first)
+/// - Tracks access times for intelligent eviction
 class AudioCacheService {
   static final Map<String, String> _urlToLocalPathCache = {};
   static final Map<String, bool> _downloadingUrls = {};
+  
+  // Cache size limit (1GB default)
+  static const int maxCacheSizeBytes = 1 * 1024 * 1024 * 1024;
+  static const String _metadataFileName = 'audio_metadata.json';
 
   /// Get cache directory for audio files
   static Future<String> _getCacheDirectory() async {
@@ -172,11 +182,27 @@ class AudioCacheService {
     // Check cache
     final cachedPath = await getCachedPath(render.url);
     if (cachedPath != null) {
+      // Update access time for LRU
+      await _updateAudioAccessTime(render.url);
       return cachedPath;
     }
 
+    // Check cache size before downloading
+    final cacheSize = await getCacheSize();
+    if (cacheSize >= maxCacheSizeBytes) {
+      debugPrint('⚠️ [AUDIO_CACHE] Cache full, evicting old files');
+      await _evictLeastRecentlyUsedAudio();
+    }
+
     // Download and cache
-    return await downloadAndCache(render.url, onProgress: onProgress);
+    final downloadedPath = await downloadAndCache(render.url, onProgress: onProgress);
+    
+    // Track in metadata if successful
+    if (downloadedPath != null) {
+      await _updateAudioAccessTime(render.url);
+    }
+    
+    return downloadedPath;
   }
 
   /// Clear entire cache
@@ -220,5 +246,168 @@ class AudioCacheService {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
+
+  // ============================================================================
+  // LRU Eviction Methods
+  // ============================================================================
+
+  /// Get path to metadata file
+  static Future<File> _getMetadataFile() async {
+    final cacheDir = await _getCacheDirectory();
+    return File(path.join(cacheDir, _metadataFileName));
+  }
+
+  /// Load audio metadata (access times, etc.)
+  static Future<Map<String, dynamic>> _loadAudioMetadata() async {
+    try {
+      final file = await _getMetadataFile();
+      if (!await file.exists()) {
+        return {};
+      }
+
+      final content = await file.readAsString();
+      return jsonDecode(content) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('❌ [AUDIO_CACHE] Error loading metadata: $e');
+      return {};
+    }
+  }
+
+  /// Save audio metadata
+  static Future<void> _saveAudioMetadata(Map<String, dynamic> metadata) async {
+    try {
+      final file = await _getMetadataFile();
+      await file.writeAsString(jsonEncode(metadata));
+    } catch (e) {
+      debugPrint('❌ [AUDIO_CACHE] Error saving metadata: $e');
+    }
+  }
+
+  /// Update access time for a URL (for LRU tracking)
+  static Future<void> _updateAudioAccessTime(String url) async {
+    try {
+      final metadata = await _loadAudioMetadata();
+      
+      metadata[url] = {
+        'last_accessed_at': DateTime.now().toIso8601String(),
+        'access_count': (metadata[url]?['access_count'] ?? 0) + 1,
+      };
+
+      await _saveAudioMetadata(metadata);
+    } catch (e) {
+      debugPrint('❌ [AUDIO_CACHE] Error updating access time: $e');
+    }
+  }
+
+  /// Extract URL from file path
+  static String _urlFromPath(String filePath) {
+    // Simple heuristic: check if filename is in our URL cache
+    for (var entry in _urlToLocalPathCache.entries) {
+      if (entry.value == filePath) {
+        return entry.key;
+      }
+    }
+    // Fallback: use the filename
+    return path.basename(filePath);
+  }
+
+  /// Evict least recently used audio files to free up space
+  static Future<void> _evictLeastRecentlyUsedAudio() async {
+    try {
+      final metadata = await _loadAudioMetadata();
+      final cacheDir = await _getCacheDirectory();
+      final dir = Directory(cacheDir);
+
+      // Get all audio files with access times
+      final List<_AudioFileMeta> files = [];
+      await for (final entity in dir.list()) {
+        if (entity is File && 
+            entity.path.endsWith('.mp3') && 
+            !entity.path.endsWith(_metadataFileName)) {
+          final url = _urlFromPath(entity.path);
+          final lastAccessed = metadata[url]?['last_accessed_at'] != null
+              ? DateTime.parse(metadata[url]!['last_accessed_at'] as String)
+              : DateTime.fromMillisecondsSinceEpoch(0);
+
+          final size = await entity.length();
+          files.add(_AudioFileMeta(
+            file: entity,
+            url: url,
+            lastAccessed: lastAccessed,
+            size: size,
+          ));
+        }
+      }
+
+      // Sort by last accessed (oldest first)
+      files.sort((a, b) => a.lastAccessed.compareTo(b.lastAccessed));
+
+      // Delete oldest files until under limit (target 80% of limit)
+      final targetSize = (maxCacheSizeBytes * 0.8).toInt();
+      int currentSize = await getCacheSize();
+      int deletedCount = 0;
+
+      for (var fileMeta in files) {
+        if (currentSize <= targetSize) break;
+
+        await fileMeta.file.delete();
+        metadata.remove(fileMeta.url);
+        _urlToLocalPathCache.remove(fileMeta.url);
+        currentSize -= fileMeta.size;
+        deletedCount++;
+
+        debugPrint('🗑️ [AUDIO_CACHE] Evicted: ${path.basename(fileMeta.file.path)}');
+      }
+
+      // Save updated metadata
+      await _saveAudioMetadata(metadata);
+
+      debugPrint('✅ [AUDIO_CACHE] Evicted $deletedCount files, cache now ${formatCacheSize(currentSize)}');
+    } catch (e) {
+      debugPrint('❌ [AUDIO_CACHE] Error during eviction: $e');
+    }
+  }
+
+  /// Get cache statistics
+  static Future<Map<String, dynamic>> getCacheStats() async {
+    try {
+      final size = await getCacheSize();
+      final metadata = await _loadAudioMetadata();
+      final fileCount = metadata.length;
+
+      return {
+        'file_count': fileCount,
+        'size_bytes': size,
+        'size_formatted': formatCacheSize(size),
+        'limit_bytes': maxCacheSizeBytes,
+        'limit_formatted': formatCacheSize(maxCacheSizeBytes),
+        'usage_percent': ((size / maxCacheSizeBytes) * 100).toStringAsFixed(1),
+      };
+    } catch (e) {
+      return {
+        'file_count': 0,
+        'size_bytes': 0,
+        'size_formatted': '0 B',
+        'limit_bytes': maxCacheSizeBytes,
+        'limit_formatted': formatCacheSize(maxCacheSizeBytes),
+        'usage_percent': '0.0',
+      };
+    }
+  }
+}
+
+/// Internal class to hold audio file metadata for LRU eviction
+class _AudioFileMeta {
+  final File file;
+  final String url;
+  final DateTime lastAccessed;
+  final int size;
+
+  _AudioFileMeta({
+    required this.file,
+    required this.url,
+    required this.lastAccessed,
+    required this.size,
+  });
 }
 

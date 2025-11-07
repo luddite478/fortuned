@@ -9,20 +9,17 @@ import '../widgets/sequencer/v2/edit_buttons_widget.dart' as v2;
 import '../widgets/sequencer/v2/top_multitask_panel_widget.dart' as v2;
 import '../widgets/sequencer/v2/sequencer_body.dart';
 import '../widgets/sequencer/v2/value_control_overlay.dart';
-import '../widgets/sections_chain_squares.dart';
+import '../widgets/thread/v2/thread_view_widget.dart';
 import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
-import '../state/library_state.dart';
 import '../state/user_state.dart';
 import '../services/threads_service.dart';
 import '../services/snapshot/snapshot_service.dart';
-import '../services/audio_cache_service.dart';
 import '../services/http_client.dart';
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
 import '../models/thread/thread_user.dart';
 import '../models/thread/message.dart';
-import '../models/thread/thread.dart';
 // New state imports for migration
 import '../state/sequencer/table.dart';
 import '../state/sequencer/playback.dart';
@@ -81,11 +78,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   final ScrollController _threadScrollController = ScrollController();
   bool _isLoadingOlderMessages = false;
   bool _hasMoreMessages = true;
-  String? _optimisticRenderKey;
   static const int _initialMessageCount = 30;
-  final GlobalKey<AnimatedListState> _animatedListKey = GlobalKey<AnimatedListState>();
-  List<Message> _displayedMessages = [];
-  bool _hasPerformedInitialLoad = false;
   
   @override
   void initState() {
@@ -310,11 +303,6 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     
     // Load thread messages when switching to thread view
     if (newView == _SequencerView.thread) {
-      // Mark initial load as complete on first switch to thread view
-      // This prevents existing messages from animating, but allows new ones to animate
-      if (!_hasPerformedInitialLoad) {
-        _hasPerformedInitialLoad = true;
-      }
       _loadThreadMessages();
     }
   }
@@ -624,280 +612,14 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   }
 
   Widget _buildThreadView() {
-    return Container(
-      color: AppColors.sequencerSurfaceRaised, // Match sound settings background for floating effect
-      child: Consumer<ThreadsState>(
-        builder: (context, threadsState, child) {
-          final thread = threadsState.activeThread;
-          final messages = threadsState.activeThreadMessages;
-
-          if (thread == null) {
-            return Center(
-              child: Text(
-                'No active thread',
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.sequencerText,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            );
-          }
-
-          if (messages.isEmpty && threadsState.isLoadingMessages(thread.id)) {
-            return Center(
-              child: CircularProgressIndicator(color: AppColors.sequencerAccent),
-            );
-          }
-
-          // Reset displayed messages when empty
-          if (messages.isEmpty && _displayedMessages.isNotEmpty) {
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {
-                  _displayedMessages = [];
-                  // Don't reset _hasPerformedInitialLoad - we want new messages to animate
-                });
-              }
-            });
-          }
-
-          // Detect new messages and animate them in
-          _updateDisplayedMessages(messages);
-
-          final now = DateTime.now();
-          final today = DateTime(now.year, now.month, now.day);
-          final allMessagesToday = _displayedMessages.isEmpty || _displayedMessages.every((msg) {
-            final msgDate = DateTime(msg.timestamp.year, msg.timestamp.month, msg.timestamp.day);
-            return msgDate == today;
-          });
-
-          return Stack(
-            children: [
-              // Always render AnimatedList, even when empty
-              AnimatedList(
-            key: _animatedListKey,
-            controller: _threadScrollController,
-            reverse: true,
-            padding: EdgeInsets.only(
-              top: 8,
-              left: 12,
-              right: 12,
-              bottom: 52, // Extra space for floating bar
-            ),
-            initialItemCount: _displayedMessages.length + (_isLoadingOlderMessages ? 1 : 0),
-            itemBuilder: (context, index, animation) {
-              if (index == _displayedMessages.length) {
-                return Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: CircularProgressIndicator(color: AppColors.sequencerAccent),
-                  ),
-                );
-              }
-
-              // In a reversed list, index 0 is at bottom (newest)
-              // Our _displayedMessages is in normal order (oldest first), so we need to reverse
-              final reversedIndex = _displayedMessages.length - 1 - index;
-              final message = _displayedMessages[reversedIndex];
-              final isCurrentUser = message.userId == threadsState.currentUserId;
-
-              final bool needsDivider = !allMessagesToday && (
-                reversedIndex == 0 ||
-                _needsDayDivider(
-                  _displayedMessages[reversedIndex - 1].timestamp,
-                  message.timestamp,
-                )
-              );
-
-              Widget bubble = _buildMessageBubble(context, thread, message, isCurrentUser);
-
-              if (needsDivider) {
-                bubble = Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildDayDivider(message.timestamp),
-                    const SizedBox(height: 8),
-                    bubble,
-                  ],
-                );
-              }
-
-              // Animate new messages sliding up from bottom
-              // Only animate for messages at the bottom (index close to 0)
-              return _buildMessageAnimation(bubble, animation, isNewMessage: index == 0);
-            },
-          ),
-              // Show "No checkpoints yet" overlay when empty
-              if (_displayedMessages.isEmpty)
-                Positioned.fill(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          'No checkpoints yet',
-                          style: GoogleFonts.sourceSans3(
-                            color: AppColors.sequencerText,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
+    return ThreadViewWidget(
+      scrollController: _threadScrollController,
+      isLoadingOlderMessages: _isLoadingOlderMessages,
+      onShowMessageContextMenu: _showMessageContextMenu,
+      onApplyMessage: _applyMessage,
+      onAddToLibrary: _showAddToLibraryDialog,
+      onShareRender: _showShareRenderDialog,
     );
-  }
-
-  Widget _buildMessageAnimation(Widget child, Animation<double> animation, {bool isNewMessage = false}) {
-    // Only apply slide animation to new messages at the bottom
-    if (!isNewMessage) {
-      return child;
-    }
-    
-    return SlideTransition(
-      position: Tween<Offset>(
-        begin: const Offset(0, 0.3),
-        end: Offset.zero,
-      ).animate(CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutCubic,
-      )),
-      child: FadeTransition(
-        opacity: CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeIn,
-        ),
-        child: child,
-      ),
-    );
-  }
-
-  void _updateDisplayedMessages(List<Message> newMessages) {
-    // Detect new messages that need to be animated
-    if (_displayedMessages.isEmpty && newMessages.isNotEmpty && !_hasPerformedInitialLoad) {
-      // Initial load when first opening thread view - no animation
-      _displayedMessages = List.from(newMessages);
-      _hasPerformedInitialLoad = true;
-    } else if (_displayedMessages.length < newMessages.length) {
-      // New messages added - animate them
-      final animatedList = _animatedListKey.currentState;
-      
-      if (animatedList != null && _currentView == _SequencerView.thread) {
-        // Get the new messages that were added (they're at the end of newMessages list)
-        final List<Message> newlyAdded = newMessages.sublist(_displayedMessages.length);
-        
-        // Add new messages one by one with animation
-        // Since list is reversed, new messages (at end of data) appear at bottom (index 0)
-        for (int i = 0; i < newlyAdded.length; i++) {
-          final message = newlyAdded[i];
-          _displayedMessages.add(message); // Add to end of data list
-          
-          // In reversed AnimatedList, index 0 is the visual bottom (where new messages appear)
-          // The itemBuilder will use reversedIndex to get the last item from _displayedMessages
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) {
-              // Insert at index 0 which is the visual bottom in a reversed list
-              animatedList.insertItem(0, duration: const Duration(milliseconds: 350));
-            }
-          });
-        }
-      } else {
-        // AnimatedList not ready yet or not in thread view, just update the list
-        _displayedMessages = List.from(newMessages);
-      }
-    } else if (_displayedMessages.length > newMessages.length) {
-      // Messages removed (e.g., deleted) - need to properly remove from AnimatedList
-      final animatedList = _animatedListKey.currentState;
-      
-      if (animatedList != null && _currentView == _SequencerView.thread) {
-        // Get thread info before removal
-        final threadsState = Provider.of<ThreadsState>(context, listen: false);
-        final thread = threadsState.activeThread;
-        final currentUserId = threadsState.currentUserId;
-        
-        if (thread != null) {
-          // Find which message(s) were removed
-          final removedIndices = <int>[];
-          for (int i = 0; i < _displayedMessages.length; i++) {
-            final msg = _displayedMessages[i];
-            if (!newMessages.any((m) => m.id == msg.id)) {
-              removedIndices.add(i);
-            }
-          }
-          
-          // Remove items from AnimatedList (in reverse order to maintain indices)
-          for (int i = removedIndices.length - 1; i >= 0; i--) {
-            final removedIndex = removedIndices[i];
-            final removedMessage = _displayedMessages[removedIndex];
-            final isCurrentUser = removedMessage.userId == currentUserId;
-            
-            // Remove from AnimatedList with animation
-            animatedList.removeItem(
-              removedIndex,
-              (context, animation) => SizeTransition(
-                sizeFactor: animation,
-                child: FadeTransition(
-                  opacity: animation,
-                  child: _buildMessageBubble(
-                    context,
-                    thread,
-                    removedMessage,
-                    isCurrentUser,
-                  ),
-                ),
-              ),
-              duration: const Duration(milliseconds: 250),
-            );
-          }
-        }
-        
-        // Update our displayed messages list
-        _displayedMessages = List.from(newMessages);
-      } else {
-        // AnimatedList not ready or not in thread view, just update the list
-        _displayedMessages = List.from(newMessages);
-      }
-    } else {
-      // Check if messages are different (e.g., updated renders, changed content)
-      bool isDifferent = false;
-      for (int i = 0; i < newMessages.length; i++) {
-        final oldMsg = _displayedMessages[i];
-        final newMsg = newMessages[i];
-        
-        // Check if message ID changed
-        if (oldMsg.id != newMsg.id) {
-          isDifferent = true;
-          break;
-        }
-        
-        // Check if renders changed (count or content)
-        if (oldMsg.renders.length != newMsg.renders.length) {
-          isDifferent = true;
-          break;
-        }
-        
-        // Check if any render uploadStatus changed
-        for (int j = 0; j < oldMsg.renders.length; j++) {
-          if (oldMsg.renders[j].uploadStatus != newMsg.renders[j].uploadStatus ||
-              oldMsg.renders[j].id != newMsg.renders[j].id ||
-              oldMsg.renders[j].url != newMsg.renders[j].url) {
-            isDifferent = true;
-            break;
-          }
-        }
-        if (isDifferent) break;
-      }
-      
-      if (isDifferent) {
-        _displayedMessages = List.from(newMessages);
-      }
-    }
   }
 
   Widget _buildFloatingPlaybackBar() {
@@ -1246,406 +968,6 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     );
   }
 
-  // Thread message building methods
-  Widget _buildMessageBubble(
-    BuildContext context,
-    Thread thread,
-    Message message,
-    bool isCurrentUser,
-  ) {
-    final userName = thread.users.firstWhere(
-      (u) => u.id == message.userId,
-      orElse: () => ThreadUser(
-        id: message.userId,
-        name: '',
-        joinedAt: DateTime.now(),
-      ),
-    ).name;
-
-    // Show username only if:
-    // 1. Username is not empty AND
-    // 2. Thread has multiple participants (not solo)
-    final shouldShowUsername = userName.isNotEmpty && thread.users.length > 1;
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onSecondaryTapDown: (details) => _showMessageContextMenu(context, message, details.globalPosition),
-      onLongPressStart: (details) => _showMessageContextMenu(context, message, details.globalPosition),
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: Container(
-          width: double.infinity,
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceBase, // Dark gray background for message tiles
-            borderRadius: BorderRadius.circular(2),
-            border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-          ),
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  if (shouldShowUsername) ...[
-                    Text(
-                      userName,
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.sequencerText,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                    const Spacer(),
-                  ] else
-                    const Spacer(),
-                  if (message.sendStatus == SendStatus.failed && isCurrentUser) ...[
-                    Icon(Icons.error, color: AppColors.sequencerAccent, size: 16),
-                    const SizedBox(width: 6),
-                  ],
-                  Text(
-                    _formatTimestamp(message.timestamp),
-                    style: GoogleFonts.sourceSans3(
-                      color: AppColors.sequencerLightText,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ),
-              if (shouldShowUsername) const SizedBox(height: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildMessagePreviewFromMetadata(message),
-                  const SizedBox(height: 8),
-                  if (message.renders.isNotEmpty)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (final render in message.renders)
-                          _buildRenderButton(context, message, render),
-                        const SizedBox(height: 4),
-                      ],
-                    ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      if (message.renders.isNotEmpty) ...[
-                        OutlinedButton.icon(
-                          onPressed: () => _addToPlaylist(context, message.renders.first),
-                          icon: const Icon(Icons.playlist_add, size: 16),
-                          label: const Text('Add to playlist'),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.sequencerText,
-                            side: BorderSide(color: AppColors.sequencerBorder),
-                            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                            minimumSize: const Size(0, 28),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                      ],
-                      OutlinedButton(
-                        onPressed: () => _applyMessage(context, message),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.sequencerText,
-                          side: BorderSide(color: AppColors.sequencerBorder),
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
-                          minimumSize: const Size(0, 28),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        child: const Text('Load'),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessagePreviewFromMetadata(Message message) {
-    final meta = message.snapshotMetadata ?? const {};
-    final sectionsCount = (meta['sections_count'] as num?)?.toInt() ?? 0;
-    final stepsPerSectionMeta = (meta['sections_steps'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
-    final loopsMeta = (meta['sections_loops_num'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
-    final layersMeta = (meta['layers'] as List?)?.map((e) => (e as num).toInt()).toList() ?? const <int>[];
-
-    final loopsTrimmed = loopsMeta.length >= sectionsCount
-        ? loopsMeta.take(sectionsCount).toList()
-        : List<int>.from(loopsMeta)..addAll(List<int>.filled(sectionsCount - loopsMeta.length, loopsMeta.isNotEmpty ? loopsMeta.last : 4));
-
-    final int defaultLayersPerSection = (layersMeta.isNotEmpty ? layersMeta.first : 4);
-    final layersTrimmed = layersMeta.length >= sectionsCount
-        ? layersMeta.take(sectionsCount).toList()
-        : List<int>.from(layersMeta)..addAll(List<int>.filled(sectionsCount - layersMeta.length, defaultLayersPerSection));
-
-    return Container(
-      height: 80,
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised, // Dark gray background for preview
-        borderRadius: BorderRadius.circular(2),
-        border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
-        child: SectionsChainSquares(
-          loopsPerSection: loopsTrimmed,
-          layersPerSection: layersTrimmed,
-          stepsPerSection: () {
-            if (stepsPerSectionMeta.isEmpty) return null;
-            if (stepsPerSectionMeta.length >= sectionsCount) {
-              return stepsPerSectionMeta.take(sectionsCount).toList();
-            }
-            final list = List<int>.from(stepsPerSectionMeta);
-            list.addAll(List<int>.filled(sectionsCount - stepsPerSectionMeta.length, stepsPerSectionMeta.last));
-            return list;
-          }(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRenderButton(BuildContext context, Message message, Render render) {
-    final isUploading = render.uploadStatus == RenderUploadStatus.uploading;
-    final isFailed = render.uploadStatus == RenderUploadStatus.failed;
-    
-    return Consumer<AudioPlayerState>(
-      builder: (context, audioPlayer, _) {
-        final isPlaying = audioPlayer.isPlayingRender(message.id, render.id);
-        final isLoadingFromNetwork = audioPlayer.isLoadingRender(message.id, render.id);
-        final isThisRender = audioPlayer.currentlyPlayingMessageId == message.id && 
-                             audioPlayer.currentlyPlayingRenderId == render.id;
-        
-        return FutureBuilder<bool>(
-          future: (isUploading || isFailed) ? Future.value(false) : AudioCacheService.isCached(render.url),
-          builder: (context, snapshot) {
-            final renderKey = '${message.id}::${render.id}';
-            final bool isOptimistic = _optimisticRenderKey == renderKey;
-            
-            if (isOptimistic) {
-              final shouldClear = (isThisRender && isPlaying) || (!isThisRender && !isLoadingFromNetwork);
-              if (shouldClear) {
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) {
-                    setState(() { _optimisticRenderKey = null; });
-                  }
-                });
-              }
-            }
-            
-            final bool showLoading = isUploading || (isLoadingFromNetwork && !isThisRender && !isOptimistic);
-
-            return Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: BoxDecoration(
-                color: isFailed ? AppColors.sequencerAccent.withOpacity(0.1) : AppColors.sequencerSurfaceRaised, // Dark gray for render buttons
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isFailed ? AppColors.sequencerAccent : AppColors.sequencerBorder,
-                  width: 0.5,
-                ),
-              ),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: (isUploading || isFailed) ? null : () async {
-                      final player = context.read<AudioPlayerState>();
-                      if (isThisRender && isPlaying) {
-                        setState(() { _optimisticRenderKey = null; });
-                        await player.playRender(
-                          messageId: message.id,
-                          render: render,
-                        );
-                      } else {
-                        setState(() { _optimisticRenderKey = renderKey; });
-                        await player.playRender(
-                          messageId: message.id,
-                          render: render,
-                        );
-                      }
-                    },
-                    child: Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: isFailed
-                            ? AppColors.sequencerAccent
-                            : showLoading
-                                ? AppColors.sequencerBorder.withOpacity(0.5)
-                                : AppColors.sequencerText.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: isFailed
-                          ? Icon(Icons.error, color: AppColors.sequencerText, size: 16)
-                          : showLoading
-                              ? Padding(
-                                  padding: const EdgeInsets.all(6),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.sequencerLightText,
-                                    value: isLoadingFromNetwork && audioPlayer.downloadProgress > 0 
-                                        ? audioPlayer.downloadProgress 
-                                        : null,
-                                  ),
-                                )
-                              : Icon(
-                                  (isPlaying || (isOptimistic && isThisRender)) ? Icons.pause : Icons.play_arrow,
-                                  color: AppColors.sequencerPageBackground,
-                                  size: 16,
-                                ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: isFailed
-                        ? Text(
-                            'Upload failed - file too large or network error',
-                            style: GoogleFonts.sourceSans3(
-                              color: AppColors.sequencerAccent,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          )
-                        : isUploading
-                            ? Row(
-                                children: [
-                                  Text(
-                                    'Uploading...',
-                                    style: GoogleFonts.sourceSans3(
-                                      color: AppColors.sequencerLightText,
-                                      fontSize: 12,
-                                      fontStyle: FontStyle.italic,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Container(
-                                    height: 2,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.sequencerBorder.withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(1),
-                                    ),
-                                  ),
-                                ],
-                              )
-                            : isThisRender
-                                ? SliderTheme(
-                                    data: SliderThemeData(
-                                      trackHeight: 2,
-                                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                                      overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                      activeTrackColor: AppColors.sequencerText.withOpacity(0.6),
-                                      inactiveTrackColor: AppColors.sequencerBorder.withOpacity(0.3),
-                                      thumbColor: AppColors.sequencerText,
-                                      overlayColor: AppColors.sequencerText.withOpacity(0.1),
-                                    ),
-                                    child: Slider(
-                                      value: audioPlayer.duration.inMilliseconds > 0
-                                          ? audioPlayer.position.inMilliseconds.toDouble()
-                                          : 0.0,
-                                      min: 0.0,
-                                      max: audioPlayer.duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
-                                      onChanged: (value) async {
-                                        final player = context.read<AudioPlayerState>();
-                                        await player.seek(Duration(milliseconds: value.toInt()));
-                                      },
-                                    ),
-                                  )
-                                : Container(
-                                    height: 2,
-                                    decoration: BoxDecoration(
-                                      color: AppColors.sequencerBorder.withOpacity(0.3),
-                                      borderRadius: BorderRadius.circular(1),
-                                    ),
-                                  ),
-                  ),
-                ],
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  String _formatTimestamp(DateTime timestamp) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
-    
-    final timeStr = '${timestamp.hour.toString().padLeft(2, '0')}:${timestamp.minute.toString().padLeft(2, '0')}';
-    
-    if (messageDate == today) {
-      return timeStr;
-    } else if (messageDate == yesterday) {
-      return 'Yesterday at $timeStr';
-    } else {
-      return '${timestamp.day.toString().padLeft(2, '0')}/${timestamp.month.toString().padLeft(2, '0')}/${timestamp.year}, $timeStr';
-    }
-  }
-
-  bool _needsDayDivider(DateTime previous, DateTime current) {
-    final prevDate = DateTime(previous.year, previous.month, previous.day);
-    final currDate = DateTime(current.year, current.month, current.day);
-    return prevDate != currDate;
-  }
-
-  Widget _buildDayDivider(DateTime timestamp) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final yesterday = today.subtract(const Duration(days: 1));
-    final messageDate = DateTime(timestamp.year, timestamp.month, timestamp.day);
-    
-    String dateLabel;
-    if (messageDate == today) {
-      dateLabel = 'Today';
-    } else if (messageDate == yesterday) {
-      dateLabel = 'Yesterday';
-    } else {
-      final months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                     'July', 'August', 'September', 'October', 'November', 'December'];
-      dateLabel = '${timestamp.day} ${months[timestamp.month - 1]} ${timestamp.year}';
-    }
-    
-    return Row(
-      children: [
-        Expanded(
-          child: Container(
-            height: 1,
-            color: AppColors.sequencerBorder.withOpacity(0.5),
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Text(
-            dateLabel,
-            style: GoogleFonts.sourceSans3(
-              color: AppColors.sequencerLightText,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        Expanded(
-          child: Container(
-            height: 1,
-            color: AppColors.sequencerBorder.withOpacity(0.5),
-          ),
-        ),
-      ],
-    );
-  }
-
   void _showMessageContextMenu(BuildContext context, Message message, Offset globalPos) async {
     final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
     final selected = await showMenu<String>(
@@ -1670,48 +992,6 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
           ),
         );
       }
-    }
-  }
-
-  Future<void> _addToPlaylist(BuildContext context, Render render) async {
-    final userState = context.read<UserState>();
-    final userId = userState.currentUser?.id;
-    
-    if (userId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Please log in to add to playlist'),
-          backgroundColor: AppColors.menuErrorColor,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      return;
-    }
-    
-    final libraryState = context.read<LibraryState>();
-    final success = await libraryState.addToPlaylist(
-      userId: userId,
-      render: render,
-    );
-    
-    if (!mounted) return;
-    
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Added to playlist'),
-          backgroundColor: AppColors.menuOnlineIndicator,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Failed to add to playlist'),
-          backgroundColor: AppColors.menuErrorColor,
-          duration: const Duration(seconds: 2),
-        ),
-      );
     }
   }
 
@@ -1783,6 +1063,24 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       barrierDismissible: true,
       barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
       builder: (context) => _InviteLinkDialog(threadId: threadId),
+    );
+  }
+
+  void _showAddToLibraryDialog(BuildContext context, Render render) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
+      builder: (context) => _AddToLibraryDialog(render: render),
+    );
+  }
+
+  void _showShareRenderDialog(BuildContext context, Render render) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
+      builder: (context) => _ShareRenderDialog(render: render),
     );
   }
 }
@@ -1880,6 +1178,310 @@ class _InviteLinkDialog extends StatelessWidget {
                               side: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
                               padding: const EdgeInsets.symmetric(vertical: 12),
                               minimumSize: const Size(0, 44),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Dialog for adding track to library
+class _AddToLibraryDialog extends StatefulWidget {
+  final Render render;
+
+  const _AddToLibraryDialog({required this.render});
+
+  @override
+  State<_AddToLibraryDialog> createState() => _AddToLibraryDialogState();
+}
+
+class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
+  final TextEditingController _trackNameController = TextEditingController();
+  bool _isSubmitting = false;
+
+  @override
+  void dispose() {
+    _trackNameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = (size.width * 0.85).clamp(280.0, size.width);
+    final dialogHeight = (size.height * 0.35).clamp(220.0, size.height);
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints.tightFor(width: dialogWidth, height: dialogHeight),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.sequencerSurfaceRaised,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Add track to the library?',
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 24),
+                          splashRadius: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Track name',
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.sequencerLightText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _trackNameController,
+                      autofocus: true,
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.sequencerText,
+                        fontSize: 15,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'Enter track name',
+                        hintStyle: GoogleFonts.sourceSans3(
+                          color: AppColors.sequencerLightText.withOpacity(0.5),
+                          fontSize: 15,
+                        ),
+                        filled: true,
+                        fillColor: AppColors.sequencerSurfaceBase,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(6),
+                          borderSide: BorderSide(color: AppColors.sequencerAccent, width: 1),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      onSubmitted: (_) => _handleSubmit(),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.sequencerText,
+                              side: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size(0, 48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isSubmitting ? null : _handleSubmit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.sequencerAccent,
+                              foregroundColor: AppColors.sequencerText,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size(0, 48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            child: _isSubmitting
+                                ? SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      color: AppColors.sequencerText,
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Add', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _handleSubmit() {
+    final trackName = _trackNameController.text.trim();
+    if (trackName.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    // TODO: Backend logic will be implemented later
+    // For now, just show success and close
+    debugPrint('📚 Adding track to library: $trackName');
+    debugPrint('📚 Render ID: ${widget.render.id}, URL: ${widget.render.url}');
+    
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Track "$trackName" will be added (backend pending)'),
+            backgroundColor: AppColors.sequencerAccent,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    });
+  }
+}
+
+// Dialog for sharing render
+class _ShareRenderDialog extends StatelessWidget {
+  final Render render;
+
+  const _ShareRenderDialog({required this.render});
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = (size.width * 0.85).clamp(280.0, size.width);
+    final dialogHeight = (size.height * 0.35).clamp(220.0, size.height);
+    
+    final shareUrl = render.url;
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints.tightFor(width: dialogWidth, height: dialogHeight),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.sequencerSurfaceRaised,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Share Audio',
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 24),
+                          splashRadius: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Share link',
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.sequencerLightText,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.sequencerSurfaceBase,
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+                      ),
+                      child: SelectableText(
+                        shareUrl,
+                        textAlign: TextAlign.left,
+                        style: GoogleFonts.sourceCodePro(
+                          color: AppColors.sequencerText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            icon: const Icon(Icons.copy, size: 16),
+                            label: const Text('Copy Link'),
+                            onPressed: () {
+                              Clipboard.setData(ClipboardData(text: shareUrl));
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('Link copied to clipboard'),
+                                  backgroundColor: AppColors.sequencerAccent,
+                                  duration: const Duration(seconds: 1),
+                                ),
+                              );
+                            },
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.sequencerText,
+                              side: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size(0, 48),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                             ),
                           ),

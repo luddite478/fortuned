@@ -79,6 +79,24 @@ class S3Service:
         # Construct public URL: https://BUCKET.REGION.digitaloceanspaces.com/FILE_KEY
         return f"https://{self.bucket_name}.{self.endpoint_url.replace('https://', '')}/{file_key}"
     
+    def get_public_url(self, file_key: str) -> str:
+        """Alias for get_file_url"""
+        return self.get_file_url(file_key)
+    
+    def file_exists(self, file_key: str) -> bool:
+        """Check if a file exists in S3"""
+        try:
+            self.client.head_object(
+                Bucket=self.bucket_name,
+                Key=file_key
+            )
+            return True
+        except ClientError as e:
+            if e.response['Error']['Code'] == '404':
+                return False
+            logger.error(f"❌ Error checking file existence: {e}")
+            return False
+    
     def cleanup_folder(self, prefix: str) -> bool:
         """
         Delete all files in a folder (prefix) from S3

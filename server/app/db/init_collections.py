@@ -34,6 +34,7 @@ def load_json_schema(collection_name: str) -> Dict:
         'threads': os.path.join(schemas_root, 'thread', 'thread.json'),
         'samples': os.path.join(schemas_root, 'sample', 'sample.json'),
         'messages': os.path.join(schemas_root, 'thread', 'message.json'),
+        'audio_files': os.path.join(schemas_root, 'audio', 'audio.json'),
     }
 
     schema_path = collection_to_schema_path.get(collection_name)
@@ -57,6 +58,7 @@ JSON_SCHEMAS = {
     "threads": load_json_schema("threads"),
     "samples": load_json_schema("samples"),
     "messages": load_json_schema("messages"),
+    "audio_files": load_json_schema("audio_files"),
 }
 
 # Collection Schema Definitions
@@ -98,6 +100,17 @@ COLLECTIONS_CONFIG = {
             {"fields": "created_at", "unique": False}
         ],
         "schema": {k: v for k, v in JSON_SCHEMAS.get("messages", {}).get("properties", {}).items()}
+    },
+    "audio_files": {
+        "indexes": [
+            {"fields": "id", "unique": True},
+            {"fields": "url", "unique": True},  # Dedupe by URL (backward compat)
+            {"fields": "content_hash", "unique": True},  # Primary deduplication
+            {"fields": "s3_key", "unique": False},
+            {"fields": "created_at", "unique": False},
+            {"fields": "reference_count", "unique": False}
+        ],
+        "schema": {k: v for k, v in JSON_SCHEMAS.get("audio_files", {}).get("properties", {}).items()}
     }
 }
 

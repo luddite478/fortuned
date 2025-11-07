@@ -40,6 +40,7 @@ dependencies:
   just_audio: ^0.9.36
   connectivity_plus: ^7.0.0
   app_links: ^6.2.0
+  crypto: ^3.0.5
 name: fortuned
 publish_to: none
 dev_dependencies:

@@ -34,7 +34,13 @@ from http_api.threads import (
     delete_message_handler,
     attach_render_to_message_handler,
 )
-from http_api.files import upload_audio_handler
+from http_api.audio import (
+    upload_audio_handler,
+    get_audio_file_handler,
+    get_or_create_audio_handler,
+    decrement_audio_reference_handler,
+    get_audio_stats_handler,
+)
 from typing import Dict, Any
 import json
 
@@ -208,3 +214,24 @@ async def upload_audio(
 ):
     """Upload an audio file"""
     return await upload_audio_handler(request, file, token, format, bitrate, duration)
+
+# Audio files endpoints (deduplication)
+@router.get("/audio/{audio_id}")
+async def get_audio_file(request: Request, audio_id: str, token: str = Query(...)):
+    """Get audio file metadata by ID"""
+    return await get_audio_file_handler(request, audio_id, token)
+
+@router.post("/audio")
+async def get_or_create_audio(request: Request, audio_data: Dict[str, Any] = Body(...)):
+    """Get existing audio by URL or create new one (used by both messages and library)"""
+    return await get_or_create_audio_handler(request, audio_data)
+
+@router.post("/audio/decrement")
+async def decrement_audio_reference(request: Request, audio_data: Dict[str, Any] = Body(...)):
+    """Decrement reference count (called on message delete or library remove)"""
+    return await decrement_audio_reference_handler(request, audio_data)
+
+@router.get("/audio/stats")
+async def get_audio_stats(request: Request, token: str = Query(...)):
+    """Get audio deduplication statistics"""
+    return await get_audio_stats_handler(request, token)
