@@ -181,14 +181,8 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
 
   void _updateDisplayedMessages(List<Message> newMessages, ThreadsState threadsState) {
     if (_displayedMessages.isEmpty && newMessages.isNotEmpty && !_hasPerformedInitialLoad) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          setState(() {
-            _displayedMessages = List.from(newMessages);
-            _hasPerformedInitialLoad = true;
-          });
-        }
-      });
+      _displayedMessages = List.from(newMessages);
+      _hasPerformedInitialLoad = true;
     } else if (_displayedMessages.length < newMessages.length) {
       final animatedList = _animatedListKey.currentState;
       

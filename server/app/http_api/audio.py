@@ -134,8 +134,8 @@ async def upload_audio_handler(
         content_type = content_type_map.get(format, "audio/mpeg")
         
         uploaded_url = s3_service.upload_file(
-            file_content=file_data,
-            s3_key=s3_key,
+            file_data=file_data,
+            file_key=s3_key,
             content_type=content_type
         )
         
