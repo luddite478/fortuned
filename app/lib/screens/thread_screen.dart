@@ -686,6 +686,10 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   Widget _buildRenderButton(BuildContext context, Message message, Render render, {required ThreadsState threadsState}) {
     final isUploading = render.uploadStatus == RenderUploadStatus.uploading;
     final isFailed = render.uploadStatus == RenderUploadStatus.failed;
+    final hasLocalFile = render.localPath != null;
+    
+    // Allow playback if we have a local file, even during upload or after failure
+    final isPlayable = hasLocalFile || (!isUploading && !isFailed);
     
     return Consumer<AudioPlayerState>(
       builder: (context, audioPlayer, _) {
@@ -731,7 +735,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                 children: [
                   // Play/Pause/Loading/Error button
                   GestureDetector(
-                    onTap: (isUploading || isFailed) ? null : () async {
+                    onTap: !isPlayable ? null : () async {
                       final player = context.read<AudioPlayerState>();
                       if (isThisRender && isPlaying) {
                         // Pausing current render: clear optimistic flag so icon switches to play
@@ -739,6 +743,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                         await player.playRender(
                           messageId: message.id,
                           render: render,
+                          localPathIfRecorded: render.localPath,
                         );
                       } else {
                         // Starting/resuming: show pause immediately while playback starts
@@ -746,6 +751,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
                         await player.playRender(
                           messageId: message.id,
                           render: render,
+                          localPathIfRecorded: render.localPath,
                         );
                       }
                     },

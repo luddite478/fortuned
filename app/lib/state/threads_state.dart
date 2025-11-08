@@ -11,6 +11,7 @@ import '../services/threads_api.dart';
 import '../services/ws_client.dart';
 import '../services/snapshot/snapshot_service.dart';
 import '../services/upload_service.dart';
+import '../services/cache/offline_sync_service.dart';
 import 'sequencer/table.dart';
 import 'sequencer/playback.dart';
 import 'sequencer/sample_bank.dart';
@@ -47,6 +48,9 @@ class ThreadsState extends ChangeNotifier {
   final PlaybackState _playbackState;
   final SampleBankState _sampleBankState;
   RecordingState? _recordingState;
+  
+  // Callback for when a render completes uploading (used to sync with library)
+  Function(String renderId, String url)? _onRenderUploadComplete;
 
   ThreadsState({
     required WebSocketClient wsClient,
@@ -424,9 +428,10 @@ class ThreadsState extends ChangeNotifier {
         duration: _recordingState!.recordingDuration.inSeconds.toDouble(),
         createdAt: DateTime.now(),
         uploadStatus: RenderUploadStatus.uploading,
+        localPath: _recordingState!.convertedMp3Path, // LOCAL FILE for instant playback!
       );
       optimisticRenders.add(optimisticRender);
-      debugPrint('🎵 [THREADS] Created optimistic render for message');
+      debugPrint('🎵 [THREADS] Created optimistic render with local path: ${_recordingState!.convertedMp3Path}');
     }
     
     final pending = Message(
@@ -521,7 +526,10 @@ class ThreadsState extends ChangeNotifier {
         _recordingState?.setUploadError('Upload failed');
         _recordingState?.setUploading(false);
         
-        // Mark render as failed in the message
+        // Queue for retry via OfflineSyncService
+        await _queueFailedAudioUpload(messageId, mp3Path);
+        
+        // Mark render as failed in the message (but keep local file reference)
         _markRenderAsFailed(messageId);
       }
     } catch (e) {
@@ -529,8 +537,27 @@ class ThreadsState extends ChangeNotifier {
       _recordingState?.setUploadError('Upload error: $e');
       _recordingState?.setUploading(false);
       
-      // Mark render as failed in the message
+      // Queue for retry via OfflineSyncService
+      await _queueFailedAudioUpload(messageId, mp3Path);
+      
+      // Mark render as failed in the message (but keep local file reference)
       _markRenderAsFailed(messageId);
+    }
+  }
+  
+  /// Queue failed audio upload for retry
+  Future<void> _queueFailedAudioUpload(String messageId, String mp3Path) async {
+    try {
+      await OfflineSyncService.queueOperation({
+        'type': 'upload_audio',
+        'message_id': messageId,
+        'file_path': mp3Path,
+        'format': 'mp3',
+        'bitrate': 320,
+      });
+      debugPrint('⏳ [THREADS] Queued audio upload for retry: $messageId');
+    } catch (e) {
+      debugPrint('❌ [THREADS] Failed to queue audio upload: $e');
     }
   }
   
@@ -556,6 +583,12 @@ class ThreadsState extends ChangeNotifier {
     }
   }
 
+  /// Set callback for when a render completes uploading
+  /// This is used to sync with library state when an upload completes
+  void setOnRenderUploadComplete(Function(String renderId, String url)? callback) {
+    _onRenderUploadComplete = callback;
+  }
+  
   Future<void> _attachRenderToMessage(String messageId, Render render) async {
     // Update on server first
     try {
@@ -575,7 +608,13 @@ class ThreadsState extends ChangeNotifier {
         
         // Replace optimistic renders with actual uploaded render
         final nonOptimisticRenders = message.renders.where((r) => r.uploadStatus != RenderUploadStatus.uploading).toList();
-        final updatedRenders = [...nonOptimisticRenders, render.copyWith(uploadStatus: RenderUploadStatus.completed)];
+        final updatedRenders = [
+          ...nonOptimisticRenders, 
+          render.copyWith(
+            uploadStatus: RenderUploadStatus.completed,
+            localPath: null, // Clear local path - now use S3 URL
+          )
+        ];
         final updatedMessage = message.copyWith(renders: updatedRenders);
         
         list[idx] = updatedMessage;
@@ -583,6 +622,13 @@ class ThreadsState extends ChangeNotifier {
         notifyListeners();
         
         debugPrint('✅ [THREADS] Replaced optimistic render with uploaded render for message $messageId');
+        
+        // Notify library state if callback is set
+        if (_onRenderUploadComplete != null) {
+          _onRenderUploadComplete!(render.id, render.url);
+          debugPrint('📚 [THREADS] Notified library of render upload completion: ${render.id}');
+        }
+        
         break;
       }
     }

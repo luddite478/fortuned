@@ -283,14 +283,34 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                             crossAxisAlignment: CrossAxisAlignment.start,
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Text(
-                                item.name,
-                                style: GoogleFonts.sourceSans3(
-                                  color: AppColors.menuText,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      item.name,
+                                      style: GoogleFonts.sourceSans3(
+                                        color: AppColors.menuText,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  // Upload indicator
+                                  if (item.uploadStatus == RenderUploadStatus.uploading) ...[
+                                    const SizedBox(width: 4),
+                                    SizedBox(
+                                      width: 10,
+                                      height: 10,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 1.5,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          AppColors.menuLightText.withOpacity(0.5),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                               if (item.duration != null) ...[
                                 const SizedBox(height: 2),
@@ -352,11 +372,14 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
       duration: item.duration,
       sizeBytes: item.sizeBytes,
       createdAt: item.createdAt,
+      localPath: item.localPath, // For instant playback!
+      uploadStatus: item.uploadStatus,
     );
     
     await audioPlayer.playRender(
       messageId: 'playlist', // Use 'playlist' as a special message ID
       render: render,
+      localPathIfRecorded: item.localPath, // Use local file if available
     );
   }
   

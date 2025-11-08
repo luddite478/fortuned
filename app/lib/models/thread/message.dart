@@ -10,6 +10,7 @@ class Render {
   final int? sizeBytes;
   final DateTime createdAt;
   final RenderUploadStatus? uploadStatus; // Client-only
+  final String? localPath; // Client-only: local file path for immediate playback
 
   const Render({
     required this.id,
@@ -20,6 +21,7 @@ class Render {
     this.sizeBytes,
     required this.createdAt,
     this.uploadStatus,
+    this.localPath,
   });
 
   factory Render.fromJson(Map<String, dynamic> json) {
@@ -53,6 +55,7 @@ class Render {
     int? sizeBytes,
     DateTime? createdAt,
     RenderUploadStatus? uploadStatus,
+    String? localPath,
   }) {
     return Render(
       id: id ?? this.id,
@@ -63,6 +66,7 @@ class Render {
       sizeBytes: sizeBytes ?? this.sizeBytes,
       createdAt: createdAt ?? this.createdAt,
       uploadStatus: uploadStatus ?? this.uploadStatus,
+      localPath: localPath ?? this.localPath,
     );
   }
 }

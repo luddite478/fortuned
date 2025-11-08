@@ -232,14 +232,29 @@ await OfflineSyncService.processQueue();
 **Queued operations**:
 - Message creation
 - Message deletion
-- Library additions
-- (Future: more operations)
+- **Library additions** ✅
+  - Added instantly with local file
+  - Syncs to server when upload completes
+  - Playable immediately from local file
+- **Audio uploads** ✅
+  - Automatically queued when upload fails
+  - Retries when network returns
+  - Preserves local file for re-upload
 
 **Retry logic**:
 - Max 3 attempts
 - Exponential backoff (1s, 2s, 4s)
 - Remove from queue on success
 - Mark as failed after max attempts
+
+**Audio Upload Retry Flow**:
+1. Upload fails (network error, timeout)
+2. Local file preserved on device
+3. Operation queued with file path
+4. When network returns → `processQueue()` triggered
+5. Re-upload from local file
+6. Attach render to message
+7. Remove from queue on success
 
 ---
 
@@ -292,6 +307,79 @@ else:
 - Automatic deduplication across all users
 - No coordination needed between clients
 - 50%+ storage savings expected
+
+---
+
+## Instant Audio Playback
+
+When a user records and sends a message with audio, the audio is **playable immediately** from the local file while upload happens in the background.
+
+### Implementation
+
+**1. Optimistic Render with Local Path**:
+
+```dart
+// threads_state.dart - sendMessageFromSequencer()
+final optimisticRender = Render(
+  id: 'temp_${timestamp}',
+  url: '', // Empty until uploaded
+  format: 'mp3',
+  uploadStatus: RenderUploadStatus.uploading,
+  localPath: mp3Path, // ← LOCAL FILE for instant playback!
+);
+```
+
+**2. Audio Player Uses Local Path First**:
+
+```dart
+// When playing a render, pass the localPath
+await player.playRender(
+  messageId: message.id,
+  render: render,
+  localPathIfRecorded: render.localPath, // ← Use local file if available
+);
+```
+
+**3. Background Upload**:
+
+```dart
+// Upload happens in background (does NOT block playback)
+unawaited(_uploadRecordingInBackground(messageId, mp3Path));
+
+// On upload success:
+// - Update render with S3 URL
+// - Change uploadStatus to completed
+// - Remove localPath (now use S3)
+
+// On upload failure:
+// - Mark uploadStatus as failed (show red indicator)
+// - Keep localPath (audio still playable!)
+// - Queue for automatic retry
+```
+
+### User Experience
+
+✅ **Record → Send → Play Immediately**  
+- No waiting for upload
+- Audio plays from local file instantly
+- **NO upload indicator shown** (plays immediately!)
+
+✅ **Upload in Background**  
+- Upload happens silently
+- If successful: S3 URL replaces local file seamlessly
+- If failed: red indicator shown, auto-retry queued
+- Audio remains playable throughout
+
+✅ **Add to Library → Play Immediately**  
+- Audio added to library instantly (even if still uploading)
+- **Plays from local file** immediately
+- Small upload indicator shown in library (doesn't block playback)
+- Syncs to server when upload completes
+
+✅ **Offline-First**  
+- Full functionality without internet
+- Uploads sync when online
+- Audio always playable from local file
 
 ---
 
@@ -402,6 +490,10 @@ Future<void> sendMessage({
 ConnectivityPlus().onConnectivityChanged.listen((result) {
   if (result != ConnectivityResult.none) {
     // Back online - process queued operations
+    // This includes:
+    // - Failed message sends
+    // - Failed audio uploads
+    // - Failed library additions
     OfflineSyncService.processQueue();
   }
 });
@@ -410,9 +502,28 @@ ConnectivityPlus().onConnectivityChanged.listen((result) {
 @override
 void didChangeAppLifecycleState(AppLifecycleState state) {
   if (state == AppLifecycleState.resumed) {
+    // Process any pending operations (including audio uploads)
     OfflineSyncService.processQueue();
   }
 }
+```
+
+### Example: Audio Upload with Auto-Retry
+
+```dart
+// Record and send message
+await sendMessageFromSequencer(threadId: threadId);
+// Audio upload happens in background
+// If network fails:
+// 1. Audio marked as "failed" in UI
+// 2. Upload queued for retry
+// 3. Local file preserved
+
+// When network returns:
+await OfflineSyncService.processQueue();
+// Automatically retries all failed uploads
+// Max 3 attempts per upload
+// Render updated in message on success
 ```
 
 ---
@@ -489,9 +600,16 @@ class SnapshotsCacheService {
 ```dart
 class OfflineSyncService {
   /// Process queued operations
+  /// Handles: messages, audio uploads, library operations
   static Future<void> processQueue();
 
   /// Queue operation for later
+  /// Supported types:
+  /// - 'create_message'
+  /// - 'delete_message'
+  /// - 'add_playlist'
+  /// - 'remove_playlist'
+  /// - 'upload_audio' (NEW)
   static Future<void> queueOperation({
     required String type,
     required Map<String, dynamic> data,
@@ -499,6 +617,9 @@ class OfflineSyncService {
 
   /// Get pending operations count
   static Future<int> getPendingCount();
+
+  /// Get queue status with breakdown by type
+  static Future<Map<String, dynamic>> getQueueStatus();
 
   /// Clear queue
   static Future<void> clearQueue();
@@ -577,6 +698,18 @@ class AudioCacheService {
 4. Enable internet
 5. Call processQueue()
 6. All 3 sync to server
+```
+
+#### Test 6: Audio Upload Retry
+```
+1. Turn on airplane mode
+2. Record audio and send message
+3. Message appears, audio shows "uploading"
+4. After timeout, audio shows "failed"
+5. Turn off airplane mode
+6. Call OfflineSyncService.processQueue()
+7. Audio upload retries automatically
+8. Render updates in message on success
 ```
 
 ### Automated Tests
@@ -717,6 +850,38 @@ await OfflineSyncService.processQueue();
 // Check pending count
 final pending = await OfflineSyncService.getPendingCount();
 print('Pending operations: $pending');
+
+// Get detailed queue status
+final status = await OfflineSyncService.getQueueStatus();
+print('Queue status: $status');
+// Example output:
+// {
+//   'total': 3,
+//   'by_type': {
+//     'upload_audio': 2,
+//     'create_message': 1
+//   },
+//   'has_pending': true
+// }
+```
+
+### Issue: Audio upload failed and stuck
+
+```dart
+// Check if audio upload is in queue
+final status = await OfflineSyncService.getQueueStatus();
+if (status['by_type']['upload_audio'] > 0) {
+  print('${status['by_type']['upload_audio']} audio uploads pending');
+  
+  // Retry manually
+  await OfflineSyncService.processQueue();
+}
+
+// If still failing after 3 attempts:
+// 1. Check if local file still exists
+// 2. Check network connectivity
+// 3. Check server logs for errors
+// 4. File will be removed from queue after 3 failed attempts
 ```
 
 ### Issue: Audio cache full
@@ -754,8 +919,11 @@ curl "http://your-server/api/v1/audio/stats?token=$TOKEN"
 ### What You Get ✅
 
 - **Instant UI**: All data loads from cache immediately
+- **Instant audio playback**: Play recordings immediately from local file
+- **Instant library adds**: Add to library instantly, plays while uploading
 - **Background sync**: Server updates happen without blocking
 - **Offline support**: Queue operations, process when online
+- **Audio upload retry**: Failed uploads automatically retry (max 3 attempts)
 - **Efficient storage**: LRU eviction for snapshots & audio
 - **Audio deduplication**: 50%+ server storage savings
 - **Simple API**: Just call the services, everything else is automatic
@@ -769,6 +937,7 @@ curl "http://your-server/api/v1/audio/stats?token=$TOKEN"
 | Snapshots caching | ✅ Ready | LRU (30 max) |
 | Audio caching | ✅ Ready | Size LRU (1GB) |
 | Offline queue | ✅ Ready | Auto-retry with backoff |
+| Audio upload retry | ✅ Ready | **NEW**: Auto-queue failed uploads |
 | Audio deduplication | ✅ Ready | Content-based S3 keys |
 | Aggressive deletion | ✅ Ready | Delete when count = 0 |
 

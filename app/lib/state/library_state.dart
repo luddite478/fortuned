@@ -133,9 +133,13 @@ class LibraryState extends ChangeNotifier {
   
   /// Load playlist once on app startup
   Future<void> loadPlaylist({required String userId}) async {
-    // If already loaded, don't reload
-    if (_hasLoaded) {
-      debugPrint('📚 [LIBRARY] Playlist already loaded (${_playlist.length} items)');
+    // If already loaded or has items (from optimistic updates), don't reload
+    if (_hasLoaded || _playlist.isNotEmpty) {
+      debugPrint('📚 [LIBRARY] Playlist already loaded or has items (${_playlist.length} items)');
+      if (!_hasLoaded) {
+        // Mark as loaded if we have items from optimistic updates
+        _hasLoaded = true;
+      }
       return;
     }
     
@@ -171,7 +175,11 @@ class LibraryState extends ChangeNotifier {
                     'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     final name = '${months[now.month - 1]} ${now.day}, ${now.year}';
     
-    // Create playlist item
+    // Determine if render is still uploading
+    final isUploading = render.uploadStatus == RenderUploadStatus.uploading || 
+                       render.url.isEmpty;
+    
+    // Create playlist item with localPath for instant playback
     final item = PlaylistItem(
       name: name,
       url: render.url,
@@ -182,13 +190,84 @@ class LibraryState extends ChangeNotifier {
       sizeBytes: render.sizeBytes,
       createdAt: render.createdAt,
       type: 'render',
+      localPath: render.localPath, // For instant playback!
+      uploadStatus: isUploading ? render.uploadStatus : null,
     );
     
     // Optimistically add to local list
     _playlist = [item, ..._playlist];
     notifyListeners();
     
-    // Sync to server in background
+    debugPrint('📚 [LIBRARY] Added to local playlist: ${render.id} (${isUploading ? "uploading" : "ready"})');
+    
+    // Only sync to server if URL is available (not uploading)
+    if (!isUploading && render.url.isNotEmpty) {
+      try {
+        final success = await _addToPlaylistOnServer(
+          userId: userId,
+          render: render,
+        );
+        
+        if (!success) {
+          // Rollback on failure
+          _playlist = _playlist.where((i) => i.id != item.id).toList();
+          notifyListeners();
+          return false;
+        }
+        
+        return true;
+      } catch (e) {
+        // Rollback on error
+        _playlist = _playlist.where((i) => i.id != item.id).toList();
+        notifyListeners();
+        debugPrint('❌ [LIBRARY] Failed to add to playlist: $e');
+        return false;
+      }
+    } else {
+      // Item added locally, will sync when upload completes
+      debugPrint('📚 [LIBRARY] Item queued for server sync when upload completes');
+      return true;
+    }
+  }
+  
+  /// Update playlist item when render upload completes
+  Future<void> updateItemAfterUpload({
+    required String userId,
+    required String renderId,
+    required String url,
+  }) async {
+    // Find the item
+    final index = _playlist.indexWhere((i) => i.id == renderId);
+    if (index == -1) {
+      debugPrint('📚 [LIBRARY] Item not found for update: $renderId');
+      return;
+    }
+    
+    final oldItem = _playlist[index];
+    
+    // Update with URL and remove upload status
+    final updatedItem = oldItem.copyWith(
+      url: url,
+      uploadStatus: RenderUploadStatus.completed,
+      // Keep localPath for now (will be cleaned up by cache service)
+    );
+    
+    _playlist = List.from(_playlist)..[index] = updatedItem;
+    notifyListeners();
+    
+    debugPrint('📚 [LIBRARY] Updated item with URL: $renderId');
+    
+    // Now sync to server with the URL
+    final render = Render(
+      id: updatedItem.id,
+      url: updatedItem.url,
+      format: updatedItem.format,
+      bitrate: updatedItem.bitrate,
+      duration: updatedItem.duration,
+      sizeBytes: updatedItem.sizeBytes,
+      createdAt: updatedItem.createdAt,
+    );
+    
     try {
       final success = await _addToPlaylistOnServer(
         userId: userId,
@@ -196,19 +275,10 @@ class LibraryState extends ChangeNotifier {
       );
       
       if (!success) {
-        // Rollback on failure
-        _playlist = _playlist.where((i) => i.id != item.id).toList();
-        notifyListeners();
-        return false;
+        debugPrint('⚠️ [LIBRARY] Failed to sync to server, but keeping in local library');
       }
-      
-      return true;
     } catch (e) {
-      // Rollback on error
-      _playlist = _playlist.where((i) => i.id != item.id).toList();
-      notifyListeners();
-      debugPrint('❌ [LIBRARY] Failed to add to playlist: $e');
-      return false;
+      debugPrint('⚠️ [LIBRARY] Error syncing to server: $e');
     }
   }
   

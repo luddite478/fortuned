@@ -1259,16 +1259,7 @@ class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Track name',
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.sequencerLightText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 10),
                     TextField(
                       controller: _trackNameController,
                       autofocus: true,

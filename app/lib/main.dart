@@ -112,6 +112,31 @@ class _MainPageState extends State<MainPage> {
     _initDeepLinks();
     // Remove the immediate call to _syncCurrentUser() since it will be called
     // reactively when UserState completes loading
+    
+    // Set up callback for syncing library when render uploads complete
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _setupLibrarySyncCallback();
+    });
+  }
+  
+  void _setupLibrarySyncCallback() {
+    final threadsState = context.read<ThreadsState>();
+    final libraryState = context.read<LibraryState>();
+    final userState = context.read<UserState>();
+    
+    // Set callback to update library when renders complete uploading
+    threadsState.setOnRenderUploadComplete((renderId, url) async {
+      final userId = userState.currentUser?.id;
+      if (userId != null) {
+        await libraryState.updateItemAfterUpload(
+          userId: userId,
+          renderId: renderId,
+          url: url,
+        );
+      }
+    });
+    
+    debugPrint('📚 [MAIN] Set up library sync callback for render uploads');
   }
 
   Future<void> _initDeepLinks() async {

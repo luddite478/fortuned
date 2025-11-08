@@ -536,6 +536,10 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
   Widget _buildRenderButton(BuildContext context, Message message, Render render) {
     final isUploading = render.uploadStatus == RenderUploadStatus.uploading;
     final isFailed = render.uploadStatus == RenderUploadStatus.failed;
+    final hasLocalFile = render.localPath != null;
+    
+    // Allow playback if we have a local file, even during upload or after failure
+    final isPlayable = hasLocalFile || (!isUploading && !isFailed);
     
     return Consumer<AudioPlayerState>(
       builder: (context, audioPlayer, _) {
@@ -561,7 +565,8 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
               }
             }
             
-            final bool showLoading = isUploading || (isLoadingFromNetwork && !isThisRender && !isOptimistic);
+            // Don't show loading if we have a local file (instant playback!)
+            final bool showLoading = (isUploading && !hasLocalFile) || (isLoadingFromNetwork && !isThisRender && !isOptimistic);
 
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
@@ -576,19 +581,21 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
               child: Row(
                 children: [
                   GestureDetector(
-                    onTap: (isUploading || isFailed) ? null : () async {
+                    onTap: !isPlayable ? null : () async {
                       final player = context.read<AudioPlayerState>();
                       if (isThisRender && isPlaying) {
                         setState(() { _optimisticRenderKey = null; });
                         await player.playRender(
                           messageId: message.id,
                           render: render,
+                          localPathIfRecorded: render.localPath,
                         );
                       } else {
                         setState(() { _optimisticRenderKey = renderKey; });
                         await player.playRender(
                           messageId: message.id,
                           render: render,
+                          localPathIfRecorded: render.localPath,
                         );
                       }
                     },
@@ -690,17 +697,17 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                   ),
                   const SizedBox(width: 12),
                   GestureDetector(
-                    onTap: (isUploading || isFailed) ? null : () => widget.onAddToLibrary(context, render),
+                    onTap: !isPlayable ? null : () => widget.onAddToLibrary(context, render),
                     child: Icon(
                       Icons.playlist_add,
-                      color: (isUploading || isFailed) 
+                      color: !isPlayable
                           ? AppColors.sequencerLightText.withOpacity(0.3)
                           : AppColors.sequencerText,
                       size: 26,
                     ),
                   ),
                   const SizedBox(width: 12),
-                  _buildShareButton(context, message, render, isUploading, isFailed),
+                  _buildShareButton(context, message, render, isPlayable),
                 ],
               ),
             );
@@ -714,8 +721,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
     BuildContext context,
     Message message,
     Render render,
-    bool isUploading,
-    bool isFailed,
+    bool isPlayable,
   ) {
     final renderKey = '${message.id}::${render.id}';
     final isDownloadingForShare = _downloadingShareRenderKey == renderKey;
@@ -733,7 +739,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
     }
 
     return GestureDetector(
-      onTap: (isUploading || isFailed)
+      onTap: !isPlayable
           ? null
           : () async {
               // Check if file is cached
@@ -751,6 +757,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                   await audioPlayer.playRender(
                     messageId: message.id,
                     render: render,
+                    localPathIfRecorded: render.localPath,
                   );
                   // Stop playback immediately after download completes
                   await audioPlayer.stop();
@@ -781,7 +788,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
             },
       child: Icon(
         Icons.link,
-        color: (isUploading || isFailed)
+        color: !isPlayable
             ? AppColors.sequencerLightText.withOpacity(0.3)
             : AppColors.sequencerText,
         size: 22,

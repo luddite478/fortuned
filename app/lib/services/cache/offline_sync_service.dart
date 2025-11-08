@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../http_client.dart';
+import '../upload_service.dart';
 import 'local_cache_service.dart';
 
 /// Manages offline operation queue and syncing
@@ -109,6 +111,9 @@ class OfflineSyncService {
 
       case 'remove_playlist':
         return await _syncRemovePlaylist(operation);
+      
+      case 'upload_audio':
+        return await _syncUploadAudio(operation);
 
       default:
         debugPrint('⚠️ [OFFLINE_SYNC] Unknown operation type: $type');
@@ -173,6 +178,58 @@ class OfflineSyncService {
     } catch (e) {
       debugPrint('❌ [OFFLINE_SYNC] Remove playlist failed: $e');
       return false;
+    }
+  }
+  
+  /// Sync audio upload operation
+  static Future<bool> _syncUploadAudio(Map<String, dynamic> op) async {
+    try {
+      final messageId = op['message_id'] as String;
+      final filePath = op['file_path'] as String;
+      final format = op['format'] as String? ?? 'mp3';
+      final bitrate = op['bitrate'] as int? ?? 320;
+      
+      // Check if file still exists
+      final file = File(filePath);
+      if (!await file.exists()) {
+        debugPrint('❌ [OFFLINE_SYNC] Audio file no longer exists: $filePath');
+        return true; // File gone, remove from queue (success = remove)
+      }
+      
+      debugPrint('🔄 [OFFLINE_SYNC] Retrying audio upload for message $messageId');
+      
+      // Upload audio
+      final render = await UploadService.uploadAudio(
+        filePath: filePath,
+        format: format,
+        bitrate: bitrate,
+      );
+      
+      if (render == null) {
+        debugPrint('❌ [OFFLINE_SYNC] Audio upload failed, will retry');
+        return false; // Failed, keep in queue for retry
+      }
+      
+      debugPrint('✅ [OFFLINE_SYNC] Audio uploaded successfully: ${render.url}');
+      
+      // Attach render to message
+      final attachResponse = await ApiHttpClient.post(
+        '/messages/$messageId/renders',
+        body: {
+          'render': render.toJson(),
+        },
+      );
+      
+      if (attachResponse.statusCode == 200) {
+        debugPrint('✅ [OFFLINE_SYNC] Render attached to message $messageId');
+        return true; // Success, remove from queue
+      } else {
+        debugPrint('❌ [OFFLINE_SYNC] Failed to attach render: ${attachResponse.statusCode}');
+        return false; // Keep in queue for retry
+      }
+    } catch (e) {
+      debugPrint('❌ [OFFLINE_SYNC] Upload audio failed: $e');
+      return false; // Keep in queue for retry
     }
   }
 
