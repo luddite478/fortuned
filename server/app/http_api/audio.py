@@ -144,11 +144,35 @@ async def upload_audio_handler(
         
         logger.info(f"✅ Uploaded to S3: {s3_key}")
         
-        # Return upload result (client will call POST /audio to register)
+        # Create audio_files record immediately after upload
+        db = get_database()
+        audio_id = str(ObjectId())
+        audio_file = {
+            "schema_version": 1,
+            "id": audio_id,
+            "url": uploaded_url,
+            "s3_key": s3_key,
+            "content_hash": content_hash,
+            "format": format,
+            "reference_count": 0,
+            "size_bytes": file_size,
+            "created_at": datetime.utcnow().isoformat() + "Z"
+        }
+        
+        if bitrate:
+            audio_file["bitrate"] = bitrate
+        if duration:
+            audio_file["duration"] = duration
+        
+        db.audio_files.insert_one(audio_file)
+        logger.info(f"✅ Created audio_files record: {audio_id}")
+        
+        # Return upload result with audio_file_id
         return {
             "url": uploaded_url,
             "s3_key": s3_key,
             "content_hash": content_hash,
+            "audio_file_id": audio_id,
             "size_bytes": file_size,
             "format": format,
             "status": "uploaded",

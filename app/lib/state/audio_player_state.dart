@@ -4,6 +4,12 @@ import '../models/thread/message.dart';
 import '../services/audio_cache_service.dart';
 // import '../sequencer_library.dart';
 
+enum LoopMode {
+  off,        // No looping
+  single,     // Loop single track
+  playlist,   // Loop whole playlist
+}
+
 /// State for playing audio from messages (renders)
 /// Uses just_audio for full playback control with seeking
 class AudioPlayerState extends ChangeNotifier {
@@ -19,11 +25,16 @@ class AudioPlayerState extends ChangeNotifier {
   Duration _position = Duration.zero;
   String? _lastLoadedFilePath;
   
-  // Simple loop mode - just on/off for current track
-  bool _isLooping = false;
+  // Loop modes: off, single track, or playlist
+  LoopMode _loopMode = LoopMode.off;
   
-  // Callback for when track completes and needs to advance
+  // Shuffle mode
+  bool _shuffleEnabled = false;
+  
+  // Callbacks for track navigation
   VoidCallback? _onTrackCompleted;
+  VoidCallback? _onNextTrack;
+  VoidCallback? _onPreviousTrack;
 
   AudioPlayerState() {
     _setupListeners();
@@ -61,11 +72,14 @@ class AudioPlayerState extends ChangeNotifier {
   }
   
   void _handleTrackCompletion() {
-    if (_isLooping) {
+    if (_loopMode == LoopMode.single) {
       // Replay current track
       _reloadAndPlay();
+    } else if (_loopMode == LoopMode.playlist) {
+      // Advance to next track (or loop to start)
+      _onTrackCompleted?.call();
     } else {
-      // Notify parent to handle next track (or stop if no callback)
+      // No loop - just advance to next or stop
       _onTrackCompleted?.call();
     }
   }
@@ -81,17 +95,53 @@ class AudioPlayerState extends ChangeNotifier {
   String? get error => _error;
   Duration get duration => _duration;
   Duration get position => _position;
-  bool get isLooping => _isLooping;
+  LoopMode get loopMode => _loopMode;
+  bool get shuffleEnabled => _shuffleEnabled;
   
-  // Set track completion callback (for auto-advance)
+  // Set callbacks for track navigation
   void setTrackCompletionCallback(VoidCallback? callback) {
     _onTrackCompleted = callback;
   }
   
-  // Toggle loop on/off
-  void toggleLoop() {
-    _isLooping = !_isLooping;
+  void setNextTrackCallback(VoidCallback? callback) {
+    _onNextTrack = callback;
+  }
+  
+  void setPreviousTrackCallback(VoidCallback? callback) {
+    _onPreviousTrack = callback;
+  }
+  
+  // Cycle through loop modes: off -> single -> playlist -> off
+  void toggleLoopMode() {
+    switch (_loopMode) {
+      case LoopMode.off:
+        _loopMode = LoopMode.single;
+        break;
+      case LoopMode.single:
+        _loopMode = LoopMode.playlist;
+        break;
+      case LoopMode.playlist:
+        _loopMode = LoopMode.off;
+        break;
+    }
     notifyListeners();
+  }
+  
+  // Toggle shuffle mode
+  void toggleShuffle() {
+    _shuffleEnabled = !_shuffleEnabled;
+    debugPrint('🔀 Shuffle ${_shuffleEnabled ? "enabled" : "disabled"}');
+    notifyListeners();
+  }
+  
+  // Trigger next track
+  void playNext() {
+    _onNextTrack?.call();
+  }
+  
+  // Trigger previous track
+  void playPrevious() {
+    _onPreviousTrack?.call();
   }
 
   bool isPlayingRender(String messageId, String renderId) {

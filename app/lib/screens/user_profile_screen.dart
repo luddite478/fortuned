@@ -219,7 +219,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
               ),
             ),
           ),
-          const BottomAudioPlayer(showLoopButton: true),
+          const BottomAudioPlayer(),
         ],
       ),
     ),

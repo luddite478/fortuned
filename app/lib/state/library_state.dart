@@ -56,15 +56,21 @@ class LibraryState extends ChangeNotifier {
   
   /// Add item to server
   Future<bool> _addToPlaylistOnServer({
-    required String userId,
+required String userId,
     required Render render,
+    String? customName,
   }) async {
     try {
-      // Format name as "Oct 5, 2025"
-      final now = DateTime.now();
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      final name = '${months[now.month - 1]} ${now.day}, ${now.year}';
+      // Use custom name if provided, otherwise format as "Oct 5, 2025"
+      final String name;
+      if (customName != null && customName.isNotEmpty) {
+        name = customName;
+      } else {
+        final now = DateTime.now();
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        name = '${months[now.month - 1]} ${now.day}, ${now.year}';
+      }
       
       // Convert render to playlist item format
       final playlistItem = {
@@ -168,12 +174,18 @@ class LibraryState extends ChangeNotifier {
   Future<bool> addToPlaylist({
     required String userId,
     required Render render,
+    String? customName,
   }) async {
-    // Format name as "Oct 5, 2025"
-    final now = DateTime.now();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    final name = '${months[now.month - 1]} ${now.day}, ${now.year}';
+    // Use custom name if provided, otherwise format as "Oct 5, 2025"
+    final String name;
+    if (customName != null && customName.isNotEmpty) {
+      name = customName;
+    } else {
+      final now = DateTime.now();
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      name = '${months[now.month - 1]} ${now.day}, ${now.year}';
+    }
     
     // Determine if render is still uploading
     final isUploading = render.uploadStatus == RenderUploadStatus.uploading || 
@@ -206,6 +218,7 @@ class LibraryState extends ChangeNotifier {
         final success = await _addToPlaylistOnServer(
           userId: userId,
           render: render,
+          customName: customName,
         );
         
         if (!success) {

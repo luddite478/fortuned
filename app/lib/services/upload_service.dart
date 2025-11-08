@@ -61,6 +61,7 @@ class UploadService {
         // Log upload result
         final status = json['status'] ?? 'unknown';
         final s3Key = json['s3_key'] ?? 'unknown';
+        final audioFileId = json['audio_file_id'] ?? 'MISSING';
         
         if (status == 'existing') {
           debugPrint('♻️  [UPLOAD] File already exists on server (deduplicated)');
@@ -70,8 +71,11 @@ class UploadService {
           debugPrint('📍 [UPLOAD] S3 key: $s3Key');
         }
         
+        debugPrint('🆔 [UPLOAD] Audio file ID: $audioFileId');
+        
         final render = Render.fromJson(json);
         debugPrint('🎵 [UPLOAD] Render URL: ${render.url}');
+        debugPrint('🎵 [UPLOAD] Render ID: ${render.id}');
         return render;
       } else {
         debugPrint('❌ [UPLOAD] Upload failed: ${response.statusCode} - ${response.body}');

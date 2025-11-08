@@ -37,6 +37,7 @@ import '../state/sequencer/ui_selection.dart';
 import '../services/thread_draft_service.dart';
 import 'sequencer_settings_screen.dart';
 import '../widgets/username_creation_dialog.dart';
+import '../state/library_state.dart';
 
 enum _SequencerView { sequencer, thread }
 
@@ -1343,7 +1344,7 @@ class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
     );
   }
 
-  void _handleSubmit() {
+  void _handleSubmit() async {
     final trackName = _trackNameController.text.trim();
     if (trackName.isEmpty) {
       return;
@@ -1353,23 +1354,83 @@ class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
       _isSubmitting = true;
     });
 
-    // TODO: Backend logic will be implemented later
-    // For now, just show success and close
-    debugPrint('📚 Adding track to library: $trackName');
-    debugPrint('📚 Render ID: ${widget.render.id}, URL: ${widget.render.url}');
-    
-    Future.delayed(const Duration(milliseconds: 500), () {
-      if (mounted) {
-        Navigator.of(context).pop();
+    try {
+      // Get user ID
+      final userState = context.read<UserState>();
+      final userId = userState.currentUser?.id;
+      
+      if (userId == null) {
+        if (mounted) {
+          setState(() {
+            _isSubmitting = false;
+          });
+          Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please log in to add to library'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      
+      debugPrint('📚 [ADD_TO_LIBRARY] Track: $trackName');
+      debugPrint('📚 [ADD_TO_LIBRARY] Render ID: "${widget.render.id}"');
+      debugPrint('📚 [ADD_TO_LIBRARY] Render URL: ${widget.render.url}');
+      
+      // Check for empty ID issue
+      if (widget.render.id.isEmpty) {
+        debugPrint('⚠️ [ADD_TO_LIBRARY] ERROR: Render has EMPTY ID! Cannot add to library properly.');
+        debugPrint('⚠️ [ADD_TO_LIBRARY] This will cause all tracks to be highlighted when playing.');
+      }
+      
+      // Add to library using LibraryState
+      final libraryState = context.read<LibraryState>();
+      final success = await libraryState.addToPlaylist(
+        userId: userId,
+        render: widget.render,
+        customName: trackName,
+      );
+      
+      if (!mounted) return;
+      
+      Navigator.of(context).pop();
+      
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Track "$trackName" will be added (backend pending)'),
+            content: Text('Track "$trackName" added to library'),
             backgroundColor: AppColors.sequencerAccent,
             duration: const Duration(seconds: 2),
           ),
         );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add to library'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
-    });
+    } catch (e) {
+      debugPrint('❌ Error adding to library: $e');
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to add to library'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 }
 

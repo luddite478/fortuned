@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +11,7 @@ import '../models/thread/message.dart';
 import '../state/audio_player_state.dart';
 import '../state/library_state.dart';
 import '../state/user_state.dart';
+import '../services/audio_cache_service.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({Key? key}) : super(key: key);
@@ -57,17 +59,33 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
   }
   
   void _setupAudioPlayerCallback() {
-    if (_isCallbackActive) return; // Don't set up if already active
+    if (_isCallbackActive) return;
     
-    // Set up callback for auto-advance when track completes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       final audioPlayer = context.read<AudioPlayerState>();
+      
+      // Track completion callback
       audioPlayer.setTrackCompletionCallback(() {
+        if (mounted && _isCallbackActive) {
+          _playNextTrack(autoAdvance: true);
+        }
+      });
+      
+      // Next track callback
+      audioPlayer.setNextTrackCallback(() {
         if (mounted && _isCallbackActive) {
           _playNextTrack();
         }
       });
+      
+      // Previous track callback
+      audioPlayer.setPreviousTrackCallback(() {
+        if (mounted && _isCallbackActive) {
+          _playPreviousTrack();
+        }
+      });
+      
       _isCallbackActive = true;
     });
   }
@@ -78,35 +96,98 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
     try {
       final audioPlayer = context.read<AudioPlayerState>();
       audioPlayer.setTrackCompletionCallback(null);
+      audioPlayer.setNextTrackCallback(null);
+      audioPlayer.setPreviousTrackCallback(null);
       _isCallbackActive = false;
     } catch (_) {}
   }
   
-  void _playNextTrack() {
+  void _playNextTrack({bool autoAdvance = false}) {
     final libraryState = context.read<LibraryState>();
     final audioPlayer = context.read<AudioPlayerState>();
     final playlist = libraryState.playlist;
     
     if (playlist.isEmpty) return;
     
-    // Find current track index
     final currentRenderId = audioPlayer.currentlyPlayingRenderId;
     if (currentRenderId == null) return;
     
     final currentIndex = playlist.indexWhere((item) => item.id == currentRenderId);
     if (currentIndex == -1) return;
     
-    // Move to next track (or just pause at the end, don't close player)
-    final nextIndex = currentIndex + 1;
-    if (nextIndex >= playlist.length) {
-      // Just pause - keep the player visible
-      audioPlayer.pause();
+    int nextIndex;
+    
+    // If shuffle is enabled, pick a random track (excluding current)
+    if (audioPlayer.shuffleEnabled && playlist.length > 1) {
+      do {
+        nextIndex = (DateTime.now().millisecondsSinceEpoch % playlist.length);
+      } while (nextIndex == currentIndex);
+    } else {
+      // Normal sequential playback
+      nextIndex = currentIndex + 1;
+      
+      // Handle end of playlist
+      if (nextIndex >= playlist.length) {
+        if (autoAdvance && audioPlayer.loopMode == LoopMode.playlist) {
+          // Loop back to start
+          nextIndex = 0;
+        } else {
+          // Just pause at the end
+          audioPlayer.pause();
+          return;
+        }
+      }
+    }
+    
+    final nextItem = playlist[nextIndex];
+    _playPlaylistItem(nextItem);
+  }
+  
+  void _playPreviousTrack() {
+    final libraryState = context.read<LibraryState>();
+    final audioPlayer = context.read<AudioPlayerState>();
+    final playlist = libraryState.playlist;
+    
+    if (playlist.isEmpty) return;
+    
+    final currentRenderId = audioPlayer.currentlyPlayingRenderId;
+    if (currentRenderId == null) return;
+    
+    final currentIndex = playlist.indexWhere((item) => item.id == currentRenderId);
+    if (currentIndex == -1) return;
+    
+    // If more than 3 seconds into track, restart current track
+    if (audioPlayer.position.inSeconds > 3) {
+      audioPlayer.seek(Duration.zero);
       return;
     }
     
-    // Play next track
-    final nextItem = playlist[nextIndex];
-    _playPlaylistItem(nextItem);
+    int prevIndex;
+    
+    // If shuffle is enabled, pick a random track (excluding current)
+    if (audioPlayer.shuffleEnabled && playlist.length > 1) {
+      do {
+        prevIndex = (DateTime.now().millisecondsSinceEpoch % playlist.length);
+      } while (prevIndex == currentIndex);
+    } else {
+      // Normal sequential playback
+      prevIndex = currentIndex - 1;
+      
+      // Handle start of playlist
+      if (prevIndex < 0) {
+        if (audioPlayer.loopMode == LoopMode.playlist) {
+          // Loop to end
+          prevIndex = playlist.length - 1;
+        } else {
+          // Just restart current track
+          audioPlayer.seek(Duration.zero);
+          return;
+        }
+      }
+    }
+    
+    final prevItem = playlist[prevIndex];
+    _playPlaylistItem(prevItem);
   }
   
   @override
@@ -189,7 +270,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
             ),
           ),
           // Audio player at the bottom
-          const BottomAudioPlayer(showLoopButton: true),
+          const BottomAudioPlayer(),
         ],
       ),
       ),
@@ -328,14 +409,22 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                         
                         const SizedBox(width: 8),
                         
-                        // Share button
+                        // Share button (disabled if still uploading or invalid URL)
                         IconButton(
                           icon: Icon(
                             Icons.share,
-                            color: AppColors.menuLightText,
+                            color: (item.uploadStatus == RenderUploadStatus.uploading || 
+                                   item.url.isEmpty || 
+                                   !item.url.startsWith('http'))
+                                ? AppColors.menuLightText.withOpacity(0.3)
+                                : AppColors.menuLightText,
                             size: 20,
                           ),
-                          onPressed: () => _sharePlaylistItem(item),
+                          onPressed: (item.uploadStatus == RenderUploadStatus.uploading || 
+                                     item.url.isEmpty || 
+                                     !item.url.startsWith('http'))
+                              ? null
+                              : () => _sharePlaylistItem(item),
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(
                             minWidth: 40,
@@ -362,6 +451,11 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
   
   Future<void> _playPlaylistItem(PlaylistItem item) async {
     final audioPlayer = context.read<AudioPlayerState>();
+    
+    // Debug: Only log when ID issues detected
+    if (item.id.isEmpty) {
+      debugPrint('⚠️ [LIBRARY] Playing item "${item.name}" with EMPTY ID!');
+    }
     
     // Create a minimal Render object for playback
     final render = Render(
@@ -462,11 +556,86 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
   
   Future<void> _sharePlaylistItem(PlaylistItem item) async {
     try {
-      // Share the URL of the audio file with the item name
-      await Share.share(
-        item.url,
+      // Check if track is still uploading
+      if (item.uploadStatus == RenderUploadStatus.uploading) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Track is still uploading. Please wait...'),
+              backgroundColor: AppColors.menuBorder,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      
+      // Check if URL is valid
+      if (item.url.isEmpty || !item.url.startsWith('http')) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Track URL is not available'),
+              backgroundColor: Colors.red.shade900,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+      
+      // Get local file path - check cache first, download if needed
+      String? localPath = item.localPath;
+      
+      // If not in localPath, check if it's cached
+      if (localPath == null || !await File(localPath).exists()) {
+        localPath = await AudioCacheService.getCachedPath(item.url);
+      }
+      
+      // If still not available, download it with progress dialog
+      if (localPath == null || !await File(localPath).exists()) {
+        if (!mounted) return;
+        
+        // Show downloading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (BuildContext dialogContext) {
+            return _DownloadingDialog(trackName: item.name);
+          },
+        );
+        
+        // Download from S3
+        localPath = await AudioCacheService.downloadAndCache(item.url);
+        
+        // Close downloading dialog
+        if (mounted) {
+          Navigator.of(context, rootNavigator: true).pop();
+        }
+        
+        if (localPath == null) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: const Text('Failed to download track'),
+                backgroundColor: Colors.red.shade900,
+                duration: const Duration(seconds: 2),
+              ),
+            );
+          }
+          return;
+        }
+      }
+      
+      // Share the actual audio file (not just URL)
+      final xFile = XFile(localPath);
+      await Share.shareXFiles(
+        [xFile],
         subject: item.name,
+        text: item.name,
       );
+      
+      debugPrint('✅ [LIBRARY] Shared file: $localPath');
     } catch (e) {
       debugPrint('❌ Failed to share playlist item: $e');
       if (mounted) {
@@ -509,6 +678,62 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// Downloading dialog widget
+class _DownloadingDialog extends StatelessWidget {
+  final String trackName;
+  
+  const _DownloadingDialog({required this.trackName});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: AppColors.menuPageBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Spinner
+            SizedBox(
+              width: 40,
+              height: 40,
+              child: CircularProgressIndicator(
+                color: AppColors.menuText,
+                strokeWidth: 3,
+              ),
+            ),
+            const SizedBox(height: 20),
+            // Message
+            Text(
+              'Downloading track',
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.menuText,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              trackName,
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.menuLightText,
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -26,7 +26,8 @@ class Render {
 
   factory Render.fromJson(Map<String, dynamic> json) {
     return Render(
-      id: json['id'] ?? '',
+      // Support both 'audio_file_id' (from upload endpoint) and 'id' (from database)
+      id: json['audio_file_id'] ?? json['id'] ?? '',
       url: json['url'] ?? '',
       format: json['format'] ?? 'mp3',
       bitrate: json['bitrate'],
