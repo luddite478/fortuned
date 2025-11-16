@@ -75,7 +75,7 @@ class _SequencerScreenV1State extends State<SequencerScreenV1> with WidgetsBindi
     _soundSettingsState = SoundSettingsState();
     _uiSelectionState = UiSelectionState();
     _recordingState = RecordingState();
-    _recordingState.attachPanelState(_multitaskPanelState);
+    _recordingState.setOnRecordingComplete(() => _onRecordingComplete());
     _editState = EditState(_tableState, _uiSelectionState);
     _sectionSettingsState = SectionSettingsState();
     _sliderOverlayState = SliderOverlayState();
@@ -205,6 +205,29 @@ class _SequencerScreenV1State extends State<SequencerScreenV1> with WidgetsBindi
           _isInitialLoading = false;
         });
       }
+    }
+  }
+
+  void _onRecordingComplete() {
+    debugPrint('🎵 [SEQUENCER_V1] Recording complete, auto-saving as message...');
+    final threadsState = context.read<ThreadsState>();
+    final activeThread = threadsState.activeThread;
+    
+    if (activeThread != null) {
+      threadsState.sendMessageFromSequencer(threadId: activeThread.id).then((_) {
+        debugPrint('✅ [SEQUENCER_V1] Recording auto-saved successfully');
+      }).catchError((e) {
+        debugPrint('❌ [SEQUENCER_V1] Failed to auto-save recording: $e');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Failed to save recording'),
+              backgroundColor: AppColors.sequencerAccent,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      });
     }
   }
 

@@ -115,135 +115,139 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 }
                 
                 return Expanded(
-                  child: Column(
+                  child: Stack(
                     children: [
-              // Projects List
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Projects content
-                    Expanded(
-                      child: _error != null
-                          ? Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.error_outline, color: AppColors.menuLightText, size: 48),
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    _error!, 
-                                    style: GoogleFonts.sourceSans3(
-                                      color: AppColors.menuLightText,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 12),
-                                  ElevatedButton(
-                                    onPressed: () {
-                                      _loadProjects();
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: AppColors.menuButtonBackground,
-                                    ),
-                                    child: Text(
-                                      'RETRY',
-                                      style: GoogleFonts.sourceSans3(
-                                        color: AppColors.menuText,
-                                        fontWeight: FontWeight.bold,
-                                        letterSpacing: 1.0,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : Consumer<ThreadsState>(
-                                builder: (context, threadsState, child) {
-                                  final projects = [...threadsState.threads]
-                                    ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-                                  
-                                  if (projects.isEmpty) {
-                                    return const SizedBox.shrink(); // Show nothing when no projects
-                                  }
-                                  
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      // Invites section (if current user has pending invites)
-                                      Consumer2<UserState, ThreadsState>(
-                                        builder: (context, userState, threadsState, _) {
-                                          final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
-                                          if (invites.isEmpty) return const SizedBox.shrink();
-                                          // Ensure missing invite thread summaries are loaded
-                                          final existingIds = threadsState.threads.map((t) => t.id).toSet();
-                                          final missing = invites.where((id) => !existingIds.contains(id)).toList();
-                                          if (missing.isNotEmpty) {
-                                            WidgetsBinding.instance.addPostFrameCallback((_) async {
-                                              for (final id in missing) {
-                                                try { await threadsState.ensureThreadSummary(id); } catch (_) {}
-                                              }
-                                              if (mounted) setState(() {});
-                                            });
-                                          }
-                                          return Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
+                      Column(
+                        children: [
+                          // Projects List
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Projects content
+                                Expanded(
+                                  child: _error != null
+                                      ? Center(
+                                          child: Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
-                                              Padding(
-                                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                              Icon(Icons.error_outline, color: AppColors.menuLightText, size: 48),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                _error!, 
+                                                style: GoogleFonts.sourceSans3(
+                                                  color: AppColors.menuLightText,
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              ElevatedButton(
+                                                onPressed: () {
+                                                  _loadProjects();
+                                                },
+                                                style: ElevatedButton.styleFrom(
+                                                  backgroundColor: AppColors.menuButtonBackground,
+                                                ),
                                                 child: Text(
-                                                  'INVITES',
+                                                  'RETRY',
                                                   style: GoogleFonts.sourceSans3(
                                                     color: AppColors.menuText,
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w600,
-                                                    letterSpacing: 1.5,
+                                                    fontWeight: FontWeight.bold,
+                                                    letterSpacing: 1.0,
                                                   ),
                                                 ),
                                               ),
-                                              ...invites.map((id) {
-                                                final t = threadsState.threads.firstWhere(
-                                                  (x) => x.id == id,
-                                                  orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
-                                                );
-                                                return _buildInviteCard(t.users.isEmpty ? null : t, userState, id);
-                                              }).toList(),
                                             ],
-                                          );
-                                        },
-                                      ),
-                                      // Recent header - only show when there are projects
-                                      Padding(
-                                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-                                        child: Text(
-                                          'RECENT',
-                                          style: GoogleFonts.sourceSans3(
-                                            color: AppColors.menuText,
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: 1.5,
                                           ),
-                                        ),
-                                      ),
-                                      
-                                      // Projects list
-                                      Expanded(
-                                        child: ListView.builder(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                                          itemCount: projects.length,
-                                          itemBuilder: (context, index) {
-                                            return _buildProjectCard(projects[index]);
-                                          },
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                    ),
-                  ],
-                ),
-              ),
+                                        )
+                                      : Consumer<ThreadsState>(
+                                            builder: (context, threadsState, child) {
+                                              final projects = [...threadsState.threads]
+                                                ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+                                              
+                                              if (projects.isEmpty) {
+                                                return const SizedBox.shrink(); // Show nothing when no projects
+                                              }
+                                              
+                                              return Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                children: [
+                                                  // Invites section (if current user has pending invites)
+                                                  Consumer2<UserState, ThreadsState>(
+                                                    builder: (context, userState, threadsState, _) {
+                                                      final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
+                                                      if (invites.isEmpty) return const SizedBox.shrink();
+                                                      // Ensure missing invite thread summaries are loaded
+                                                      final existingIds = threadsState.threads.map((t) => t.id).toSet();
+                                                      final missing = invites.where((id) => !existingIds.contains(id)).toList();
+                                                      if (missing.isNotEmpty) {
+                                                        WidgetsBinding.instance.addPostFrameCallback((_) async {
+                                                          for (final id in missing) {
+                                                            try { await threadsState.ensureThreadSummary(id); } catch (_) {}
+                                                          }
+                                                          if (mounted) setState(() {});
+                                                        });
+                                                      }
+                                                      return Column(
+                                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                                        children: [
+                                                          Padding(
+                                                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                                            child: Text(
+                                                              'INVITES',
+                                                              style: GoogleFonts.sourceSans3(
+                                                                color: AppColors.menuText,
+                                                                fontSize: 13,
+                                                                fontWeight: FontWeight.w600,
+                                                                letterSpacing: 1.5,
+                                                              ),
+                                                            ),
+                                                          ),
+                                                          ...invites.map((id) {
+                                                            final t = threadsState.threads.firstWhere(
+                                                              (x) => x.id == id,
+                                                              orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                                                            );
+                                                            return _buildInviteCard(t.users.isEmpty ? null : t, userState, id);
+                                                          }).toList(),
+                                                        ],
+                                                      );
+                                                    },
+                                                  ),
+                                                  // Recent header - only show when there are projects
+                                                  Padding(
+                                                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                                                    child: Text(
+                                                      'RECENT',
+                                                      style: GoogleFonts.sourceSans3(
+                                                        color: AppColors.menuText,
+                                                        fontSize: 13,
+                                                        fontWeight: FontWeight.w600,
+                                                        letterSpacing: 1.5,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  
+                                                  // Projects list
+                                                  Expanded(
+                                                    child: ListView.builder(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                                      itemCount: projects.length,
+                                                      itemBuilder: (context, index) {
+                                                        return _buildProjectCard(projects[index]);
+                                                      },
+                                                    ),
+                                                  ),
+                                                ],
+                                              );
+                                            },
+                                          ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
                       // Show subtle refresh indicator when refreshing in background
                       if (threadsState.isRefreshing && threadsState.hasLoaded)
                         Positioned(
@@ -806,7 +810,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             ),
           ),
           content: Text(
-            'Are you sure you want to delete this project? This will delete it for all participants.',
+            'Are you sure you want to delete this pattern? This will delete it for all participants.',
             style: GoogleFonts.sourceSans3(
               color: AppColors.menuLightText,
               fontSize: 14,

@@ -107,6 +107,9 @@ class PlaybackState extends ChangeNotifier {
   int _currentSectionLoopsNum = 4;
   bool _initialized = false;
   
+  // Developer settings (UI-only, not synced from native)
+  bool _enhancedPlaybackLogging = false;
+  
   // ValueNotifiers for UI binding
   final ValueNotifier<int> currentStepNotifier = ValueNotifier<int>(0);
   final ValueNotifier<bool> isPlayingNotifier = ValueNotifier<bool>(false);
@@ -393,6 +396,7 @@ class PlaybackState extends ChangeNotifier {
   int get currentSectionLoop => _currentSectionLoop;
   int get currentSectionLoopsNum => _currentSectionLoopsNum;
   bool get initialized => _initialized;
+  bool get enhancedPlaybackLogging => _enhancedPlaybackLogging;
 
   /// Get loops count for all sections as a list (length = sectionsCount)
   List<int> getSectionsLoopsNum() {
@@ -406,6 +410,23 @@ class PlaybackState extends ChangeNotifier {
       }
     } catch (_) {}
     return result;
+  }
+  
+  /// Set enhanced playback logging (for debugging)
+  void setEnhancedPlaybackLogging(bool enabled) {
+    if (_enhancedPlaybackLogging == enabled) return;
+    _enhancedPlaybackLogging = enabled;
+    
+    if (_initialized) {
+      try {
+        _playback_ffi.playbackSetEnhancedLogging(enabled ? 1 : 0);
+        debugPrint('🐛 [PLAYBACK_STATE] Enhanced playback logging ${enabled ? "enabled" : "disabled"}');
+      } catch (e) {
+        debugPrint('⚠️ [PLAYBACK_STATE] Failed to set enhanced logging: $e');
+      }
+    }
+    
+    notifyListeners();
   }
   
   @override

@@ -139,6 +139,10 @@ void table_append_section(int steps, int copy_from_section, int undo_record);
 __attribute__((visibility("default"))) __attribute__((used))
 void table_delete_section(int section_index, int undo_record);
 
+// Section reordering (move section from one position to another)
+__attribute__((visibility("default"))) __attribute__((used))
+void table_reorder_section(int from_index, int to_index, int undo_record);
+
 // Return a stable pointer to the native TableState (prefix-mapped by Dart)
 __attribute__((visibility("default"))) __attribute__((used))
 const TableState* table_get_state_ptr(void);

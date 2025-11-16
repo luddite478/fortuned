@@ -13,7 +13,6 @@ import '../../sequencer/v2/message_sections_chain.dart';
 typedef MessageContextMenuCallback = void Function(BuildContext context, Message message, Offset globalPosition);
 typedef ApplyMessageCallback = void Function(BuildContext context, Message message);
 typedef AddToLibraryCallback = void Function(BuildContext context, Render render);
-typedef ShareRenderCallback = void Function(BuildContext context, Render render);
 
 class ThreadViewWidget extends StatefulWidget {
   final ScrollController scrollController;
@@ -21,7 +20,6 @@ class ThreadViewWidget extends StatefulWidget {
   final MessageContextMenuCallback onShowMessageContextMenu;
   final ApplyMessageCallback onApplyMessage;
   final AddToLibraryCallback onAddToLibrary;
-  final ShareRenderCallback onShareRender;
 
   const ThreadViewWidget({
     super.key,
@@ -30,7 +28,6 @@ class ThreadViewWidget extends StatefulWidget {
     required this.onShowMessageContextMenu,
     required this.onApplyMessage,
     required this.onAddToLibrary,
-    required this.onShareRender,
   });
 
   @override
@@ -40,15 +37,54 @@ class ThreadViewWidget extends StatefulWidget {
 class _ThreadViewWidgetState extends State<ThreadViewWidget> {
   final GlobalKey<AnimatedListState> _animatedListKey = GlobalKey<AnimatedListState>();
   List<Message> _displayedMessages = [];
-  bool _hasPerformedInitialLoad = false;
   String? _optimisticRenderKey;
-  String? _downloadingShareRenderKey;
+  String? _highlightedRenderKey; // Track newly added recording for highlight
   
   // Configurable chat alignment percentages
   static const double singleUserLeftMarginPercent = 0.02; // 2% left margin for single user
   static const double currentUserLeftMarginPercent = 0.02; // 2% left margin for current user (multi-user)
   static const double otherUserRightMarginPercent = 0.02; // 2% right margin for other users
-  static const double layer3WidthPercent = 0.95; // Layer 3 (sections + buttons) is 95% of message width
+  static const double layer3WidthPercent = 0.975; // Layer 3 (sections + buttons) is 90% of message width
+  
+  // Color controls for all 3 message levels
+  static const Color messageHeaderColor = Color.fromARGB(255, 76, 76, 76); // Layer 1: Header background color
+  static const Color messageRenderColor = Color.fromARGB(255, 70, 67, 67); // Layer 2: Render player background color
+  static const Color messageChainContainerColor = Color.fromARGB(255, 239, 236, 236); // Layer 3: Chain+buttons container background color
+  static const double messageChainContainerOpacity = 0.1; // Opacity of chain+buttons container (0.0 to 1.0)
+  
+  // Chain divider controls
+  static const Color chainDividerColor = Color.fromARGB(255, 95, 95, 95); // Light gray color for section dividers
+  static const double chainDividerWidth = 1.0; // Width of dividers
+  static const bool showChainDividers = true; // Enable/disable dividers
+  static const int chainDividerSpacingLayers = 4; // Number of layers to use for calculating divider spacing (default: 4 layers)
+    
+  // Padding controls
+  static const double chainInternalVerticalPadding = 2.0; // Vertical padding inside chain rectangles (top and bottom of numbers)
+  static const double chainContainerHeight = 40.0; // Height of the chain container
+  
+  // Padding controls for chain element inside yellow container (top, left, bottom, right)
+  static const double chainElementPaddingTop = 7.0;
+  static const double chainElementPaddingLeft = 10.0;
+  static const double chainElementPaddingBottom = 0.0;
+  static const double chainElementPaddingRight = 10.0;
+  
+  // Padding controls for buttons inside yellow container (top, left, bottom, right)
+  static const double buttonsPaddingTop = 2.0;
+  static const double buttonsPaddingBottom = 1.0;
+  static const double buttonsPaddingLeft = 10.0;
+  static const double buttonsPaddingRight = 10.0;
+  
+  // Button color controls
+  static const Color notesButtonBackgroundColor = Color.fromARGB(255, 86, 86, 82); // Notes button background color
+  static const Color notesButtonForegroundColor = AppColors.sequencerLightText; // Notes button text color
+  static const double notesButtonForegroundOpacity = 0.5; // Notes button text opacity (0.0 to 1.0)
+  static const Color loadButtonBackgroundColor = Color.fromARGB(255, 84, 84, 81); // Load button background color
+  static const Color loadButtonForegroundColor = AppColors.sequencerText; // Load button text color
+  
+  // Spacing between messages
+  static const double messageSpacing = 16.0;
+ 
+
 
   @override
   Widget build(BuildContext context) {
@@ -180,10 +216,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
   }
 
   void _updateDisplayedMessages(List<Message> newMessages, ThreadsState threadsState) {
-    if (_displayedMessages.isEmpty && newMessages.isNotEmpty && !_hasPerformedInitialLoad) {
-      _displayedMessages = List.from(newMessages);
-      _hasPerformedInitialLoad = true;
-    } else if (_displayedMessages.length < newMessages.length) {
+    if (_displayedMessages.length < newMessages.length) {
       final animatedList = _animatedListKey.currentState;
       
       if (animatedList != null) {
@@ -193,14 +226,56 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
           final message = newlyAdded[i];
           _displayedMessages.add(message);
           
+          // Highlight new recordings (defer to avoid setState during build)
+          if (message.renders.isNotEmpty) {
+            final render = message.renders.first;
+            final renderKey = '${message.id}::${render.id}';
+            
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {
+                  _highlightedRenderKey = renderKey;
+                });
+                
+                // Clear highlight after 3 seconds
+                Future.delayed(const Duration(seconds: 3), () {
+                  if (mounted && _highlightedRenderKey == renderKey) {
+                    setState(() {
+                      _highlightedRenderKey = null;
+                    });
+                  }
+                });
+              }
+            });
+          }
+          
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
               animatedList.insertItem(0, duration: const Duration(milliseconds: 350));
+              
+              // Scroll to show the new message at the bottom (position 0 in reverse list)
+              // Delay slightly to ensure the animation has started and the item has height
+              Future.delayed(const Duration(milliseconds: 50), () {
+                if (mounted && widget.scrollController.hasClients) {
+                  widget.scrollController.animateTo(
+                    0.0,
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOut,
+                  );
+                }
+              });
             }
           });
         }
       } else {
+        // AnimatedList not ready yet, just set messages directly
         _displayedMessages = List.from(newMessages);
+        // Scroll to bottom once AnimatedList is ready
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && widget.scrollController.hasClients) {
+            widget.scrollController.jumpTo(0.0);
+          }
+        });
       }
     } else if (_displayedMessages.length > newMessages.length) {
       final animatedList = _animatedListKey.currentState;
@@ -348,137 +423,185 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
             margin: EdgeInsets.only(
               left: leftMargin,
               right: rightMargin,
-              bottom: 8,
+              bottom: messageSpacing,
             ),
             child: Column(
-              crossAxisAlignment: isMultiUser && !isCurrentUser 
-                  ? CrossAxisAlignment.start 
-                  : CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Solid message container with all 3 layers
+                // Layer 1: Header (username + timestamp) - darker background, full width
                 Container(
                   decoration: BoxDecoration(
-                    color: AppColors.sequencerSurfaceBase,
-                    borderRadius: BorderRadius.circular(2),
-                    border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Layer 1: Header (username + timestamp)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-                        child: Row(
-                          children: [
-                            if (shouldShowUsername) ...[
-                              Text(
-                                userName,
-                                style: GoogleFonts.sourceSans3(
-                                  color: AppColors.sequencerText,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w600,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                              const Spacer(),
-                            ] else
-                              const Spacer(),
-                            if (message.sendStatus == SendStatus.failed && isCurrentUser) ...[
-                              Icon(Icons.error, color: AppColors.sequencerAccent, size: 16),
-                              const SizedBox(width: 6),
-                            ],
-                            Text(
-                              _formatTimestamp(message.timestamp),
-                              style: GoogleFonts.sourceSans3(
-                                color: AppColors.sequencerLightText,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      // Layer 2: Optional render audio bar (directly under header, no gap)
-                      if (message.renders.isNotEmpty)
-                        for (final render in message.renders)
-                          Container(
-                            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-                            child: _buildRenderButton(context, message, render),
+                    color: messageHeaderColor,
+                    borderRadius: message.renders.isEmpty 
+                        ? const BorderRadius.only(
+                            topLeft: Radius.circular(2),
+                            topRight: Radius.circular(2),
+                            bottomLeft: Radius.circular(2),
+                            bottomRight: Radius.circular(2),
+                          )
+                        : const BorderRadius.only(
+                            topLeft: Radius.circular(2),
+                            topRight: Radius.circular(2),
                           ),
-                      
-                      // Layer 3: Sections chain + buttons (slightly narrower)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                        child: LayoutBuilder(
-                          builder: (context, innerConstraints) {
-                            final layer3Width = innerConstraints.maxWidth * layer3WidthPercent;
-                            final layer3LeftMargin = (innerConstraints.maxWidth - layer3Width) / 2;
-                            
-                            return Container(
-                              margin: EdgeInsets.only(left: layer3LeftMargin, right: layer3LeftMargin),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  _buildMessagePreviewFromMetadata(message),
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: null,
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF2A2D30),
-                                            foregroundColor: AppColors.sequencerLightText.withOpacity(0.5),
-                                            disabledBackgroundColor: const Color(0xFF2A2D30),
-                                            disabledForegroundColor: AppColors.sequencerLightText.withOpacity(0.5),
-                                            elevation: 0,
-                                            shadowColor: Colors.black.withOpacity(0.1),
-                                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                            minimumSize: const Size(0, 40),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Comment',
-                                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Expanded(
-                                        child: ElevatedButton(
-                                          onPressed: () => widget.onApplyMessage(context, message),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: const Color(0xFF2A2D30),
-                                            foregroundColor: AppColors.sequencerText,
-                                            elevation: 0,
-                                            shadowColor: Colors.black.withOpacity(0.1),
-                                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                                            minimumSize: const Size(0, 40),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(4),
-                                            ),
-                                          ),
-                                          child: const Text(
-                                            'Load',
-                                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
+                    border: Border(
+                      left: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                      top: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                      right: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                      bottom: message.renders.isEmpty 
+                          ? BorderSide(color: AppColors.sequencerBorder, width: 0.5)
+                          : BorderSide.none, // No bottom border to connect with render element
+                    ),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      if (shouldShowUsername) ...[
+                        Text(
+                          userName,
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      if (message.sendStatus == SendStatus.failed && isCurrentUser) ...[
+                        Icon(Icons.error, color: AppColors.sequencerAccent, size: 16),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        _formatTimestamp(message.timestamp),
+                        style: GoogleFonts.sourceSans3(
+                          color: const Color.fromARGB(255, 240, 238, 230),
+                          fontSize: 13,
+                          fontWeight: FontWeight.w400,
                         ),
                       ),
                     ],
                   ),
+                ),
+                
+                // Layer 2: Optional render audio bar - darker but not as dark as header, full width
+                if (message.renders.isNotEmpty)
+                  for (final render in message.renders)
+                    Container(
+                      decoration: BoxDecoration(
+                        color: messageRenderColor,
+                        borderRadius: BorderRadius.zero, // No radius, connects seamlessly
+                        border: Border(
+                          left: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                          right: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                          top: BorderSide.none, // No top border to connect with header
+                          bottom: BorderSide.none, // No bottom border to connect with chain element
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Symmetric vertical padding for centering
+                      child: Center(
+                        child: _buildRenderButton(context, message, render),
+                      ),
+                    ),
+                
+                // Layer 3: Sections chain + buttons (90% width, shifted based on user)
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bottomElementWidth = constraints.maxWidth * layer3WidthPercent;
+                    // Move the entire parent container: right for current user, left for other participants
+                    return Align(
+                      alignment: isCurrentUser ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        width: bottomElementWidth,
+                      decoration: BoxDecoration(
+                        color: messageChainContainerColor.withOpacity(messageChainContainerOpacity),
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(2),
+                          bottomRight: Radius.circular(2),
+                        ),
+                        border: Border(
+                          left: BorderSide(color: AppColors.sequencerBorder.withOpacity(messageChainContainerOpacity), width: 0.5),
+                          right: BorderSide(color: AppColors.sequencerBorder.withOpacity(messageChainContainerOpacity), width: 0.5),
+                          bottom: BorderSide(color: AppColors.sequencerBorder.withOpacity(messageChainContainerOpacity), width: 0.5),
+                          top: BorderSide.none, // No top border to connect with render element
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Chain element with controllable padding
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: chainElementPaddingTop,
+                              left: chainElementPaddingLeft,
+                              bottom: chainElementPaddingBottom,
+                              right: chainElementPaddingRight,
+                            ),
+                            child: _buildMessagePreviewFromMetadata(message),
+                          ),
+                          // Buttons row with controllable padding
+                          Padding(
+                            padding: EdgeInsets.only(
+                              top: buttonsPaddingTop,
+                              left: buttonsPaddingLeft,
+                              bottom: buttonsPaddingBottom,
+                              right: buttonsPaddingRight,
+                            ),
+                            child: Row(
+                              children: [
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: notesButtonBackgroundColor,
+                                    foregroundColor: notesButtonForegroundColor.withOpacity(notesButtonForegroundOpacity),
+                                    disabledBackgroundColor: notesButtonBackgroundColor,
+                                    disabledForegroundColor: notesButtonForegroundColor.withOpacity(notesButtonForegroundOpacity),
+                                    elevation: 0,
+                                    shadowColor: Colors.black.withOpacity(0.1),
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                    minimumSize: const Size(0, 32),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Notes',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width:  8),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () => widget.onApplyMessage(context, message),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: loadButtonBackgroundColor,
+                                    foregroundColor: loadButtonForegroundColor,
+                                    elevation: 0,
+                                    shadowColor: Colors.black.withOpacity(0.1),
+                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                    minimumSize: const Size(0, 32),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    'Load',
+                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                  ),
+                                ),
+                              ),
+                            ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -515,21 +638,23 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
     }();
 
     return Container(
-      height: 80,
+      height: chainContainerHeight, // Controllable height of chain container
       decoration: BoxDecoration(
         color: AppColors.sequencerSurfaceRaised,
         borderRadius: BorderRadius.circular(2),
         border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(8),
         child: MessageSectionsChain(
           sectionsCount: sectionsCount,
           stepsPerSection: stepsPerSectionTrimmed,
           loopsPerSection: loopsTrimmed,
           layersPerSection: layersTrimmed,
+          verticalPadding: chainInternalVerticalPadding, // Controllable vertical padding inside chain rectangles
+          dividerColor: chainDividerColor, // Light gray dividers
+          dividerWidth: chainDividerWidth, // Divider width
+          showDividers: showChainDividers, // Enable/disable dividers
+          dividerSpacingLayers: chainDividerSpacingLayers, // Number of layers for divider spacing
         ),
-      ),
     );
   }
 
@@ -537,6 +662,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
     final isUploading = render.uploadStatus == RenderUploadStatus.uploading;
     final isFailed = render.uploadStatus == RenderUploadStatus.failed;
     final hasLocalFile = render.localPath != null;
+    final isConverting = hasLocalFile && render.localPath!.endsWith('.wav');
     
     // Allow playback if we have a local file, even during upload or after failure
     final isPlayable = hasLocalFile || (!isUploading && !isFailed);
@@ -567,17 +693,29 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
             
             // Don't show loading if we have a local file (instant playback!)
             final bool showLoading = (isUploading && !hasLocalFile) || (isLoadingFromNetwork && !isThisRender && !isOptimistic);
+            final bool isHighlighted = _highlightedRenderKey == renderKey;
 
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-              decoration: isFailed ? BoxDecoration(
-                color: AppColors.sequencerAccent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: AppColors.sequencerAccent,
-                  width: 0.5,
-                ),
-              ) : null,
+              decoration: isFailed 
+                  ? BoxDecoration(
+                      color: AppColors.sequencerAccent.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppColors.sequencerAccent,
+                        width: 0.5,
+                      ),
+                    )
+                  : isHighlighted
+                      ? BoxDecoration(
+                          color: AppColors.sequencerAccent.withOpacity(0.08),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: AppColors.sequencerAccent.withOpacity(0.3),
+                            width: 1.0,
+                          ),
+                        )
+                      : null,
               child: Row(
                 children: [
                   GestureDetector(
@@ -641,7 +779,29 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                               fontStyle: FontStyle.italic,
                             ),
                           )
-                        : isUploading
+                        : isConverting
+                            ? Row(
+                                children: [
+                                  SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.sequencerLightText,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Converting to MP3...',
+                                    style: GoogleFonts.sourceSans3(
+                                      color: AppColors.sequencerLightText,
+                                      fontSize: 12,
+                                      fontStyle: FontStyle.italic,
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : (isUploading && !hasLocalFile)
                             ? Row(
                                 children: [
                                   Text(
@@ -706,93 +866,12 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                       size: 26,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  _buildShareButton(context, message, render, isPlayable),
                 ],
               ),
             );
           },
         );
       },
-    );
-  }
-
-  Widget _buildShareButton(
-    BuildContext context,
-    Message message,
-    Render render,
-    bool isPlayable,
-  ) {
-    final renderKey = '${message.id}::${render.id}';
-    final isDownloadingForShare = _downloadingShareRenderKey == renderKey;
-
-    if (isDownloadingForShare) {
-      // Show loading indicator while downloading
-      return SizedBox(
-        width: 22,
-        height: 22,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: AppColors.sequencerText,
-        ),
-      );
-    }
-
-    return GestureDetector(
-      onTap: !isPlayable
-          ? null
-          : () async {
-              // Check if file is cached
-              final isCached = await AudioCacheService.isCached(render.url);
-              
-              if (!isCached) {
-                // Download the file first
-                setState(() {
-                  _downloadingShareRenderKey = renderKey;
-                });
-
-                try {
-                  // Use AudioPlayerState to download the file (it handles caching)
-                  final audioPlayer = context.read<AudioPlayerState>();
-                  await audioPlayer.playRender(
-                    messageId: message.id,
-                    render: render,
-                    localPathIfRecorded: render.localPath,
-                  );
-                  // Stop playback immediately after download completes
-                  await audioPlayer.stop();
-                } catch (e) {
-                  debugPrint('Error downloading render for share: $e');
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Failed to download audio for sharing'),
-                        backgroundColor: AppColors.sequencerAccent,
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                  }
-                  setState(() {
-                    _downloadingShareRenderKey = null;
-                  });
-                  return;
-                }
-
-                setState(() {
-                  _downloadingShareRenderKey = null;
-                });
-              }
-
-              // Now share the cached file
-              widget.onShareRender(context, render);
-            },
-      child: Icon(
-        Icons.link,
-        color: !isPlayable
-            ? AppColors.sequencerLightText.withOpacity(0.3)
-            : AppColors.sequencerText,
-        size: 22,
-      ),
     );
   }
 

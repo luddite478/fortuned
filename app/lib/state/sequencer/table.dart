@@ -461,6 +461,98 @@ class TableState extends ChangeNotifier {
     // notifyListeners();
     debugPrint('🗑️ [TABLE_STATE] Deleted section $sectionIndex');
   }
+
+  void reorderSection(int fromIndex, int toIndex, {bool undoRecord = false}) {
+    if (fromIndex == toIndex) return;
+    _table_ffi.tableReorderSection!(fromIndex, toIndex, undoRecord ? 1 : 0);
+    debugPrint('🔄 [TABLE_STATE] Reordered section $fromIndex → $toIndex');
+  }
+
+  // Section management clipboard
+  int? _copiedSectionIndex;
+  
+  bool get hasCopiedSection => _copiedSectionIndex != null && _copiedSectionIndex! < sectionsCount;
+  
+  void copySectionToClipboard(int sectionIndex) {
+    _copiedSectionIndex = sectionIndex;
+    debugPrint('📋 [TABLE_STATE] Copied section $sectionIndex to clipboard');
+    notifyListeners();
+  }
+  
+  // Helper: Validate clipboard has valid section
+  bool _hasValidClipboard() {
+    if (_copiedSectionIndex == null || _copiedSectionIndex! >= sectionsCount) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot paste - no valid section in clipboard');
+      return false;
+    }
+    return true;
+  }
+  
+  // Helper: Insert section and reorder to target position
+  void _insertSectionAt(int targetPosition, {int? copyFrom}) {
+    final newIndex = _sectionsCount; // Read BEFORE appending
+    appendSection(copyFrom: copyFrom ?? -1, undoRecord: true);
+    
+    if (newIndex != targetPosition) {
+      reorderSection(newIndex, targetPosition);
+    }
+    
+    _uiSelectedSection = targetPosition;
+  }
+  
+  void pasteSection(int targetSection) {
+    if (!_hasValidClipboard()) return;
+    
+    if (targetSection < 0 || targetSection >= sectionsCount) {
+      debugPrint('⚠️ [TABLE_STATE] Invalid target section: $targetSection');
+      return;
+    }
+    
+    // Get section pointers and bounds
+    final sourceSectionPtr = _sectionsPtr + _copiedSectionIndex!;
+    final targetSectionPtr = _sectionsPtr + targetSection;
+    final sourceStartStep = sourceSectionPtr.ref.start_step;
+    final sourceStepCount = sourceSectionPtr.ref.num_steps;
+    final targetStartStep = targetSectionPtr.ref.start_step;
+    final targetStepCount = targetSectionPtr.ref.num_steps;
+    
+    // Resize target if needed
+    if (targetStepCount != sourceStepCount) {
+      setSectionStepCount(targetSection, sourceStepCount, undoRecord: true);
+    }
+    
+    // Copy all cells
+    for (int step = 0; step < sourceStepCount && step < _maxSteps; step++) {
+      for (int col = 0; col < _maxCols; col++) {
+        final sourceCell = getCellPointer(sourceStartStep + step, col).ref;
+        final targetStep = targetStartStep + step;
+        
+        if (sourceCell.sample_slot >= 0) {
+          setCell(targetStep, col, sourceCell.sample_slot, 
+                 sourceCell.settings.volume, sourceCell.settings.pitch, undoRecord: false);
+        } else {
+          clearCell(targetStep, col, undoRecord: false);
+        }
+      }
+    }
+    
+    debugPrint('📋 [TABLE_STATE] Pasted section $_copiedSectionIndex contents into section $targetSection');
+    notifyListeners();
+  }
+  
+  void pasteSectionAfter(int afterIndex) {
+    if (!_hasValidClipboard()) return;
+    
+    _insertSectionAt(afterIndex + 1, copyFrom: _copiedSectionIndex);
+    debugPrint('📋 [TABLE_STATE] Pasted section from clipboard after section $afterIndex');
+    notifyListeners();
+  }
+  
+  void addSectionAfter(int afterIndex) {
+    _insertSectionAt(afterIndex + 1);
+    debugPrint('➕ [TABLE_STATE] Added new section after section $afterIndex');
+    notifyListeners();
+  }
   
   // Getters
   int get maxSteps => _maxSteps;
@@ -658,6 +750,23 @@ class TableState extends ChangeNotifier {
       debugPrint('✅ [TABLE_STATE] All SunVox patterns reset');
     } catch (e) {
       debugPrint('❌ [TABLE_STATE] Failed to reset patterns: $e');
+    }
+  }
+
+  /// Update the SunVox timeline seamlessly (recalculate pattern X positions)
+  /// This ensures all pattern X positions match the table layout without stopping playback
+  /// Call this after bulk operations that create/resize patterns (like import)
+  void updateTimelineSeamless() {
+    if (!_initialized) {
+      debugPrint('⚠️ [TABLE_STATE] Cannot update timeline - table not initialized');
+      return;
+    }
+    
+    try {
+      // Pass -1 to update all patterns (not a specific section)
+      _playback_ffi.sunvoxUpdateTimelineSeamless(-1);
+    } catch (e) {
+      debugPrint('❌ [TABLE_STATE] Failed to update timeline: $e');
     }
   }
 

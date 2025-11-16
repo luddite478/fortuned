@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/log.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../../utils/app_colors.dart';
@@ -278,7 +279,7 @@ class SampleSelectionWidget extends StatelessWidget {
                                   onTap: () async {
                                     final targetSlot = browserState.targetCol;
                                     if (targetSlot != null && item.sampleId != null) {
-                                      debugPrint('🎵 Loading sample id=${item.sampleId} into slot $targetSlot');
+                                      Log.d(' Loading sample id=${item.sampleId} into slot $targetSlot');
                                       final success = await sampleBankState.loadSample(targetSlot, item.sampleId!);
                                       debugPrint(success ? '✅ Sample loaded successfully' : '❌ Failed to load sample');
                                     }
@@ -497,7 +498,7 @@ class SampleSelectionWidget extends StatelessWidget {
                                                 // Load sample by manifest id into the target slot
                                                 final targetSlot = browserState.targetCol;
                                                 if (targetSlot != null && item.sampleId != null) {
-                                                  debugPrint('🎵 Loading sample id=${item.sampleId} into slot $targetSlot');
+                                                  Log.d(' Loading sample id=${item.sampleId} into slot $targetSlot');
                                                   final success = await sampleBankState.loadSample(targetSlot, item.sampleId!);
                                                   debugPrint(success ? '✅ Sample loaded successfully' : '❌ Failed to load sample');
                                                 }

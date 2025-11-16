@@ -5,7 +5,6 @@ import 'package:ffi/ffi.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../../ffi/playback_bindings.dart';
 import '../../conversion_library.dart';
-import 'multitask_panel.dart';
 import 'dart:io';
 import 'package:path/path.dart' as path;
 
@@ -14,8 +13,9 @@ import 'package:path/path.dart' as path;
 class RecordingState extends ChangeNotifier {
   final PlaybackBindings _playback = PlaybackBindings();
   final ConversionLibrary _conversion = ConversionLibrary();
-  MultitaskPanelState? _panelState;
-  bool _overlayVisible = false;
+  
+  // Callback for when recording is complete and should be saved as message
+  Function()? _onRecordingComplete;
 
   bool _isRecording = false;
   String? _currentRecordingPath;
@@ -51,7 +51,6 @@ class RecordingState extends ChangeNotifier {
   DateTime? get recordingStartTime => _recordingStartTime;
   Duration get recordingDuration => _recordingDuration;
   List<String> get localRecordings => List.unmodifiable(_localRecordings);
-  bool get isOverlayVisible => _overlayVisible;
   bool get isConverting => _isConverting;
   String? get conversionError => _conversionError;
   String? get convertedMp3Path => _convertedMp3Path;
@@ -125,10 +124,14 @@ class RecordingState extends ChangeNotifier {
       
       notifyListeners();
       debugPrint('⏹️ [RECORDING] Stopped recording. Duration: $formattedDuration');
-      // Auto-convert WAV -> MP3 in background
-      unawaited(convertToMp3(bitrateKbps: 320));
-      // Immediately show overlay (don't wait for conversion)
-      showOverlay();
+      
+      // Immediately trigger callback to save message and switch view
+      if (_onRecordingComplete != null) {
+        _onRecordingComplete!();
+      }
+      
+      // Convert WAV -> MP3 in background (happens after message is created)
+      _convertInBackground();
       return true;
     } catch (e) {
       debugPrint('❌ [RECORDING] Failed to stop recording: $e');
@@ -351,24 +354,34 @@ class RecordingState extends ChangeNotifier {
     } catch (_) {}
   }
   
-  // Panel wiring (optional)
-  void attachPanelState(MultitaskPanelState panel) {
-    _panelState = panel;
+  // Callback registration for automatic message creation
+  void setOnRecordingComplete(Function()? callback) {
+    _onRecordingComplete = callback;
   }
 
-  void showOverlay() {
-    if (!_overlayVisible) {
-      _overlayVisible = true;
-      notifyListeners();
-      debugPrint('🎛️ [RECORDING] Overlay shown');
-    }
+  // Callback for when conversion completes (to update message with MP3 path)
+  Function(String mp3Path)? _onConversionComplete;
+  void setOnConversionComplete(Function(String mp3Path)? callback) {
+    _onConversionComplete = callback;
   }
 
-  void hideOverlay() {
-    if (_overlayVisible) {
-      _overlayVisible = false;
-      notifyListeners();
-      debugPrint('🎛️ [RECORDING] Overlay hidden');
+  // Convert to MP3 in background (after message is already created)
+  Future<void> _convertInBackground() async {
+    try {
+      debugPrint('🔄 [RECORDING] Starting background conversion...');
+      final success = await convertToMp3(bitrateKbps: 320);
+      
+      if (success && _convertedMp3Path != null) {
+        debugPrint('✅ [RECORDING] Conversion complete: $_convertedMp3Path');
+        // Notify that conversion is complete (to update message with MP3 path)
+        if (_onConversionComplete != null) {
+          _onConversionComplete!(_convertedMp3Path!);
+        }
+      } else if (!success) {
+        debugPrint('❌ [RECORDING] Conversion failed');
+      }
+    } catch (e) {
+      debugPrint('❌ [RECORDING] Error during conversion: $e');
     }
   }
 

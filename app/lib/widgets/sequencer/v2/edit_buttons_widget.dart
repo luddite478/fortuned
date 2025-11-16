@@ -76,17 +76,15 @@ class EditButtonsWidget extends StatelessWidget {
                     SizedBox(width: spacing),
                     SizedBox(
                       width: buttonWidth,
-                      child: _buildTextActionButton(
+                      child: _JumpButtonWithFeedback(
                         label: 'JUMP ${editState.stepInsertSize}',
                         height: buttonHeight,
                         fontSize: textFontSize,
-                        enabled: true,
+                        horizontalPadding: buttonHPad,
                         onPressed: () {
                           editState.toggleStepInsertMode();
                           Provider.of<MultitaskPanelState>(context, listen: false).showStepInsertSettings();
                         },
-                        isActive: editState.isStepInsertMode,
-                        horizontalPadding: buttonHPad,
                       ),
                     ),
                     SizedBox(width: spacing),
@@ -96,13 +94,15 @@ class EditButtonsWidget extends StatelessWidget {
                         label: 'DEL',
                         height: buttonHeight,
                         fontSize: textFontSize,
-                        enabled: editState.hasSelection || uiSelection.isSampleBank,
-                        onPressed: (editState.hasSelection || uiSelection.isSampleBank)
+                        enabled: editState.hasSelection || uiSelection.isSampleBank || uiSelection.isSection,
+                        onPressed: (editState.hasSelection || uiSelection.isSampleBank || uiSelection.isSection)
                             ? () {
                                 if (uiSelection.isSampleBank) {
                                   final slot = uiSelection.selectedSampleSlot ?? sampleBankState.activeSlot;
                                   sampleBankState.unloadSample(slot);
                                   uiSelection.clear();
+                                } else if (uiSelection.isSection) {
+                                  _deleteSectionWithConfirmation(context, tableState, uiSelection);
                                 } else {
                                   editState.deleteCells();
                                 }
@@ -119,8 +119,16 @@ class EditButtonsWidget extends StatelessWidget {
                         label: 'COPY',
                         height: buttonHeight,
                         fontSize: textFontSize,
-                        enabled: editState.hasSelection,
-                        onPressed: editState.hasSelection ? () => editState.copyCells() : null,
+                        enabled: editState.hasSelection || uiSelection.isSection,
+                        onPressed: (editState.hasSelection || uiSelection.isSection)
+                            ? () {
+                                if (uiSelection.isSection) {
+                                  tableState.copySectionToClipboard(uiSelection.selectedSection!);
+                                } else {
+                                  editState.copyCells();
+                                }
+                              }
+                            : null,
                         isActive: false,
                         horizontalPadding: buttonHPad,
                       ),
@@ -132,9 +140,18 @@ class EditButtonsWidget extends StatelessWidget {
                         label: 'PASTE',
                         height: buttonHeight,
                         fontSize: textFontSize,
-                        enabled: editState.hasClipboardData && editState.hasSelection,
-                        onPressed: (editState.hasClipboardData && editState.hasSelection)
-                            ? () => editState.pasteCells()
+                        enabled: (editState.hasClipboardData && editState.hasSelection) || 
+                                (tableState.hasCopiedSection && uiSelection.isSection),
+                        onPressed: ((editState.hasClipboardData && editState.hasSelection) || 
+                                   (tableState.hasCopiedSection && uiSelection.isSection))
+                            ? () {
+                                if (uiSelection.isSection && tableState.hasCopiedSection) {
+                                  // Paste section contents INTO selected section (replace)
+                                  tableState.pasteSection(uiSelection.selectedSection!);
+                                } else {
+                                  editState.pasteCells();
+                                }
+                              }
                             : null,
                         isActive: false,
                         horizontalPadding: buttonHPad,
@@ -445,5 +462,238 @@ class EditButtonsWidget extends StatelessWidget {
       ),
     );
   }
- 
-  } 
+}
+
+// Stateful JUMP button with click feedback (no active state)
+class _JumpButtonWithFeedback extends StatefulWidget {
+  final String label;
+  final double height;
+  final double fontSize;
+  final double horizontalPadding;
+  final VoidCallback onPressed;
+
+  const _JumpButtonWithFeedback({
+    required this.label,
+    required this.height,
+    required this.fontSize,
+    required this.horizontalPadding,
+    required this.onPressed,
+  });
+
+  @override
+  State<_JumpButtonWithFeedback> createState() => _JumpButtonWithFeedbackState();
+}
+
+class _JumpButtonWithFeedbackState extends State<_JumpButtonWithFeedback> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+      },
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () {
+        setState(() => _isPressed = false);
+      },
+      child: Container(
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: _isPressed 
+              ? AppColors.sequencerAccent 
+              : AppColors.sequencerSurfaceRaised,
+          borderRadius: BorderRadius.circular(3),
+          border: Border.all(
+            color: AppColors.sequencerBorder,
+            width: 0.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sequencerShadow,
+              blurRadius: 1.5,
+              offset: const Offset(0, 1),
+            ),
+            BoxShadow(
+              color: AppColors.sequencerSurfaceRaised,
+              blurRadius: 0.5,
+              offset: const Offset(0, -0.5),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: widget.horizontalPadding),
+          child: Center(
+            child: Text(
+              widget.label,
+              style: GoogleFonts.sourceSans3(
+                fontSize: widget.fontSize,
+                fontWeight: FontWeight.w700,
+                color: _isPressed 
+                    ? AppColors.sequencerPageBackground 
+                    : AppColors.sequencerText,
+                letterSpacing: 0.8,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Helper function for section deletion
+void _deleteSectionWithConfirmation(
+  BuildContext context,
+  TableState tableState,
+  UiSelectionState uiSelection,
+) {
+    final selectedSection = uiSelection.selectedSection;
+    if (selectedSection == null) return;
+    
+    if (tableState.sectionsCount <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot delete the last section'),
+          backgroundColor: AppColors.sequencerAccent,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      return;
+    }
+    
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
+      builder: (dialogContext) => _DeleteSectionDialog(
+        sectionNumber: selectedSection + 1,
+        onConfirm: () {
+          tableState.deleteSection(selectedSection, undoRecord: true);
+          
+          // Adjust selection if needed
+          if (selectedSection >= tableState.sectionsCount) {
+            uiSelection.selectSection(tableState.sectionsCount - 1);
+            tableState.setUiSelectedSection(tableState.sectionsCount - 1);
+          } else {
+            uiSelection.selectSection(selectedSection);
+            tableState.setUiSelectedSection(selectedSection);
+          }
+        },
+      ),
+    );
+}
+
+// Delete confirmation dialog styled like share menu
+class _DeleteSectionDialog extends StatelessWidget {
+  final int sectionNumber;
+  final VoidCallback onConfirm;
+
+  const _DeleteSectionDialog({
+    required this.sectionNumber,
+    required this.onConfirm,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final dialogWidth = (size.width * 0.8).clamp(280.0, size.width);
+    final dialogHeight = (size.height * 0.35).clamp(220.0, size.height);
+
+    return Material(
+      type: MaterialType.transparency,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints.tightFor(width: dialogWidth, height: dialogHeight),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.sequencerSurfaceRaised,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+            ),
+            clipBehavior: Clip.hardEdge,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Delete Section $sectionNumber?',
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        IconButton(
+                          icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 24),
+                          splashRadius: 20,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                          onPressed: () => Navigator.of(context).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'This action cannot be undone.',
+                      textAlign: TextAlign.left,
+                      style: GoogleFonts.sourceSans3(
+                        color: AppColors.sequencerLightText,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.sequencerText,
+                              side: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size(0, 48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              onConfirm();
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.red,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              minimumSize: const Size(0, 48),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              elevation: 0,
+                            ),
+                            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

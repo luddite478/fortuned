@@ -22,19 +22,19 @@ class EditState extends ChangeNotifier {
   
   // Jump insert state
   bool _isStepInsertMode = false;
-  int _stepInsertSize = 1;
+  int _stepInsertSize = 0;
   
   // Value notifiers for UI binding
   final ValueNotifier<bool> isInSelectionModeNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<Set<int>> selectedCellsNotifier = ValueNotifier<Set<int>>(<int>{});
   final ValueNotifier<bool> hasClipboardDataNotifier = ValueNotifier<bool>(false);
   final ValueNotifier<bool> isStepInsertModeNotifier = ValueNotifier<bool>(false);
-  final ValueNotifier<int> stepInsertSizeNotifier = ValueNotifier<int>(1);
+  final ValueNotifier<int> stepInsertSizeNotifier = ValueNotifier<int>(0);
   
   EditState(this._tableState, this._uiSelection) {
-    // When unified selection switches to sample bank, clear cell selection without resetting UI selection
+    // When unified selection switches to sample bank or section, clear cell selection without resetting UI selection
     _uiSelection.kindNotifier.addListener(() {
-      if (_uiSelection.isSampleBank && _selectedCells.isNotEmpty) {
+      if ((_uiSelection.isSampleBank || _uiSelection.isSection) && _selectedCells.isNotEmpty) {
         _clearSelectionInternal(preserveUiSelection: true);
       }
     });
@@ -301,7 +301,7 @@ class EditState extends ChangeNotifier {
   }
   
   void setStepInsertSize(int size) {
-    _stepInsertSize = size.clamp(1, 16);
+    _stepInsertSize = size.clamp(0, 16);
     stepInsertSizeNotifier.value = _stepInsertSize;
     notifyListeners();
     debugPrint('🔗 [EDIT] Jump insert size: $_stepInsertSize');

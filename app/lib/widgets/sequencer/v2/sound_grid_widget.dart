@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../utils/log.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'dart:async';
@@ -438,7 +439,7 @@ class _SampleGridWidgetState extends State<SampleGridWidget> {
             
             // Use the new table system with inheritance sentinels
             tableState.setCell(absoluteStep, absoluteCol, sampleSlot, -1.0, -1.0);
-            debugPrint('🎵 [DRAG] Set cell [$absoluteStep, $absoluteCol] = sample $sampleSlot');
+            Log.d(' [DRAG] Set cell [$absoluteStep, $absoluteCol] = sample $sampleSlot');
           },
           builder: (context, candidateData, rejectedData) {
             final bool isDragHovering = candidateData.isNotEmpty;

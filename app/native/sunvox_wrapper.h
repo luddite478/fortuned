@@ -55,6 +55,10 @@ void sunvox_wrapper_update_timeline(void);
 // section_index: which section was resized (for loop mode refresh)
 void sunvox_wrapper_update_timeline_seamless(int section_index);
 
+// Seamless section reordering (called after table_reorder_section)
+// Updates timeline and preserves playback position
+void sunvox_wrapper_reorder_section(int from_index, int to_index);
+
 // Start playback
 // Returns 0 on success, negative on error
 int sunvox_wrapper_play(void);

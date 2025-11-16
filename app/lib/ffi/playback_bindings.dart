@@ -115,6 +115,13 @@ class PlaybackBindings {
     _sunvoxResetAllPatternsPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function()>>('sunvox_wrapper_reset_all_patterns');
     sunvoxResetAllPatterns = _sunvoxResetAllPatternsPtr.asFunction<void Function()>();
 
+    // SunVox update timeline seamlessly (pass -1 to update all patterns)
+    _sunvoxUpdateTimelineSeamlessPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>>('sunvox_wrapper_update_timeline_seamless');
+    sunvoxUpdateTimelineSeamless = _sunvoxUpdateTimelineSeamlessPtr.asFunction<void Function(int)>();
+
+    // Enhanced playback logging
+    _playbackSetEnhancedLoggingPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>>('playback_set_enhanced_logging');
+    playbackSetEnhancedLogging = _playbackSetEnhancedLoggingPtr.asFunction<void Function(int)>();
   }
 
   late final ffi.Pointer<ffi.NativeFunction<ffi.Int32 Function()>> _playbackInitPtr;
@@ -184,6 +191,13 @@ class PlaybackBindings {
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function()>> _sunvoxResetAllPatternsPtr;
   late final void Function() sunvoxResetAllPatterns;
 
+  // SunVox update timeline seamlessly
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>> _sunvoxUpdateTimelineSeamlessPtr;
+  late final void Function(int) sunvoxUpdateTimelineSeamless;
+
+  // Enhanced playback logging
+  late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32)>> _playbackSetEnhancedLoggingPtr;
+  late final void Function(int) playbackSetEnhancedLogging;
 }
 
 

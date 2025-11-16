@@ -42,6 +42,9 @@ static int g_current_step = 0;
 static PlaybackState g_playback_state;
 static int g_consecutive_stopped_count = 0;  // Count consecutive "stopped" detections
 
+// Enhanced playback logging flag (for debugging)
+static int g_enhanced_playback_logging = 0;
+
 // Audio device for output
 static ma_device g_audio_device;
 static int g_audio_device_initialized = 0;
@@ -90,6 +93,7 @@ static void* poll_thread_func(void* arg);
 static void update_current_step_from_sunvox(void);
 static int sunvox_is_actually_playing(void);
 static void audio_callback(ma_device* device, void* output, const void* input, ma_uint32 frameCount);
+static void log_enhanced_playback_state(const char* event);
 
 // Forward for master volume
 extern "C" int sv_volume(int slot, int vol);
@@ -97,11 +101,11 @@ extern "C" int sv_volume(int slot, int vol);
 // Initialize playback system
 int playback_init(void) {
     if (g_initialized) {
-        prnt("🔄 [PLAYBACK] Re-initializing: running cleanup first");
+        prnt_debug("🔄 [PLAYBACK] Re-initializing: running cleanup first");
         playback_cleanup();
     }
     
-    prnt("🎵 [PLAYBACK] Initializing playback system (SunVox backend)");
+    prnt_debug("🎵 [PLAYBACK] Initializing playback system (SunVox backend)");
     
     // Initialize sample bank
     sample_bank_init();
@@ -258,7 +262,7 @@ int playback_start(int bpm, int start_step) {
     // Reset loop counter to 0 (displays as "1/X" in UI)
     // This is the ONLY place where we reset the counter after it was preserved at stop
     g_playback_state.current_section_loop = 0;
-    prnt("🔄 [PLAYBACK] Reset loop counter to 0 (will display as 1/X)");
+    prnt_debug("🔄 [PLAYBACK] Reset loop counter to 0 (will display as 1/X)");
     
     // Configure SunVox for song/loop mode, starting with our target section.
     // This will also reset the engine's internal loop counter via sv_set_pattern_loop_count()
@@ -267,7 +271,7 @@ int playback_start(int bpm, int start_step) {
     // Get the absolute timeline position (line number) for the start of the target section's pattern.
     int timeline_start_line = sunvox_wrapper_get_section_pattern_x(section_index);
     
-    prnt("🎯 [PLAYBACK] Starting playback at section %d (timeline line %d)", section_index, timeline_start_line);
+    prnt_debug("🎯 [PLAYBACK] Starting playback at section %d (timeline line %d)", section_index, timeline_start_line);
     
     // Rewind SunVox to the calculated starting line. This is the crucial fix.
     sv_rewind(0, timeline_start_line);
@@ -287,20 +291,27 @@ int playback_start(int bpm, int start_step) {
     
     prnt("▶️ [PLAYBACK] Started sequencer (BPM: %d, section: %d, mode: %s)", 
          bpm, section_index, g_playback_state.song_mode ? "song" : "loop");
+    
+    // Log enhanced playback state on start
+    log_enhanced_playback_state("PLAYBACK STARTED");
+    
     return 0;
 }
 
 // Stop sequencer playback
 void playback_stop(void) {
-    prnt("⏹️ [PLAYBACK STOP] === STOP CALLED ===");
-    prnt("⏹️ [PLAYBACK STOP] Stack trace would show caller (if available)");
+    prnt_debug("⏹️ [PLAYBACK STOP] === STOP CALLED ===");
+    prnt_debug("⏹️ [PLAYBACK STOP] Stack trace would show caller (if available)");
+    
+    // Log enhanced playback state before stopping
+    log_enhanced_playback_state("PLAYBACK STOPPING");
     
     g_sequencer_playing = 0;
     g_current_step = -1;
     
     sunvox_wrapper_stop();
     
-    prnt("⏹️ [PLAYBACK] Stopped sequencer");
+    prnt_debug("⏹️ [PLAYBACK] Stopped sequencer");
     
     state_write_begin();
     state_update_prefix();
@@ -313,7 +324,7 @@ void playback_set_bpm(int bpm) {
         g_playback_state.bpm = bpm;
         sunvox_wrapper_set_bpm(bpm);
         
-        prnt("🎵 [PLAYBACK] BPM changed to %d", bpm);
+        prnt_debug("🎵 [PLAYBACK] BPM changed to %d", bpm);
         
         state_write_begin();
         state_update_prefix();
@@ -333,7 +344,7 @@ void playback_set_region(int start, int end) {
     // In multi-pattern mode, regions are handled via timeline
     // Just update state for UI
     
-    prnt("🎭 [PLAYBACK] Set playback region: %d to %d", start, end);
+    prnt_debug("🎭 [PLAYBACK] Set playback region: %d to %d", start, end);
     
     state_write_begin();
     state_update_prefix();
@@ -346,11 +357,11 @@ void playback_set_region(int start, int end) {
 void playback_set_mode(int song_mode) {
     int was_loop_mode = !g_playback_state.song_mode;
     
-    prnt("🎵 [PLAYBACK] === PLAYBACK MODE CHANGE ===");
-    prnt("🎵 [PLAYBACK] Old mode: %s, New mode: %s", 
+    prnt_debug("🎵 [PLAYBACK] === PLAYBACK MODE CHANGE ===");
+    prnt_debug("🎵 [PLAYBACK] Old mode: %s, New mode: %s", 
          was_loop_mode ? "loop" : "song", song_mode ? "song" : "loop");
-    prnt("🎵 [PLAYBACK] g_sequencer_playing: %d", g_sequencer_playing);
-    prnt("🎵 [PLAYBACK] Counter BEFORE mode change: section=%d, loop=%d", 
+    prnt_debug("🎵 [PLAYBACK] g_sequencer_playing: %d", g_sequencer_playing);
+    prnt_debug("🎵 [PLAYBACK] Counter BEFORE mode change: section=%d, loop=%d", 
          g_playback_state.current_section, g_playback_state.current_section_loop);
     
     // If switching TO loop mode from song mode, determine which section and loop we're currently in
@@ -376,7 +387,7 @@ void playback_set_mode(int song_mode) {
                     g_playback_state.current_section = i;
                     g_playback_state.current_section_loop = loop_num;
                     
-                    prnt("🎯 [PLAYBACK] Song→Loop: Detected section %d, loop %d/%d (at line %d)", 
+                    prnt_debug("🎯 [PLAYBACK] Song→Loop: Detected section %d, loop %d/%d (at line %d)", 
                          i, loop_num + 1, loops, current_line);
                     prnt("🔒 [PLAYBACK] Counter will freeze at %d/%d in loop mode", loop_num + 1, loops);
                     found = 1;
@@ -408,7 +419,7 @@ void playback_set_mode(int song_mode) {
             // Update to the actual loop we're in
             g_playback_state.current_section_loop = loop_num;
             
-            prnt("🔄 [PLAYBACK] Loop→Song: Calculated actual loop from position: %d/%d (line=%d, offset=%d, steps=%d)",
+            prnt_debug("🔄 [PLAYBACK] Loop→Song: Calculated actual loop from position: %d/%d (line=%d, offset=%d, steps=%d)",
                  loop_num + 1, g_playback_state.sections_loops_num_storage[g_playback_state.current_section],
                  current_line, offset_from_start, section_steps);
         }
@@ -429,10 +440,10 @@ void playback_set_mode(int song_mode) {
     state_update_prefix();
     state_write_end();
     
-    prnt("🎵 [PLAYBACK] Counter AFTER mode change: section=%d, loop=%d", 
+    prnt_debug("🎵 [PLAYBACK] Counter AFTER mode change: section=%d, loop=%d", 
          g_playback_state.current_section, g_playback_state.current_section_loop);
-    prnt("🎵 [PLAYBACK] Mode change complete - NO stop/start called");
-    prnt("🎵 [PLAYBACK] === PLAYBACK MODE CHANGE DONE ===");
+    prnt_debug("🎵 [PLAYBACK] Mode change complete - NO stop/start called");
+    prnt_debug("🎵 [PLAYBACK] === PLAYBACK MODE CHANGE DONE ===");
     
     UndoRedoManager_record();
 }
@@ -466,7 +477,7 @@ void switch_to_section(int section_index) {
     state_update_prefix();
     state_write_end();
     
-    prnt("🎯 [PLAYBACK] Switched to section %d (step %d)", 
+    prnt_debug("🎯 [PLAYBACK] Switched to section %d (step %d)", 
          g_playback_state.current_section, g_current_step);
     
     if (was_playing) {
@@ -494,7 +505,7 @@ void playback_set_section_loops_num(int section, int loops) {
     state_update_prefix();
     state_write_end();
     
-    prnt("🔁 [PLAYBACK] Set section %d loops to %d", section, loops);
+    prnt_debug("🔁 [PLAYBACK] Set section %d loops to %d", section, loops);
     UndoRedoManager_record();
 }
 
@@ -583,14 +594,23 @@ void playback_set_master_volume(float volume01) {
     // SunVox slot is 0
     int prev = sv_volume(0, vol256);
     (void)prev; // previous volume is not used currently
-    prnt("🔊 [PLAYBACK] Master volume set to %d/256 (%.3f)", vol256, volume01);
+    prnt_debug("🔊 [PLAYBACK] Master volume set to %d/256 (%.3f)", vol256, volume01);
+}
+
+// Enhanced playback logging control (for debugging)
+void playback_set_enhanced_logging(int enabled) {
+    g_enhanced_playback_logging = enabled;
+    prnt("🐛 [PLAYBACK] Enhanced playback logging %s", enabled ? "ENABLED" : "DISABLED");
+    if (enabled) {
+        prnt("🐛 [PLAYBACK] Enhanced logging will show detailed state on every step");
+    }
 }
 
 // Polling thread function - just updates state from SunVox
 static void* poll_thread_func(void* arg) {
     (void)arg;
     
-    prnt("🔄 [PLAYBACK] Polling thread started");
+    prnt_debug("🔄 [PLAYBACK] Polling thread started");
     
     int poll_iter = 0;
     while (g_poll_thread_running) {
@@ -671,8 +691,112 @@ static void* poll_thread_func(void* arg) {
         usleep(16000);
     }
     
-    prnt("🔄 [PLAYBACK] Polling thread stopped");
+    prnt_debug("🔄 [PLAYBACK] Polling thread stopped");
     return NULL;
+}
+
+// Enhanced logging helper - shows comprehensive playback state
+static void log_enhanced_playback_state(const char* event) {
+    if (!g_enhanced_playback_logging) return;
+    
+    // Get current state
+    int sunvox_line = sunvox_wrapper_get_current_line();
+    int current_pattern_loop = sunvox_wrapper_get_pattern_current_loop(g_playback_state.current_section);
+    int sections_count = table_get_sections_count();
+    
+    // Header
+    prnt("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    prnt("🐛 [ENHANCED PLAYBACK LOG] %s", event);
+    prnt("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    // Playback State Section
+    prnt("📊 PLAYBACK STATE:");
+    prnt("   Is Playing:       %s", g_sequencer_playing ? "YES ▶️" : "NO ⏸️");
+    prnt("   Mode:             %s", g_playback_state.song_mode ? "SONG 🎵" : "LOOP 🔁");
+    prnt("   BPM:              %d", g_playback_state.bpm);
+    prnt("   Current Step:     %d", g_current_step);
+    prnt("   Current Section:  %d / %d", g_playback_state.current_section, sections_count - 1);
+    prnt("   Section Loop:     %d / %d (display: %d/%d)", 
+         g_playback_state.current_section_loop,
+         g_playback_state.sections_loops_num_storage[g_playback_state.current_section] - 1,
+         g_playback_state.current_section_loop + 1,
+         g_playback_state.sections_loops_num_storage[g_playback_state.current_section]);
+    prnt("   Region:           [%d, %d)", g_playback_state.region_start, g_playback_state.region_end);
+    prnt("");
+    
+    // SunVox Engine State Section
+    prnt("🎹 SUNVOX ENGINE STATE:");
+    prnt("   Current Line:     %d", sunvox_line);
+    prnt("   Pattern Loop:     %d", current_pattern_loop);
+    prnt("   Pattern X Pos:    %d", sunvox_wrapper_get_section_pattern_x(g_playback_state.current_section));
+    prnt("");
+    
+    // Section Details
+    if (g_playback_state.current_section >= 0 && g_playback_state.current_section < sections_count) {
+        int section_start = table_get_section_start_step(g_playback_state.current_section);
+        int section_steps = table_get_section_step_count(g_playback_state.current_section);
+        int section_loops = g_playback_state.sections_loops_num_storage[g_playback_state.current_section];
+        
+        prnt("📑 CURRENT SECTION [%d] DETAILS:", g_playback_state.current_section);
+        prnt("   Start Step:       %d", section_start);
+        prnt("   Step Count:       %d", section_steps);
+        prnt("   Total Loops:      %d", section_loops);
+        prnt("");
+        
+        // Table Contents for Current Section
+        prnt("🎼 TABLE CONTENTS (Section %d, Steps %d-%d):", 
+             g_playback_state.current_section, section_start, section_start + section_steps - 1);
+        
+        // Show table as a grid with sample slots
+        int has_any_samples = 0;
+        for (int step = section_start; step < section_start + section_steps; step++) {
+            char row_buffer[256] = {0};
+            snprintf(row_buffer, sizeof(row_buffer), "   Step %3d: ", step);
+            int row_has_samples = 0;
+            
+            for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+                Cell* cell = table_get_cell(step, col);
+                if (cell && cell->sample_slot >= 0) {
+                    char cell_str[16];
+                    snprintf(cell_str, sizeof(cell_str), "[%2d]", cell->sample_slot);
+                    strncat(row_buffer, cell_str, sizeof(row_buffer) - strlen(row_buffer) - 1);
+                    row_has_samples = 1;
+                    has_any_samples = 1;
+                } else {
+                    strncat(row_buffer, " -- ", sizeof(row_buffer) - strlen(row_buffer) - 1);
+                }
+                strncat(row_buffer, " ", sizeof(row_buffer) - strlen(row_buffer) - 1);
+            }
+            
+            // Only print rows that have samples or the current step
+            if (row_has_samples || step == g_current_step) {
+                if (step == g_current_step) {
+                    prnt("%s 👉 CURRENT", row_buffer);
+                } else {
+                    prnt("%s", row_buffer);
+                }
+            }
+        }
+        
+        if (!has_any_samples) {
+            prnt("   (Section is empty - no samples placed)");
+        }
+        prnt("");
+    }
+    
+    // All Sections Overview
+    prnt("📚 ALL SECTIONS OVERVIEW:");
+    for (int i = 0; i < sections_count; i++) {
+        int start = table_get_section_start_step(i);
+        int steps = table_get_section_step_count(i);
+        int loops = g_playback_state.sections_loops_num_storage[i];
+        const char* marker = (i == g_playback_state.current_section) ? " 👉" : "   ";
+        prnt("%s Section %d: Steps [%d-%d] (%d steps), Loops: %d",
+             marker, i, start, start + steps - 1, steps, loops);
+    }
+    
+    prnt("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    prnt("");
 }
 
 // Update current step from SunVox playback position
@@ -696,12 +820,15 @@ static void update_current_step_from_sunvox(void) {
             current_section_from_line = i;
             local_line = line - timeline_pos;
             section_start_step = table_get_section_start_step(i);
+            prnt_debug("🎯 [PLAYBACK POS] SunVox line %d → Section %d, local_line %d, section_start_step %d",
+                       line, i, local_line, section_start_step);
             break;
         }
         timeline_pos += section_steps;
     }
 
     if (current_section_from_line == -1) {
+        prnt_debug("⚠️ [PLAYBACK POS] SunVox line %d is past end of timeline (max: %d)", line, timeline_pos);
         return; // Playhead is past the end of the known timeline
     }
     
@@ -726,5 +853,8 @@ static void update_current_step_from_sunvox(void) {
         g_playback_state.current_section_loop = final_loop;
         state_update_prefix();
         state_write_end();
+        
+        // Log enhanced playback state on step change
+        log_enhanced_playback_state("STEP UPDATE");
     }
 }

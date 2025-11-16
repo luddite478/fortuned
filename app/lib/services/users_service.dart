@@ -4,6 +4,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'http_client.dart';
 import 'ws_client.dart';
 import '../models/playlist_item.dart';
+import '../utils/log.dart';
 
 class UserProfile {
   final String id;
@@ -262,8 +263,8 @@ class UsersService {
   
   static String get _apiToken {
     final token = dotenv.env['API_TOKEN'] ?? '';
-    print('API_TOKEN from env: "$token"');
-    print('All env vars: ${dotenv.env.keys.toList()}');
+    Log.d('API_TOKEN from env: "$token"');
+    Log.d('All env vars: ${dotenv.env.keys.toList()}');
     
     return token;
   }
@@ -315,19 +316,19 @@ class UsersService {
     try {
       final loginRequest = LoginRequest(email: email, password: password);
       
-      print('Attempting login to: /auth/login');
+      Log.d('Attempting login to: /auth/login');
 
       final response = await ApiHttpClient.post('/auth/login', 
         body: loginRequest.toJson(),
       );
 
-      print('Login response status: ${response.statusCode}');
-      print('Login response body: ${response.body}');
+      Log.d('Login response status: ${response.statusCode}');
+      Log.d('Login response body: ${response.body}');
 
       final jsonData = json.decode(response.body);
       return AuthResponse.fromJson(jsonData);
     } catch (e) {
-      print('Error during login: $e');
+      Log.d('Error during login: $e');
       return AuthResponse(
         success: false,
         message: 'Login failed: $e',
@@ -344,19 +345,19 @@ class UsersService {
         password: password,
       );
 
-      print('Attempting registration to: /auth/register');
+      Log.d('Attempting registration to: /auth/register');
 
       final response = await ApiHttpClient.post('/auth/register', 
         body: registerRequest.toJson(),
       );
 
-      print('Register response status: ${response.statusCode}');
-      print('Register response body: ${response.body}');
+      Log.d('Register response status: ${response.statusCode}');
+      Log.d('Register response body: ${response.body}');
 
       final jsonData = json.decode(response.body);
       return AuthResponse.fromJson(jsonData);
     } catch (e) {
-      print('Error during registration: $e');
+      Log.d('Error during registration: $e');
       return AuthResponse(
         success: false,
         message: 'Registration failed: $e',
@@ -371,7 +372,7 @@ class UsersService {
     try {
       // Try to reload dotenv if token is empty
       if (dotenv.env['API_TOKEN']?.isEmpty ?? true) {
-        print('API_TOKEN is empty, reloading dotenv...');
+        Log.d('API_TOKEN is empty, reloading dotenv...');
         await dotenv.load(fileName: ".env");
       }
       
@@ -379,14 +380,14 @@ class UsersService {
         'limit': limit.toString(),
         'offset': offset.toString(),
       };
-      print('Query params: $queryParams');
+      Log.d('Query params: $queryParams');
       
-      print('Fetching users from: /users/list');
+      Log.d('Fetching users from: /users/list');
 
       final response = await ApiHttpClient.get('/users/list', queryParams: queryParams);
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}');
+      Log.d('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -397,7 +398,7 @@ class UsersService {
         throw Exception('Failed to load users: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching users: $e');
+      Log.d('Error fetching users: $e');
       throw Exception('Network error: $e');
     }
   }
@@ -408,12 +409,12 @@ class UsersService {
         'id': userId,
       };
 
-      print('Fetching user from: /users/user');
+      Log.d('Fetching user from: /users/user');
 
       final response = await ApiHttpClient.get('/users/user', queryParams: queryParams);
 
-      print('Response status: ${response.statusCode}');
-      print('Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}');
+      Log.d('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -426,7 +427,7 @@ class UsersService {
         throw Exception('Failed to load user: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching user: $e');
+      Log.d('Error fetching user: $e');
       throw Exception('Network error: $e');
     }
   }
@@ -438,12 +439,12 @@ class UsersService {
         'target_user_id': targetUserId,
       };
 
-      print('Following user: $targetUserId');
+      Log.d('Following user: $targetUserId');
 
       final response = await ApiHttpClient.post('/users/follow', body: body);
 
-      print('Follow response status: ${response.statusCode}');
-      print('Follow response body: ${response.body}');
+      Log.d('Follow response status: ${response.statusCode}');
+      Log.d('Follow response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -454,7 +455,7 @@ class UsersService {
         throw Exception('Failed to follow user: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error following user: $e');
+      Log.d('Error following user: $e');
       throw Exception('Network error: $e');
     }
   }
@@ -466,12 +467,12 @@ class UsersService {
         'target_user_id': targetUserId,
       };
 
-      print('Unfollowing user: $targetUserId');
+      Log.d('Unfollowing user: $targetUserId');
 
       final response = await ApiHttpClient.post('/users/unfollow', body: body);
 
-      print('Unfollow response status: ${response.statusCode}');
-      print('Unfollow response body: ${response.body}');
+      Log.d('Unfollow response status: ${response.statusCode}');
+      Log.d('Unfollow response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -482,7 +483,7 @@ class UsersService {
         throw Exception('Failed to unfollow user: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error unfollowing user: $e');
+      Log.d('Error unfollowing user: $e');
       throw Exception('Network error: $e');
     }
   }
@@ -494,12 +495,12 @@ class UsersService {
         'limit': limit.toString(),
       };
 
-      print('Searching users with query: $query');
+      Log.d('Searching users with query: $query');
 
       final response = await ApiHttpClient.get('/users/search', queryParams: queryParams);
 
-      print('Search response status: ${response.statusCode}');
-      print('Search response body: ${response.body}');
+      Log.d('Search response status: ${response.statusCode}');
+      Log.d('Search response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -519,7 +520,7 @@ class UsersService {
         throw Exception('Failed to search users: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error searching users: $e');
+      Log.d('Error searching users: $e');
       throw Exception('Network error: $e');
     }
   }
@@ -530,12 +531,12 @@ class UsersService {
         'user_id': userId,
       };
 
-      print('Getting followed users for: $userId');
+      Log.d('Getting followed users for: $userId');
 
       final response = await ApiHttpClient.get('/users/following', queryParams: queryParams);
 
-      print('Following response status: ${response.statusCode}');
-      print('Following response body: ${response.body}');
+      Log.d('Following response status: ${response.statusCode}');
+      Log.d('Following response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -555,21 +556,21 @@ class UsersService {
         throw Exception('Failed to get followed users: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error getting followed users: $e');
+      Log.d('Error getting followed users: $e');
       throw Exception('Network error: $e');
     }
   }
 
   static Future<UserProfile> getOrCreateUser(UserProfile user) async {
     try {
-      print('Attempting to get or create user: ${user.id}');
+      Log.d('Attempting to get or create user: ${user.id}');
 
       final response = await ApiHttpClient.post('/users/session',
         body: user.toJson(),
       );
 
-      print('Get-or-create response status: ${response.statusCode}');
-      print('Get-or-create response body: ${response.body}');
+      Log.d('Get-or-create response status: ${response.statusCode}');
+      Log.d('Get-or-create response body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final jsonData = json.decode(response.body);
@@ -578,7 +579,7 @@ class UsersService {
         throw Exception('Failed to get or create user: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error during get-or-create user: $e');
+      Log.d('Error during get-or-create user: $e');
       // In case of network error, just return the local user profile
       // The app can retry later.
       return user;
@@ -587,14 +588,14 @@ class UsersService {
 
   static Future<UserProfile> updateUsername(String userId, String newUsername) async {
     try {
-      print('Updating username for user: $userId to: $newUsername');
+      Log.d('Updating username for user: $userId to: $newUsername');
 
       final response = await ApiHttpClient.put('/users/$userId/username',
         body: {'username': newUsername},
       );
 
-      print('Update username response status: ${response.statusCode}');
-      print('Update username response body: ${response.body}');
+      Log.d('Update username response status: ${response.statusCode}');
+      Log.d('Update username response body: ${response.body}');
 
       if (response.statusCode == 200) {
         final jsonData = json.decode(response.body);
@@ -606,7 +607,7 @@ class UsersService {
         throw Exception('Failed to update username: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error updating username: $e');
+      Log.d('Error updating username: $e');
       rethrow;
     }
   }

@@ -11,12 +11,18 @@ class MessageSectionsChain extends StatelessWidget {
   final List<int> stepsPerSection;
   final List<int> loopsPerSection;
   final List<int> layersPerSection;
+  final double? verticalPadding; // Optional vertical padding to control space inside container
+  final Color? dividerColor; // Optional divider color
+  final double? dividerWidth; // Optional divider width
+  final bool showDividers; // Whether to show dividers
+  final int? dividerSpacingLayers; // Number of layers to use for calculating divider spacing
   
   // Sizing constants similar to old widget
-  static const double rectangleSizePercentOfHeight = 0.85; // ~85% of container height (bigger)
+  static const double rectangleSizePercentOfHeight = 0.75; // ~75% of container height (reduced for smaller rectangles)
   static const double rectangleHorizontalMarginPercent = 0.06; // 6% margin on each side (less margin = bigger)
   static const double rectangleMinWidth = 40.0; // Minimum width for rectangle (increased)
   static const double layerColumnMinWidth = 14.0; // Minimum width per layer column (increased)
+  static const int defaultLayersForSpacing = 4; // Default number of layers to use for divider spacing
 
   const MessageSectionsChain({
     super.key,
@@ -24,39 +30,104 @@ class MessageSectionsChain extends StatelessWidget {
     required this.stepsPerSection,
     required this.loopsPerSection,
     required this.layersPerSection,
+    this.verticalPadding,
+    this.dividerColor,
+    this.dividerWidth,
+    this.showDividers = false,
+    this.dividerSpacingLayers,
   });
 
   @override
   Widget build(BuildContext context) {
-    if (sectionsCount == 0) {
-      return const SizedBox.shrink();
-    }
-
     return LayoutBuilder(
       builder: (context, constraints) {
         final h = constraints.maxHeight <= 0 ? 24.0 : constraints.maxHeight;
-        final normalizedPercent = rectangleSizePercentOfHeight > 1.0
-            ? (rectangleSizePercentOfHeight > 100.0 ? 1.0 : rectangleSizePercentOfHeight / 100.0)
-            : rectangleSizePercentOfHeight;
-        final double baseHeight = (h * normalizedPercent).clamp(12.0, h);
+        
+        // Calculate available height after accounting for vertical padding
+        final double availableHeight = verticalPadding != null
+            ? (h - (verticalPadding! * 2)).clamp(0.0, h)
+            : h;
+        
+        // Use full available height if padding is specified, otherwise use percentage
+        final double baseHeight = verticalPadding != null
+            ? availableHeight.clamp(12.0, h)
+            : (h * rectangleSizePercentOfHeight).clamp(12.0, h);
 
-        return SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: List.generate(sectionsCount, (sectionIndex) {
-              final layers = layersPerSection[sectionIndex];
-              final steps = stepsPerSection[sectionIndex];
-              final loops = loopsPerSection[sectionIndex];
+        // Calculate width of a section with specified layers (for divider spacing)
+        final int spacingLayers = (dividerSpacingLayers ?? defaultLayersForSpacing).clamp(1, 12);
+        final double defaultMinLayerWidth = layerColumnMinWidth;
+        final double defaultBaseWidth = (spacingLayers * defaultMinLayerWidth).clamp(rectangleMinWidth, double.infinity);
+        final double defaultHorizontalMargin = defaultBaseWidth * rectangleHorizontalMarginPercent;
+        final double defaultSectionWidth = defaultBaseWidth + (defaultHorizontalMargin * 2);
+        final double dividerW = dividerWidth ?? 1.0;
+        
+        // Calculate how many dividers to show to fill the visible area + one additional divider
+        // Each divider unit (divider + spacing) = defaultSectionWidth
+        final double containerWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : 400.0; // Fallback if infinite
+        // Number of dividers that fit in visible width
+        final int dividersForWidth = (containerWidth / defaultSectionWidth).ceil();
+        // Show dividers that fill visible area + exactly 1 additional divider beyond
+        final int dividerCount = dividersForWidth + 1;
+        
+        return Padding(
+          padding: EdgeInsets.symmetric(
+            vertical: verticalPadding ?? 0.0,
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Stack(
+              children: [
+                // Background: Full-height dividers spanning entire container height
+                if (showDividers)
+                  SizedBox(
+                    height: h, // Full container height
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        // Divider at the start
+                        Container(
+                          width: dividerW,
+                          color: dividerColor ?? const Color.fromARGB(255, 180, 180, 180),
+                        ),
+                        // Dividers evenly spaced - fill the entire line
+                        ...List.generate(dividerCount, (dividerIndex) {
+                          return Row(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              SizedBox(width: defaultSectionWidth - dividerW),
+                              // Divider after each spacing
+                              Container(
+                                width: dividerW,
+                                color: dividerColor ?? const Color.fromARGB(255, 180, 180, 180),
+                              ),
+                            ],
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                // Foreground: Sections (only if sections exist)
+                if (sectionsCount > 0)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: List.generate(sectionsCount, (sectionIndex) {
+                      final layers = layersPerSection[sectionIndex];
+                      final steps = stepsPerSection[sectionIndex];
+                      final loops = loopsPerSection[sectionIndex];
 
-              return _buildSectionRectangle(
-                context,
-                layersCount: layers,
-                stepsCount: steps,
-                loopsCount: loops,
-                baseHeight: baseHeight,
-              );
-            }),
+                      return _buildSectionRectangle(
+                        context,
+                        layersCount: layers,
+                        stepsCount: steps,
+                        loopsCount: loops,
+                        baseHeight: baseHeight,
+                      );
+                    }),
+                  ),
+              ],
+            ),
           ),
         );
       },
@@ -106,8 +177,8 @@ class _SectionRectangle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Split height: 30% for layers header, 70% for counters (via Expanded)
-    final double headerHeight = height * 0.30;
+    // Split height: 50% for layers header, 50% for counters (via Expanded)
+    final double headerHeight = height * 0.50;
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(2),
@@ -168,31 +239,51 @@ class _SectionRectangle extends StatelessWidget {
                 }),
               ),
             ),
-            // Bottom part: Loops and steps on one line (loops steps)
+            // Bottom part: Loops and steps aligned left and right
             Expanded(
               child: Container(
                 clipBehavior: Clip.hardEdge,
                 decoration: const BoxDecoration(),
-                padding: const EdgeInsets.all(2),
-                alignment: Alignment.center,
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: Text(
-                      '$loopsCount $stepsCount',
-                      style: GoogleFonts.sourceSans3(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        height: 1.0,
-                        letterSpacing: 0,
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    // Loops on the left
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '$loopsCount',
+                        style: GoogleFonts.sourceSans3(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                          letterSpacing: 0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        softWrap: false,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.clip,
-                      softWrap: false,
                     ),
-                  ),
+                    // Steps on the right
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Text(
+                        '$stepsCount',
+                        style: GoogleFonts.sourceSans3(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          height: 1.0,
+                          letterSpacing: 0,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.clip,
+                        softWrap: false,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),

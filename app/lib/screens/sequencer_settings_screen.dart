@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter/services.dart';
 import '../widgets/app_header_widget.dart';
 // Removed performance test integration
 // import '../ffi/pitch_bindings.dart';
 import '../utils/app_colors.dart';
 import 'package:provider/provider.dart';
 import '../state/sequencer/table.dart';
+import '../state/sequencer/playback.dart';
+import '../state/threads_state.dart';
 class SequencerSettingsScreen extends StatefulWidget {
   const SequencerSettingsScreen({super.key});
 
@@ -45,6 +48,15 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
               _buildSectionHeader('Layout Settings'),
               const SizedBox(height: 16),
               _buildLayoutSelection(),
+              
+              const SizedBox(height: 32),
+              
+              // Developer Settings Section
+              _buildSectionHeader('Developer Settings'),
+              const SizedBox(height: 16),
+              _buildProjectInfo(),
+              const SizedBox(height: 16),
+              _buildEnhancedPlaybackLogging(),
               
               const SizedBox(height: 32),
               
@@ -149,6 +161,162 @@ class _SequencerSettingsScreenState extends State<SequencerSettingsScreen> {
     );
   }
 
+
+  Widget _buildProjectInfo() {
+    final threadsState = context.watch<ThreadsState>();
+    final activeThread = threadsState.activeThread;
+    final projectId = activeThread?.id ?? 'No project loaded';
+    final projectName = activeThread?.name ?? 'Untitled';
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceBase,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.info_outline,
+                color: AppColors.sequencerAccent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Project Information',
+                style: GoogleFonts.sourceSans3(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.sequencerText,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _buildInfoRow('Name', projectName),
+          const SizedBox(height: 8),
+          _buildInfoRow('Project ID', projectId, copyable: true),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value, {bool copyable = false}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 80,
+          child: Text(
+            label,
+            style: GoogleFonts.sourceSans3(
+              fontSize: 11,
+              color: AppColors.sequencerText.withOpacity(0.6),
+            ),
+          ),
+        ),
+        Expanded(
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  value,
+                  style: GoogleFonts.robotoMono(
+                    fontSize: 11,
+                    color: AppColors.sequencerText,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (copyable && value != 'No project loaded')
+                IconButton(
+                  icon: Icon(
+                    Icons.copy,
+                    size: 16,
+                    color: AppColors.sequencerAccent,
+                  ),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: value));
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Copied: $value'),
+                        backgroundColor: AppColors.sequencerAccent,
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEnhancedPlaybackLogging() {
+    final playbackState = context.watch<PlaybackState>();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceBase,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.bug_report,
+            color: AppColors.sequencerAccent,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Enhanced Playback Logging',
+                  style: GoogleFonts.sourceSans3(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.sequencerText,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Logs detailed playback state to console for debugging',
+                  style: GoogleFonts.sourceSans3(
+                    fontSize: 11,
+                    color: AppColors.sequencerText.withOpacity(0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Switch(
+            value: playbackState.enhancedPlaybackLogging,
+            onChanged: (value) {
+              playbackState.setEnhancedPlaybackLogging(value);
+            },
+            activeColor: AppColors.sequencerAccent,
+          ),
+        ],
+      ),
+    );
+  }
 
   Widget _buildResetButton() {
     return SizedBox(

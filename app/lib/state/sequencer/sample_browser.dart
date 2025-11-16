@@ -1,3 +1,4 @@
+import '../../utils/log.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 import 'dart:convert';
@@ -36,13 +37,13 @@ class SampleBrowserState extends ChangeNotifier {
       if (fullManifest is Map && fullManifest.containsKey('samples')) {
         _manifestData = fullManifest['samples'];
         _refreshCurrentItems();
-        debugPrint('📁 Sample browser initialized with ${_manifestData?.keys.length ?? 0} samples');
+        Log.d('📁 Sample browser initialized with ${_manifestData?.keys.length ?? 0} samples');
       } else {
-        debugPrint('❌ Invalid manifest structure: no samples key found');
+        Log.d('❌ Invalid manifest structure: no samples key found');
         _manifestData = {};
       }
     } catch (e) {
-      debugPrint('❌ Failed to load samples manifest: $e');
+      Log.d('❌ Failed to load samples manifest: $e');
       _manifestData = {}; // Empty fallback
     }
     
@@ -56,7 +57,7 @@ class SampleBrowserState extends ChangeNotifier {
     _targetCol = col;
     _isVisible = true;
     notifyListeners();
-    debugPrint('📁 Showing sample browser for cell [$step, $col]');
+    Log.d('📁 Showing sample browser for cell [$step, $col]');
   }
   
   // Show for a sample bank slot (V2 compatibility)
@@ -65,7 +66,7 @@ class SampleBrowserState extends ChangeNotifier {
     _targetCol = slot; // Reuse targetCol for slot
     _isVisible = true;
     notifyListeners();
-    debugPrint('📁 Showing sample browser for slot $slot');
+    Log.d('📁 Showing sample browser for slot $slot');
   }
   
   // Hide the sample browser
@@ -74,7 +75,7 @@ class SampleBrowserState extends ChangeNotifier {
     _targetStep = null;
     _targetCol = null;
     notifyListeners();
-    debugPrint('📁 Sample browser hidden');
+    Log.d('📁 Sample browser hidden');
   }
   
   // Navigate into a folder
@@ -82,7 +83,7 @@ class SampleBrowserState extends ChangeNotifier {
     _currentPath.add(folderName);
     _refreshCurrentItems();
     notifyListeners();
-    debugPrint('📁 Navigated to: ${_currentPath.join('/')}');
+    Log.d('📁 Navigated to: ${_currentPath.join('/')}');
   }
   
   // Navigate back one level
@@ -91,7 +92,7 @@ class SampleBrowserState extends ChangeNotifier {
       _currentPath.removeLast();
       _refreshCurrentItems();
       notifyListeners();
-      debugPrint('📁 Navigated back to: ${_currentPath.join('/')}');
+      Log.d('📁 Navigated back to: ${_currentPath.join('/')}');
     }
   }
   
@@ -99,7 +100,7 @@ class SampleBrowserState extends ChangeNotifier {
   String? selectSample(SampleItem item) {
     if (item.isFolder) return null;
     
-    debugPrint('📁 Selected sample: ${item.path}');
+    Log.d('📁 Selected sample: ${item.path}');
     return item.path; // Path is already complete from manifest
   }
   
@@ -120,13 +121,13 @@ class SampleBrowserState extends ChangeNotifier {
       
       // If same sample is already loaded in preview slot, just play it
       if (_previewSampleId == item.sampleId && sampleBankState.isSlotLoaded(_previewSlot)) {
-        debugPrint('▶️ [SAMPLE_BROWSER] Reusing preview slot for sample: ${item.sampleId}');
+        Log.d('▶️ [SAMPLE_BROWSER] Reusing preview slot for sample: ${item.sampleId}');
         playbackState.previewSampleSlot(_previewSlot, pitchRatio: 1.0, volume01: 1.0);
         return;
       }
       
       // Load sample into preview slot
-      debugPrint('📥 [SAMPLE_BROWSER] Loading sample into preview slot: ${item.sampleId}');
+      Log.d('📥 [SAMPLE_BROWSER] Loading sample into preview slot: ${item.sampleId}');
       final success = await sampleBankState.loadSample(_previewSlot, item.sampleId!);
       
       if (success) {
@@ -134,12 +135,12 @@ class SampleBrowserState extends ChangeNotifier {
         // Wait a tiny bit for sample to be ready, then preview
         await Future.delayed(const Duration(milliseconds: 50));
         playbackState.previewSampleSlot(_previewSlot, pitchRatio: 1.0, volume01: 1.0);
-        debugPrint('▶️ [SAMPLE_BROWSER] Preview started for sample: ${item.sampleId}');
+        Log.d('▶️ [SAMPLE_BROWSER] Preview started for sample: ${item.sampleId}');
       } else {
-        debugPrint('❌ [SAMPLE_BROWSER] Failed to load sample for preview: ${item.sampleId}');
+        Log.d('❌ [SAMPLE_BROWSER] Failed to load sample for preview: ${item.sampleId}');
       }
     } catch (e) {
-      debugPrint('❌ [SAMPLE_BROWSER] Error previewing sample: $e');
+      Log.d('❌ [SAMPLE_BROWSER] Error previewing sample: $e');
     }
   }
   
@@ -148,9 +149,9 @@ class SampleBrowserState extends ChangeNotifier {
     playbackState.stopPreview();
     if (unload) {
       _previewSampleId = null;
-      debugPrint('🛑 [SAMPLE_BROWSER] Preview stopped and slot cleared');
+      Log.d('🛑 [SAMPLE_BROWSER] Preview stopped and slot cleared');
     } else {
-      debugPrint('🛑 [SAMPLE_BROWSER] Preview stopped (slot kept for reuse)');
+      Log.d('🛑 [SAMPLE_BROWSER] Preview stopped (slot kept for reuse)');
     }
   }
   
@@ -159,7 +160,7 @@ class SampleBrowserState extends ChangeNotifier {
     _currentItems.clear();
     
     if (_manifestData == null) {
-      debugPrint('📁 No manifest data available');
+      Log.d('📁 No manifest data available');
       return;
     }
     
@@ -171,7 +172,7 @@ class SampleBrowserState extends ChangeNotifier {
     final currentPathPrefix = _currentPath.join('/');
     final searchPrefix = currentPathPrefix.isEmpty ? 'samples/' : 'samples/$currentPathPrefix/';
     
-    debugPrint('📁 Searching for items with prefix: $searchPrefix');
+    Log.d('📁 Searching for items with prefix: $searchPrefix');
     
     // Go through all samples in manifest
     int totalSamples = 0;
@@ -221,11 +222,11 @@ class SampleBrowserState extends ChangeNotifier {
     files.sort((a, b) => a.name.compareTo(b.name));
     _currentItems.addAll(files);
     
-    debugPrint('📁 Refreshed items for path: ${_currentPath.join('/')}');
-    debugPrint('📁 Total samples in manifest: $totalSamples');
-    debugPrint('📁 Matching samples: $matchingSamples');
-    debugPrint('📁 Found ${folders.length} folders, ${files.length} files');
-    debugPrint('📁 Current items count: ${_currentItems.length}');
+    Log.d('📁 Refreshed items for path: ${_currentPath.join('/')}');
+    Log.d('📁 Total samples in manifest: $totalSamples');
+    Log.d('📁 Matching samples: $matchingSamples');
+    Log.d('📁 Found ${folders.length} folders, ${files.length} files');
+    Log.d('📁 Current items count: ${_currentItems.length}');
     
     notifyListeners();
   }

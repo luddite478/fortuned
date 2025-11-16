@@ -184,6 +184,8 @@ class TableBindings {
     tableAppendSection = _tableAppendSectionPtr!.asFunction<void Function(int, int, int)>();
     _tableDeleteSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32)>>('table_delete_section');
     tableDeleteSection = _tableDeleteSectionPtr!.asFunction<void Function(int, int)>();
+    _tableReorderSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32)>>('table_reorder_section');
+    tableReorderSection = _tableReorderSectionPtr!.asFunction<void Function(int, int, int)>();
     // New single setters for batch updates
     _tableSetSectionPtr = lib.lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32, ffi.Int32)>>('table_set_section');
     tableSetSection = _tableSetSectionPtr.asFunction<void Function(int, int, int, int)>();
@@ -257,6 +259,9 @@ class TableBindings {
 
   ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32)>>? _tableDeleteSectionPtr;
   void Function(int, int)? tableDeleteSection; // (sectionIndex, undo)
+
+  ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32)>>? _tableReorderSectionPtr;
+  void Function(int, int, int)? tableReorderSection; // (fromIndex, toIndex, undo)
   // Single setters for batch updates
   late final ffi.Pointer<ffi.NativeFunction<ffi.Void Function(ffi.Int32, ffi.Int32, ffi.Int32, ffi.Int32)>> _tableSetSectionPtr;
   late final void Function(int, int, int, int) tableSetSection;

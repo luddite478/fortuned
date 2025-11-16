@@ -19,7 +19,8 @@ class MultitaskPanelState extends ChangeNotifier {
   void showMasterSettings() => setMode(MultitaskPanelMode.masterSettings);
   void showStepInsertSettings() => setMode(MultitaskPanelMode.stepInsertSettings);
   void showShareWidget() => setMode(MultitaskPanelMode.shareWidget);
-  void showRecordingWidget() => setMode(MultitaskPanelMode.recordingWidget);
+  void showSectionSettings() => setMode(MultitaskPanelMode.sectionSettings);
+  void showSectionManagement() => setMode(MultitaskPanelMode.sectionManagement);
   void showPlaceholder() => setMode(MultitaskPanelMode.placeholder);
 }
 
@@ -31,5 +32,8 @@ enum MultitaskPanelMode {
   masterSettings,
   stepInsertSettings,
   shareWidget,
+  sectionSettings,
+  sectionManagement,
+  @Deprecated('Recording widget removed - recordings now auto-save as messages')
   recordingWidget,
 }

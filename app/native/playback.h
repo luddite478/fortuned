@@ -152,6 +152,10 @@ void switch_to_section(int section_index);
 __attribute__((visibility("default"))) __attribute__((used))
 void playback_set_master_volume(float volume01);
 
+// Enhanced playback logging (for debugging)
+__attribute__((visibility("default"))) __attribute__((used))
+void playback_set_enhanced_logging(int enabled);
+
 // Volume smoothing configuration
 __attribute__((visibility("default"))) __attribute__((used))
 void playback_set_smoothing_rise_time(float ms);

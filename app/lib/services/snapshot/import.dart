@@ -190,6 +190,15 @@ class SnapshotImporter {
     }
     
     debugPrint('✅ [SNAPSHOT_IMPORT] All patterns created and synced');
+    
+    // CRITICAL FIX: Recalculate timeline positions seamlessly
+    // During import, setSectionStepCount() was called incrementally, triggering timeline
+    // updates when only SOME patterns existed. This caused incorrect X positions.
+    // Now that ALL patterns exist, we recalculate the timeline one final time.
+    // We use the seamless update (not full rebuild) to preserve the seamless approach.
+    debugPrint('🔄 [SNAPSHOT_IMPORT] Recalculating final timeline positions (seamless)');
+    _tableState.updateTimelineSeamless();
+    debugPrint('✅ [SNAPSHOT_IMPORT] Timeline positions finalized');
   }
 
   Future<bool> _importSampleBankState(Map<String, dynamic> sampleBankData) async {
@@ -357,6 +366,8 @@ class SnapshotImporter {
       final currentSection = playbackData['current_section'] as int;
       final sectionsLoopsNum = playbackData['sections_loops_num'] as List<dynamic>;
 
+      debugPrint('  📊 Saved state: BPM=$bpm, songMode=$songMode, currentSection=$currentSection');
+
       // Set playback parameters
       _playbackState.setBpm(bpm);
       _playbackState.setSongMode(songMode != 0);
@@ -369,8 +380,11 @@ class SnapshotImporter {
         _playbackState.setSectionLoopsNum(i, loops);
       }
 
-      // Switch to the saved section
-      _playbackState.switchToSection(currentSection);
+      // IMPORTANT: Always start from section 0 on import for consistency
+      // The saved currentSection is informational only and could cause UI confusion
+      // if the project was saved mid-playback or at a later section
+      debugPrint('  🔄 Resetting to section 0 (saved section was $currentSection)');
+      _playbackState.switchToSection(0);
 
       debugPrint('✅ [SNAPSHOT_IMPORT] Playback state imported');
       return true;

@@ -1115,7 +1115,96 @@ if( s->pattern_current_loop[ pnum ] >= s->pattern_loop_counts[ pnum ] )
 
 ---
 
-**Last Updated:** October 22, 2025  
+## Bug Fix: sv_get_pattern_lines() Returns Wrong Field (November 16, 2025)
+
+### Problem
+
+The `sv_get_pattern_lines()` function was returning `pat->data_ysize` (internal buffer allocation size) instead of `pat->lines` (visible line count), causing pattern resize verification to fail when shrinking patterns.
+
+### Root Cause
+
+The `sunvox_pattern` struct has two separate size fields:
+```cpp
+struct sunvox_pattern {
+    int data_ysize;  // Allocated buffer capacity (may be over-allocated)
+    int lines;       // Visible line count (used by audio engine)
+    // ...
+};
+```
+
+When shrinking a pattern (e.g., 16→11 lines), `sunvox_pattern_set_number_of_lines()` only updates `pat->lines` (to 11) but leaves `pat->data_ysize` unchanged (at 16) as a memory optimization. This is intentional - it avoids frequent reallocation by keeping an over-allocated buffer.
+
+However, `sv_get_pattern_lines()` was returning `data_ysize` instead of `lines`, so:
+1. Pattern successfully resized to 11 lines internally ✅
+2. Function returned 0 (success) ✅  
+3. But `sv_get_pattern_lines()` returned 16 (buffer size) instead of 11 (visible size) ❌
+4. Verification failed, triggering unnecessary pattern recreation fallback ❌
+
+### The Fix
+
+**File:** `sunvox_lib/main/sunvox_lib.cpp`  
+**Line:** 1922 (previously 1918)
+
+**Before:**
+```cpp
+return s->pats[ pat_num ]->data_ysize;  // ❌ Returned buffer allocation size
+```
+
+**After:**
+```cpp
+return s->pats[ pat_num ]->lines;  // ✅ Returns visible line count
+```
+
+### Why This Is Correct
+
+1. **API Semantics:** Function named `sv_get_pattern_lines()` should return user-visible line count
+2. **Audio Engine Usage:** The audio callback uses `pat->lines` for playback boundaries:
+   ```cpp
+   // sunvox_engine_audio_callback.cpp line 2321
+   if( new_line_counter >= s->pats_info[ pnum ].x + s->pats[ pnum ]->lines )
+   ```
+3. **Encapsulation:** `data_ysize` is an internal implementation detail that should not leak through public API
+4. **Consistency:** All SunVox timeline calculations use `pat->lines`, not `data_ysize`
+
+### Impact
+
+✅ **Pattern shrinking now works correctly**
+- No more "Pattern resize FAILED verification" errors
+- No unnecessary fallback to pattern recreation
+- Seamless operations succeed on first attempt
+
+✅ **Backward compatible**
+- Pattern growing (already worked) continues to work
+- Only fixes the broken shrinking case
+- No breaking changes for existing code
+
+✅ **Performance improvement**
+- Seamless resize is faster than delete+recreate fallback
+- Eliminates unnecessary pattern recreation overhead
+
+### Testing
+
+```cpp
+// Test case: Shrink pattern from 16 to 11 lines
+int pat = sv_new_pattern(0, -1, 0, 0, 16, 16, 0, "Test");
+
+sv_lock_slot(0);
+int result = sv_set_pattern_size(0, pat, 16, 11);
+sv_unlock_slot(0);
+
+int size = sv_get_pattern_lines(0, pat);
+assert(size == 11);  // ✅ NOW PASSES (was returning 16 before)
+```
+
+### Related Documentation
+
+- Complete analysis: `/SUNVOX_PATTERN_RESIZE_BUG_ROOT_CAUSE_AND_FIX.md`
+- Original bug report: `/SUNVOX_PATTERN_RESIZE_BUG.md`
+- Wrapper workaround (can now be removed): `app/native/sunvox_wrapper.mm` lines 397-421
+
+---
+
+**Last Updated:** November 16, 2025 (Bug Fix Applied)  
 **SunVox Version:** 2.1.2b  
 **Status:** Production Ready ✅
 

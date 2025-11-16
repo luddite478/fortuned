@@ -1915,7 +1915,11 @@ SUNVOX_EXPORT int sv_get_pattern_lines( int slot, int pat_num )
     sunvox_engine* s = g_sv[ slot ];
     if( (unsigned)pat_num >= (unsigned)s->pats_num ) return 0;
     if( !s->pats[ pat_num ] ) return 0;
-    return s->pats[ pat_num ]->data_ysize;
+    // FORTUNED FIX (Nov 16, 2025): Return visible line count, not internal buffer size
+    // The audio engine uses pat->lines for playback boundaries, not data_ysize
+    // data_ysize is the allocated buffer capacity (may be over-allocated for optimization)
+    // lines is the visible/active line count (what user expects and engine uses)
+    return s->pats[ pat_num ]->lines;
 }
 #ifdef OS_ANDROID
 SUNVOX_EXPORT JNIEXPORT jint JNICALL Java_nightradio_sunvoxlib_SunVoxLib_get_1pattern_1lines( JNIEnv* je, jclass jc, jint slot, jint pat_num )

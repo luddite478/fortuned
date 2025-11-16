@@ -1,3 +1,4 @@
+import '../../utils/log.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
@@ -62,7 +63,7 @@ class SampleBankState extends ChangeNotifier {
   }
   
   void _initializeSampleBank() {
-    debugPrint('🏗️ [SAMPLE_BANK_STATE] Initializing sample bank state');
+    Log.d('🏗️ [SAMPLE_BANK_STATE] Initializing sample bank state');
     
     // Ensure native sample bank is initialized/reset
     _sample_bank_ffi.sampleBankInit();
@@ -70,7 +71,7 @@ class SampleBankState extends ChangeNotifier {
     // Sync initial state from native
     syncSampleBankState();
     
-    debugPrint('✅ [SAMPLE_BANK_STATE] Sample bank state initialized');
+    Log.d('✅ [SAMPLE_BANK_STATE] Sample bank state initialized');
   }
   
   /// Load sample into a slot by manifest ID (required).
@@ -81,15 +82,15 @@ class SampleBankState extends ChangeNotifier {
   /// Load sample from asset path into slot with a stable sampleId (internal)
   Future<bool> _loadSampleWithId(int slot, String assetPath, String sampleId) async {
     if (slot < 0 || slot >= maxSampleSlots) {
-      debugPrint('❌ [SAMPLE_BANK_STATE] Invalid slot: $slot');
+      Log.d('❌ [SAMPLE_BANK_STATE] Invalid slot: $slot');
       return false;
     }
     try {
-      debugPrint('📂 [SAMPLE_BANK_STATE] Loading sample with id into slot $slot: $assetPath (id=$sampleId)');
+      Log.d('📂 [SAMPLE_BANK_STATE] Loading sample with id into slot $slot: $assetPath (id=$sampleId)');
 
       final tempFilePath = await _copyAssetToTempFile(assetPath);
       if (tempFilePath == null) {
-        debugPrint('❌ [SAMPLE_BANK_STATE] Failed to copy asset to temp file: $assetPath');
+        Log.d('❌ [SAMPLE_BANK_STATE] Failed to copy asset to temp file: $assetPath');
         return false;
       }
 
@@ -117,14 +118,14 @@ class SampleBankState extends ChangeNotifier {
       if (result == 0) {
         _slotNames[slot] = assetPath.split('/').last;
         _slotPaths[slot] = assetPath;
-        debugPrint('✅ [SAMPLE_BANK_STATE] Loaded sample $slot with id: ${_slotNames[slot]}');
+        Log.d('✅ [SAMPLE_BANK_STATE] Loaded sample $slot with id: ${_slotNames[slot]}');
         return true;
       } else {
-        debugPrint('❌ [SAMPLE_BANK_STATE] Failed to load sample with id $slot: $result');
+        Log.d('❌ [SAMPLE_BANK_STATE] Failed to load sample with id $slot: $result');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ [SAMPLE_BANK_STATE] Error loading sample with id $slot: $e');
+      Log.d('❌ [SAMPLE_BANK_STATE] Error loading sample with id $slot: $e');
       return false;
     }
   }
@@ -141,15 +142,15 @@ class SampleBankState extends ChangeNotifier {
           final assetPath = entry['path'] as String;
           return await _loadSampleWithId(slot, assetPath, sampleId);
         } else {
-          debugPrint('❌ [SAMPLE_BANK_STATE] Manifest id not found or invalid: $sampleId');
+          Log.d('❌ [SAMPLE_BANK_STATE] Manifest id not found or invalid: $sampleId');
           return false;
         }
       } else {
-        debugPrint('❌ [SAMPLE_BANK_STATE] Invalid manifest structure');
+        Log.d('❌ [SAMPLE_BANK_STATE] Invalid manifest structure');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ [SAMPLE_BANK_STATE] Failed to load manifest: $e');
+      Log.d('❌ [SAMPLE_BANK_STATE] Failed to load manifest: $e');
       return false;
     }
   }
@@ -172,10 +173,10 @@ class SampleBankState extends ChangeNotifier {
       final File tempFile = File(tempPath);
       await tempFile.writeAsBytes(bytes);
       
-      debugPrint('📁 [SAMPLE_BANK_STATE] Copied asset to temp file: $tempPath');
+      Log.d('📁 [SAMPLE_BANK_STATE] Copied asset to temp file: $tempPath');
       return tempPath;
     } catch (e) {
-      debugPrint('❌ [SAMPLE_BANK_STATE] Failed to copy asset: $e');
+      Log.d('❌ [SAMPLE_BANK_STATE] Failed to copy asset: $e');
       return null;
     }
   }
@@ -183,7 +184,7 @@ class SampleBankState extends ChangeNotifier {
   /// Unload sample from slot
   void unloadSample(int slot) {
     if (slot < 0 || slot >= maxSampleSlots) {
-      debugPrint('❌ [SAMPLE_BANK_STATE] Invalid slot: $slot');
+      Log.d('❌ [SAMPLE_BANK_STATE] Invalid slot: $slot');
       return;
     }
     
@@ -194,7 +195,7 @@ class SampleBankState extends ChangeNotifier {
     _slotPaths[slot] = null;
     
     // Native state will be synced automatically by timer
-    debugPrint('🗑️ [SAMPLE_BANK_STATE] Unloaded sample $slot');
+    Log.d('🗑️ [SAMPLE_BANK_STATE] Unloaded sample $slot');
   }
   
   /// Set active slot for UI
@@ -203,7 +204,7 @@ class SampleBankState extends ChangeNotifier {
       _activeSlot = slot;
       activeSlotNotifier.value = slot;
       notifyListeners();
-      debugPrint('🎯 [SAMPLE_BANK_STATE] Set active slot to $slot');
+      Log.d('🎯 [SAMPLE_BANK_STATE] Set active slot to $slot');
       // If unified selection is available, mark sample bank as active selection
       _uiSelection?.selectSampleBank(slot);
     }
@@ -262,7 +263,7 @@ class SampleBankState extends ChangeNotifier {
     _sample_bank_ffi.sampleBankSetSampleSettings(slot, v, p);
     _sampleVolumeNotifiers[slot]?.value = v;
     _samplePitchNotifiers[slot]?.value = p;
-    debugPrint('🎚️ [SAMPLE_BANK_STATE] Set sample settings slot=$slot vol=${volume?.toStringAsFixed(2)} pitch=${pitch?.toStringAsFixed(2)}');
+    Log.d('🎚️ [SAMPLE_BANK_STATE] Set sample settings slot=$slot vol=${volume?.toStringAsFixed(2)} pitch=${pitch?.toStringAsFixed(2)}');
   }
   
   // Getters (state comes from native, metadata from local)
@@ -341,7 +342,7 @@ class SampleBankState extends ChangeNotifier {
   
   Future<void> uiPickFileForSlot(int slot) async {
     // Placeholder implementation - would open file picker in real implementation
-    debugPrint('🎵 [SAMPLE_BANK_STATE] Pick file for slot $slot (placeholder)');
+    Log.d('🎵 [SAMPLE_BANK_STATE] Pick file for slot $slot (placeholder)');
   }
 
   /// Sync sample bank state from native using seqlock pattern (called by timer each frame)
@@ -430,7 +431,7 @@ class SampleBankState extends ChangeNotifier {
   
   @override
   void dispose() {
-    debugPrint('🧹 [SAMPLE_BANK_STATE] Disposing sample bank state');
+    Log.d('🧹 [SAMPLE_BANK_STATE] Disposing sample bank state');
     
     // Dispose ValueNotifiers
     loadedCountNotifier.dispose();

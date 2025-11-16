@@ -3,15 +3,12 @@ import 'package:provider/provider.dart';
 import 'sound_grid_widget.dart';
 import 'sample_selection_widget.dart';
 import 'sound_grid_side_control_widget.dart';
-import 'section_control_overlay.dart';
 import 'section_creation_overlay.dart';
 import 'sequencer_body_overlay_menu.dart';
 import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/playback.dart';
 import '../../../state/sequencer/sample_browser.dart';
 import '../../../state/sequencer/edit.dart';
-import '../../../state/sequencer/recording.dart';
-import 'recording_widget.dart';
 import '../../../state/sequencer/section_settings.dart';
 import '../../../utils/app_colors.dart';
 
@@ -56,12 +53,11 @@ class _SequencerBodyState extends State<SequencerBody> {
 
   @override
   Widget build(BuildContext context) {
-    return Selector4<TableState, PlaybackState, SampleBrowserState, RecordingState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen, bool isRecordingOverlayOpen, int numSections, int currentIndex})>(
-      selector: (context, tableState, playbackState, sampleBrowserState, recordingState) => (
+    return Selector3<TableState, PlaybackState, SampleBrowserState, ({bool isBodyBrowserOpen, bool isSectionControlOpen, bool isSectionCreationOpen, int numSections, int currentIndex})>(
+      selector: (context, tableState, playbackState, sampleBrowserState) => (
         isBodyBrowserOpen: sampleBrowserState.isVisible,
         isSectionControlOpen: false, // Moved to SectionSettingsState
         isSectionCreationOpen: false, // Moved to SectionSettingsState
-        isRecordingOverlayOpen: recordingState.isOverlayVisible,
         numSections: tableState.sectionsCount,
         currentIndex: tableState.uiSelectedSection,
       ),
@@ -113,30 +109,8 @@ class _SequencerBodyState extends State<SequencerBody> {
                 ),
               ),
 
-            // Recording overlay over grid area
-            if (data.isRecordingOverlayOpen)
-              Positioned(
-                left: MediaQuery.of(context).size.width * (SequencerBody.sideControlWidthPercent / 100.0),
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: const SequencerBodyOverlayMenu(
-                  type: SequencerBodyOverlayMenuType.recording,
-                  child: RecordingWidget(),
-                ),
-              ),
-
-            if (sectionSettings.isSectionControlOpen)
-              Positioned(
-                left: MediaQuery.of(context).size.width * (SequencerBody.sideControlWidthPercent / 100.0),
-                right: 0,
-                top: 0,
-                bottom: 0,
-                child: const SequencerBodyOverlayMenu(
-                  type: SequencerBodyOverlayMenuType.sectionSettings,
-                  child: SectionControlOverlay(),
-                ),
-              ),
+            // Recording overlay removed - recordings now auto-save as messages
+            // Section settings moved to multitask panel (no longer an overlay)
 
             // Value control overlay handled at screen level (to optionally include edit buttons)
           ],
@@ -184,8 +158,10 @@ class _SequencerBodyState extends State<SequencerBody> {
                     playbackState.switchToPreviousSection();
                   }
                 }
-                // Update UI selection separately
-                tableState.setUiSelectedSection(index);
+                // Update UI selection separately (use post-frame callback to avoid setState during build)
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  tableState.setUiSelectedSection(index);
+                });
               }
             },
             itemCount: tableState.sectionsCount + 1, // +1 for section creation

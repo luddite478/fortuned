@@ -88,7 +88,7 @@ int sample_bank_load(int slot, const char* file_path) {
         return -1;
     }
 
-    prnt("📂 [SAMPLE_BANK] Loading sample into slot %d: %s", slot, file_path);
+    prnt_debug("📂 [SAMPLE_BANK] Loading sample into slot %d: %s", slot, file_path);
 
     // Unload existing sample if any
     if (g_sample_bank_state.samples[slot].loaded) {
@@ -160,7 +160,7 @@ void sample_bank_unload(int slot) {
         return; // Already unloaded
     }
 
-    prnt("🗑️ [SAMPLE_BANK] Unloading sample from slot %d", slot);
+    prnt_debug("🗑️ [SAMPLE_BANK] Unloading sample from slot %d", slot);
 
     // Unload from SunVox sampler module
     if (sunvox_wrapper_is_initialized()) {
@@ -211,7 +211,7 @@ void sample_bank_stop(int slot) {
         return;
     }
 
-    prnt("⏹️ [SAMPLE_BANK] Stopping sample preview for slot %d", slot);
+    prnt_debug("⏹️ [SAMPLE_BANK] Stopping sample preview for slot %d", slot);
 }
 
 int sample_bank_is_loaded(int slot) {

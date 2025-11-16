@@ -150,15 +150,241 @@ void sunvox_wrapper_update_timeline_seamless(void) {
 
 **No audio interruption** - the playhead jumps from step 15 to step 14 without stopping audio.
 
+## Table Compaction Implementation
+
+### The Three-Layer Architecture
+
+The sequencer uses three synchronized data structures:
+
+1. **Table (`table[MAX_STEPS][MAX_COLS]`)** - Physical cell storage (contiguous, compacted)
+2. **Sections Metadata (`sections[MAX_SECTIONS]`)** - Logical view (start_step, num_steps)
+3. **SunVox Patterns** - Audio engine representation (patterns in timeline)
+
+### Table Layout: Contiguous Compaction
+
+The table uses a **contiguous compacted layout** where all sections are packed sequentially with **no gaps**:
+
+```
+Physical Table Memory:
+Row 0-15:   Section 0 cells (16 steps)
+Row 16-31:  Section 1 cells (16 steps)
+Row 32-47:  Section 2 cells (16 steps)
+Row 48-63:  Section 3 cells (16 steps)
+...
+
+Sections Metadata:
+Section 0: start_step=0,  num_steps=16
+Section 1: start_step=16, num_steps=16
+Section 2: start_step=32, num_steps=16
+Section 3: start_step=48, num_steps=16
+
+SunVox Timeline:
+Pattern 0: X=0,  lines=16 (occupies timeline 0-15)
+Pattern 1: X=16, lines=16 (occupies timeline 16-31)
+Pattern 2: X=32, lines=16 (occupies timeline 32-47)
+Pattern 3: X=48, lines=16 (occupies timeline 48-63)
+```
+
+**Key Principle:** `start_step` values are **calculated** from `num_steps`, not stored independently!
+
+### Core Function: `table_recompute_section_starts()`
+
+This function ensures the table stays compacted after any operation:
+
+```cpp
+static void table_recompute_section_starts(void) {
+    int cursor = 0;
+    for (int i = 0; i < g_table_state.sections_count; i++) {
+        g_table_state.sections[i].start_step = cursor;
+        cursor += g_table_state.sections[i].num_steps;
+    }
+}
+```
+
+**When called:**
+- After inserting/deleting steps
+- After deleting entire sections
+- After reordering sections
+- After changing section size
+
+**What it does:**
+- Recalculates all `start_step` values as cumulative sum
+- Ensures no gaps in the layout
+- Maintains contiguous memory usage
+
+### Step Insertion: Full Table Shift
+
+When inserting a step, **all subsequent sections' data must shift down**:
+
+```cpp
+void table_insert_step(int section_index, int at_step, int undo_record) {
+    // Calculate total table size BEFORE insertion
+    int total_steps = 0;
+    for (int i = 0; i < sections_count; i++) {
+        total_steps += sections[i].num_steps;
+    }
+    
+    state_write_begin();
+    
+    // CRITICAL: Shift ALL rows from end of table down to insertion point
+    // This moves ALL subsequent sections' data down by 1 row
+    for (int step = total_steps - 1; step >= at_step; step--) {
+        for (int col = 0; col < MAX_COLS; col++) {
+            table[step + 1][col] = table[step][col];
+        }
+    }
+    
+    // Clear the new row at insertion point
+    for (int col = 0; col < MAX_COLS; col++) {
+        table_set_cell_defaults(&table[at_step][col]);
+    }
+    
+    // Update metadata
+    sections[section_index].num_steps++;
+    table_recompute_section_starts();  // Recalculate all start_step values
+    
+    state_write_end();
+    
+    // Sync to SunVox
+    sunvox_wrapper_create_section_pattern(section_index, sections[section_index].num_steps);
+}
+```
+
+**Example:**
+```
+Before: Insert at step 10 in Section 0
+Row 0-15:  Section 0 (16 steps)
+Row 16-31: Section 1 (16 steps) ← Has sample at row 21
+
+After: Section 0 now has 17 steps
+Row 0-16:  Section 0 (17 steps) ← New step inserted at row 10
+Row 17-32: Section 1 (16 steps) ← ALL CELLS SHIFTED DOWN from 16-31 to 17-32
+           Sample now at row 22 (still at step 5 within Section 1!)
+```
+
+### Step Deletion: Full Table Compaction
+
+When deleting a step, **all subsequent sections' data must shift up**:
+
+```cpp
+void table_delete_step(int section_index, int at_step, int undo_record) {
+    // Calculate total table size BEFORE deletion
+    int total_steps = 0;
+    for (int i = 0; i < sections_count; i++) {
+        total_steps += sections[i].num_steps;
+    }
+    
+    state_write_begin();
+    
+    // CRITICAL: Shift ALL rows from deletion point to end of table up by 1
+    // This moves ALL subsequent sections' data up by 1 row
+    for (int step = at_step; step < total_steps - 1; step++) {
+        for (int col = 0; col < MAX_COLS; col++) {
+            table[step][col] = table[step + 1][col];
+        }
+    }
+    
+    // Clear the last row (now empty after shift)
+    for (int col = 0; col < MAX_COLS; col++) {
+        table_set_cell_defaults(&table[total_steps - 1][col]);
+    }
+    
+    // Update metadata
+    sections[section_index].num_steps--;
+    table_recompute_section_starts();  // Recalculate all start_step values
+    
+    state_write_end();
+    
+    // Sync to SunVox
+    sunvox_wrapper_create_section_pattern(section_index, sections[section_index].num_steps);
+}
+```
+
+**Example:**
+```
+Before: Delete step 10 from Section 0
+Row 0-15:  Section 0 (16 steps)
+Row 16-31: Section 1 (16 steps) ← Has sample at row 21
+
+After: Section 0 now has 15 steps
+Row 0-14:  Section 0 (15 steps) ← Step 10 deleted
+Row 15-29: Section 1 (16 steps) ← ALL CELLS SHIFTED UP from 16-31 to 15-29
+           Sample now at row 20 (still at step 5 within Section 1!)
+```
+
+### Section Reordering: Full Table Rebuild
+
+When reordering sections, the entire table is rebuilt:
+
+```cpp
+void table_reorder_section(int from_index, int to_index, int undo_record) {
+    // 1. Save moving section's data to temp buffer
+    Cell* temp_buffer = malloc(moving_steps * MAX_COLS * sizeof(Cell));
+    for (int step = 0; step < moving_steps; step++) {
+        for (int col = 0; col < MAX_COLS; col++) {
+            temp_buffer[step * MAX_COLS + col] = table[moving_start + step][col];
+        }
+    }
+    
+    // 2. Shift sections metadata
+    // (Reorder sections array entries)
+    
+    // 3. Rebuild entire table in new order
+    Cell* rebuild_buffer = malloc(MAX_STEPS * MAX_COLS * sizeof(Cell));
+    int cursor = 0;
+    for (int i = 0; i < sections_count; i++) {
+        // Copy each section's data to new position in rebuild buffer
+        cursor += sections[i].num_steps;
+    }
+    
+    // 4. Recalculate all positions
+    table_recompute_section_starts();
+    
+    // 5. Copy rebuild buffer back to table
+    memcpy(table, rebuild_buffer, ...);
+    
+    // 6. Sync to SunVox (seamless reorder)
+    sunvox_wrapper_reorder_section(from_index, to_index);
+}
+```
+
+### Why This Design?
+
+**Contiguous Compaction Advantages:**
+- ✅ **No wasted memory** - No gaps between sections
+- ✅ **Simple position calculation** - `start_step` is just cumulative sum
+- ✅ **Cache-friendly** - Sequential memory access
+- ✅ **Easy to sync** - Maps directly to SunVox timeline
+
+**Section Independence (Logical):**
+- ✅ Each section has independent `num_steps`
+- ✅ Adding/removing steps doesn't change other sections' step counts
+- ✅ Samples stay at same position **within their section**
+
+**Physical Dependency (Implementation):**
+- ⚠️ Cell data for all sections must shift to maintain compaction
+- ⚠️ `start_step` values are recalculated, not independent
+- ⚠️ Operations affect physical memory layout of subsequent sections
+
+**This is exactly like a dynamic array:**
+- Removing element 5 shifts elements 6, 7, 8... up by 1
+- Element 7 stays "element 7" but moves to index 6
+- Similarly, Section 1 Step 5 stays "Section 1 Step 5" but moves physical row
+
 ## Implementation Files
 
 ### Modified Files
-- **`app/native/sunvox_wrapper.mm`**: Added `sunvox_wrapper_update_timeline_seamless()` function
-- **`app/native/sunvox_wrapper.h`**: Added function declaration
-- **`app/native/sunvox_wrapper.mm`**: Modified `sunvox_wrapper_create_section_pattern()` to call seamless update
+- **`app/native/table.mm`**: 
+  - `table_recompute_section_starts()` - Recalculates all section positions
+  - `table_insert_step()` - Shifts entire table from insertion point
+  - `table_delete_step()` - Shifts entire table from deletion point
+  - `table_reorder_section()` - Rebuilds entire table in new order
+- **`app/native/sunvox_wrapper.mm`**: 
+  - `sunvox_wrapper_update_timeline_seamless()` - Updates pattern X positions
+  - `sunvox_wrapper_create_section_pattern()` - Calls seamless timeline update
+- **`app/native/sunvox_wrapper.h`**: Added function declarations
 
 ### Unchanged Files
-- `table.mm` - No changes needed, still calls `sunvox_wrapper_create_section_pattern()`
 - SunVox library - No modifications needed, uses existing APIs
 - Dart layer - No changes needed
 

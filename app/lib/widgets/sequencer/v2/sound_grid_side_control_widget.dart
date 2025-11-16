@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 // duplicate import removed
 import 'package:provider/provider.dart';
 import '../../../state/sequencer/section_settings.dart';
+import '../../../state/sequencer/multitask_panel.dart';
 import '../../../state/sequencer/undo_redo.dart';
 import '../../../state/sequencer/table.dart';
 import '../../../state/sequencer/playback.dart';
@@ -20,6 +21,7 @@ class SoundGridSideControlWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final sectionSettings = context.watch<SectionSettingsState>();
+    final multitaskPanel = context.watch<MultitaskPanelState>();
     final playbackState = context.watch<PlaybackState>();
     // final editState = context.watch<EditState>(); // reserved for future selection-mode awareness
     final undoRedo = context.watch<UndoRedoState>();
@@ -72,67 +74,18 @@ class SoundGridSideControlWidget extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: side == SideControlSide.left ? [
                   // Left Side: Section Control Button
-                  _buildSideControlButtonWithText(
+                  _SectionControlButton(
                     width: buttonWidth,
                     height: buttonHeight,
-                    text: '${tableState.uiSelectedSection + 1}',
-                    color: sectionSettings.isSectionControlOpen 
-                        ? AppColors.sequencerAccent 
-                        : AppColors.sequencerLightText,
+                    sectionNumber: tableState.uiSelectedSection + 1,
                     onPressed: () {
-                      sectionSettings.toggleSectionControlOverlay();
+                      if (multitaskPanel.currentMode == MultitaskPanelMode.sectionSettings) {
+                        multitaskPanel.showPlaceholder();
+                      } else {
+                        multitaskPanel.showSectionSettings();
+                      }
                     },
                     tooltip: 'Section Settings',
-                    bottom: ValueListenableBuilder<bool>(
-                      valueListenable: playbackState.songModeNotifier,
-                      builder: (context, isSongMode, __) {
-                        if (!isSongMode) {
-                          // Loop mode: show infinity symbol
-                          final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
-                          return Text(
-                            '∞',
-                            overflow: TextOverflow.fade,
-                            softWrap: false,
-                            style: TextStyle(
-                              color: color,
-                              fontSize: buttonWidth * 0.7,
-                              fontWeight: FontWeight.w600,
-                              height: 1.0,
-                            ),
-                          );
-                        } else {
-                          // Song mode: show loop counter
-                          return ValueListenableBuilder<int>(
-                            valueListenable: playbackState.currentSectionLoopNotifier,
-                            builder: (context, currentLoopZeroBased, __) {
-                              return ValueListenableBuilder<int>(
-                                valueListenable: playbackState.currentSectionLoopsNumNotifier,
-                                builder: (context, totalLoops, ___) {
-                                  final displayCurrent = (currentLoopZeroBased + 1).clamp(1, totalLoops);
-                                  final label = '$displayCurrent/$totalLoops';
-                                  final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
-                                  return Text(
-                                    label,
-                                    overflow: TextOverflow.fade,
-                                    softWrap: false,
-                                    style: TextStyle(
-                                      color: color,
-                                      fontSize: buttonWidth * 0.40,
-                                      fontWeight: FontWeight.w600,
-                                      height: 1.0,
-                                      letterSpacing: 0.2,
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        }
-                      },
-                    ),
-                    backgroundColor: sectionSettings.isSectionControlOpen
-                        ? AppColors.sequencerPrimaryButton
-                        : null,
                   ),
                    
                   SizedBox(height: buttonSpacing),
@@ -300,84 +253,146 @@ class SoundGridSideControlWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildSideControlButtonWithText({
-    required double width,
-    required double height,
-    required String text,
-    required Color color,
-    required VoidCallback? onPressed,
-    required String tooltip,
-    Widget? bottom,
-    Color? backgroundColor,
-  }) {
-    final isEnabled = onPressed != null;
+}
+
+// Stateful section control button with click feedback
+class _SectionControlButton extends StatefulWidget {
+  final double width;
+  final double height;
+  final int sectionNumber;
+  final VoidCallback onPressed;
+  final String tooltip;
+
+  const _SectionControlButton({
+    required this.width,
+    required this.height,
+    required this.sectionNumber,
+    required this.onPressed,
+    required this.tooltip,
+  });
+
+  @override
+  State<_SectionControlButton> createState() => _SectionControlButtonState();
+}
+
+class _SectionControlButtonState extends State<_SectionControlButton> {
+  bool _isPressed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final playbackState = context.watch<PlaybackState>();
     
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: backgroundColor ?? (isEnabled 
-            ? AppColors.sequencerSurfaceRaised 
-            : AppColors.sequencerSurfacePressed),
-        borderRadius: BorderRadius.circular(2), // Sharp corners
-        border: Border.all(
-          color: AppColors.sequencerBorder,
-          width: 0.5,
-        ),
-        boxShadow: isEnabled
-            ? [
-                // Protruding effect for enabled buttons
-                BoxShadow(
-                  color: AppColors.sequencerShadow,
-                  blurRadius: 1.5,
-                  offset: const Offset(0, 1),
-                ),
-                BoxShadow(
-                  color: AppColors.sequencerSurfaceRaised,
-                  blurRadius: 0.5,
-                  offset: const Offset(0, -0.5),
-                ),
-              ]
-            : [
-                // Recessed effect for disabled buttons
-                BoxShadow(
-                  color: AppColors.sequencerShadow,
-                  blurRadius: 1,
-                  offset: const Offset(0, 0.5),
-                ),
-              ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onPressed,
+    return GestureDetector(
+      onTapDown: (_) {
+        setState(() => _isPressed = true);
+      },
+      onTapUp: (_) {
+        setState(() => _isPressed = false);
+        widget.onPressed();
+      },
+      onTapCancel: () {
+        setState(() => _isPressed = false);
+      },
+      child: Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          color: _isPressed 
+              ? AppColors.sequencerPrimaryButton 
+              : AppColors.sequencerSurfaceRaised,
           borderRadius: BorderRadius.circular(2),
-          child: Container(
-            padding: EdgeInsets.zero,
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    text,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: width * 0.55,
-                      fontWeight: FontWeight.w700,
-                      height: 0.9,
-                    ),
-                  ),
-                  if (bottom != null) ...[
-                    SizedBox(height: height * 0.08),
-                    Container(
-                      height: width * 0.7,
-                      alignment: Alignment.center,
-                      child: bottom,
-                    ),
-                  ],
-                ],
-              ),
+          border: Border.all(
+            color: AppColors.sequencerBorder,
+            width: 0.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.sequencerShadow,
+              blurRadius: 1.5,
+              offset: const Offset(0, 1),
             ),
+            BoxShadow(
+              color: AppColors.sequencerSurfaceRaised,
+              blurRadius: 0.5,
+              offset: const Offset(0, -0.5),
+            ),
+          ],
+        ),
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                '${widget.sectionNumber}',
+                style: TextStyle(
+                  color: _isPressed 
+                      ? Colors.white 
+                      : AppColors.sequencerLightText,
+                  fontSize: widget.width * 0.55,
+                  fontWeight: FontWeight.w700,
+                  height: 0.9,
+                ),
+              ),
+              ValueListenableBuilder<bool>(
+                valueListenable: playbackState.songModeNotifier,
+                builder: (context, isSongMode, __) {
+                  if (!isSongMode) {
+                    // Loop mode: show infinity symbol
+                    final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
+                    return Padding(
+                      padding: EdgeInsets.only(top: widget.height * 0.08),
+                      child: SizedBox(
+                        height: widget.width * 0.7,
+                        child: Text(
+                          '∞',
+                          overflow: TextOverflow.fade,
+                          softWrap: false,
+                          style: TextStyle(
+                            color: color,
+                            fontSize: widget.width * 0.7,
+                            fontWeight: FontWeight.w600,
+                            height: 1.0,
+                          ),
+                        ),
+                      ),
+                    );
+                  } else {
+                    // Song mode: show loop counter
+                    return ValueListenableBuilder<int>(
+                      valueListenable: playbackState.currentSectionLoopNotifier,
+                      builder: (context, currentLoopZeroBased, __) {
+                        return ValueListenableBuilder<int>(
+                          valueListenable: playbackState.currentSectionLoopsNumNotifier,
+                          builder: (context, totalLoops, ___) {
+                            final displayCurrent = (currentLoopZeroBased + 1).clamp(1, totalLoops);
+                            final label = '$displayCurrent/$totalLoops';
+                            final color = Color.lerp(AppColors.menuErrorColor, AppColors.sequencerLightText, 0.5)!;
+                            return Padding(
+                              padding: EdgeInsets.only(top: widget.height * 0.08),
+                              child: SizedBox(
+                                height: widget.width * 0.7,
+                                child: Text(
+                                  label,
+                                  overflow: TextOverflow.fade,
+                                  softWrap: false,
+                                  style: TextStyle(
+                                    color: color,
+                                    fontSize: widget.width * 0.40,
+                                    fontWeight: FontWeight.w600,
+                                    height: 1.0,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    );
+                  }
+                },
+              ),
+            ],
           ),
         ),
       ),

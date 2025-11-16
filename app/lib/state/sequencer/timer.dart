@@ -1,3 +1,4 @@
+import '../../utils/log.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/foundation.dart';
 import 'table.dart';
@@ -34,7 +35,7 @@ class TimerState {
     _ticker!.start();
     _isRunning = true;
     
-    debugPrint('⏰ [TIMER_STATE] Started timer system');
+    Log.d('⏰ [TIMER_STATE] Started timer system');
   }
   
   void stop() {
@@ -45,7 +46,7 @@ class TimerState {
     _ticker = null;
     _isRunning = false;
     
-    debugPrint('⏹️ [TIMER_STATE] Stopped timer system');
+    Log.d('⏹️ [TIMER_STATE] Stopped timer system');
   }
   
   /// Called every frame by Flutter's Ticker
@@ -60,16 +61,16 @@ class TimerState {
       
       // Debug logging every 60 frames (~1 second at 60fps)
       // if (_frameCount % 60 == 0) {
-      //   debugPrint('⏰ [TIMER_STATE] Frame $_frameCount');
+      //   Log.d('⏰ [TIMER_STATE] Frame $_frameCount');
       // }
     } catch (e) {
-      debugPrint('❌ [TIMER_STATE] Error in tick: $e');
+      Log.d('❌ [TIMER_STATE] Error in tick: $e');
     }
   }
   
   void dispose() {
     stop();
-    debugPrint('🧹 [TIMER_STATE] Disposed timer state');
+    Log.d('🧹 [TIMER_STATE] Disposed timer state');
   }
   
   bool get isRunning => _isRunning;

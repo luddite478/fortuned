@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
+import '../utils/log.dart';
 
 /// Custom HttpOverrides to trust self-signed certificates for stage environment
 class DevHttpOverrides extends HttpOverrides {
@@ -47,26 +48,26 @@ class ApiHttpClient {
     finalQueryParams['token'] = _apiToken;
     final finalUrl = url.replace(queryParameters: finalQueryParams);
     
-    print('🌐 GET: $finalUrl');
+    Log.d('GET: $finalUrl', 'HTTP');
     if (queryParams != null && queryParams.isNotEmpty) {
-      print('📝 Query params: $queryParams');
+      Log.d('Query params: $queryParams', 'HTTP');
     }
     
     try {
       final response = await http.get(finalUrl, headers: _defaultHeaders);
       
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}', 'HTTP');
+      Log.d('Response body: ${response.body}', 'HTTP');
       
       if (response.statusCode >= 400) {
-        print('❌ HTTP Error ${response.statusCode} for GET $path');
+        Log.e('HTTP Error ${response.statusCode} for GET $path', 'HTTP');
       } else {
-        print('✅ GET $path completed successfully');
+        Log.d('GET $path completed successfully', 'HTTP');
       }
       
       return response;
     } catch (e) {
-      print('❌ Network error for GET $path: $e');
+      Log.e('Network error for GET $path', 'HTTP', e);
       rethrow;
     }
   }
@@ -79,11 +80,11 @@ class ApiHttpClient {
     bodyWithAuth['token'] = _apiToken;
     final jsonBody = json.encode(bodyWithAuth);
     
-    print('🌐 POST: $finalUrl');
+    Log.d('POST: $finalUrl', 'HTTP');
     if (queryParams != null && queryParams.isNotEmpty) {
-      print('📝 Query params: $queryParams');
+      Log.d('Query params: $queryParams', 'HTTP');
     }
-    print('📝 Request body: $jsonBody');
+    Log.d('Request body: $jsonBody', 'HTTP');
     
     try {
       final response = await http.post(
@@ -92,18 +93,18 @@ class ApiHttpClient {
         body: jsonBody,
       );
       
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}', 'HTTP');
+      Log.d('Response body: ${response.body}', 'HTTP');
       
       if (response.statusCode >= 400) {
-        print('❌ HTTP Error ${response.statusCode} for POST $path');
+        Log.e('HTTP Error ${response.statusCode} for POST $path', 'HTTP');
       } else {
-        print('✅ POST $path completed successfully');
+        Log.d('POST $path completed successfully', 'HTTP');
       }
       
       return response;
     } catch (e) {
-      print('❌ Network error for POST $path: $e');
+      Log.e('Network error for POST $path', 'HTTP', e);
       rethrow;
     }
   }
@@ -116,11 +117,11 @@ class ApiHttpClient {
     bodyWithAuth['token'] = _apiToken;
     final jsonBody = json.encode(bodyWithAuth);
     
-    print('🌐 PUT: $finalUrl');
+    Log.d('PUT: $finalUrl', 'HTTP');
     if (queryParams != null && queryParams.isNotEmpty) {
-      print('📝 Query params: $queryParams');
+      Log.d('Query params: $queryParams', 'HTTP');
     }
-    print('📝 Request body: $jsonBody');
+    Log.d('Request body: $jsonBody', 'HTTP');
     
     try {
       final response = await http.put(
@@ -129,18 +130,18 @@ class ApiHttpClient {
         body: jsonBody,
       );
       
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}', 'HTTP');
+      Log.d('Response body: ${response.body}', 'HTTP');
       
       if (response.statusCode >= 400) {
-        print('❌ HTTP Error ${response.statusCode} for PUT $path');
+        Log.e('HTTP Error ${response.statusCode} for PUT $path', 'HTTP');
       } else {
-        print('✅ PUT $path completed successfully');
+        Log.d('PUT $path completed successfully', 'HTTP');
       }
       
       return response;
     } catch (e) {
-      print('❌ Network error for PUT $path: $e');
+      Log.e('Network error for PUT $path', 'HTTP', e);
       rethrow;
     }
   }
@@ -152,26 +153,26 @@ class ApiHttpClient {
     finalQueryParams['token'] = _apiToken;
     final finalUrl = url.replace(queryParameters: finalQueryParams);
     
-    print('🌐 DELETE: $finalUrl');
+    Log.d('DELETE: $finalUrl', 'HTTP');
     if (queryParams != null && queryParams.isNotEmpty) {
-      print('📝 Query params: $queryParams');
+      Log.d('Query params: $queryParams', 'HTTP');
     }
     
     try {
       final response = await http.delete(finalUrl, headers: _defaultHeaders);
       
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}', 'HTTP');
+      Log.d('Response body: ${response.body}', 'HTTP');
       
       if (response.statusCode >= 400) {
-        print('❌ HTTP Error ${response.statusCode} for DELETE $path');
+        Log.e('HTTP Error ${response.statusCode} for DELETE $path', 'HTTP');
       } else {
-        print('✅ DELETE $path completed successfully');
+        Log.d('DELETE $path completed successfully', 'HTTP');
       }
       
       return response;
     } catch (e) {
-      print('❌ Network error for DELETE $path: $e');
+      Log.e('Network error for DELETE $path', 'HTTP', e);
       rethrow;
     }
   }
@@ -185,8 +186,8 @@ class ApiHttpClient {
   }) async {
     final url = Uri.parse('$_baseUrl$path');
     
-    print('🌐 UPLOAD: $url');
-    print('📁 File: $filePath');
+    Log.d('UPLOAD: $url', 'HTTP');
+    Log.d('File: $filePath', 'HTTP');
     
     try {
       final request = http.MultipartRequest('POST', url);
@@ -204,22 +205,22 @@ class ApiHttpClient {
         await http.MultipartFile.fromPath(fileFieldName, filePath),
       );
       
-      print('📤 Uploading file...');
+      Log.d('Uploading file...', 'HTTP');
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
       
-      print('📥 Response status: ${response.statusCode}');
-      print('📥 Response body: ${response.body}');
+      Log.d('Response status: ${response.statusCode}', 'HTTP');
+      Log.d('Response body: ${response.body}', 'HTTP');
       
       if (response.statusCode >= 400) {
-        print('❌ HTTP Error ${response.statusCode} for UPLOAD $path');
+        Log.e('HTTP Error ${response.statusCode} for UPLOAD $path', 'HTTP');
       } else {
-        print('✅ UPLOAD $path completed successfully');
+        Log.i('UPLOAD $path completed successfully', 'HTTP');
       }
       
       return response;
     } catch (e) {
-      print('❌ Network error for UPLOAD $path: $e');
+      Log.e('Network error for UPLOAD $path', 'HTTP', e);
       rethrow;
     }
   }

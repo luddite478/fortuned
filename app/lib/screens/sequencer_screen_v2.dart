@@ -18,6 +18,7 @@ import '../services/snapshot/snapshot_service.dart';
 import '../services/http_client.dart';
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
+import '../utils/log.dart';
 import '../models/thread/thread_user.dart';
 import '../models/thread/message.dart';
 // New state imports for migration
@@ -93,7 +94,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     _threadScrollController.addListener(_onThreadScroll);
     
     // Initialize new state system (reuse Provider-managed states)
-    debugPrint('🎵 [SEQUENCER_V2] Initializing new state system');
+    Log.d('Initializing new state system', 'SEQUENCER_V2');
     _undoRedoState = UndoRedoState();
     _tableState = Provider.of<TableState>(context, listen: false);
     _playbackState = Provider.of<PlaybackState>(context, listen: false);
@@ -103,7 +104,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     _soundSettingsState = SoundSettingsState();
     _uiSelectionState = UiSelectionState();
     _recordingState = RecordingState();
-    _recordingState.attachPanelState(_multitaskPanelState);
+    _recordingState.setOnRecordingComplete(() => _onRecordingComplete());
     _editState = EditState(_tableState, _uiSelectionState);
     _sectionSettingsState = SectionSettingsState();
     _sliderOverlayState = SliderOverlayState();
@@ -140,21 +141,21 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   void _setupThreadsServiceListeners() async {
     // Setup connection status listener
     _threadsService.connectionStream.listen((connected) {
-      debugPrint('📡 ThreadsService connection status changed: $connected');
+      Log.d('Connection status changed: $connected', 'THREADS');
       if (connected) {
-        debugPrint('📡 ✅ WebSocket connected and ready for notifications');
+        Log.i('WebSocket connected and ready for notifications', 'THREADS');
       } else {
-        debugPrint('📡 ❌ WebSocket disconnected');
+        Log.w('WebSocket disconnected', 'THREADS');
       }
     });
     
     // Setup error listener
     _threadsService.errorStream.listen((error) {
-      debugPrint('📡 ❌ ThreadsService error: $error');
+      Log.e('ThreadsService error: $error', 'THREADS');
     });
     
     // No need to connect here - it's already connected globally
-    debugPrint('📡 Using global ThreadsService connection in sequencer V2');
+    Log.i('Using global ThreadsService connection in sequencer V2', 'THREADS');
   }
 
   Future<void> _importInitialSnapshotIfAny() async {
@@ -167,9 +168,9 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
         sampleBankState: _sampleBankState,
       );
       await service.importFromJson(json.encode(snapshot));
-      debugPrint('✅ Imported initial snapshot into Sequencer V2');
+      Log.i('Imported initial snapshot into Sequencer V2', 'SEQUENCER_V2');
     } catch (e) {
-      debugPrint('❌ Failed to import initial snapshot: $e');
+      Log.e('Failed to import initial snapshot', 'SEQUENCER_V2', e);
     }
   }
 
@@ -179,7 +180,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     // If there's no active thread, create one (no collaboration logic)
     if (threadsState.activeThread == null) {
       try {
-        debugPrint('📝 No active thread found, creating new unpublished thread for sequencer V2');
+        Log.d('No active thread found, creating new unpublished thread', 'SEQUENCER_V2');
         
         final currentUserId = threadsState.currentUserId;
         final currentUserName = threadsState.currentUserName;
@@ -201,12 +202,12 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             },
           );
           
-          debugPrint('✅ Created new unpublished thread: $threadId with name: $threadName');
+          Log.i('Created new unpublished thread: $threadId with name: $threadName', 'SEQUENCER_V2');
         } else {
-          debugPrint('❌ Cannot create thread: No current user ID');
+          Log.w('Cannot create thread: No current user ID', 'SEQUENCER_V2');
         }
       } catch (e) {
-        debugPrint('❌ Failed to create initial thread: $e');
+        Log.e('Failed to create initial thread', 'SEQUENCER_V2', e);
         // Not critical - user can still work and publish later
       }
     }
@@ -216,7 +217,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     if (activeThread != null) {
       // Preload only recent 30 messages (not all) for faster loading and instant thread UI
       threadsState.preloadRecentMessages(activeThread.id, limit: 30).catchError((e) {
-        debugPrint('⚠️ Background message preload failed (non-critical): $e');
+        Log.d('Background message preload failed (non-critical): $e', 'SEQUENCER_V2');
       });
     }
   }
@@ -248,7 +249,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       //   await _loadDraftIfAny();
       // }
     } catch (e) {
-      debugPrint('❌ Initial sequencer bootstrap failed: $e');
+      Log.e('Initial sequencer bootstrap failed', 'SEQUENCER_V2', e);
     } finally {
       if (mounted) {
         setState(() {
@@ -383,7 +384,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
 
   @override
   void dispose() {
-    debugPrint('🧹 [SEQUENCER_V2] Disposing new state system');
+    Log.d('Disposing new state system', 'SEQUENCER_V2');
     
     try {
       final threadsState = context.read<ThreadsState>();
@@ -414,7 +415,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      debugPrint('🔄 App resumed - reconfiguring Bluetooth audio session');
+      Log.d('App resumed - reconfiguring Bluetooth audio session', 'SEQUENCER_V2');
     }
   }
 
@@ -534,7 +535,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
               }
             },
             borderRadius: BorderRadius.circular(3),
-            constraints: const BoxConstraints(minHeight: 36, minWidth: 55),
+            constraints: const BoxConstraints(minHeight: 36, minWidth: 50),
             fillColor: AppColors.sequencerPrimaryButton,
             selectedColor: Colors.white,
             color: AppColors.sequencerLightText,
@@ -553,7 +554,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                 child: Icon(Icons.my_library_music_rounded, size: 18),
               ),
             ],
-                               ),
+          ),
           ),
       ],
     );
@@ -619,7 +620,6 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       onShowMessageContextMenu: _showMessageContextMenu,
       onApplyMessage: _applyMessage,
       onAddToLibrary: _showAddToLibraryDialog,
-      onShareRender: _showShareRenderDialog,
     );
   }
 
@@ -680,22 +680,45 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                                       builder: (context, isRecording, _) {
                                         return Stack(
                                           children: [
-                                            Container(
-                                              decoration: BoxDecoration(
-                                                color: isRecording ? AppColors.sequencerShadow : AppColors.sequencerSurfaceBase,
-                                                borderRadius: BorderRadius.circular(4),
-                                                border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-                                              ),
-                                              clipBehavior: Clip.hardEdge,
-                                              padding: const EdgeInsets.symmetric(horizontal: 8),
-                                              child: Center(
-                                                child: _buildSectionChain(
-                                                  tableState.sectionsCount,
-                                                  playbackState,
-                                                  allActive: _currentView == _SequencerView.thread,
+                                            // Section chain (conversion happens in thread view now)
+                                            // Make clickable to toggle section management
+                                            GestureDetector(
+                                              onTap: isRecording ? null : () {
+                                                final multitaskPanelState = context.read<MultitaskPanelState>();
+                                                if (multitaskPanelState.currentMode == MultitaskPanelMode.sectionManagement) {
+                                                  multitaskPanelState.showPlaceholder();
+                                                } else {
+                                                  multitaskPanelState.showSectionManagement();
+                                                }
+                                              },
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.sequencerSurfaceBase,
+                                                  borderRadius: BorderRadius.circular(4),
+                                                  border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+                                                ),
+                                                clipBehavior: Clip.hardEdge,
+                                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                                child: Center(
+                                                  child: _buildSectionChain(
+                                                    tableState.sectionsCount,
+                                                    playbackState,
+                                                    allActive: _currentView == _SequencerView.thread,
+                                                  ),
                                                 ),
                                               ),
                                             ),
+                                            // Dark overlay when recording
+                                            if (isRecording)
+                                              Positioned.fill(
+                                                child: Container(
+                                                  decoration: BoxDecoration(
+                                                    color: AppColors.sequencerSurfaceBase.withOpacity(0.9),
+                                                    borderRadius: BorderRadius.circular(4),
+                                                  ),
+                                                ),
+                                              ),
+                                            // Recording timer on top
                                             if (isRecording)
                                               Positioned.fill(
                                                 child: Center(
@@ -720,7 +743,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                                                             return Text(
                                                               text,
                                                               style: TextStyle(
-                                                                color: AppColors.sequencerLightText,
+                                                                color: const Color.fromARGB(255, 231, 229, 226),
                                                                 fontSize: 11,
                                                                 fontWeight: FontWeight.w600,
                                                                 fontFamily: 'monospace',
@@ -755,7 +778,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   clipBehavior: Clip.hardEdge,
-                                  child: _currentView == _SequencerView.sequencer
+                                  child: _currentView != _SequencerView.thread
                                       ? ValueListenableBuilder<bool>(
                                           valueListenable: recordingState.isRecordingNotifier,
                                           builder: (context, isRecording, _) {
@@ -775,7 +798,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                                                       onPressed: (index) async {
                                                         if (index == 0) {
                                                           // Master settings button - toggle
-                                                          debugPrint('🎛️ Master settings button pressed');
+                                                          Log.d('Master settings button pressed', 'SEQUENCER_V2');
                                                           if (multitaskPanelState.currentMode == MultitaskPanelMode.masterSettings) {
                                                             multitaskPanelState.showPlaceholder();
                                                           } else {
@@ -855,9 +878,20 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             final double availableWidth = constraints.maxWidth;
             final int rawVisible = (availableWidth / totalSquareWidth).floor();
             final int visibleCount = rawVisible > 0 ? rawVisible : 1;
-            final int centerIndexWithinView = visibleCount ~/ 2;
             
-            final int startIndex = currentSection - centerIndexWithinView;
+            // In thread view (allActive), center all sections as a group
+            // In sequencer view, center around current section
+            final int startIndex;
+            if (allActive) {
+              // Center the entire group: start from middle of all sections minus half of visible count
+              final int centerOfAllSections = numSections ~/ 2;
+              final int centerIndexWithinView = visibleCount ~/ 2;
+              startIndex = centerOfAllSections - centerIndexWithinView;
+            } else {
+              // Sequencer view: center around current section
+              final int centerIndexWithinView = visibleCount ~/ 2;
+              startIndex = currentSection - centerIndexWithinView;
+            }
             
             return ClipRect(
               child: Row(
@@ -865,7 +899,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                 children: List.generate(visibleCount, (visibleIndex) {
                   final actualIndex = startIndex + visibleIndex;
                   if (actualIndex < 0 || actualIndex >= numSections) {
-                    // Placeholder to keep current section centered
+                    // Placeholder to keep sections centered
                     return Container(
                       width: squareWidth,
                       height: 15,
@@ -946,7 +980,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
         _draftService.clearDraft(activeThread.id);
         // Success: no popup per request
       }).catchError((e) {
-        debugPrint('Error sending message: $e');
+        Log.e('Error sending message', 'SEQUENCER_V2', e);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -954,6 +988,36 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             backgroundColor: AppColors.sequencerAccent,
             duration: const Duration(seconds: 2),
           ),
+          );
+        }
+      });
+    }
+  }
+
+  void _onRecordingComplete() {
+    Log.i('Recording complete, auto-saving as message...', 'SEQUENCER_V2');
+    final threadsState = context.read<ThreadsState>();
+    final activeThread = threadsState.activeThread;
+    
+    if (activeThread != null) {
+      threadsState.sendMessageFromSequencer(threadId: activeThread.id).then((_) {
+        Log.s('Recording auto-saved successfully', 'SEQUENCER_V2');
+        _draftService.clearDraft(activeThread.id);
+        
+        // Automatically switch to thread view to show the new recording
+        if (mounted && _currentView != _SequencerView.thread) {
+          Log.d('Auto-switching to thread view', 'SEQUENCER_V2');
+          _switchView(_SequencerView.thread);
+        }
+      }).catchError((e) {
+        Log.e('Failed to auto-save recording', 'SEQUENCER_V2', e);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Failed to save recording'),
+              backgroundColor: AppColors.sequencerAccent,
+              duration: const Duration(seconds: 2),
+            ),
           );
         }
       });
@@ -1001,7 +1065,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     final thread = threadsState.activeThread;
     
     if (thread == null) {
-      debugPrint('❌ [SEQUENCER] Cannot apply message - no active thread');
+      Log.w('Cannot apply message - no active thread', 'SEQUENCER_V2');
       return;
     }
     
@@ -1017,7 +1081,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       // Switch back to sequencer view after loading
       _switchView(_SequencerView.sequencer);
     } else {
-      debugPrint('❌ [SEQUENCER] Failed to load checkpoint');
+      Log.e('Failed to load checkpoint', 'SEQUENCER_V2');
     }
   }
 
@@ -1076,14 +1140,6 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
     );
   }
 
-  void _showShareRenderDialog(BuildContext context, Render render) {
-    showDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
-      builder: (context) => _ShareRenderDialog(render: render),
-    );
-  }
 }
 
 class _InviteLinkDialog extends StatelessWidget {
@@ -1376,14 +1432,13 @@ class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
         return;
       }
       
-      debugPrint('📚 [ADD_TO_LIBRARY] Track: $trackName');
-      debugPrint('📚 [ADD_TO_LIBRARY] Render ID: "${widget.render.id}"');
-      debugPrint('📚 [ADD_TO_LIBRARY] Render URL: ${widget.render.url}');
+      Log.d('Track: $trackName', 'LIBRARY');
+      Log.d('Render ID: "${widget.render.id}"', 'LIBRARY');
+      Log.d('Render URL: ${widget.render.url}', 'LIBRARY');
       
       // Check for empty ID issue
       if (widget.render.id.isEmpty) {
-        debugPrint('⚠️ [ADD_TO_LIBRARY] ERROR: Render has EMPTY ID! Cannot add to library properly.');
-        debugPrint('⚠️ [ADD_TO_LIBRARY] This will cause all tracks to be highlighted when playing.');
+        Log.w('Render has EMPTY ID! Cannot add to library properly. This will cause all tracks to be highlighted when playing.', 'LIBRARY');
       }
       
       // Add to library using LibraryState
@@ -1416,7 +1471,7 @@ class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
         );
       }
     } catch (e) {
-      debugPrint('❌ Error adding to library: $e');
+      Log.e('Error adding to library', 'LIBRARY', e);
       if (mounted) {
         setState(() {
           _isSubmitting = false;
@@ -1431,123 +1486,6 @@ class _AddToLibraryDialogState extends State<_AddToLibraryDialog> {
         );
       }
     }
-  }
-}
-
-// Dialog for sharing render
-class _ShareRenderDialog extends StatelessWidget {
-  final Render render;
-
-  const _ShareRenderDialog({required this.render});
-
-  @override
-  Widget build(BuildContext context) {
-    final size = MediaQuery.of(context).size;
-    final dialogWidth = (size.width * 0.85).clamp(280.0, size.width);
-    final dialogHeight = (size.height * 0.35).clamp(220.0, size.height);
-    
-    final shareUrl = render.url;
-
-    return Material(
-      type: MaterialType.transparency,
-      child: Center(
-        child: ConstrainedBox(
-          constraints: BoxConstraints.tightFor(width: dialogWidth, height: dialogHeight),
-          child: Container(
-            decoration: BoxDecoration(
-              color: AppColors.sequencerSurfaceRaised,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          'Share Audio',
-                          style: GoogleFonts.sourceSans3(
-                            color: AppColors.sequencerText,
-                            fontSize: 20,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 24),
-                          splashRadius: 20,
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      'Share link',
-                      style: GoogleFonts.sourceSans3(
-                        color: AppColors.sequencerLightText,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: AppColors.sequencerSurfaceBase,
-                        borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
-                      ),
-                      child: SelectableText(
-                        shareUrl,
-                        textAlign: TextAlign.left,
-                        style: GoogleFonts.sourceCodePro(
-                          color: AppColors.sequencerText,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            icon: const Icon(Icons.copy, size: 16),
-                            label: const Text('Copy Link'),
-                            onPressed: () {
-                              Clipboard.setData(ClipboardData(text: shareUrl));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: const Text('Link copied to clipboard'),
-                                  backgroundColor: AppColors.sequencerAccent,
-                                  duration: const Duration(seconds: 1),
-                                ),
-                              );
-                            },
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: AppColors.sequencerText,
-                              side: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
-                              padding: const EdgeInsets.symmetric(vertical: 14),
-                              minimumSize: const Size(0, 48),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 }
 

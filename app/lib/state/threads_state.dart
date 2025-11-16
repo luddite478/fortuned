@@ -1,3 +1,4 @@
+import '../utils/log.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -207,7 +208,7 @@ class ThreadsState extends ChangeNotifier {
   }) async {
     // Skip if already loaded and not forcing refresh
     if (!force && _messagesByThread.containsKey(threadId)) {
-      debugPrint('📬 [THREADS] Using cached messages for thread $threadId (${_messagesByThread[threadId]?.length} messages)');
+      Log.d(' [THREADS] Using cached messages for thread $threadId (${_messagesByThread[threadId]?.length} messages)');
       return;
     }
     
@@ -230,7 +231,7 @@ class ThreadsState extends ChangeNotifier {
       final existingMessages = _messagesByThread[threadId] ?? [];
       _messagesByThread[threadId] = _mergeMessagesPreservingUploads(existingMessages, stored);
       
-      debugPrint('📬 [THREADS] Loaded ${stored.length} messages for thread $threadId (stored ascending)');
+      Log.d(' [THREADS] Loaded ${stored.length} messages for thread $threadId (stored ascending)');
     } catch (e) {
       _setError('Failed to load messages: $e');
       debugPrint('❌ [THREADS] Error loading messages: $e');
@@ -248,7 +249,7 @@ class ThreadsState extends ChangeNotifier {
   Future<void> preloadRecentMessages(String threadId, {int limit = 30}) async {
     // Skip if currently loading
     if (_messagesLoadingByThread[threadId] == true) {
-      debugPrint('📬 [THREADS] Messages currently loading for thread $threadId, skipping preload');
+      Log.d(' [THREADS] Messages currently loading for thread $threadId, skipping preload');
       return;
     }
     
@@ -256,7 +257,7 @@ class ThreadsState extends ChangeNotifier {
       _messagesLoadingByThread[threadId] = true;
       notifyListeners();
       
-      debugPrint('📬 [THREADS] Preloading recent $limit messages in background for thread $threadId...');
+      Log.d(' [THREADS] Preloading recent $limit messages in background for thread $threadId...');
       final messages = await ThreadsApi.getMessages(
         threadId,
         limit: limit,
@@ -270,7 +271,7 @@ class ThreadsState extends ChangeNotifier {
       final existingMessages = _messagesByThread[threadId] ?? [];
       _messagesByThread[threadId] = _mergeMessagesPreservingUploads(existingMessages, stored);
       
-      debugPrint('✅ [THREADS] Preloaded ${messages.length} recent messages for thread $threadId');
+      Log.d('Preloaded ${messages.length} recent messages for thread $threadId');
     } catch (e) {
       debugPrint('⚠️ [THREADS] Failed to preload messages (non-critical): $e');
       // Don't rethrow - this is a background operation
@@ -419,7 +420,9 @@ class ThreadsState extends ChangeNotifier {
     
     // Create optimistic render if there's audio to upload
     final List<Render> optimisticRenders = [];
-    if (_recordingState != null && _recordingState!.convertedMp3Path != null) {
+    if (_recordingState != null && _recordingState!.currentRecordingPath != null) {
+      // Use WAV path initially (will be updated to MP3 when conversion completes)
+      final audioPath = _recordingState!.convertedMp3Path ?? _recordingState!.currentRecordingPath!;
       final optimisticRender = Render(
         id: 'temp_${DateTime.now().microsecondsSinceEpoch}',
         url: '', // Empty until uploaded
@@ -428,10 +431,10 @@ class ThreadsState extends ChangeNotifier {
         duration: _recordingState!.recordingDuration.inSeconds.toDouble(),
         createdAt: DateTime.now(),
         uploadStatus: RenderUploadStatus.uploading,
-        localPath: _recordingState!.convertedMp3Path, // LOCAL FILE for instant playback!
+        localPath: audioPath, // LOCAL FILE for instant playback (WAV initially, MP3 after conversion)
       );
       optimisticRenders.add(optimisticRender);
-      debugPrint('🎵 [THREADS] Created optimistic render with local path: ${_recordingState!.convertedMp3Path}');
+      debugPrint('🎵 [THREADS] Created optimistic render with local path: $audioPath');
     }
     
     final pending = Message(
@@ -484,13 +487,76 @@ class ThreadsState extends ChangeNotifier {
       }
       
       // Check if there's a recording to upload - do this AFTER we have the message ID
-      if (_recordingState != null && _recordingState!.convertedMp3Path != null) {
-        debugPrint('🎵 [THREADS] Found recording to upload for message: ${saved.id}');
-        _recordingState!.setUploading(true);
-        _recordingState!.clearUploadStatus();
+      if (_recordingState != null && _recordingState!.currentRecordingPath != null) {
+        debugPrint('🎵 [THREADS] Found recording for message: ${saved.id}');
+        final messageId = saved.id;
         
-        // Start upload in background with the specific message ID
-        unawaited(_uploadRecordingInBackground(saved.id, _recordingState!.convertedMp3Path!));
+        // Check if MP3 conversion is already complete
+        if (_recordingState!.convertedMp3Path != null) {
+          debugPrint('🎵 [THREADS] MP3 already converted: ${_recordingState!.convertedMp3Path}');
+          final mp3Path = _recordingState!.convertedMp3Path!;
+          
+          // Update the message's render with the MP3 path immediately
+          final list = _messagesByThread[threadId] ?? [];
+          final idx = list.indexWhere((m) => m.id == messageId);
+          if (idx >= 0) {
+            final message = list[idx];
+            debugPrint('🎵 [THREADS] Message renders count: ${message.renders.length}');
+            if (message.renders.isNotEmpty) {
+              final updatedRenders = message.renders.map((r) {
+                debugPrint('🎵 [THREADS] Render localPath before: ${r.localPath}');
+                // Update all renders with uploading status (should be the just-recorded one)
+                if (r.uploadStatus == RenderUploadStatus.uploading && r.localPath != null) {
+                  debugPrint('🎵 [THREADS] Updating to MP3: $mp3Path');
+                  return r.copyWith(localPath: mp3Path);
+                }
+                return r;
+              }).toList();
+              list[idx] = message.copyWith(renders: updatedRenders);
+              _messagesByThread[threadId] = List<Message>.from(list);
+              notifyListeners();
+              debugPrint('🎵 [THREADS] Updated message with MP3 path');
+            }
+          }
+          
+          // Start upload immediately
+          _recordingState!.setUploading(true);
+          _recordingState!.clearUploadStatus();
+          unawaited(_uploadRecordingInBackground(messageId, mp3Path));
+        } else {
+          // MP3 not ready yet, wait for conversion to complete
+          _recordingState!.setOnConversionComplete((mp3Path) {
+            debugPrint('🎵 [THREADS] MP3 conversion complete, updating message and starting upload: $mp3Path');
+            
+            // Update the message's render with the MP3 path
+            final list = _messagesByThread[threadId] ?? [];
+            final idx = list.indexWhere((m) => m.id == messageId);
+            if (idx >= 0) {
+              final message = list[idx];
+              debugPrint('🎵 [THREADS] (Callback) Message renders count: ${message.renders.length}');
+              if (message.renders.isNotEmpty) {
+                final updatedRenders = message.renders.map((r) {
+                  debugPrint('🎵 [THREADS] (Callback) Render localPath before: ${r.localPath}');
+                  // Update all renders with uploading status (should be the just-recorded one)
+                  if (r.uploadStatus == RenderUploadStatus.uploading && r.localPath != null) {
+                    debugPrint('🎵 [THREADS] (Callback) Updating to MP3: $mp3Path');
+                    return r.copyWith(localPath: mp3Path);
+                  }
+                  return r;
+                }).toList();
+                list[idx] = message.copyWith(renders: updatedRenders);
+                _messagesByThread[threadId] = List<Message>.from(list);
+                notifyListeners();
+                debugPrint('🎵 [THREADS] (Callback) Updated message with MP3 path');
+              }
+            }
+            
+            // Now start upload with MP3
+            _recordingState!.setUploading(true);
+            _recordingState!.clearUploadStatus();
+            unawaited(_uploadRecordingInBackground(messageId, mp3Path));
+          });
+        }
       }
     } catch (e) {
       // Mark as failed

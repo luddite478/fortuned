@@ -8,7 +8,6 @@ import '../../../state/sequencer/edit.dart';
 import '../../../state/sequencer/sample_bank.dart';
 import '../../../state/sequencer/ui_selection.dart';
 import '../../../ffi/table_bindings.dart' show CellData;
-import 'recording_widget.dart';
 import 'sample_selection_widget.dart';
 import 'share_widget.dart';
 import 'sound_settings.dart';
@@ -85,11 +84,19 @@ class MultitaskPanelWidget extends StatelessWidget {
           case MultitaskPanelMode.shareWidget:
             return const ShareWidget();
           
+          case MultitaskPanelMode.sectionSettings:
+            // Section settings is a v2 feature - show placeholder in v1
+            return _buildPlaceholder();
+          
+          case MultitaskPanelMode.sectionManagement:
+            // Section management is a v2 feature - show placeholder in v1
+            return _buildPlaceholder();
+          
           case MultitaskPanelMode.recordingWidget:
-            return const RecordingWidget();
+            // Recording widget removed - recordings now auto-save as messages
+            return _buildPlaceholder();
           
           case MultitaskPanelMode.placeholder:
-            // Always show placeholder; recording overlay is rendered above grid, not here
             return _buildPlaceholder();
         }
       },

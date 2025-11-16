@@ -12,6 +12,7 @@ import '../../../ffi/table_bindings.dart' show CellData;
 // musical notes handled elsewhere if needed
 import 'generic_slider.dart';
 import '../../../state/sequencer/slider_overlay.dart';
+import 'wheel_select_widget.dart';
 
 
 // Pitch conversion utilities
@@ -33,6 +34,18 @@ class PitchConversion {
     // Convert: ratio → semitones → UI value
     final semitones = 12.0 * (math.log(ratio) / math.ln2);
     return (semitones + 12.0) / 24.0;
+  }
+  
+  /// Convert pitch ratio to semitones (-12 to +12)
+  static int pitchRatioToSemitones(double ratio) {
+    if (ratio <= 0.0) return 0;
+    final semitones = 12.0 * (math.log(ratio) / math.ln2);
+    return semitones.round().clamp(-12, 12);
+  }
+  
+  /// Convert semitones (-12 to +12) to pitch ratio
+  static double semitonesToPitchRatio(int semitones) {
+    return math.pow(2.0, semitones / 12.0).toDouble();
   }
 }
 
@@ -645,63 +658,44 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
         child: widget.type == SettingsType.sample
             ? ValueListenableBuilder<double>(
                 valueListenable: sampleBankState.getSamplePitchNotifier(index),
-                builder: (context, pitch, _) => ValueListenableBuilder<bool>(
-                  valueListenable: sampleBankState.getSampleProcessingNotifier(index),
-                  builder: (context, isProcessing, __) {
-                    // Provide processing source to overlay instead of mutating overlay state
-                    final overlay = context.read<SliderOverlayState>();
-                    overlay.setProcessingSource(sampleBankState.getSampleProcessingNotifier(index));
-                    return GenericSlider(
-                      value: PitchConversion.pitchRatioToUiValue(pitch),
-                      min: 0.0,
-                      max: 1.0,
-                      divisions: 24,
-                      type: SliderType.pitch,
-                      onChanged: (value) {
-                        // Debounce sample pitch commit
-                        _samplePitchDebounceTimer?.cancel();
-                        _samplePitchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
-                          final ratio = PitchConversion.uiValueToPitchRatio(value);
-                          sampleBankState.setSampleSettings(index, pitch: ratio);
-                        });
+                builder: (context, pitch, _) {
+                  final semitones = PitchConversion.pitchRatioToSemitones(pitch);
+                  return SemitoneWheelWidget(
+                    semitones: semitones,
+                    onSemitonesChanged: (newSemitones) {
+                      final ratio = PitchConversion.semitonesToPitchRatio(newSemitones);
+                      
+                      // Debounce sample pitch commit
+                      _samplePitchDebounceTimer?.cancel();
+                      _samplePitchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+                        sampleBankState.setSampleSettings(index, pitch: ratio);
+                      });
 
-                        // Live preview: debounce and restart note
-                        final playback = context.read<PlaybackState>();
-                        final vol = sampleBankState.getSampleVolumeNotifier(index).value;
-                        _previewDebounceTimer?.cancel();
-                        _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
-                          if (vol <= 0.0) {
-                            playback.stopPreview();
-                            return;
-                          }
-                          final ratio = PitchConversion.uiValueToPitchRatio(value);
-                          playback.previewSampleSlot(index, pitchRatio: ratio, volume01: vol);
-                        });
-                      },
-                      height: height,
-                      sliderOverlay: overlay,
-                      onChangeStart: (v) {
-                        // immediate preview on drag start
-                        final playback = context.read<PlaybackState>();
-                        final vol = sampleBankState.getSampleVolumeNotifier(index).value;
+                      // Live preview: immediate restart of note with new pitch
+                      final playback = context.read<PlaybackState>();
+                      final vol = sampleBankState.getSampleVolumeNotifier(index).value;
+                      _previewDebounceTimer?.cancel();
+                      _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
                         if (vol <= 0.0) {
                           playback.stopPreview();
                           return;
                         }
-                        final ratio = PitchConversion.uiValueToPitchRatio(v);
                         playback.previewSampleSlot(index, pitchRatio: ratio, volume01: vol);
-                      },
-                      onChangeEnd: (_) {
-                        final playback = context.read<PlaybackState>();
-                        playback.stopPreview();
-                      },
-                      processingSource: sampleBankState.getSampleProcessingNotifier(index),
-                      contextLabel: 'Sample ${sampleBankState.getSlotLetter(index)}',
-                    );
-                  },
-                ),
+                      });
+                    },
+                    onChangeStart: () {
+                      // No preview on start - let onSemitonesChanged handle it
+                      // This prevents double-sound (old pitch then new pitch)
+                    },
+                    onChangeEnd: () {
+                      // Stop preview when scrolling ends
+                      final playback = context.read<PlaybackState>();
+                      playback.stopPreview();
+                    },
+                  );
+                },
               )
-            : _buildCellPitchSlider(tableState, index, height),
+            : _buildCellPitchWheel(tableState, index, height),
       ),
     );
   }
@@ -897,7 +891,7 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
     );
   }
 
-  Widget _buildCellPitchSlider(TableState tableState, int selectedCellIndex, double height) {
+  Widget _buildCellPitchWheel(TableState tableState, int selectedCellIndex, double height) {
     final visibleCols = tableState.getVisibleCols().length;
     final row = selectedCellIndex ~/ visibleCols;
     final col = selectedCellIndex % visibleCols;
@@ -914,95 +908,57 @@ class _SoundSettingsWidgetState extends State<SoundSettingsWidget> {
           defaultPitch = (sd.pitch > 0.0) ? sd.pitch : 1.0;
         }
         final effectiveRatio = (cell.pitch < 0.0) ? defaultPitch : cell.pitch;
-        final uiPitch = PitchConversion.pitchRatioToUiValue(effectiveRatio);
-        final overlay = context.read<SliderOverlayState>();
-        final sampleSlot = cell.sampleSlot;
-        if (sampleSlot >= 0) {
-          return ValueListenableBuilder<bool>(
-            valueListenable: sampleBank.getSampleProcessingNotifier(sampleSlot),
-            builder: (context, isProcessing, ___) {
-              // Provide processing source to overlay during interaction
-              overlay.setProcessingSource(sampleBank.getSampleProcessingNotifier(sampleSlot));
-              return GenericSlider(
-                value: uiPitch,
-                min: 0.0,
-                max: 1.0,
-                divisions: 24,
-                type: SliderType.pitch,
-                onChanged: (value) {
-                  if (cell.isNotEmpty && cell.sampleSlot != -1) {
-                    // Debounce cell pitch commit
-                    _cellPitchDebounceTimer?.cancel();
-                    _cellPitchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
-                      final ratio = PitchConversion.uiValueToPitchRatio(value);
-                      tableState.setCellSettings(step, colAbs, pitch: ratio);
-                    });
+        final semitones = PitchConversion.pitchRatioToSemitones(effectiveRatio);
+        
+        if (cell.sampleSlot >= 0) {
+          return SemitoneWheelWidget(
+            semitones: semitones,
+            onSemitonesChanged: (newSemitones) {
+              if (cell.isNotEmpty && cell.sampleSlot != -1) {
+                final ratio = PitchConversion.semitonesToPitchRatio(newSemitones);
+                
+                // Debounce cell pitch commit
+                _cellPitchDebounceTimer?.cancel();
+                _cellPitchDebounceTimer = Timer(const Duration(milliseconds: 250), () {
+                  tableState.setCellSettings(step, colAbs, pitch: ratio);
+                });
 
-                    // Live preview: debounce 120ms and restart note
-                    final playback = context.read<PlaybackState>();
-                    final sampleBank = context.read<SampleBankState>();
-                    // Resolve effective volume
-                    double defaultVol = 1.0;
-                    if (cell.sampleSlot >= 0) {
-                      final sd = sampleBank.getSampleData(cell.sampleSlot);
-                      defaultVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
-                    }
-                    final effVol = (cell.volume < 0.0) ? defaultVol : cell.volume;
-                    _previewDebounceTimer?.cancel();
-                    _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
-                      if (effVol <= 0.0) {
-                        playback.stopPreview();
-                        return;
-                      }
-                      final ratio = PitchConversion.uiValueToPitchRatio(value);
-                      playback.previewCell(step: step, colAbs: colAbs, pitchRatio: ratio, volume01: effVol);
-                    });
-                  }
-                },
-                height: height,
-                sliderOverlay: overlay,
-                onChangeStart: (v) {
-                  if (!cell.isNotEmpty || cell.sampleSlot == -1) return;
-                  final playback = context.read<PlaybackState>();
-                  final sampleBank = context.read<SampleBankState>();
-                  // Resolve effective volume
-                  double defaultVol = 1.0;
-                  if (cell.sampleSlot >= 0) {
-                    final sd = sampleBank.getSampleData(cell.sampleSlot);
-                    defaultVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
-                  }
-                  final effVol = (cell.volume < 0.0) ? defaultVol : cell.volume;
+                // Live preview: immediate restart of note with new pitch
+                final playback = context.read<PlaybackState>();
+                final sampleBank = context.read<SampleBankState>();
+                // Resolve effective volume
+                double defaultVol = 1.0;
+                if (cell.sampleSlot >= 0) {
+                  final sd = sampleBank.getSampleData(cell.sampleSlot);
+                  defaultVol = (sd.volume >= 0.0 && sd.volume <= 1.0) ? sd.volume : 1.0;
+                }
+                final effVol = (cell.volume < 0.0) ? defaultVol : cell.volume;
+                _previewDebounceTimer?.cancel();
+                _previewDebounceTimer = Timer(Duration(milliseconds: _previewDebounceMs), () {
                   if (effVol <= 0.0) {
                     playback.stopPreview();
                     return;
                   }
-                  final ratio = PitchConversion.uiValueToPitchRatio(v);
                   playback.previewCell(step: step, colAbs: colAbs, pitchRatio: ratio, volume01: effVol);
-                },
-                onChangeEnd: (_) {
-                  final playback = context.read<PlaybackState>();
-                  playback.stopPreview();
-                },
-                processingSource: sampleBank.getSampleProcessingNotifier(sampleSlot),
-                contextLabel: 'Cell ${row + 1}:${col + 1}',
-              );
+                });
+              }
+            },
+            onChangeStart: () {
+              // No preview on start - let onSemitonesChanged handle it
+              // This prevents double-sound (old pitch then new pitch)
+            },
+            onChangeEnd: () {
+              // Stop preview when scrolling ends
+              final playback = context.read<PlaybackState>();
+              playback.stopPreview();
             },
           );
         } else {
-          // No sample → no processing
-          // No sample → ensure processing source is null
-          overlay.setProcessingSource(null);
-          return GenericSlider(
-            value: uiPitch,
-            min: 0.0,
-            max: 1.0,
-            divisions: 24,
-            type: SliderType.pitch,
-            onChanged: (_) {},
-            height: height,
-            sliderOverlay: overlay,
-            processingSource: null,
-            contextLabel: 'Cell ${row + 1}:${col + 1}',
+          // No sample → show wheel but disabled
+          return SemitoneWheelWidget(
+            semitones: semitones,
+            onSemitonesChanged: (_) {}, // No action when no sample
+            enableHaptic: false,
           );
         }
       },

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import '../utils/log.dart';
 
 class WebSocketClient {
   WebSocket? _socket;
@@ -40,7 +41,7 @@ class WebSocketClient {
   // Register a handler for a specific message type
   void registerMessageHandler(String messageType, Function(Map<String, dynamic>) handler) {
     _messageHandlers.putIfAbsent(messageType, () => []).add(handler);
-    print('📋 Registered handler for message type: $messageType');
+    Log.d('Registered handler for message type: $messageType', 'WS');
   }
 
   // Unregister a specific handler for a message type
@@ -49,19 +50,19 @@ class WebSocketClient {
     if (_messageHandlers[messageType]?.isEmpty == true) {
       _messageHandlers.remove(messageType);
     }
-    print('📋 Unregistered handler for message type: $messageType');
+    Log.d('Unregistered handler for message type: $messageType', 'WS');
   }
 
   // Unregister all handlers for a message type
   void unregisterAllHandlers(String messageType) {
     _messageHandlers.remove(messageType);
-    print('📋 Unregistered all handlers for message type: $messageType');
+    Log.d('Unregistered all handlers for message type: $messageType', 'WS');
   }
   
   Future<bool> connect(String clientId) async {
     try {
       _clientId = clientId;
-      print('🔗 Connecting to $serverUrl as $clientId...');
+      Log.d('Connecting to $serverUrl as $clientId...', 'WS');
       
       // Connect to WebSocket
       _socket = await WebSocket.connect(serverUrl);
@@ -73,7 +74,7 @@ class WebSocketClient {
       });
       
       _socket!.add(authMessage);
-      print('🔐 Sent authentication with token: $authToken');
+      Log.d('Sent authentication', 'WS');
       
       // Listen for messages
       _socket!.listen(
@@ -97,10 +98,10 @@ class WebSocketClient {
           orElse: () => false,
         ).timeout(const Duration(seconds: 10));
         
-        print('✅ WebSocket connection fully established and authenticated');
+        Log.i('WebSocket connection fully established and authenticated', 'WS');
         return true;
       } catch (e) {
-        print('⚠️ Connection timeout or failed to get confirmation: $e');
+        Log.w('Connection timeout or failed to get confirmation: $e', 'WS');
         // Still return true if socket is connected, just log the issue
         return _socket != null;
       }
@@ -124,23 +125,23 @@ class WebSocketClient {
         if (!_connectionController.isClosed) {
           _connectionController.add(true);
         }
-        print('✅ ${message['message']}');
+        Log.i('${message['message']}', 'WS');
         return;
       }
       
       // Route message to registered handlers
       final handlers = _messageHandlers[type];
       if (handlers != null && handlers.isNotEmpty) {
-        print('📩 Routing message type "$type" to ${handlers.length} handler(s)');
+        Log.d('Routing message type "$type" to ${handlers.length} handler(s)', 'WS');
         for (final handler in handlers) {
           try {
             handler(message);
           } catch (e) {
-            print('❌ Error in handler for message type "$type": $e');
+            Log.e('Error in handler for message type "$type"', 'WS', e);
           }
         }
       } else {
-        print('📩 No handlers registered for message type: $type');
+        Log.d('No handlers registered for message type: $type', 'WS');
       }
       
       // Also forward to generic message stream for backward compatibility
@@ -148,8 +149,8 @@ class WebSocketClient {
         _messageController.add(message);
       }
     } catch (e) {
-      print('📩 Raw message (parse error): $data');
-      print('📩 Parse error: $e');
+      Log.d('Raw message (parse error): $data', 'WS');
+      Log.d('Parse error: $e', 'WS');
     }
   }
   

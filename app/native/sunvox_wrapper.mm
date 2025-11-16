@@ -50,7 +50,7 @@ static int g_updating_timeline = 0; // Recursion guard for update_timeline
 
 // Initialize SunVox engine
 int sunvox_wrapper_init(void) {
-    prnt("🎵 [SUNVOX] Initializing SunVox wrapper (NEW LIBRARY - Oct 14 2025)");
+    prnt_debug("🎵 [SUNVOX] Initializing SunVox wrapper (NEW LIBRARY - Oct 14 2025)");
     
     // WORKAROUND for crash bug: Pre-create config files before sv_init()
     // SunVox's smisc_global_init() tries to load config files and crashes if they don't exist
@@ -63,7 +63,7 @@ int sunvox_wrapper_init(void) {
     // Create empty config file if it doesn't exist
     if (![[NSFileManager defaultManager] fileExistsAtPath:configPath]) {
         [@"" writeToFile:configPath atomically:YES encoding:NSUTF8StringEncoding error:nil];
-        prnt("🔧 [SUNVOX] Created empty config file at: %s", [configPath UTF8String]);
+        prnt_debug("🔧 [SUNVOX] Created empty config file at: %s", [configPath UTF8String]);
     }
     #endif
     
@@ -123,14 +123,14 @@ int sunvox_wrapper_init(void) {
     
     if (actual_patterns > 0) {
         prnt("⚠️ [SUNVOX] WARNING: SunVox created %d default pattern(s)!", actual_patterns);
-        prnt("🗑️ [SUNVOX] Deleting default patterns to start clean...");
+        prnt_debug("🗑️ [SUNVOX] Deleting default patterns to start clean...");
         
         // Delete all default patterns
         sv_lock_slot(SUNVOX_SLOT);
         for (int i = 0; i < num_pattern_slots; i++) {
             int lines = sv_get_pattern_lines(SUNVOX_SLOT, i);
             if (lines > 0) {
-                prnt("🗑️ [SUNVOX] Deleting default pattern %d", i);
+                prnt_debug("🗑️ [SUNVOX] Deleting default pattern %d", i);
                 sv_remove_pattern(SUNVOX_SLOT, i);
             }
         }
@@ -237,7 +237,7 @@ int sunvox_wrapper_load_sample(int sample_slot, const char* file_path) {
         return -1;
     }
     
-    prnt("📂 [SUNVOX] Loading sample %d: %s", sample_slot, file_path);
+    prnt_debug("📂 [SUNVOX] Loading sample %d: %s", sample_slot, file_path);
     
     // Lock slot for sample loading
     sv_lock_slot(SUNVOX_SLOT);
@@ -252,14 +252,14 @@ int sunvox_wrapper_load_sample(int sample_slot, const char* file_path) {
     
     // Verify the module flags
     uint32_t flags = sv_get_module_flags(SUNVOX_SLOT, mod_id);
-    prnt("🔍 [SUNVOX] Module %d flags: 0x%X (exists=%d, generator=%d)", 
+    prnt_debug("🔍 [SUNVOX] Module %d flags: 0x%X (exists=%d, generator=%d)", 
          mod_id, flags, (flags & SV_MODULE_FLAG_EXISTS) != 0, (flags & SV_MODULE_FLAG_GENERATOR) != 0);
     
     // Set sampler volume to maximum
     int vol_ctl = sv_get_module_ctl_value(SUNVOX_SLOT, mod_id, 4, 0); // Controller 4 = Volume
-    prnt("🔊 [SUNVOX] Module %d current volume: %d", mod_id, vol_ctl);
+    prnt_debug("🔊 [SUNVOX] Module %d current volume: %d", mod_id, vol_ctl);
     sv_set_module_ctl_value(SUNVOX_SLOT, mod_id, 4, 256, 0); // Set to max (256)
-    prnt("🔊 [SUNVOX] Module %d volume set to 256", mod_id);
+    prnt_debug("🔊 [SUNVOX] Module %d volume set to 256", mod_id);
     
     sv_unlock_slot(SUNVOX_SLOT);
     
@@ -278,7 +278,7 @@ void sunvox_wrapper_unload_sample(int sample_slot) {
     int mod_id = g_sampler_modules[sample_slot];
     if (mod_id < 0) return;
     
-    prnt("🗑️ [SUNVOX] Unloading sample %d (module %d)", sample_slot, mod_id);
+    prnt_debug("🗑️ [SUNVOX] Unloading sample %d (module %d)", sample_slot, mod_id);
     
     // Clear the sampler by loading an empty sample
     // TODO: Find better way to clear sampler
@@ -358,7 +358,7 @@ void sunvox_wrapper_sync_cell(int step, int col) {
             );
             
             if (result == 0) {
-                prnt("📝 [SUNVOX] Set pattern event [section=%d, line=%d, col=%d]: note=%d, vel=%d, mod=%d",
+                prnt_debug("📝 [SUNVOX] Set pattern event [section=%d, line=%d, col=%d]: note=%d, vel=%d, mod=%d",
                      section_index, local_line, col, final_note, velocity, mod_id + 1);
             } else {
                 prnt_err("❌ [SUNVOX] Failed to set pattern event: %d", result);
@@ -394,8 +394,12 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
         int old_lines = sv_get_pattern_lines(SUNVOX_SLOT, existing_pat_id);
         int result = sv_set_pattern_size(SUNVOX_SLOT, existing_pat_id, max_cols, section_length);
         
-        if (result == 0) {
-            prnt("📏 [SUNVOX] Resized existing pattern %d for section %d from %d to %d lines (seamless)", 
+        // CRITICAL FIX: Verify the resize actually worked by reading back the size
+        int actual_lines = sv_get_pattern_lines(SUNVOX_SLOT, existing_pat_id);
+        int actual_tracks = sv_get_pattern_tracks(SUNVOX_SLOT, existing_pat_id);
+        
+        if (result == 0 && actual_lines == section_length && actual_tracks == max_cols) {
+            prnt("📏 [SUNVOX] Resized existing pattern %d for section %d from %d to %d lines (seamless, verified)", 
                  existing_pat_id, section_index, old_lines, section_length);
             
             // Sync the section data to the resized pattern
@@ -408,7 +412,10 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
             
             return 0;
         } else {
-            prnt_err("❌ [SUNVOX] Failed to resize pattern %d: %d, falling back to recreation", existing_pat_id, result);
+            prnt_err("❌ [SUNVOX] Pattern resize FAILED verification: result=%d, expected %dx%d, got %dx%d", 
+                     result, max_cols, section_length, actual_tracks, actual_lines);
+            prnt_err("❌ [SUNVOX] sv_set_pattern_size() returned success but pattern wasn't actually resized!");
+            prnt_err("❌ [SUNVOX] Falling back to pattern recreation to ensure correct size");
             sv_unlock_slot(SUNVOX_SLOT);
             // Fall through to recreation logic
         }
@@ -492,7 +499,7 @@ int sunvox_wrapper_create_section_pattern(int section_index, int section_length)
         // If playback was active, restart it to apply new timeline
         // Note: This only happens when a pattern is recreated, not resized
         if (was_playing) {
-            prnt("🔄 [SUNVOX] Restarting playback to apply new pattern (pattern was recreated)");
+            prnt_debug("🔄 [SUNVOX] Restarting playback to apply new pattern (pattern was recreated)");
             sv_stop(SUNVOX_SLOT);
             sv_rewind(SUNVOX_SLOT, 0);
             sv_play(SUNVOX_SLOT);
@@ -515,7 +522,7 @@ void sunvox_wrapper_remove_section_pattern(int section_index) {
     sv_unlock_slot(SUNVOX_SLOT);
     
     g_section_patterns[section_index] = -1;
-    prnt("🗑️ [SUNVOX] Removed pattern for section %d", section_index);
+    prnt_debug("🗑️ [SUNVOX] Removed pattern for section %d", section_index);
     
     // Update timeline
     sunvox_wrapper_update_timeline();
@@ -525,7 +532,7 @@ void sunvox_wrapper_remove_section_pattern(int section_index) {
 void sunvox_wrapper_reset_all_patterns(void) {
     if (!g_sunvox_initialized) return;
     
-    prnt("🔄 [SUNVOX] === RESETTING ALL PATTERNS ===");
+    prnt_debug("🔄 [SUNVOX] === RESETTING ALL PATTERNS ===");
     
     // Stop playback first
     sv_stop(SUNVOX_SLOT);
@@ -536,14 +543,14 @@ void sunvox_wrapper_reset_all_patterns(void) {
     
     // Get number of pattern slots
     int num_pattern_slots = sv_get_number_of_patterns(SUNVOX_SLOT);
-    prnt("🔍 [SUNVOX] Found %d pattern slots", num_pattern_slots);
+    prnt_debug("🔍 [SUNVOX] Found %d pattern slots", num_pattern_slots);
     
     // Remove all existing patterns
     int removed_count = 0;
     for (int i = 0; i < num_pattern_slots; i++) {
         int lines = sv_get_pattern_lines(SUNVOX_SLOT, i);
         if (lines > 0) {
-            prnt("🗑️ [SUNVOX] Removing pattern %d (%d lines)", i, lines);
+            prnt_debug("🗑️ [SUNVOX] Removing pattern %d (%d lines)", i, lines);
             sv_remove_pattern(SUNVOX_SLOT, i);
             removed_count++;
         }
@@ -585,7 +592,7 @@ void sunvox_wrapper_sync_section(int section_index) {
     int section_length = table_get_section_step_count(section_index);
     int max_cols = table_get_max_cols();
     
-    prnt("🔄 [SUNVOX] Syncing section %d (start=%d, length=%d, pat_id=%d)", 
+    prnt_debug("🔄 [SUNVOX] Syncing section %d (start=%d, length=%d, pat_id=%d)", 
          section_index, section_start, section_length, pat_id);
     
     int synced_cells = 0;
@@ -669,7 +676,7 @@ void sunvox_wrapper_set_playback_mode(int song_mode, int current_section, int cu
     
     if (song_mode) {
         // Song mode: Setup pattern sequence and loop counts
-        prnt("🎵 [SUNVOX] Entering SONG MODE");
+        prnt_debug("🎵 [SUNVOX] Entering SONG MODE");
         
         // Get sections and their loop counts from playback state
         const PlaybackState* pb_state = playback_get_state_ptr();
@@ -714,7 +721,7 @@ void sunvox_wrapper_set_playback_mode(int song_mode, int current_section, int cu
         }
     } else {
         // Loop mode: Enable infinite loop for current section
-        prnt("🔁 [SUNVOX] Entering LOOP MODE (section %d)", current_section);
+        prnt_debug("🔁 [SUNVOX] Entering LOOP MODE (section %d)", current_section);
         
         int pat_id = g_section_patterns[current_section];
         if (pat_id >= 0) {
@@ -754,16 +761,24 @@ void sunvox_wrapper_set_playback_mode(int song_mode, int current_section, int cu
 // SEAMLESS timeline update for pattern size changes (add/remove steps)
 // Updates pattern positions and forces boundary recalculation WITHOUT stopping playback
 void sunvox_wrapper_update_timeline_seamless(int section_index) {
-    if (!g_sunvox_initialized || g_updating_timeline) return;
+    if (!g_sunvox_initialized || g_updating_timeline) {
+        prnt("⚠️ [SUNVOX TIMELINE SEAMLESS] Skipped: initialized=%d, updating=%d", 
+             g_sunvox_initialized, g_updating_timeline);
+        return;
+    }
     g_updating_timeline = 1;
     
     int sections_count = table_get_sections_count();
     int was_playing = (sv_end_of_song(SUNVOX_SLOT) == 0);
     int current_line = sv_get_current_line(SUNVOX_SLOT);
     
-    // Find current section and local offset (before pattern positions change)
-    int target_section = -1;
-    int section_local_offset = 0;
+    prnt("🗺️ [SUNVOX TIMELINE SEAMLESS] === RECALCULATING PATTERN POSITIONS ===");
+    prnt("🗺️ [SUNVOX TIMELINE SEAMLESS] section_index=%d, sections_count=%d, was_playing=%d", 
+         section_index, sections_count, was_playing);
+    
+    // CRITICAL: Track by pattern ID, not section index (for reordering support)
+    int playing_pattern_id = -1;
+    int pattern_local_offset = 0;
     if (was_playing) {
         for (int i = 0; i < sections_count; i++) {
             int pat_id = g_section_patterns[i];
@@ -771,8 +786,8 @@ void sunvox_wrapper_update_timeline_seamless(int section_index) {
             int pat_x = sv_get_pattern_x(SUNVOX_SLOT, pat_id);
             int pat_lines = sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
             if (current_line >= pat_x && current_line < pat_x + pat_lines) {
-                target_section = i;
-                section_local_offset = current_line - pat_x;
+                playing_pattern_id = pat_id;  // Save pattern ID, not section index
+                pattern_local_offset = current_line - pat_x;
                 break;
             }
         }
@@ -780,35 +795,58 @@ void sunvox_wrapper_update_timeline_seamless(int section_index) {
     
     // Save loop counter before refreshing (song mode only)
     int saved_loop_counter = -1;
-    if (was_playing && g_song_mode && target_section >= 0) {
-        int pat_id = g_section_patterns[target_section];
-        if (pat_id >= 0) {
-            saved_loop_counter = sv_get_pattern_current_loop(SUNVOX_SLOT, pat_id);
-        }
+    if (was_playing && g_song_mode && playing_pattern_id >= 0) {
+        saved_loop_counter = sv_get_pattern_current_loop(SUNVOX_SLOT, playing_pattern_id);
     }
     
     // Update pattern X positions and recalculate proj_lines atomically (within lock)
     sv_lock_slot(SUNVOX_SLOT);
     
+    prnt("🗺️ [SUNVOX TIMELINE SEAMLESS] Recalculating X positions for all patterns:");
     int timeline_x = 0;
+    int mismatches = 0;
     for (int i = 0; i < sections_count; i++) {
         int pat_id = g_section_patterns[i];
-        if (pat_id < 0) continue;
+        if (pat_id < 0) {
+            prnt("  ⚠️ Section %d: NO PATTERN (skipped)", i);
+            continue;
+        }
+        int pat_lines = sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
+        int table_steps = table_get_section_step_count(i);
+        int table_start = table_get_section_start_step(i);
+        
         sv_set_pattern_xy(SUNVOX_SLOT, pat_id, timeline_x, i);
-        timeline_x += sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
+        
+        // Verify consistency between table and SunVox
+        if (pat_lines != table_steps) {
+            prnt("  ❌ Section %d: MISMATCH! Pattern %d has %d lines but table has %d steps!", 
+                 i, pat_id, pat_lines, table_steps);
+            mismatches++;
+        } else if (timeline_x != table_start) {
+            prnt("  ⚠️ Section %d: Position mismatch! Pattern X=%d but table start=%d (diff=%d)", 
+                 i, timeline_x, table_start, timeline_x - table_start);
+        } else {
+            prnt("  ✅ Section %d: Pattern %d at x=%d (%d lines, ends at %d) [table consistent]", 
+                 i, pat_id, timeline_x, pat_lines, timeline_x + pat_lines);
+        }
+        timeline_x += pat_lines;
     }
+    prnt("🗺️ [SUNVOX TIMELINE SEAMLESS] Total timeline length: %d lines", timeline_x);
+    if (mismatches > 0) {
+        prnt("⚠️ [SUNVOX TIMELINE SEAMLESS] WARNING: Found %d pattern/table size mismatches!", mismatches);
+    }
+    prnt("🗺️ [SUNVOX TIMELINE SEAMLESS] ==========================================");
     
     // Calculate new playhead position
     int new_line = 0;
-    if (target_section >= 0) {
-        int pat_id = g_section_patterns[target_section];
-        int new_pat_x = sv_get_pattern_x(SUNVOX_SLOT, pat_id);
-        int new_pat_lines = sv_get_pattern_lines(SUNVOX_SLOT, pat_id);
+    if (playing_pattern_id >= 0) {
+        int new_pat_x = sv_get_pattern_x(SUNVOX_SLOT, playing_pattern_id);
+        int new_pat_lines = sv_get_pattern_lines(SUNVOX_SLOT, playing_pattern_id);
         // Clamp offset if pattern shrank
-        if (section_local_offset >= new_pat_lines) {
-            section_local_offset = new_pat_lines - 1;
+        if (pattern_local_offset >= new_pat_lines) {
+            pattern_local_offset = new_pat_lines - 1;
         }
-        new_line = new_pat_x + section_local_offset;
+        new_line = new_pat_x + pattern_local_offset;
     }
     
     // CRITICAL: Call sv_set_position() WHILE LOCK HELD to prevent race condition
@@ -821,7 +859,7 @@ void sunvox_wrapper_update_timeline_seamless(int section_index) {
     
     // Refresh mode-specific settings
     if (was_playing) {
-        if (g_song_mode && target_section >= 0) {
+        if (g_song_mode && playing_pattern_id >= 0) {
             // Song mode: Refresh loop counts and restore counter
             const PlaybackState* pb_state = playback_get_state_ptr();
             for (int i = 0; i < sections_count; i++) {
@@ -832,12 +870,11 @@ void sunvox_wrapper_update_timeline_seamless(int section_index) {
             }
             
             // Restore loop counter for currently playing pattern
-            int current_pat_id = g_section_patterns[target_section];
-            if (current_pat_id >= 0 && saved_loop_counter >= 0) {
-                sv_set_pattern_current_loop(SUNVOX_SLOT, current_pat_id, saved_loop_counter);
+            if (saved_loop_counter >= 0) {
+                sv_set_pattern_current_loop(SUNVOX_SLOT, playing_pattern_id, saved_loop_counter);
             }
             
-            sv_set_pattern_loop(SUNVOX_SLOT, current_pat_id);
+            sv_set_pattern_loop(SUNVOX_SLOT, playing_pattern_id);
             sv_set_autostop(SUNVOX_SLOT, 1);
             
         } else if (section_index == g_current_section && g_section_patterns[section_index] >= 0) {
@@ -850,6 +887,37 @@ void sunvox_wrapper_update_timeline_seamless(int section_index) {
     }
     
     g_updating_timeline = 0;
+}
+
+// Seamless section reordering
+// Called after table_reorder_section has already moved the data
+void sunvox_wrapper_reorder_section(int from_index, int to_index) {
+    prnt_debug("🔄 [SUNVOX] Seamless reorder: section %d → %d", from_index, to_index);
+    
+    // CRITICAL: Reorder the pattern associations to match the new section order
+    // Save the pattern ID being moved
+    int moving_pattern_id = g_section_patterns[from_index];
+    
+    // Shift pattern associations to match table reorder
+    if (from_index < to_index) {
+        // Moving down: shift patterns [from+1..to] up by one
+        for (int i = from_index; i < to_index; i++) {
+            g_section_patterns[i] = g_section_patterns[i + 1];
+        }
+        g_section_patterns[to_index] = moving_pattern_id;
+    } else {
+        // Moving up: shift patterns [to..from-1] down by one
+        for (int i = from_index; i > to_index; i--) {
+            g_section_patterns[i] = g_section_patterns[i - 1];
+        }
+        g_section_patterns[to_index] = moving_pattern_id;
+    }
+    
+    prnt("  ↪️ [SUNVOX] Pattern associations reordered");
+    
+    // Use seamless update - it now tracks by pattern ID so reordering works correctly
+    // Pass -1 as section_index since we don't need loop mode refresh (reorder affects all modes)
+    sunvox_wrapper_update_timeline_seamless(-1);
 }
 
 // Update timeline with current section order
@@ -881,11 +949,12 @@ void sunvox_wrapper_update_timeline(void) {
     // ===== NO-CLONE APPROACH: Simple linear layout =====
     // One pattern per section, placed sequentially
     // Loop counting is handled in SunVox engine via sv_set_pattern_loop_count()
-    prnt("📋 [SUNVOX] Building simple timeline: %d sections (NO CLONES)", sections_count);
+    prnt_debug("📋 [SUNVOX] Building simple timeline: %d sections (NO CLONES)", sections_count);
     
     sv_lock_slot(SUNVOX_SLOT);
     
     // Layout patterns sequentially
+    prnt("🗺️ [SUNVOX TIMELINE] === BUILDING PATTERN LAYOUT ===");
     int timeline_x = 0;
     for (int i = 0; i < sections_count; i++) {
         int pat_id = g_section_patterns[i];
@@ -895,14 +964,15 @@ void sunvox_wrapper_update_timeline(void) {
         
         // Place pattern at current X position
         sv_set_pattern_xy(SUNVOX_SLOT, pat_id, timeline_x, i);
-        prnt("  📍 [SUNVOX] Section %d: Pattern %d at x=%d (%d lines)", 
-             i, pat_id, timeline_x, pat_lines);
+        prnt("  📍 [SUNVOX] Section %d: Pattern %d at x=%d (%d lines, ends at %d)", 
+             i, pat_id, timeline_x, pat_lines, timeline_x + pat_lines);
         
         timeline_x += pat_lines;
     }
     
     sv_unlock_slot(SUNVOX_SLOT);
     prnt("✅ [SUNVOX] Simple timeline built: %d lines total (0 clones)", timeline_x);
+    prnt("🗺️ [SUNVOX TIMELINE] ===================================");
     
     g_updating_timeline = 0;
     
@@ -917,7 +987,7 @@ void sunvox_wrapper_update_timeline(void) {
         
     } else {
         // Playback was stopped
-        prnt("⏮️ [SUNVOX] Rewound to beginning (playback stopped)");
+        prnt_debug("⏮️ [SUNVOX] Rewound to beginning (playback stopped)");
     }
 }
 
@@ -932,7 +1002,7 @@ int sunvox_wrapper_play(void) {
     
     // Debug: Check audio status
     int audio_callback = sv_get_sample_rate();
-    prnt("🔊 [SUNVOX] Audio sample rate: %d Hz", audio_callback);
+    prnt_debug("🔊 [SUNVOX] Audio sample rate: %d Hz", audio_callback);
     
     // Debug: Check module volume and mute status
     for (int i = 0; i < 3; i++) {
@@ -940,7 +1010,7 @@ int sunvox_wrapper_play(void) {
         if (mod_id >= 0) {
             uint32_t flags = sv_get_module_flags(SUNVOX_SLOT, mod_id);
             int muted = (flags & SV_MODULE_FLAG_MUTE) != 0;
-            prnt("🔍 [SUNVOX] Module %d: exists=%d, muted=%d", 
+            prnt_debug("🔍 [SUNVOX] Module %d: exists=%d, muted=%d", 
                  mod_id, (flags & SV_MODULE_FLAG_EXISTS) != 0, muted);
         }
     }
@@ -954,7 +1024,7 @@ int sunvox_wrapper_play(void) {
     
     // Verify playback status
     int status = sv_end_of_song(SUNVOX_SLOT);
-    prnt("🎵 [SUNVOX] Playback status after start: %d (0=playing)", status);
+    prnt_debug("🎵 [SUNVOX] Playback status after start: %d (0=playing)", status);
     
     return 0;
 }
@@ -963,7 +1033,7 @@ int sunvox_wrapper_play(void) {
 void sunvox_wrapper_stop(void) {
     if (!g_sunvox_initialized) return;
     
-    prnt("⏹️ [SUNVOX] Stopping playback");
+    prnt_debug("⏹️ [SUNVOX] Stopping playback");
     sv_stop(SUNVOX_SLOT);
 }
 
@@ -975,7 +1045,7 @@ void sunvox_wrapper_set_bpm(int bpm) {
     if (bpm < 1) bpm = 1;
     if (bpm > 16000) bpm = 16000;
     
-    prnt("🎵 [SUNVOX] Setting BPM to %d", bpm);
+    prnt_debug("🎵 [SUNVOX] Setting BPM to %d", bpm);
     
     // Set BPM using SunVox effect 0x1F
     // sv_send_event(slot, track_num, note, vel, module, ctl, ctl_val)
@@ -1008,7 +1078,7 @@ void sunvox_wrapper_set_bpm(int bpm) {
 void sunvox_wrapper_set_region(int start, int end) {
     if (!g_sunvox_initialized) return;
     
-    prnt("🎭 [SUNVOX] Setting region: %d to %d", start, end);
+    prnt_debug("🎭 [SUNVOX] Setting region: %d to %d", start, end);
     
     // Stop all currently playing notes by sending note-off to all samplers
     // Only needed if playback is active
@@ -1058,7 +1128,7 @@ int sunvox_wrapper_get_section_pattern_x(int section_index) {
 void sunvox_wrapper_trigger_step(int step) {
     if (!g_sunvox_initialized) return;
     
-    prnt("🎯 [SUNVOX] Triggering notes at step %d", step);
+    prnt_debug("🎯 [SUNVOX] Triggering notes at step %d", step);
     
     sv_lock_slot(SUNVOX_SLOT);
     
@@ -1107,7 +1177,7 @@ void sunvox_wrapper_trigger_step(int step) {
             0                   // no controller value
         );
         
-        prnt("🎵 [SUNVOX] Triggered note [step=%d, col=%d]: mod=%d, vel=%d, note=%d", 
+        prnt_debug("🎵 [SUNVOX] Triggered note [step=%d, col=%d]: mod=%d, vel=%d, note=%d", 
              step, col, mod_id, velocity, final_note);
     }
     
@@ -1132,11 +1202,11 @@ int sunvox_wrapper_is_initialized(void) {
 // void sunvox_wrapper_debug_dump_patterns(const char* context) {
 //     if (!g_sunvox_initialized) return;
 //
-//     prnt("🔍 [SUNVOX DEBUG DUMP] ========== %s ==========", context);
+//     prnt_debug("🔍 [SUNVOX DEBUG DUMP] ========== %s ==========", context);
 //
 //     // Get number of pattern slots from SunVox
 //     int num_pattern_slots = sv_get_number_of_patterns(SUNVOX_SLOT);
-//     prnt("🔍 [SUNVOX DEBUG] SunVox has %d pattern slots", num_pattern_slots);
+//     prnt_debug("🔍 [SUNVOX DEBUG] SunVox has %d pattern slots", num_pattern_slots);
 //
 //     // List all patterns that exist (slots that contain patterns)
 //     int actual_patterns = 0;
@@ -1153,10 +1223,10 @@ int sunvox_wrapper_is_initialized(void) {
 //                  i, name ? name : "???", tracks, lines, x, y);
 //         }
 //     }
-//     prnt("🔍 [SUNVOX DEBUG] %d actual patterns exist (out of %d slots)", actual_patterns, num_pattern_slots);
+//     prnt_debug("🔍 [SUNVOX DEBUG] %d actual patterns exist (out of %d slots)", actual_patterns, num_pattern_slots);
 //
 //     // Show our mapping
-//     prnt("🔍 [SUNVOX DEBUG] Our section->pattern mapping:");
+//     prnt_debug("🔍 [SUNVOX DEBUG] Our section->pattern mapping:");
 //     for (int i = 0; i < MAX_SECTIONS; i++) {
 //         if (g_section_patterns[i] >= 0) {
 //             int lines = sv_get_pattern_lines(SUNVOX_SLOT, g_section_patterns[i]);
@@ -1166,21 +1236,21 @@ int sunvox_wrapper_is_initialized(void) {
 //
 //     // Get song length
 //     int song_length = sv_get_song_length_lines(SUNVOX_SLOT);
-//     prnt("🔍 [SUNVOX DEBUG] Song length (from sv_get_song_length_lines): %d lines", song_length);
+//     prnt_debug("🔍 [SUNVOX DEBUG] Song length (from sv_get_song_length_lines): %d lines", song_length);
 //
 //     // Get current line
 //     int current_line = sv_get_current_line(SUNVOX_SLOT);
-//     prnt("🔍 [SUNVOX DEBUG] Current playback line: %d", current_line);
+//     prnt_debug("🔍 [SUNVOX DEBUG] Current playback line: %d", current_line);
 //
 //     // Get autostop setting
 //     int autostop = sv_get_autostop(SUNVOX_SLOT);
-//     prnt("🔍 [SUNVOX DEBUG] Autostop: %d (0=loop, 1=stop at end)", autostop);
+//     prnt_debug("🔍 [SUNVOX DEBUG] Autostop: %d (0=loop, 1=stop at end)", autostop);
 //
 //     // Get playback status
 //     int playing = (sv_end_of_song(SUNVOX_SLOT) == 0);
-//     prnt("🔍 [SUNVOX DEBUG] Playing: %s", playing ? "YES" : "NO");
+//     prnt_debug("🔍 [SUNVOX DEBUG] Playing: %s", playing ? "YES" : "NO");
 //
-//     prnt("🔍 [SUNVOX DEBUG] ================================");
+//     prnt_debug("🔍 [SUNVOX DEBUG] ================================");
 // }
 
 int sunvox_wrapper_get_pattern_current_loop(int section_index) {

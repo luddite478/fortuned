@@ -47,9 +47,32 @@ static inline void table_set_cell_defaults(Cell* cell) {
     cell->is_processing = 0;
 }
 
+// Helper to recompute all section start_step values to ensure they are contiguous
+// This ensures there are no gaps or overlaps in the section ranges
+// Call this after any operation that modifies section structure or step counts
+static void table_recompute_section_starts(void) {
+    prnt_info("🔧 [TABLE_RECOMPUTE] === RECOMPUTING SECTION STARTS ===");
+    prnt_info("🔧 [TABLE_RECOMPUTE] Sections count: %d", g_table_state.sections_count);
+    
+    int cursor = 0;
+    for (int i = 0; i < g_table_state.sections_count; i++) {
+        int old_start = g_table_state.sections[i].start_step;
+        int num_steps = g_table_state.sections[i].num_steps;
+        g_table_state.sections[i].start_step = cursor;
+        
+        prnt_info("🔧 [TABLE_RECOMPUTE]   Section %d: start %d → %d, steps: %d", 
+                  i, old_start, cursor, num_steps);
+        
+        cursor += num_steps;
+    }
+    
+    prnt_info("🔧 [TABLE_RECOMPUTE] Total steps after recompute: %d", cursor);
+    prnt_info("🔧 [TABLE_RECOMPUTE] === RECOMPUTE COMPLETE ===");
+}
+
 // Initialize table with default values
 void table_init(void) {
-    prnt("🎵 [TABLE] Initializing table: %d x %d", MAX_SEQUENCER_STEPS, MAX_SEQUENCER_COLS);
+    prnt_debug("🎵 [TABLE] Initializing table: %d x %d", MAX_SEQUENCER_STEPS, MAX_SEQUENCER_COLS);
     
     // Clear all cells
     for (int step = 0; step < MAX_SEQUENCER_STEPS; step++) {
@@ -75,7 +98,7 @@ void table_init(void) {
     g_table_state.sections_ptr = &g_table_state.sections[0];
     g_table_state.layers_ptr = &g_table_state.layers[0][0];
     
-    prnt("✅ [TABLE] Table initialized successfully");
+    prnt_info("✅ [TABLE] Table initialized successfully");
 
     // Note: SunVox patterns will be created in playback_init() after SunVox is initialized
     // Do not seed undo/redo baseline here; a single baseline is recorded after all modules init
@@ -107,7 +130,7 @@ void table_set_cell(int step, int col, int sample_slot, float volume, float pitc
     cell->settings.pitch = pitch;
     cell->is_processing = 0;
     
-    prnt("🎵 [TABLE] Set cell [%d, %d]: slot=%d, vol=%.2f, pitch=%.2f", 
+    prnt_debug("🎵 [TABLE] Set cell [%d, %d]: slot=%d, vol=%.2f, pitch=%.2f", 
          step, col, sample_slot, volume, pitch);
 
     // Sync cell to SunVox pattern (unless sync is disabled for bulk operations)
@@ -128,7 +151,7 @@ void table_set_cell_settings(int step, int col, float volume, float pitch, int u
 
     cell->settings.volume = volume;
     cell->settings.pitch = pitch;
-    prnt("🎚️ [TABLE] Set settings [%d, %d]: vol=%.2f, pitch=%.2f", step, col, volume, pitch);
+    prnt_debug("🎚️ [TABLE] Set settings [%d, %d]: vol=%.2f, pitch=%.2f", step, col, volume, pitch);
 
     // Sync cell to SunVox pattern (unless sync is disabled for bulk operations)
     if (sunvox_wrapper_is_initialized() && !g_disable_sunvox_sync) {
@@ -212,34 +235,46 @@ void table_insert_step(int section_index, int at_step, int undo_record) {
         return;
     }
     
-    int section_end = g_table_state.sections[section_index].start_step + g_table_state.sections[section_index].num_steps;
+    int section_start = g_table_state.sections[section_index].start_step;
+    int section_end = section_start + g_table_state.sections[section_index].num_steps;
     
-    if (at_step < 0 || at_step > section_end || section_end >= MAX_SEQUENCER_STEPS) {
-        prnt_err("❌ [TABLE] Cannot insert step at %d (section end: %d, max: %d)", 
-                 at_step, section_end, MAX_SEQUENCER_STEPS);
+    // Calculate total table size before insertion
+    int total_steps = 0;
+    for (int i = 0; i < g_table_state.sections_count; i++) {
+        total_steps += g_table_state.sections[i].num_steps;
+    }
+    
+    if (at_step < section_start || at_step > section_end || total_steps >= MAX_SEQUENCER_STEPS) {
+        prnt_err("❌ [TABLE] Cannot insert step at %d (section: %d-%d, total: %d, max: %d)", 
+                 at_step, section_start, section_end, total_steps, MAX_SEQUENCER_STEPS);
         return;
     }
+    
     // Mutate under seqlock
     state_write_begin();
 
-    // Shift all rows down from insertion point
-    for (int step = section_end; step > at_step; step--) {
+    // CRITICAL: Shift ALL rows from the end of table down to insertion point
+    // This ensures subsequent sections' data moves down by 1 row
+    for (int step = total_steps - 1; step >= at_step; step--) {
         for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
-            g_table_state.table[step][col] = g_table_state.table[step - 1][col];
+            g_table_state.table[step + 1][col] = g_table_state.table[step][col];
         }
     }
     
-    // Clear the new row
+    // Clear the new row at insertion point
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
         table_set_cell_defaults(&g_table_state.table[at_step][col]);
     }
     
     // Increase section length
     g_table_state.sections[section_index].num_steps++;
+    // Recompute all section start_step values to eliminate gaps
+    table_recompute_section_starts();
 
     state_write_end();
     
-    prnt("➕ [TABLE] Inserted step at %d in section %d (section steps: %d)", at_step, section_index, g_table_state.sections[section_index].num_steps);
+    prnt("➕ [TABLE] Inserted step at %d in section %d (section steps: %d, total steps: %d)", 
+         at_step, section_index, g_table_state.sections[section_index].num_steps, total_steps + 1);
 
     // Recreate SunVox pattern with new size
     sunvox_wrapper_create_section_pattern(section_index, g_table_state.sections[section_index].num_steps);
@@ -259,32 +294,43 @@ void table_delete_step(int section_index, int at_step, int undo_record) {
     int section_start = g_table_state.sections[section_index].start_step;
     int section_end = section_start + g_table_state.sections[section_index].num_steps;
     
+    // Calculate total table size before deletion
+    int total_steps = 0;
+    for (int i = 0; i < g_table_state.sections_count; i++) {
+        total_steps += g_table_state.sections[i].num_steps;
+    }
+    
     if (at_step < section_start || at_step >= section_end || g_table_state.sections[section_index].num_steps <= 1) {
         prnt_err("❌ [TABLE] Cannot delete step at %d (section: %d-%d, steps: %d)", 
                  at_step, section_start, section_end-1, g_table_state.sections[section_index].num_steps);
         return;
     }
+    
     // Mutate under seqlock
     state_write_begin();
 
-    // Shift all rows up from deletion point
-    for (int step = at_step; step < section_end - 1; step++) {
+    // CRITICAL: Shift ALL rows from deletion point to end of table up by 1
+    // This ensures subsequent sections' data moves up by 1 row
+    for (int step = at_step; step < total_steps - 1; step++) {
         for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
             g_table_state.table[step][col] = g_table_state.table[step + 1][col];
         }
     }
     
-    // Clear the last row in section
+    // Clear the last row in table (now empty after shift)
     for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
-        table_set_cell_defaults(&g_table_state.table[section_end - 1][col]);
+        table_set_cell_defaults(&g_table_state.table[total_steps - 1][col]);
     }
     
     // Decrease section length
     g_table_state.sections[section_index].num_steps--;
+    // Recompute all section start_step values to eliminate gaps
+    table_recompute_section_starts();
 
     state_write_end();
     
-    prnt("➖ [TABLE] Deleted step at %d in section %d (section steps: %d)", at_step, section_index, g_table_state.sections[section_index].num_steps);
+    prnt("➖ [TABLE] Deleted step at %d in section %d (section steps: %d, total steps: %d)", 
+         at_step, section_index, g_table_state.sections[section_index].num_steps, total_steps - 1);
 
     // Recreate SunVox pattern with new size
     sunvox_wrapper_create_section_pattern(section_index, g_table_state.sections[section_index].num_steps);
@@ -342,6 +388,8 @@ void table_set_section_step_count(int section_index, int steps, int undo_record)
     if (steps > 0 && steps <= MAX_SEQUENCER_STEPS) {
         state_write_begin();
         g_table_state.sections[section_index].num_steps = steps;
+        // Recompute all section start_step values to eliminate gaps
+        table_recompute_section_starts();
         state_write_end();
         
         prnt("📏 [TABLE] Set section %d step count to %d", section_index, steps);
@@ -379,7 +427,7 @@ void table_append_section(int steps, int copy_from_section, int undo_record) {
         start += g_table_state.sections[i].num_steps;
     }
 
-    // Initialize section metadata
+    // Initialize section metadata (start_step will be recomputed below)
     g_table_state.sections[new_index].start_step = start;
     g_table_state.sections[new_index].num_steps = new_steps;
 
@@ -408,6 +456,8 @@ void table_append_section(int steps, int copy_from_section, int undo_record) {
     state_write_begin();
 
     g_table_state.sections_count++;
+    // Recompute all section start_step values to eliminate gaps
+    table_recompute_section_starts();
 
     state_write_end();
 
@@ -480,11 +530,8 @@ void table_delete_section(int section_index, int undo_record) {
         }
     }
     g_table_state.sections_count--;
-    int cursor = 0;
-    for (int i = 0; i < g_table_state.sections_count; i++) {
-        g_table_state.sections[i].start_step = cursor;
-        cursor += g_table_state.sections[i].num_steps;
-    }
+    // Recompute all section start_step values to eliminate gaps
+    table_recompute_section_starts();
     // Reset trailing layers row to defaults
     for (int l = 0; l < MAX_LAYERS_PER_SECTION; l++) {
         g_table_state.layers[g_table_state.sections_count][l].len = MAX_COLS_PER_LAYER;
@@ -501,6 +548,139 @@ void table_delete_section(int section_index, int undo_record) {
     for (int i = 0; i < g_table_state.sections_count; i++) {
         sunvox_wrapper_create_section_pattern(i, g_table_state.sections[i].num_steps);
     }
+
+    if (undo_record) {
+        UndoRedoManager_record();
+    }
+}
+
+// Reorder section: move section from from_index to to_index
+// Uses copy-paste approach to physically move data blocks
+void table_reorder_section(int from_index, int to_index, int undo_record) {
+    if (from_index < 0 || from_index >= g_table_state.sections_count) {
+        prnt_err("❌ [TABLE] Invalid from_index: %d", from_index);
+        return;
+    }
+    if (to_index < 0 || to_index >= g_table_state.sections_count) {
+        prnt_err("❌ [TABLE] Invalid to_index: %d", to_index);
+        return;
+    }
+    if (from_index == to_index) {
+        prnt("⚠️ [TABLE] Reorder no-op: from_index == to_index");
+        return;
+    }
+
+    prnt("🔄 [TABLE] Reordering section %d → %d", from_index, to_index);
+
+    // Save section metadata and layers for the moving section
+    Section moving_section = g_table_state.sections[from_index];
+    Layer moving_layers[MAX_LAYERS_PER_SECTION];
+    for (int l = 0; l < MAX_LAYERS_PER_SECTION; l++) {
+        moving_layers[l] = g_table_state.layers[from_index][l];
+    }
+
+    // Allocate temporary buffer for moving section's data
+    int moving_steps = moving_section.num_steps;
+    Cell* temp_buffer = (Cell*)malloc(moving_steps * MAX_SEQUENCER_COLS * sizeof(Cell));
+    if (!temp_buffer) {
+        prnt_err("❌ [TABLE] Failed to allocate temp buffer for reorder");
+        return;
+    }
+
+    // Copy moving section's data to temp buffer
+    int moving_start = moving_section.start_step;
+    for (int step = 0; step < moving_steps; step++) {
+        for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+            temp_buffer[step * MAX_SEQUENCER_COLS + col] = g_table_state.table[moving_start + step][col];
+        }
+    }
+
+    state_write_begin();
+
+    // Shift sections metadata and data
+    if (from_index < to_index) {
+        // Moving down: shift sections [from+1..to] up by one
+        for (int i = from_index; i < to_index; i++) {
+            g_table_state.sections[i] = g_table_state.sections[i + 1];
+            for (int l = 0; l < MAX_LAYERS_PER_SECTION; l++) {
+                g_table_state.layers[i][l] = g_table_state.layers[i + 1][l];
+            }
+        }
+        // Place moving section at to_index
+        g_table_state.sections[to_index] = moving_section;
+        for (int l = 0; l < MAX_LAYERS_PER_SECTION; l++) {
+            g_table_state.layers[to_index][l] = moving_layers[l];
+        }
+    } else {
+        // Moving up: shift sections [to..from-1] down by one
+        for (int i = from_index; i > to_index; i--) {
+            g_table_state.sections[i] = g_table_state.sections[i - 1];
+            for (int l = 0; l < MAX_LAYERS_PER_SECTION; l++) {
+                g_table_state.layers[i][l] = g_table_state.layers[i - 1][l];
+            }
+        }
+        // Place moving section at to_index
+        g_table_state.sections[to_index] = moving_section;
+        for (int l = 0; l < MAX_LAYERS_PER_SECTION; l++) {
+            g_table_state.layers[to_index][l] = moving_layers[l];
+        }
+    }
+
+    // Rebuild entire table data in new order
+    int cursor = 0;
+    Cell* rebuild_buffer = (Cell*)malloc(MAX_SEQUENCER_STEPS * MAX_SEQUENCER_COLS * sizeof(Cell));
+    if (!rebuild_buffer) {
+        free(temp_buffer);
+        state_write_end();
+        prnt_err("❌ [TABLE] Failed to allocate rebuild buffer");
+        return;
+    }
+
+    for (int i = 0; i < g_table_state.sections_count; i++) {
+        int section_steps = g_table_state.sections[i].num_steps;
+        int old_start = g_table_state.sections[i].start_step; // Still points to old position
+        
+        // Copy from old position to rebuild buffer
+        if (i == to_index) {
+            // This is the moved section - copy from temp buffer
+            for (int step = 0; step < section_steps; step++) {
+                for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+                    rebuild_buffer[(cursor + step) * MAX_SEQUENCER_COLS + col] = 
+                        temp_buffer[step * MAX_SEQUENCER_COLS + col];
+                }
+            }
+        } else {
+            // Regular section - copy from original location
+            for (int step = 0; step < section_steps; step++) {
+                for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+                    rebuild_buffer[(cursor + step) * MAX_SEQUENCER_COLS + col] = 
+                        g_table_state.table[old_start + step][col];
+                }
+            }
+        }
+        
+        cursor += section_steps;
+    }
+
+    // Recompute all section start_step values to eliminate gaps
+    table_recompute_section_starts();
+
+    // Copy rebuild buffer back to table
+    for (int step = 0; step < cursor; step++) {
+        for (int col = 0; col < MAX_SEQUENCER_COLS; col++) {
+            g_table_state.table[step][col] = rebuild_buffer[step * MAX_SEQUENCER_COLS + col];
+        }
+    }
+
+    state_write_end();
+
+    free(temp_buffer);
+    free(rebuild_buffer);
+
+    prnt("✅ [TABLE] Reordered section %d → %d", from_index, to_index);
+
+    // Call SunVox seamless reorder wrapper
+    sunvox_wrapper_reorder_section(from_index, to_index);
 
     if (undo_record) {
         UndoRedoManager_record();
@@ -525,6 +705,8 @@ void table_set_section(int index, int start_step, int num_steps, int undo_record
     state_write_begin();
     g_table_state.sections[index].start_step = start_step;
     g_table_state.sections[index].num_steps = num_steps;
+    // Note: Recompute may overwrite start_step, but that's intentional to ensure consistency
+    table_recompute_section_starts();
     state_write_end();
 
     prnt("[TABLE] Set section %d (start=%d, steps=%d)", index, start_step, num_steps);
