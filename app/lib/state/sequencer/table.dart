@@ -85,8 +85,6 @@ enum SoundGridViewMode { stack, flat }
 enum EditButtonsLayoutMode { v1, v2 }
 
 class TableState extends ChangeNotifier {
-  static const int maxNotifiersRows = 256;
-  static const int maxNotifiersCols = 16;
   static const int defaultSectionSteps = 16;
   static const int maxLayersPerSection = 4;
   static const int maxColsPerLayer = 4;
@@ -95,10 +93,8 @@ class TableState extends ChangeNotifier {
   final TableBindings _table_ffi;
   final PlaybackBindings _playback_ffi;
   
-  // 2D array of ValueNotifiers for efficient cell updates (more efficient than string keys)
-  final List<List<ValueNotifier<CellData>?>> _cellNotifiers = 
-    List.generate(maxNotifiersRows, 
-      (_) => List.filled(maxNotifiersCols, null));
+  // 2D array of ValueNotifiers for efficient cell updates (sized dynamically based on native table dimensions)
+  late final List<List<ValueNotifier<CellData>?>> _cellNotifiers;
   
   // Private state fields (synced from native)
   int _sectionsCount = 1;
@@ -137,8 +133,13 @@ class TableState extends ChangeNotifier {
     _table_ffi.tableInit();
     _maxSteps = _table_ffi.tableGetMaxSteps();
     _maxCols = _table_ffi.tableGetMaxCols();
+    
+    // Initialize notifiers array based on actual table dimensions
+    _cellNotifiers = List.generate(_maxSteps, 
+      (_) => List.filled(_maxCols, null));
+    
     _initialized = true;
-    debugPrint('✅ [TABLE_STATE] Table initialized successfully (${_maxSteps}x${_maxCols})');
+    debugPrint('✅ [TABLE_STATE] Table initialized (${_maxSteps}x${_maxCols}, ${_maxSteps * _maxCols} cell capacity)');
   }
   
   /// Set UI selected section (Flutter-only, for smart sync optimization)
@@ -322,8 +323,8 @@ class TableState extends ChangeNotifier {
     
   /// Get notifier for specific cell (efficient 2D array access, lazy initialization)
   ValueNotifier<CellData> getCellNotifier(int step, int col) {
-    if (step >= maxNotifiersRows || col >= maxNotifiersCols) {
-      throw ArgumentError('Cell out of bounds: [$step, $col] (max: $maxNotifiersRows x $maxNotifiersCols)');
+    if (step >= _maxSteps || col >= _maxCols) {
+      throw ArgumentError('Cell out of bounds: [$step, $col] (max: $_maxSteps x $_maxCols)');
     }
     
     // Lazy initialization of notifiers
@@ -419,8 +420,8 @@ class TableState extends ChangeNotifier {
     final layerEndCol = getLayerEndCol(_uiSelectedLayer);
     
     // Direct table access: Only sync cells in the visible rectangular area
-    for (int step = sectionStartStep; step < sectionEndStep && step < maxNotifiersRows; step++) {
-      for (int col = layerStartCol; col < layerEndCol && col < maxNotifiersCols; col++) {
+    for (int step = sectionStartStep; step < sectionEndStep && step < _maxSteps; step++) {
+      for (int col = layerStartCol; col < layerEndCol && col < _maxCols; col++) {
         _notifyCellChangeDirect(step, col);
       }
     }
@@ -428,7 +429,7 @@ class TableState extends ChangeNotifier {
   
   /// Direct cell change notification using table pointer
   void _notifyCellChangeDirect(int step, int col) {
-    if (step < maxNotifiersRows && col < maxNotifiersCols) {
+    if (step < _maxSteps && col < _maxCols) {
       final notifier = _cellNotifiers[step][col];
       if (notifier != null) {
         // Direct access: calculate cell pointer from base table pointer

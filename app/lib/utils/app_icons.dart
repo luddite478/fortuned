@@ -16,6 +16,12 @@ class AppIcons {
   /// Default size multiplier for send icon when used in square buttons.
   static double sendIconScale = 1;
 
+  /// Thread view icon asset filename (SVG). Point to any file under `icons/`.
+  static String threadViewIconAsset = 'thread-view';
+
+  /// Default size multiplier for thread view icon when used in square buttons.
+  static double threadViewIconScale = 1.6;
+
   /// Returns a widget for the configured send icon.
   ///
   /// - [size] is the target square size of the button area; the icon will be
@@ -28,6 +34,31 @@ class AppIcons {
   }) {
     final double iconSize = fixedSize ?? size * sendIconScale;
     final String assetPath = '$_iconsBasePath$sendIconAsset';
+
+    return SvgPicture.asset(
+      assetPath,
+      width: iconSize,
+      height: iconSize,
+      colorFilter: color != null
+          ? ColorFilter.mode(color, BlendMode.srcIn)
+          : null,
+      fit: BoxFit.contain,
+      package: null,
+    );
+  }
+
+  /// Returns a widget for the configured thread view icon.
+  ///
+  /// - [size] is the target square size of the button area; the icon will be
+  ///   scaled by [threadViewIconScale]. If you want a fixed size, pass [fixedSize].
+  /// - [color] optionally applies a color filter to the SVG.
+  static Widget buildThreadViewIcon({
+    required double size,
+    Color? color,
+    double? fixedSize,
+  }) {
+    final double iconSize = fixedSize ?? size * threadViewIconScale;
+    final String assetPath = '$_iconsBasePath$threadViewIconAsset';
 
     return SvgPicture.asset(
       assetPath,

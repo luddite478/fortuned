@@ -24,7 +24,7 @@
 // Log levels: 0=NONE, 1=ERROR, 2=WARNING, 3=INFO, 4=DEBUG
 // Set via NATIVE_LOG_LEVEL environment variable or default to INFO (3)
 #ifndef NATIVE_LOG_LEVEL
-#define NATIVE_LOG_LEVEL 3  // Default to INFO (can be overridden at compile time)
+#define NATIVE_LOG_LEVEL 4  // Default to INFO (can be overridden at compile time)
 #endif
 
 // Platform-specific logging implementations

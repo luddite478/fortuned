@@ -53,10 +53,12 @@ void sunvox_wrapper_update_timeline(void);
 // Seamless timeline update for pattern size changes (add/remove steps)
 // This updates pattern X positions WITHOUT stopping playback
 // section_index: which section was resized (for loop mode refresh)
+__attribute__((visibility("default"))) __attribute__((used))
 void sunvox_wrapper_update_timeline_seamless(int section_index);
 
 // Seamless section reordering (called after table_reorder_section)
 // Updates timeline and preserves playback position
+__attribute__((visibility("default"))) __attribute__((used))
 void sunvox_wrapper_reorder_section(int from_index, int to_index);
 
 // Start playback

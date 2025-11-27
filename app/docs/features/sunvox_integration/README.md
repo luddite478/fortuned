@@ -21,12 +21,19 @@ The key features of this integration are:
 
 For detailed information on specific features, please refer to the following documents:
 
+### 📚 Architecture & Overview
+- **[SUNVOX_LIBRARY_ARCHITECTURE.md](./SUNVOX_LIBRARY_ARCHITECTURE.md)**: Complete SunVox library architecture guide (general, not Fortuned-specific). Read this first to understand how SunVox works.
+- **[sunvox_fortuned_tweaks.md](./sunvox_fortuned_tweaks.md)**: Fortuned-specific modifications, integrations, control capabilities, and future plans. **Read this for Fortuned-specific information.**
+
 ### 🚀 Core Implementation
 - **[no_clone.md](./no_clone.md)**: A comprehensive guide to the sample-accurate, no-clone pattern sequencing implementation. **This is the core of the sequencer logic.**
 - **[seamless_playback.md](./seamless_playback.md)**: Explains the engine modifications that enable seamless pattern looping and mode switching.
 - **[seamless_step_resize.md](./seamless_step_resize.md)**: Documents the seamless add/remove steps feature (no playback interruption).
 - **[pitch.md](./pitch.md)**: Details the real-time pitch shifting system that replaces the old file-based SoundTouch method.
 - **[recording.md](./recording.md)**: Describes the architecture for real-time audio recording to a WAV file.
+
+### 🎛️ Effects System (Future)
+- **[effects_implementation_guide.md](./effects_implementation_guide.md)**: Comprehensive guide covering effect architectures (column-based chains vs presets), implementation details, and recommendations
 
 ### 🛠️ Technical Details
 - **[../../native/sunvox_lib/MODIFICATIONS.md](../../native/sunvox_lib/MODIFICATIONS.md)**: A line-by-line list of all changes made to the original SunVox library source code. Use this for reapplying patches when updating the SunVox version.

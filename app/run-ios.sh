@@ -8,6 +8,32 @@ IPHONE_MODEL="$3"
 DEV_USER_ID_ARG="$4"
 CLEAR_STORAGE="$5"
 
+# Validate arguments
+if [[ -z "$ENVIRONMENT" ]]; then
+  echo "Usage: $0 <environment> <device_type> [iphone_model] [dev_user_id] [clear]"
+  echo "  environment: stage or prod"
+  echo "  device_type: simulator or device"
+  echo "  iphone_model: e.g., 'iPhone 15' (optional, defaults to 'iPhone 15' for simulator)"
+  echo "  dev_user_id: Developer user ID (optional)"
+  echo "  clear: 'clear' to clear storage (optional)"
+  exit 1
+fi
+
+if [[ "$ENVIRONMENT" != "stage" && "$ENVIRONMENT" != "prod" ]]; then
+  echo "❌ Error: Environment must be 'stage' or 'prod', got: $ENVIRONMENT"
+  exit 1
+fi
+
+if [[ -z "$DEVICE_TYPE" ]]; then
+  echo "❌ Error: Device type must be 'simulator' or 'device'"
+  exit 1
+fi
+
+if [[ "$DEVICE_TYPE" != "simulator" && "$DEVICE_TYPE" != "device" ]]; then
+  echo "❌ Error: Device type must be 'simulator' or 'device', got: $DEVICE_TYPE"
+  exit 1
+fi
+
 # Ensure system toolchain is used (avoid ccache)
 export CC="/usr/bin/clang"
 export CXX="/usr/bin/clang++"
@@ -68,9 +94,8 @@ cd ../../../..
 
 # Prepare Flutter command
 FLUTTER_ARGS=()
-echo "$FLUTTER_ARGS"
 if [[ -n "$DEV_USER_ID_ARG" ]]; then
-  FLUTTER_ARGS+=(--dart-define=DEV_USER_ID=$DEV_USER_ID_ARG)
+  FLUTTER_ARGS+=(--dart-define="DEV_USER_ID=$DEV_USER_ID_ARG")
   echo "🔧 Running with developer user ID: $DEV_USER_ID_ARG"
 fi
 
@@ -82,7 +107,7 @@ fi
 # Step 6: Run based on target
 if [[ "$DEVICE_TYPE" == "simulator" ]]; then
   echo "Running on iPhone Simulator ($IPHONE_MODEL)..."
-  echo "flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug"
+  # Properly quote the device name to handle spaces
   flutter run "${FLUTTER_ARGS[@]}" -d "$IPHONE_MODEL" --debug
 else
   echo "Building for physical device..."
@@ -90,6 +115,7 @@ else
 
   echo "Detecting first connected physical iPhone..."
   DEVICE_ID="00008030-001564DA14F9802E"
+  # Try to auto-detect device if not hardcoded
   # DEVICE_ID=$(ios-deploy --detect 2>/dev/null | grep -oE '[0-9A-Fa-f-]{25,}' | head -n 1)
 
   if [[ -z "$DEVICE_ID" ]]; then
@@ -98,5 +124,42 @@ else
   fi
 
   echo "Deploying to device: $DEVICE_ID"
-  ios-deploy --bundle build/ios/iphoneos/Runner.app --id "$DEVICE_ID"
+  
+  # Check if device is paired/trusted
+  if ! ios-deploy --detect 2>/dev/null | grep -q "$DEVICE_ID"; then
+    echo ""
+    echo "⚠️  Device pairing issue detected!"
+    echo ""
+    echo "To fix device pairing:"
+    echo "  1. Unlock your iPhone"
+    echo "  2. Connect iPhone to Mac via USB"
+    echo "  3. On iPhone: Tap 'Trust This Computer' when prompted"
+    echo "  4. On Mac: Open Xcode → Window → Devices and Simulators"
+    echo "  5. Verify your device appears and shows 'Connected'"
+    echo "  6. If device shows 'Unpaired', click 'Use for Development'"
+    echo ""
+    echo "Alternatively, deploy via Xcode:"
+    echo "  - Open ios/Runner.xcworkspace in Xcode"
+    echo "  - Select your device from the device menu"
+    echo "  - Click Run (▶️)"
+    echo ""
+    exit 1
+  fi
+  
+  # Attempt deployment
+  if ! ios-deploy --bundle build/ios/iphoneos/Runner.app --id "$DEVICE_ID"; then
+    echo ""
+    echo "❌ Deployment failed!"
+    echo ""
+    echo "Common issues:"
+    echo "  1. Device not trusted: Unlock iPhone and tap 'Trust This Computer'"
+    echo "  2. Device not paired: Open Xcode → Window → Devices and Simulators"
+    echo "  3. Developer mode disabled: Settings → Privacy & Security → Developer Mode (iOS 16+)"
+    echo "  4. Code signing: Ensure your Apple ID is added in Xcode → Settings → Accounts"
+    echo ""
+    echo "Try deploying via Xcode instead:"
+    echo "  open ios/Runner.xcworkspace"
+    echo ""
+    exit 1
+  fi
 fi

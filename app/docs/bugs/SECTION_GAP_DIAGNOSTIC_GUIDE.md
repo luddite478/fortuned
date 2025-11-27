@@ -264,3 +264,8 @@ If the calculation from SunVox line → section → step is wrong:
 
 **Ready to test!** Run the app, reproduce the bug, and share the logs.
 
+
+
+
+
+

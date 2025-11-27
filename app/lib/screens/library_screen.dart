@@ -293,12 +293,12 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.library_music_outlined,
-                  color: AppColors.menuLightText,
-                  size: 48,
-                ),
-                const SizedBox(height: 12),
+                // Icon(
+                //   Icons.library_music_outlined,
+                //   color: AppColors.menuLightText,
+                //   size: 48,
+                // ),
+                // const SizedBox(height: 12),
                 Text(
                   'Your playlist is empty',
                   style: GoogleFonts.sourceSans3(
@@ -309,7 +309,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Add audio renders from messages',
+                  'Add audio recordings from projects history',
                   style: GoogleFonts.sourceSans3(
                     color: AppColors.menuLightText,
                     fontSize: 12,
@@ -655,12 +655,12 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.music_note,
-            color: AppColors.menuLightText,
-            size: 48,
-          ),
-          const SizedBox(height: 12),
+          // Icon(
+          //   Icons.music_note,
+          //   color: AppColors.menuLightText,
+          //   size: 48,
+          // ),
+          // const SizedBox(height: 12),
           Text(
             'Samples',
             style: GoogleFonts.sourceSans3(

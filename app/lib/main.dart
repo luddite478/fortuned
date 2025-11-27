@@ -7,6 +7,8 @@ import 'package:app_links/app_links.dart';
 
 import 'screens/main_navigation_screen.dart';
 import 'screens/thread_screen.dart';
+import 'screens/sequencer_screen.dart';
+import 'widgets/username_creation_dialog.dart';
 import 'services/threads_service.dart';
 import 'services/users_service.dart';
 import 'services/notifications.dart';
@@ -173,12 +175,54 @@ class _MainPageState extends State<MainPage> {
     // Ensure we have a valid context that can show a dialog
     if (!mounted) return;
 
+    // Check if user needs to create username first
+    final userState = context.read<UserState>();
+    final currentUsername = userState.currentUser?.username ?? '';
+    
+    if (currentUsername.isEmpty) {
+      // Show username creation dialog first
+      _showUsernameCreationForInvite(threadId);
+    } else {
+      // Show regular join confirmation
+      _showJoinDialog(threadId);
+    }
+  }
+  
+  void _showUsernameCreationForInvite(String threadId) {
+    if (!mounted) return;
+    
+    final userState = context.read<UserState>();
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppColors.menuPageBackground.withOpacity(0.8),
+      builder: (context) => UsernameCreationDialog(
+        title: 'Join Project',
+        message: 'Create a username to join this collaborative project.',
+        onSubmit: (username) async {
+          // Update username via UserState
+          final success = await userState.updateUsername(username);
+          if (success) {
+            // Close dialog and proceed to join
+            if (context.mounted) {
+              Navigator.pop(context);
+              _acceptInviteAndNavigate(threadId);
+            }
+          } else {
+            throw Exception('Failed to create username. Please try again.');
+          }
+        },
+      ),
+    );
+  }
+  
+  void _showJoinDialog(String threadId) {
     showDialog(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Join Thread'),
-          content: const Text('You have been invited to join a thread. Do you want to accept?'),
+          title: const Text('Join Project'),
+          content: const Text('You have been invited to join a collaborative project. Do you want to accept?'),
           actions: <Widget>[
             TextButton(
               child: const Text('Decline'),
@@ -190,33 +234,51 @@ class _MainPageState extends State<MainPage> {
               child: const Text('Accept'),
               onPressed: () async {
                 Navigator.of(context).pop();
-                try {
-                  final threadsState = context.read<ThreadsState>();
-                  final success = await threadsState.joinThread(threadId: threadId);
-                  if (success && mounted) {
-                    await threadsState.ensureThreadSummary(threadId);
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ThreadScreen(threadId: threadId),
-                      ),
-                    );
-                  } else if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Failed to join thread.'), backgroundColor: Colors.red),
-                    );
-                  }
-                } catch (e) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('An error occurred: $e'), backgroundColor: Colors.red),
-                  );
-                }
+                _acceptInviteAndNavigate(threadId);
               },
             ),
           ],
         );
       },
     );
+  }
+  
+  Future<void> _acceptInviteAndNavigate(String threadId) async {
+    try {
+      final threadsState = context.read<ThreadsState>();
+      final success = await threadsState.joinThread(threadId: threadId);
+      if (success && mounted) {
+        await threadsState.ensureThreadSummary(threadId);
+        
+        // Set active thread and load project into sequencer
+        final thread = threadsState.threads.firstWhere(
+          (t) => t.id == threadId,
+          orElse: () => throw Exception('Thread not found'),
+        );
+        threadsState.setActiveThread(thread);
+        
+        // Load project into sequencer
+        await threadsState.loadProjectIntoSequencer(threadId);
+        
+        // Navigate to PatternScreen (sequencer)
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const PatternScreen(initialSnapshot: null),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to join project.'), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('An error occurred: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
   }
 
   void _syncCurrentUser() {
@@ -305,7 +367,12 @@ class _MainPageState extends State<MainPage> {
               );
               final user = thread.users.firstWhere(
                 (u) => u.id == userId,
-                orElse: () => ThreadUser(id: userId, name: 'User ${userId.substring(0, 6)}', joinedAt: DateTime.now()),
+                orElse: () => ThreadUser(
+                  id: userId, 
+                  username: 'user_${userId.substring(0, 6)}',
+                  name: 'User ${userId.substring(0, 6)}', 
+                  joinedAt: DateTime.now()
+                ),
               );
               senderName = user.name;
             }

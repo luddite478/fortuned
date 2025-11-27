@@ -350,3 +350,8 @@ The most likely scenarios are:
 
 **Action Required:** Run app with enhanced logging and capture logs showing the section 9 → 10 transition.
 
+
+
+
+
+

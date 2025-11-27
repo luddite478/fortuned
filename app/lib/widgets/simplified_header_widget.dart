@@ -11,7 +11,7 @@ class SimplifiedHeaderWidget extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
+        color: const Color.fromARGB(255, 219, 219, 219),
         border: Border(
           bottom: BorderSide(
             color: AppColors.menuBorder,

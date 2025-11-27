@@ -33,15 +33,25 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
         users = thread_data.get("users", [])
         name = thread_data.get("name")
 
-        # Ensure users array items have required fields (id, name, joined_at)
-        # Allow empty username (anonymous users)
+        # Ensure users array items have required fields (id, username, name, joined_at)
+        # Fetch username from users collection if not provided
         normalized_users: List[Dict[str, Any]] = []
         for u in users:
             if not isinstance(u, dict):
                 continue
             user_id = u.get("id")
             user_name = u.get("name")
+            username = u.get("username")
             joined_at = u.get("joined_at") or now
+            
+            # Fetch username from users collection if not provided
+            if not username and user_id:
+                user_doc = db.users.find_one({"id": user_id}, {"username": 1, "name": 1})
+                if user_doc:
+                    username = user_doc.get("username", "")
+                    if not user_name:
+                        user_name = user_doc.get("name", "")
+            
             # Allow empty username, but require fields to be present
             if user_id is None or user_name is None:
                 continue
@@ -49,6 +59,7 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
                 continue
             normalized_users.append({
                 "id": user_id,
+                "username": username or user_name,  # Fallback to name if username empty
                 "name": user_name,
                 "joined_at": joined_at
             })
@@ -103,25 +114,31 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
         if not user_id:
             raise HTTPException(status_code=400, detail="user_id cannot be empty")
         
+        # Fetch username from users collection
+        user_doc = db.users.find_one({"id": user_id}, {"username": 1, "name": 1})
+        username = user_doc.get("username", user_name) if user_doc else user_name
+        display_name = user_doc.get("name", user_name) if user_doc else user_name
+        
         existing_users = [u["id"] for u in thread.get("users", [])]
         if user_id in existing_users:
             return {"status": "already_member"}
         
         # Handle username collision by adding number suffix if needed
-        existing_names = [u["name"] for u in thread.get("users", [])]
-        final_user_name = user_name
+        existing_usernames = [u.get("username", u.get("name")) for u in thread.get("users", [])]
+        final_username = username
         
-        if user_name in existing_names:
+        if username in existing_usernames:
             # Username collision detected, find a unique suffix
             counter = 1
-            while f"{user_name}_{counter}" in existing_names:
+            while f"{username}_{counter}" in existing_usernames:
                 counter += 1
-            final_user_name = f"{user_name}_{counter}"
-            print(f"Username collision detected. Changed '{user_name}' to '{final_user_name}'")
+            final_username = f"{username}_{counter}"
+            print(f"Username collision detected. Changed '{username}' to '{final_username}'")
         
         new_user = {
             "id": user_id,
-            "name": final_user_name,
+            "username": final_username,
+            "name": display_name,
             "joined_at": datetime.utcnow().isoformat() + "Z"
         }
         db.threads.update_one(
@@ -138,19 +155,18 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
             {"$addToSet": {"threads": thread_id}}  # $addToSet prevents duplicates
         )
         
-        # Also update the user's name in the users collection if it was modified
-        if final_user_name != user_name:
+        # Also update the user's username in the users collection if it was modified
+        if final_username != username:
             db.users.update_one(
                 {"id": user_id},
                 {"$set": {
-                    "name": final_user_name,
-                    "username": final_user_name
+                    "username": final_username
                 }}
             )
         
         return {
             "status": "user_added",
-            "username": final_user_name  # Return the final username (possibly modified)
+            "username": final_username  # Return the final username (possibly modified)
         }
     except Exception as e:
         if isinstance(e, HTTPException): raise e

@@ -9,6 +9,7 @@ import '../widgets/sequencer/v2/edit_buttons_widget.dart' as v2;
 import '../widgets/sequencer/v2/top_multitask_panel_widget.dart' as v2;
 import '../widgets/sequencer/v2/sequencer_body.dart';
 import '../widgets/sequencer/v2/value_control_overlay.dart';
+import '../widgets/sequencer/participants_widget.dart';
 import '../widgets/thread/v2/thread_view_widget.dart';
 import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
@@ -19,6 +20,8 @@ import '../services/http_client.dart';
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
 import '../utils/log.dart';
+import '../utils/app_icons.dart';
+import '../models/thread/thread.dart';
 import '../models/thread/thread_user.dart';
 import '../models/thread/message.dart';
 // New state imports for migration
@@ -191,7 +194,12 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
           final threadName = ThreadNameGenerator.generate(DateTime.now().microsecondsSinceEpoch.toString());
           final threadId = await threadsState.createThread(
             users: [
-              ThreadUser(id: currentUserId, name: currentUserName ?? 'User', joinedAt: DateTime.now()),
+              ThreadUser(
+                id: currentUserId, 
+                username: context.read<UserState>().currentUser?.username ?? currentUserName ?? 'User',
+                name: currentUserName ?? 'User', 
+                joinedAt: DateTime.now()
+              ),
             ],
             name: threadName,
             metadata: {
@@ -509,6 +517,23 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
         ),
         const SizedBox(width: 4),
         
+        // Participants widget (shows if thread has other users)
+        Consumer<ThreadsState>(
+          builder: (context, threadsState, _) {
+            final thread = threadsState.activeThread;
+            if (thread != null && thread.users.length > 1) {
+              return Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: ParticipantsWidget(
+                  thread: thread,
+                  onTap: () => _showParticipantsMenu(context, thread),
+                ),
+              );
+            }
+            return const SizedBox.shrink();
+          },
+        ),
+        
         // Invite button (always visible)
         IconButton(
           icon: Icon(Icons.ios_share , color: AppColors.sequencerAccent),
@@ -544,12 +569,17 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             borderWidth: 0.5,
             splashColor: Colors.transparent,
             highlightColor: Colors.transparent,
-            children: const [
+            children: [
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 6),
-                child: Icon(Icons.reorder, size: 18),
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: AppIcons.buildThreadViewIcon(
+                  size: 18,
+                  color: _currentView == _SequencerView.thread 
+                      ? Colors.white 
+                      : AppColors.sequencerLightText,
+                ),
               ),
-              Padding(
+              const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 6),
                 child: Icon(Icons.my_library_music_rounded, size: 18),
               ),
@@ -624,16 +654,16 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
   }
 
   Widget _buildFloatingPlaybackBar() {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(
-        color: AppColors.sequencerSurfaceRaised,
-        border: Border(
-          top: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+    return SafeArea(
+      top: false,
+      child: Container(
+        height: 56,
+        decoration: BoxDecoration(
+          color: AppColors.sequencerSurfaceRaised,
+          border: Border(
+            top: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+          ),
         ),
-      ),
-      child: SafeArea(
-        top: false,
         child: Consumer4<TableState, PlaybackState, RecordingState, MultitaskPanelState>(
           builder: (context, tableState, playbackState, recordingState, multitaskPanelState, child) {
             return LayoutBuilder(
@@ -1137,6 +1167,15 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       barrierDismissible: true,
       barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
       builder: (context) => _AddToLibraryDialog(render: render),
+    );
+  }
+
+  void _showParticipantsMenu(BuildContext context, Thread thread) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
+      builder: (context) => ParticipantsMenuDialog(thread: thread),
     );
   }
 

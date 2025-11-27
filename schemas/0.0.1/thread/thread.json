@@ -37,6 +37,11 @@
             "minLength": 24,
             "maxLength": 24
           },
+          "username": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
           "name": {
             "type": "string",
             "minLength": 1,
@@ -47,7 +52,7 @@
             "format": "date-time"
           }
         },
-        "required": ["id", "name", "joined_at"],
+        "required": ["id", "username", "name", "joined_at"],
         "additionalProperties": false
       }
     },

@@ -6,6 +6,8 @@ Version: 2.1.2b
 Based on: `/app/native/sunvox_lib/`  
 Official Documentation: https://warmplace.ru/soft/sunvox/sunvox_lib.php
 
+> **Note:** This document covers **general SunVox architecture**. For **Fortuned-specific modifications, integrations, and control capabilities**, see `sunvox_fortuned_tweaks.md`.
+
 ---
 
 ## Table of Contents
@@ -1301,28 +1303,143 @@ Pattern 3: x=64, lines=32  [64 - 95 ]
 
 ### 8.3 Supertracks (SunVox 2.0+)
 
-**Supertracks** allow vertical stacking of patterns.
+**Supertracks** are a fundamental feature introduced in SunVox 2.0 that revolutionizes how patterns are organized and played back.
+
+#### 8.3.1 What Are Supertracks?
+
+Supertracks allow **vertical layering** of patterns on the timeline, enabling multiple patterns to play simultaneously at the same horizontal position.
+
+**Key Concept:** Think of supertracks as "lanes" or "layers" on the timeline:
+
+```
+Timeline (vertical view):
+╔═══════════════════════════════════════════════════════════╗
+║ Supertrack 0: [Pattern A: Drums    ]──────────────────── ║ y=0
+║ Supertrack 1: [Pattern B: Bass     ]──────────────────── ║ y=1
+║ Supertrack 2: [Pattern C: Lead     ]──────────────────── ║ y=2
+║ Supertrack 3: [Pattern D: Pads     ]──────────────────── ║ y=3
+╚═══════════════════════════════════════════════════════════╝
+             x=0                    x=16              x=32
+```
+
+All four patterns start at x=0 and play **simultaneously**, but on different vertical layers.
+
+#### 8.3.2 Classic Mode vs. Supertracks Mode
 
 **Without Supertracks (Classic Mode):**
-- Only one pattern per X position
-- Patterns can't overlap horizontally
-
-**With Supertracks:**
-- Up to 64 patterns can play simultaneously
-- Patterns are stacked vertically (Y coordinate)
-- `y` coordinate in `sunvox_pattern_info`: supertrack number
-
-**Example:**
 ```
-Supertrack 0: Pattern A (x=0, y=0)
-Supertrack 1: Pattern B (x=0, y=1)  ← Plays simultaneously with A
-Supertrack 2: Pattern C (x=16, y=2)
+Timeline:
+[Pattern A]────[Pattern B]────[Pattern C]────
+x=0           x=16          x=32
+
+Only ONE pattern per X position!
 ```
+
+- Only one pattern can occupy any given X position
+- Patterns are arranged horizontally in sequence
+- Simpler mental model, but less flexible
+- Used in SunVox versions before 2.0
+
+**With Supertracks (Modern Mode):**
+```
+Timeline (3D view):
+       y=0: [Pattern A]────[Pattern D]────
+       y=1: [Pattern B]────[Pattern E]────
+       y=2: [Pattern C]────[Pattern F]────
+            x=0           x=16          x=32
+
+Multiple patterns per X position! (on different Y layers)
+```
+
+- Up to 64 patterns can play simultaneously (MAX_PLAYING_PATS = 64)
+- Patterns are arranged in a 2D grid (X = time, Y = layer/supertrack)
+- More complex but vastly more powerful
+- Essential for modern SunVox features
+
+#### 8.3.3 Technical Implementation
+
+**Engine Flag:**
+```c
+#define SUNVOX_FLAG_SUPERTRACKS  (1 << 15)
+
+// In sunvox_engine struct:
+uint32_t flags;  // Contains SUNVOX_FLAG_SUPERTRACKS when enabled
+```
+
+**Pattern Position:**
+```c
+struct sunvox_pattern_info {
+    int x;  // Horizontal position (line number on timeline)
+    int y;  // Vertical position (supertrack number / 32)
+    // ...
+};
+```
+
+**Pattern State Allocation:**
+
+In supertracks mode, the engine maintains up to 64 `sunvox_pattern_state` structures:
+
+```c
+struct sunvox_engine {
+    sunvox_pattern_state* pat_state;    // Array of state structures
+    int pat_state_size;                 // Capacity (64 in supertracks mode)
+    int cur_playing_pats[64];           // Currently active pattern indices
+    // ...
+};
+```
+
+Each active pattern gets its own state slot to track:
+- Active notes per track (`track_status` bitmask)
+- Effect state (vibrato, portamento, etc.)
+- Target modules per track
 
 **Enabling:**
 ```c
 sv_enable_supertracks(slot, 1);
 ```
+
+**Supertrack Muting:**
+
+Supertracks mode enables per-supertrack muting:
+
+```c
+struct sunvox_engine {
+    uint32_t supertrack_mute[SUPERTRACK_BITARRAY_SIZE];  // Bitmask
+    // ...
+};
+```
+
+**Multi-Layer Composition Example:**
+
+```cpp
+// Create a full arrangement with simultaneous patterns
+sv_enable_supertracks(slot, 1);
+
+// Layer 0: Drums (loops every 16 lines)
+int drums = sv_new_pattern(slot, -1, 0, 0, 4, 16, 0, "Drums");
+
+// Layer 1: Bass (loops every 16 lines)
+int bass = sv_new_pattern(slot, -1, 0, 1, 2, 16, 0, "Bass");
+
+// Layer 2: Chords (loops every 32 lines)  
+int chords = sv_new_pattern(slot, -1, 0, 2, 8, 32, 0, "Chords");
+
+// Layer 3: Lead (starts at line 32)
+int lead = sv_new_pattern(slot, -1, 32, 3, 4, 16, 0, "Lead");
+
+// Result: Drums, bass, and chords play from start
+//         Lead joins in at line 32
+//         All play simultaneously on different layers
+```
+
+**Key Benefits:**
+
+- Independent pattern state management
+- Per-pattern behavior control via flags
+- Advanced timeline arrangements
+- Better scalability for complex projects
+
+> **Note:** For Fortuned-specific usage of supertracks, see `sunvox_fortuned_tweaks.md`
 
 ### 8.4 Pattern Clones
 
@@ -1402,28 +1519,25 @@ During playback, each active pattern has a `sunvox_pattern_state`:
 **Normal Timeline Mode:**
 - Play through all patterns from start to end
 - Controlled by `single_pattern_play = -1`
+- When autostop is enabled, stops at end
+- When autostop is disabled, loops from beginning
 
 **Single Pattern Loop Mode:**
 - Loop a specific pattern indefinitely
 - Controlled by `single_pattern_play = pattern_num`
+- Only the specified pattern plays, rest of timeline ignored
+- Useful for live looping, pattern editing, rehearsal
 
-**Pattern Loop with Count (Fortuned Modification):**
-- Loop a pattern a specific number of times
-- Controlled by `pattern_loop_counts[pattern_num]`
-- Automatically advance to next pattern when count reached
-
-**API:**
+**Autostop Control:**
 ```c
-// Loop pattern indefinitely
-sv_set_pattern_loop(slot, pattern_num);
+// Loop entire project
+sv_set_autostop(slot, 0);  // 0 = loop forever
 
-// Loop pattern N times (Fortuned mod)
-sv_set_pattern_loop_count(slot, pattern_num, N);
-
-// Set pattern sequence for automatic advancement (Fortuned mod)
-int sequence[] = {0, 1, 2};
-sv_set_pattern_sequence(slot, sequence, 3);
+// Stop at end of project
+sv_set_autostop(slot, 1);  // 1 = stop at end
 ```
+
+> **Note:** Fortuned has added extended pattern loop features including loop counting and automatic pattern advancement. See `sunvox_fortuned_tweaks.md` for details.
 
 ---
 
@@ -2135,49 +2249,12 @@ sv_play(1);
 sv_audio_callback(buffer, frames, 0, sv_get_ticks());
 ```
 
-### 11.5 Pattern Loop Mode (Fortuned Modifications)
+### 11.5 Custom Extensions and Modifications
 
-**Infinite Loop:**
+The SunVox library can be extended with custom features. The Fortuned project has added several modifications for seamless pattern looping, loop counting, and automatic pattern advancement.
 
-```c
-// Enable supertracks (required)
-sv_enable_supertracks(slot, 1);
-
-// Set NO_NOTES_OFF flag for seamless looping
-sv_pattern_set_flags(slot, pat, SV_PATTERN_FLAG_NO_NOTES_OFF, 1);
-
-// Loop pattern indefinitely
-sv_set_pattern_loop(slot, pat);
-sv_set_autostop(slot, 0);  // Don't stop at end
-sv_play_from_beginning(slot);
-```
-
-**Counted Loops with Auto-Advance:**
-
-```c
-// Define pattern sequence
-int sequence[] = {0, 1, 2};  // Pattern IDs
-sv_set_pattern_sequence(slot, sequence, 3);
-
-// Set loop counts
-sv_set_pattern_loop_count(slot, 0, 2);  // Pattern 0: 2 loops
-sv_set_pattern_loop_count(slot, 1, 4);  // Pattern 1: 4 loops
-sv_set_pattern_loop_count(slot, 2, 2);  // Pattern 2: 2 loops
-
-// Start in pattern loop mode
-sv_set_pattern_loop(slot, 0);  // Start with pattern 0
-sv_set_autostop(slot, 1);      // Stop at end of sequence
-sv_play_from_beginning(slot);
-
-// Playback: Pattern 0 (2x) → Pattern 1 (4x) → Pattern 2 (2x) → STOP
-```
-
-**Query Loop State:**
-
-```c
-int current_loop = sv_get_pattern_current_loop(slot, pat);
-// Returns: 0, 1, 2, ... (current loop iteration)
-```
+> **For Fortuned-specific pattern loop features, see:** `sunvox_fortuned_tweaks.md`  
+> **For source code modifications, see:** `/app/native/sunvox_lib/MODIFICATIONS.md`
 
 ### 11.6 Thread Safety Tips
 
@@ -2215,49 +2292,23 @@ These require locking:
 
 ## Chapter 12: Advanced Topics
 
-### 12.1 Fortuned Modifications Summary
+### 12.1 Library Extensions and Modifications
 
-**Background:** The Fortuned project has made several modifications to SunVox for seamless pattern looping and loop counting.
+The SunVox library source code can be modified to add custom features. Applications can extend functionality by:
 
-**Modifications:**
+- Adding new APIs to `sunvox.h`
+- Modifying engine behavior in `sunvox_engine_audio_callback.cpp`
+- Extending data structures in `sunvox_engine.h`
 
-1. **Seamless Pattern Looping**
-   - Added `SV_PATTERN_FLAG_NO_NOTES_OFF` flag
-   - Prevents note-off events at pattern boundaries
-   - Enables continuous sound across loops
+**Example: Custom Pattern Features**
 
-2. **Pattern Loop Counting**
-   - Added per-pattern loop counters
-   - Tracks current loop iteration (0, 1, 2, ...)
-   - Supports automatic advancement to next pattern
+The Fortuned project has added several modifications including:
+- Seamless pattern looping (NO_NOTES_OFF flag)
+- Pattern loop counting with automatic advancement
+- Seamless position changes without audio interruption
 
-3. **Pattern Sequences**
-   - Define playback order of patterns
-   - Automatic pattern switching based on loop counts
-
-4. **Seamless Position Change**
-   - Added `sv_set_position()` API
-   - Changes playback position without audio cuts
-
-**APIs Added:**
-- `sv_set_pattern_loop()`
-- `sv_set_pattern_loop_count()`
-- `sv_set_pattern_sequence()`
-- `sv_get_pattern_current_loop()`
-- `sv_set_pattern_current_loop()`
-- `sv_set_position()`
-- `sv_pattern_set_flags()`
-- `sv_enable_supertracks()`
-
-**Files Modified:**
-- `sunvox_lib/headers/sunvox.h`
-- `sunvox_lib/main/sunvox_lib.cpp`
-- `lib_sunvox/sunvox_engine.h`
-- `lib_sunvox/sunvox_engine.cpp`
-- `lib_sunvox/sunvox_engine_audio_callback.cpp`
-
-**Documentation:**
-- See `/app/native/sunvox_lib/MODIFICATIONS.md` for complete details
+> **See:** `sunvox_fortuned_tweaks.md` for complete details on Fortuned's modifications  
+> **See:** `/app/native/sunvox_lib/MODIFICATIONS.md` for technical implementation
 
 ### 12.2 Custom Module Development
 
@@ -2456,6 +2507,11 @@ SunDog layer handles platform differences:
 **Related Projects:**
 - Radiant Voices: Python library for SunVox file manipulation
 - SunVox Mobile: Full SunVox app for iOS/Android
+
+**Fortuned-Specific Documentation:**
+- `sunvox_fortuned_tweaks.md` - Fortuned's modifications, integrations, and control capabilities
+- `/app/native/sunvox_lib/MODIFICATIONS.md` - Technical details of source code modifications
+- `/app/docs/features/sunvox_integration/` - Complete integration documentation
 
 ---
 
