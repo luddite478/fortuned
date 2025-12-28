@@ -565,6 +565,7 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
         
         # Check online status from memory (clients dict)
         is_online = accepted_user_id in clients
+        logger.info(f"invitation_accepted: user={accepted_user_id}, is_online={is_online}, connected_clients={list(clients.keys())}")
         
         recipients = set()
         for u in thread.get("users", []):

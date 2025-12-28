@@ -1219,41 +1219,63 @@ class ThreadsState extends ChangeNotifier {
       return;
     }
     
-    debugPrint('🎉 [THREADS] Invitation accepted: $userName joined thread $threadId');
+    debugPrint('🎉 [THREADS] Invitation accepted: $userName joined thread $threadId (is_online: ${payload['is_online']})');
     
-    // Find the thread and add the new user
+    // Create the new user with online status from payload
+    final newUser = ThreadUser(
+      id: userId,
+      username: userName,
+      name: userName,
+      joinedAt: DateTime.now(),
+      isOnline: payload['is_online'] ?? true, // Default to true since they just accepted
+    );
+    
+    // Find the thread in _threads first
     final threadIndex = _threads.indexWhere((t) => t.id == threadId);
     if (threadIndex >= 0) {
       final thread = _threads[threadIndex];
       
       // Check if user is already in the thread
-      final userExists = thread.users.any((u) => u.id == userId);
-      if (!userExists) {
-        // Add new user to thread
-        final newUser = ThreadUser(
-          id: userId,
-          username: userName,
-          name: userName,
-          joinedAt: DateTime.now(),
-          isOnline: payload['is_online'] ?? false,
-        );
-        
+      if (!thread.users.any((u) => u.id == userId)) {
         final updatedUsers = [...thread.users, newUser];
         _threads[threadIndex] = thread.copyWith(users: updatedUsers);
         
         // Update active thread if it's the same one
         if (_activeThread?.id == threadId) {
           _activeThread = _threads[threadIndex];
+          debugPrint('✅ [THREADS] Updated activeThread with new user');
         }
         
-        debugPrint('✅ [THREADS] Added $userName to thread $threadId');
+        debugPrint('✅ [THREADS] Added $userName to thread $threadId in _threads');
         notifyListeners();
       }
-    } else {
-      debugPrint('⚠️ [THREADS] Thread $threadId not found in loaded threads');
-      // Thread might not be loaded yet, refresh from server
-      ensureThreadSummary(threadId);
+      return;
     }
+    
+    // Also check _unsyncedThreads (for offline-created threads)
+    final unsyncedIndex = _unsyncedThreads.indexWhere((t) => t.id == threadId);
+    if (unsyncedIndex >= 0) {
+      final thread = _unsyncedThreads[unsyncedIndex];
+      
+      if (!thread.users.any((u) => u.id == userId)) {
+        final updatedUsers = [...thread.users, newUser];
+        _unsyncedThreads[unsyncedIndex] = thread.copyWith(users: updatedUsers);
+        
+        // Update active thread if it's the same one
+        if (_activeThread?.id == threadId) {
+          _activeThread = _unsyncedThreads[unsyncedIndex];
+          debugPrint('✅ [THREADS] Updated activeThread (unsynced) with new user');
+        }
+        
+        debugPrint('✅ [THREADS] Added $userName to thread $threadId in _unsyncedThreads');
+        notifyListeners();
+      }
+      return;
+    }
+    
+    debugPrint('⚠️ [THREADS] Thread $threadId not found in _threads or _unsyncedThreads');
+    // Thread might not be loaded yet, refresh from server
+    ensureThreadSummary(threadId);
   }
   
   void _onUserProfileUpdated(Map<String, dynamic> payload) {

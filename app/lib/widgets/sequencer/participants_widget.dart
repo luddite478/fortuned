@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -34,7 +35,9 @@ class _ParticipantsWidgetState extends State<ParticipantsWidget> {
     // Request online users when widget is first built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        context.read<UsersService>().requestOnlineUsers();
+        final usersService = context.read<UsersService>();
+        debugPrint('👥 [PARTICIPANTS] Requesting online users, WS connected: ${usersService.isConnected}');
+        usersService.requestOnlineUsers();
         // Set up periodic refresh every 10 seconds
         _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
           if (mounted) {
@@ -125,7 +128,11 @@ class _ParticipantsWidgetState extends State<ParticipantsWidget> {
       initialData: const [],
       builder: (context, snapshot) {
         final onlineUsers = snapshot.data ?? [];
-        final isOnline = onlineUsers.contains(user.id);
+        // User is online if:
+        // 1. They're in the real-time stream (most authoritative), OR
+        // 2. Their isOnline flag is true (from HTTP API or recent WebSocket notification)
+        // This ensures newly joined users show as online immediately
+        final isOnline = onlineUsers.contains(user.id) || user.isOnline;
         
         return Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -273,7 +280,11 @@ class _ParticipantsMenuDialogState extends State<ParticipantsMenuDialog> {
                           itemBuilder: (context, index) {
                             final participant = allParticipants[index];
                             final isMe = participant.id == currentUserId;
-                            final isOnline = onlineUsers.contains(participant.id);
+                            // User is online if:
+                            // 1. They're in the real-time stream (most authoritative), OR
+                            // 2. Their isOnline flag is true (from HTTP API or recent WebSocket notification)
+                            // This ensures newly joined users show as online immediately
+                            final isOnline = onlineUsers.contains(participant.id) || participant.isOnline;
                             
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
