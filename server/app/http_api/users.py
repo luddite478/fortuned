@@ -1,6 +1,7 @@
 import uuid
 import bcrypt
 import hashlib
+import logging
 from datetime import datetime, timezone
 from fastapi import Request, Query, HTTPException
 from fastapi.responses import JSONResponse
@@ -11,6 +12,9 @@ from pymongo import MongoClient
 from pydantic import BaseModel, Field
 from db.connection import get_database
 from bson import ObjectId
+
+# Initialize logger
+logger = logging.getLogger(__name__)
 
 # Initialize database connection
 db = get_database()
@@ -501,32 +505,49 @@ class UpdateUsernameRequest(BaseModel):
 async def update_username_handler(request: Request, user_id: str, username_data: UpdateUsernameRequest):
     """Update user's username"""
     try:
+        logger.info(f"🔧 [UPDATE_USERNAME] Starting username update for user: {user_id}")
         username = username_data.username.strip()
+        logger.info(f"🔧 [UPDATE_USERNAME] New username: {username}")
         
         # Validate username format: min 3 chars, alphanumeric + underscore + hyphen
         if len(username) < 3:
+            logger.warning(f"⚠️ [UPDATE_USERNAME] Username too short: {len(username)} chars")
             raise HTTPException(status_code=400, detail="Username must be at least 3 characters")
         
         import re
         if not re.match(r'^[a-zA-Z0-9_-]+$', username):
+            logger.warning(f"⚠️ [UPDATE_USERNAME] Invalid username format: {username}")
             raise HTTPException(status_code=400, detail="Username can only contain letters, numbers, underscores, and hyphens")
         
         # Check if user exists
+        logger.info(f"🔧 [UPDATE_USERNAME] Looking up user in database...")
         user = db.users.find_one({"id": user_id})
         if not user:
+            logger.error(f"❌ [UPDATE_USERNAME] User not found: {user_id}")
             raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
         
+        logger.info(f"✅ [UPDATE_USERNAME] User found, updating username in users collection...")
+        
         # Update username in users collection (source of truth)
-        db.users.update_one(
-            {"id": user_id},
-            {"$set": {
-                "username": username,
-                "name": username,  # Also update name to match username
-                "last_online": datetime.now(timezone.utc).isoformat()
-            }}
-        )
+        try:
+            timestamp = datetime.now(timezone.utc).isoformat()
+            logger.info(f"🔧 [UPDATE_USERNAME] Generated timestamp: {timestamp}")
+            
+            db.users.update_one(
+                {"id": user_id},
+                {"$set": {
+                    "username": username,
+                    "name": username,  # Also update name to match username
+                    "last_online": timestamp
+                }}
+            )
+            logger.info(f"✅ [UPDATE_USERNAME] Username updated in users collection")
+        except Exception as e:
+            logger.error(f"❌ [UPDATE_USERNAME] Failed to update users collection: {e}")
+            raise
         
         # Sync username to all threads where this user is a participant (denormalized copies)
+        logger.info(f"🔧 [UPDATE_USERNAME] Syncing username to threads...")
         try:
             result = db.threads.update_many(
                 {"users.id": user_id},  # Find all threads with this user
@@ -536,26 +557,37 @@ async def update_username_handler(request: Request, user_id: str, username_data:
                 }},
                 array_filters=[{"elem.id": user_id}]  # MongoDB array update syntax
             )
-            logger.info(f"Updated username in {result.modified_count} thread(s) for user {user_id}")
+            logger.info(f"✅ [UPDATE_USERNAME] Updated username in {result.modified_count} thread(s)")
         except Exception as e:
-            logger.error(f"Failed to sync username to threads: {e}")
+            logger.error(f"❌ [UPDATE_USERNAME] Failed to sync username to threads: {e}")
+            logger.exception(e)  # Log full traceback
             # Don't fail the request if thread sync fails
         
         # Broadcast username update to online collaborators via WebSocket
+        logger.info(f"🔧 [UPDATE_USERNAME] Broadcasting username update via WebSocket...")
         try:
             from ws.router import send_user_profile_updated_notification
             import asyncio
             delivered = await send_user_profile_updated_notification(user_id, username)
-            logger.info(f"Broadcasted username update to {delivered} online user(s)")
+            logger.info(f"✅ [UPDATE_USERNAME] Broadcasted to {delivered} online user(s)")
         except Exception as e:
-            logger.warning(f"Failed to broadcast username update: {e}")
+            logger.warning(f"⚠️ [UPDATE_USERNAME] Failed to broadcast username update: {e}")
+            logger.exception(e)  # Log full traceback
             # Don't fail the request if WebSocket broadcast fails
         
         # Return updated user (exclude sensitive fields)
+        logger.info(f"🔧 [UPDATE_USERNAME] Fetching updated user for response...")
         updated_user = db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "salt": 0})
+        if not updated_user:
+            logger.error(f"❌ [UPDATE_USERNAME] Failed to fetch updated user!")
+            raise HTTPException(status_code=500, detail="Failed to fetch updated user")
+        
+        logger.info(f"✅ [UPDATE_USERNAME] Username update complete for {user_id} -> {username}")
         return JSONResponse(content=updated_user, status_code=200)
         
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"❌ [UPDATE_USERNAME] Unexpected error: {e}")
+        logger.exception(e)  # Log full traceback
         raise HTTPException(status_code=500, detail=f"Failed to update username: {str(e)}")
