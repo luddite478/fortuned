@@ -47,6 +47,11 @@
                         "type": "string",
                         "minLength": 1,
                         "maxLength": 128
+                    },
+                    "color": {
+                        "type": "string",
+                        "pattern": "^#[0-9A-Fa-f]{6}$",
+                        "description": "Hex color (e.g., #FF5733) - only present when sample is loaded"
                     }
                 },
                 "required": ["loaded", "settings"],

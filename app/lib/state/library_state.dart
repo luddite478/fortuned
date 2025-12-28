@@ -346,5 +346,36 @@ required String userId,
     notifyListeners();
     debugPrint('📚 [LIBRARY] Cleared playlist data');
   }
+  
+  /// Refresh playlist in background (silent refresh after reconnection)
+  Future<void> refreshPlaylistInBackground({required String userId}) async {
+    try {
+      debugPrint('🔄 [LIBRARY] Refreshing playlist in background...');
+      
+      final freshPlaylist = await _fetchPlaylistFromServer(userId);
+      
+      // Compare and update if changed
+      if (_playlist.length != freshPlaylist.length ||
+          !_playlistsAreEqual(_playlist, freshPlaylist)) {
+        _playlist = freshPlaylist;
+        notifyListeners();
+        debugPrint('✅ [LIBRARY] Playlist updated after background refresh');
+      } else {
+        debugPrint('✅ [LIBRARY] Playlist unchanged after background refresh');
+      }
+    } catch (e) {
+      debugPrint('❌ [LIBRARY] Background refresh failed: $e');
+      // Silently fail - don't update error state
+    }
+  }
+  
+  /// Compare two playlists for equality
+  bool _playlistsAreEqual(List<PlaylistItem> a, List<PlaylistItem> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id) return false;
+    }
+    return true;
+  }
 }
 

@@ -403,6 +403,9 @@ class _MainPageState extends State<MainPage> {
       
       // Initialize single WebSocket connection for this user
       _initializeThreadsService(threadsService, userState.currentUser!.id, context);
+      
+      // Setup auto-sync on reconnection
+      _setupReconnectionHandler(wsClient, userState, threadsState, libraryState, followedState);
       _setupNotifications(wsClient);
     }
   }
@@ -417,6 +420,65 @@ class _MainPageState extends State<MainPage> {
       } else {
       }
     } catch (e) {
+    }
+  }
+  
+  void _setupReconnectionHandler(
+    WebSocketClient wsClient,
+    UserState userState,
+    ThreadsState threadsState,
+    LibraryState libraryState,
+    FollowedState followedState,
+  ) {
+    // Listen for connection status changes
+    wsClient.connectionStream.listen((isConnected) {
+      if (isConnected) {
+        debugPrint('✅ [MAIN] WebSocket reconnected - syncing data...');
+        _syncDataAfterReconnect(userState, threadsState, libraryState, followedState);
+      } else {
+        debugPrint('❌ [MAIN] WebSocket disconnected');
+      }
+    });
+  }
+  
+  Future<void> _syncDataAfterReconnect(
+    UserState userState,
+    ThreadsState threadsState,
+    LibraryState libraryState,
+    FollowedState followedState,
+  ) async {
+    try {
+      final userId = userState.currentUser?.id;
+      if (userId == null) return;
+      
+      debugPrint('🔄 [MAIN] Starting data sync after reconnection...');
+      
+      // 1. Refresh user profile (might have new invites)
+      await userState.refreshCurrentUserFromServer();
+      debugPrint('✅ [MAIN] User profile refreshed');
+      
+      // 2. Refresh thread list (new threads, new participants, new messages)
+      await threadsState.refreshThreadsInBackground();
+      debugPrint('✅ [MAIN] Threads refreshed');
+      
+      // 3. Refresh playlist (new items might have been added)
+      await libraryState.refreshPlaylistInBackground(userId: userId);
+      debugPrint('✅ [MAIN] Playlist refreshed');
+      
+      // 4. Refresh followed users
+      await followedState.refreshFollowedUsersInBackground(userId);
+      debugPrint('✅ [MAIN] Followed users refreshed');
+      
+      // 5. Request fresh online users list
+      if (mounted) {
+        final usersService = Provider.of<UsersService>(context, listen: false);
+        usersService.requestOnlineUsers();
+        debugPrint('✅ [MAIN] Online users requested');
+      }
+      
+      debugPrint('✅ [MAIN] Data sync complete after reconnection');
+    } catch (e) {
+      debugPrint('❌ [MAIN] Data sync failed after reconnection: $e');
     }
   }
 

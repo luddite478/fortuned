@@ -391,6 +391,17 @@ async def process_message(websocket, client_id, message):
 async def register_client(client_id, websocket):
     clients[client_id] = websocket
     logger.info(f"{client_id} connected (total: {len(clients)})")
+    
+    # Update last_online timestamp when user connects
+    try:
+        db.users.update_one(
+            {"id": client_id},
+            {"$set": {"last_online": datetime.utcnow().isoformat() + "Z"}}
+        )
+        logger.debug(f"Updated last_online for {client_id}")
+    except Exception as e:
+        logger.error(f"Failed to update last_online for {client_id}: {e}")
+    
     await send_json(websocket, {
         "type": "connected",
         "message": f"Successfully connected as {client_id}",
@@ -401,6 +412,16 @@ def unregister_client(client_id):
     if client_id in clients:
         del clients[client_id]
         logger.info(f"{client_id} disconnected (remaining: {len(clients)})")
+        
+        # Update last_online when user disconnects for accurate online status
+        try:
+            db.users.update_one(
+                {"id": client_id},
+                {"$set": {"last_online": datetime.utcnow().isoformat() + "Z"}}
+            )
+            logger.debug(f"Updated last_online for disconnected user {client_id}")
+        except Exception as e:
+            logger.error(f"Failed to update last_online on disconnect: {e}")
 
 async def handler(websocket):
     client_id = None
@@ -459,8 +480,62 @@ def is_user_online(user_id):
 
 # --- Entry Point ---
 
+async def heartbeat_loop():
+    """Update last_online and clean up stale connections every 60 seconds"""
+    while True:
+        await asyncio.sleep(60)  # Update every minute
+        
+        if not clients:
+            continue
+        
+        connected_ids = list(clients.keys())
+        logger.debug(f"Heartbeat: Checking {len(connected_ids)} connection(s)")
+        
+        # Check each connection for staleness and ping
+        stale_clients = []
+        for client_id in connected_ids:
+            ws = clients.get(client_id)
+            if ws is None:
+                continue
+            
+            try:
+                # Try to send a ping to verify connection is alive
+                await asyncio.wait_for(
+                    send_json(ws, {"type": "ping", "timestamp": int(time.time())}),
+                    timeout=5.0
+                )
+            except Exception as e:
+                logger.warning(f"Stale connection detected: {client_id} ({type(e).__name__})")
+                stale_clients.append(client_id)
+        
+        # Clean up stale connections
+        for client_id in stale_clients:
+            unregister_client(client_id)
+            logger.info(f"Removed stale connection: {client_id}")
+        
+        # Get list of still-active clients
+        active_clients = [cid for cid in connected_ids if cid not in stale_clients]
+        
+        if not active_clients:
+            continue
+        
+        try:
+            # Batch update all active users
+            result = db.users.update_many(
+                {"id": {"$in": active_clients}},
+                {"$set": {"last_online": datetime.utcnow().isoformat() + "Z"}}
+            )
+            logger.debug(f"Heartbeat: Updated {result.modified_count} active user(s)")
+        except Exception as e:
+            logger.error(f"Heartbeat error: {e}")
+
 async def start_websocket_server():
     logger.info("Starting WebSocket server at ws://0.0.0.0:8765")
+    
+    # Start heartbeat task
+    asyncio.create_task(heartbeat_loop())
+    logger.info("Started heartbeat loop for online status")
+    
     async with websockets.serve(
         handler,
         "0.0.0.0",
@@ -532,4 +607,51 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
                     pass
         return delivered
     except Exception:
+        return 0
+
+async def send_user_profile_updated_notification(user_id: str, username: str) -> int:
+    """Broadcast user profile update to all threads where this user is a participant.
+    Returns number of recipients notified.
+    """
+    try:
+        # Find all threads where this user is a participant
+        threads_cursor = db.threads.find({"users.id": user_id}, {"id": 1, "users": 1})
+        threads = list(threads_cursor)
+        
+        if not threads:
+            logger.info(f"User {user_id} is not in any threads, no notifications sent")
+            return 0
+        
+        # Collect all unique user IDs from these threads (excluding the user who updated)
+        recipient_ids = set()
+        for thread in threads:
+            for user in thread.get("users", []):
+                if isinstance(user, dict) and user.get("id") and user["id"] != user_id:
+                    recipient_ids.add(user["id"])
+        
+        if not recipient_ids:
+            logger.info(f"No other users in threads with {user_id}, no notifications sent")
+            return 0
+        
+        # Send notification to all online recipients
+        delivered = 0
+        for recipient_id in recipient_ids:
+            ws = clients.get(recipient_id)
+            if ws:
+                try:
+                    await send_json(ws, {
+                        "type": "user_profile_updated",
+                        "user_id": user_id,
+                        "username": username,
+                        "timestamp": int(time.time())
+                    })
+                    delivered += 1
+                except Exception as e:
+                    logger.error(f"Failed to send user_profile_updated to {recipient_id}: {e}")
+        
+        logger.info(f"Broadcasted username update for {user_id} to {delivered}/{len(recipient_ids)} online user(s)")
+        return delivered
+        
+    except Exception as e:
+        logger.error(f"Failed to broadcast user profile update: {e}")
         return 0

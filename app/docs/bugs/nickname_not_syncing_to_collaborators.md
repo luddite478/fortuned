@@ -1,5 +1,7 @@
 # Bug: Nickname Not Syncing to Collaborators
 
+> ℹ️ **For complete implementation guide**, see [REALTIME_COLLABORATION_SYSTEM.md](../features/REALTIME_COLLABORATION_SYSTEM.md)
+
 ## Issue Description
 
 Multiple related issues with username/nickname synchronization:

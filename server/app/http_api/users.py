@@ -516,7 +516,7 @@ async def update_username_handler(request: Request, user_id: str, username_data:
         if not user:
             raise HTTPException(status_code=404, detail=f"User not found: {user_id}")
         
-        # Update username
+        # Update username in users collection (source of truth)
         db.users.update_one(
             {"id": user_id},
             {"$set": {
@@ -525,6 +525,31 @@ async def update_username_handler(request: Request, user_id: str, username_data:
                 "last_online": datetime.now(timezone.utc).isoformat()
             }}
         )
+        
+        # Sync username to all threads where this user is a participant (denormalized copies)
+        try:
+            result = db.threads.update_many(
+                {"users.id": user_id},  # Find all threads with this user
+                {"$set": {
+                    "users.$[elem].username": username,  # Update embedded username
+                    "users.$[elem].name": username  # Update embedded name
+                }},
+                array_filters=[{"elem.id": user_id}]  # MongoDB array update syntax
+            )
+            logger.info(f"Updated username in {result.modified_count} thread(s) for user {user_id}")
+        except Exception as e:
+            logger.error(f"Failed to sync username to threads: {e}")
+            # Don't fail the request if thread sync fails
+        
+        # Broadcast username update to online collaborators via WebSocket
+        try:
+            from ws.router import send_user_profile_updated_notification
+            import asyncio
+            delivered = await send_user_profile_updated_notification(user_id, username)
+            logger.info(f"Broadcasted username update to {delivered} online user(s)")
+        except Exception as e:
+            logger.warning(f"Failed to broadcast username update: {e}")
+            # Don't fail the request if WebSocket broadcast fails
         
         # Return updated user (exclude sensitive fields)
         updated_user = db.users.find_one({"id": user_id}, {"_id": 0, "password_hash": 0, "salt": 0})

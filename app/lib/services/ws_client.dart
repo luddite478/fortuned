@@ -9,6 +9,13 @@ class WebSocketClient {
   String? _clientId;
   bool _isConnected = false;
   
+  // Auto-reconnect state
+  bool _shouldReconnect = true;
+  int _reconnectAttempts = 0;
+  Timer? _reconnectTimer;
+  // Infinite attempts - mobile apps should always try to reconnect
+  // The 30s cap on backoff prevents server overload
+  
   // Stream controllers for low-level WebSocket events
   final _messageController = StreamController<Map<String, dynamic>>.broadcast();
   final _connectionController = StreamController<bool>.broadcast();
@@ -165,11 +172,42 @@ class WebSocketClient {
   }
   
   void _handleDisconnect() {
+    final wasConnected = _isConnected;
     _isConnected = false;
+    
     if (!_connectionController.isClosed) {
       _connectionController.add(false);
     }
-    print('🔌 Disconnected from server');
+    
+    Log.w('WebSocket disconnected', 'WS');
+    
+    // Auto-reconnect if enabled and we have a client ID
+    if (_shouldReconnect && _clientId != null && wasConnected) {
+      _attemptReconnect();
+    }
+  }
+  
+  void _attemptReconnect() {
+    _reconnectAttempts++;
+    
+    // Exponential backoff with 30s cap: 1s, 2s, 4s, 8s, 16s, 30s, 30s, 30s...
+    // Infinite attempts - mobile apps should always try to reconnect when network returns
+    final delaySeconds = (1 << (_reconnectAttempts - 1)).clamp(1, 30);
+    
+    Log.i('Reconnecting in ${delaySeconds}s (attempt $_reconnectAttempts)', 'WS');
+    
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+      if (_clientId != null) {
+        Log.i('Attempting reconnection...', 'WS');
+        final success = await connect(_clientId!);
+        if (success) {
+          Log.i('Reconnection successful after $_reconnectAttempts attempts', 'WS');
+          _reconnectAttempts = 0; // Reset on success
+        }
+        // If failed, _handleDisconnect() will schedule next attempt automatically
+      }
+    });
   }
   
   // Send raw message (JSON or string)
@@ -196,7 +234,12 @@ class WebSocketClient {
     }
   }
   
-  void disconnect() {
+  void disconnect({bool permanent = false}) {
+    if (permanent) {
+      _shouldReconnect = false;
+      _reconnectTimer?.cancel();
+    }
+    
     _socket?.close();
     _isConnected = false;
     if (!_connectionController.isClosed) {
@@ -204,9 +247,21 @@ class WebSocketClient {
     }
   }
   
+  /// Enable auto-reconnection (enabled by default)
+  void enableAutoReconnect() {
+    _shouldReconnect = true;
+  }
+  
+  /// Disable auto-reconnection
+  void disableAutoReconnect() {
+    _shouldReconnect = false;
+    _reconnectTimer?.cancel();
+  }
+  
   // Clean up streams when disposing
   void dispose() {
-    disconnect();
+    _reconnectTimer?.cancel();
+    disconnect(permanent: true);
     if (!_messageController.isClosed) {
       _messageController.close();
     }

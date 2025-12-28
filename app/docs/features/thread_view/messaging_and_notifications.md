@@ -1,5 +1,7 @@
 ## Messaging and Notifications (Current Implementation)
 
+> ℹ️ **For complete real-time system documentation**, see [REALTIME_COLLABORATION_SYSTEM.md](../REALTIME_COLLABORATION_SYSTEM.md)
+
 This document summarizes how the app handles thread messages (snapshots) and real-time notifications using both HTTP API and WebSockets.
 
 ### Components

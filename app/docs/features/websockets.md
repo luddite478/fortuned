@@ -1,5 +1,7 @@
 # WebSocket Messaging System
 
+> ⚠️ **This document is deprecated.** Please refer to [REALTIME_COLLABORATION_SYSTEM.md](./REALTIME_COLLABORATION_SYSTEM.md) for the complete, up-to-date guide on WebSocket messaging, data synchronization, and real-time collaboration features.
+
 Real-time messaging architecture for Fortuned using centralized message routing.
 
 ## Architecture
