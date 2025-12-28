@@ -1198,12 +1198,60 @@ class ThreadsState extends ChangeNotifier {
   void _registerWsHandlers() {
     _wsClient.registerMessageHandler('message_created', _onMessageCreated);
     _wsClient.registerMessageHandler('user_profile_updated', _onUserProfileUpdated);
+    _wsClient.registerMessageHandler('invitation_accepted', _onInvitationAccepted);
   }
 
   void disposeWs() {
     _wsClient.unregisterAllHandlers('message_created');
     _wsClient.unregisterAllHandlers('user_profile_updated');
+    _wsClient.unregisterAllHandlers('invitation_accepted');
     _autoSaveTimer?.cancel();
+  }
+  
+  void _onInvitationAccepted(Map<String, dynamic> payload) {
+    final threadId = payload['thread_id'] as String?;
+    final userId = payload['user_id'] as String?;
+    final userName = payload['user_name'] as String?;
+    
+    if (threadId == null || userId == null || userName == null) {
+      debugPrint('⚠️ [THREADS] Invalid invitation_accepted payload');
+      return;
+    }
+    
+    debugPrint('🎉 [THREADS] Invitation accepted: $userName joined thread $threadId');
+    
+    // Find the thread and add the new user
+    final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+    if (threadIndex >= 0) {
+      final thread = _threads[threadIndex];
+      
+      // Check if user is already in the thread
+      final userExists = thread.users.any((u) => u.id == userId);
+      if (!userExists) {
+        // Add new user to thread
+        final newUser = ThreadUser(
+          id: userId,
+          username: userName,
+          name: userName,
+          joinedAt: DateTime.now(),
+        );
+        
+        final updatedUsers = [...thread.users, newUser];
+        _threads[threadIndex] = thread.copyWith(users: updatedUsers);
+        
+        // Update active thread if it's the same one
+        if (_activeThread?.id == threadId) {
+          _activeThread = _threads[threadIndex];
+        }
+        
+        debugPrint('✅ [THREADS] Added $userName to thread $threadId');
+        notifyListeners();
+      }
+    } else {
+      debugPrint('⚠️ [THREADS] Thread $threadId not found in loaded threads');
+      // Thread might not be loaded yet, refresh from server
+      ensureThreadSummary(threadId);
+    }
   }
   
   void _onUserProfileUpdated(Map<String, dynamic> payload) {
