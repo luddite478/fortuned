@@ -96,6 +96,9 @@ class PlaybackState extends ChangeNotifier {
   final PlaybackBindings _playback_ffi;
   final TableState _tableState;
   
+  // Auto-save callback (set by ThreadsState)
+  void Function()? _onStateChanged;
+  
   // Private state fields
   int _bpm = 120;
   double _masterVolume = 1.0; // 0.0..1.0
@@ -427,6 +430,19 @@ class PlaybackState extends ChangeNotifier {
     }
     
     notifyListeners();
+  }
+  
+  /// Set callback for state changes (used by ThreadsState for auto-save)
+  void setOnStateChanged(void Function()? callback) {
+    _onStateChanged = callback;
+  }
+  
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    
+    // Trigger auto-save if callback is set
+    _onStateChanged?.call();
   }
   
   @override

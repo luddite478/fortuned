@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../utils/app_colors.dart';
 import '../screens/library_screen.dart';
 
@@ -11,11 +12,11 @@ class SimplifiedHeaderWidget extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 219, 219, 219),
+        color: const Color.fromARGB(255, 66, 66, 66),
         border: Border(
           bottom: BorderSide(
-            color: AppColors.menuBorder,
-            width: 1,
+            color: AppColors.sequencerBorder,
+            width: 0.5,
           ),
         ),
       ),
@@ -23,8 +24,8 @@ class SimplifiedHeaderWidget extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           // Left side - App icon
-          Image.asset(
-            'icons/app_icon.png',
+          SvgPicture.asset(
+            'icons/app_icon.svg',
             width: 40,
             height: 40,
             fit: BoxFit.contain,
@@ -48,7 +49,7 @@ class SimplifiedHeaderWidget extends StatelessWidget {
             },
             icon: Icon(
               Icons.folder_outlined,
-              color: const Color.fromARGB(255, 61, 61, 61),
+              color: AppColors.sequencerAccent,
               size: 28,
             ),
             padding: const EdgeInsets.all(8),

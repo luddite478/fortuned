@@ -93,6 +93,9 @@ class TableState extends ChangeNotifier {
   final TableBindings _table_ffi;
   final PlaybackBindings _playback_ffi;
   
+  // Auto-save callback (set by ThreadsState)
+  void Function()? _onStateChanged;
+  
   // 2D array of ValueNotifiers for efficient cell updates (sized dynamically based on native table dimensions)
   late final List<List<ValueNotifier<CellData>?>> _cellNotifiers;
   
@@ -771,6 +774,19 @@ class TableState extends ChangeNotifier {
     }
   }
 
+  /// Set callback for state changes (used by ThreadsState for auto-save)
+  void setOnStateChanged(void Function()? callback) {
+    _onStateChanged = callback;
+  }
+  
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    
+    // Trigger auto-save if callback is set
+    _onStateChanged?.call();
+  }
+  
   @override
   void dispose() {
     debugPrint('🧹 [TABLE_STATE] Disposing state and notifiers');

@@ -47,10 +47,11 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
   static const double layer3WidthPercent = 0.975; // Layer 3 (sections + buttons) is 90% of message width
   
   // Color controls for all 3 message levels
-  static const Color messageHeaderColor = Color.fromARGB(255, 76, 76, 76); // Layer 1: Header background color
+  static const Color messageHeaderColor = Colors.transparent; // Layer 1: Header background color (transparent for lighter feel)
   static const Color messageRenderColor = Color.fromARGB(255, 70, 67, 67); // Layer 2: Render player background color
+  static const double messageRenderOpacity = 0.3; // Opacity of render player background
   static const Color messageChainContainerColor = Color.fromARGB(255, 239, 236, 236); // Layer 3: Chain+buttons container background color
-  static const double messageChainContainerOpacity = 0.1; // Opacity of chain+buttons container (0.0 to 1.0)
+  static const double messageChainContainerOpacity = 0.05; // Opacity of chain+buttons container (0.0 to 1.0)
   
   // Chain divider controls
   static const Color chainDividerColor = Color.fromARGB(255, 95, 95, 95); // Light gray color for section dividers
@@ -75,14 +76,12 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
   static const double buttonsPaddingRight = 10.0;
   
   // Button color controls
-  static const Color notesButtonBackgroundColor = Color.fromARGB(255, 86, 86, 82); // Notes button background color
-  static const Color notesButtonForegroundColor = AppColors.sequencerLightText; // Notes button text color
-  static const double notesButtonForegroundOpacity = 0.5; // Notes button text opacity (0.0 to 1.0)
   static const Color loadButtonBackgroundColor = Color.fromARGB(255, 84, 84, 81); // Load button background color
+  static const double loadButtonBackgroundOpacity = 0.4; // Load button background opacity
   static const Color loadButtonForegroundColor = AppColors.sequencerText; // Load button text color
   
   // Spacing between messages
-  static const double messageSpacing = 16.0;
+  static const double messageSpacing = 20.0;
  
 
 
@@ -387,6 +386,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
       (u) => u.id == message.userId,
       orElse: () => ThreadUser(
         id: message.userId,
+        username: 'user_${message.userId.substring(0, 6)}',
         name: '',
         joinedAt: DateTime.now(),
       ),
@@ -429,7 +429,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Layer 1: Header (username + timestamp) - darker background, full width
+                // Layer 1: Header (username + timestamp) - transparent background, no borders
                 Container(
                   decoration: BoxDecoration(
                     color: messageHeaderColor,
@@ -444,16 +444,8 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                             topLeft: Radius.circular(2),
                             topRight: Radius.circular(2),
                           ),
-                    border: Border(
-                      left: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
-                      top: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
-                      right: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
-                      bottom: message.renders.isEmpty 
-                          ? BorderSide(color: AppColors.sequencerBorder, width: 0.5)
-                          : BorderSide.none, // No bottom border to connect with render element
-                    ),
                   ),
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
@@ -461,10 +453,10 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                         Text(
                           userName,
                           style: GoogleFonts.sourceSans3(
-                            color: AppColors.sequencerText,
-                            fontSize: 14,
+                            color: const Color.fromARGB(255, 240, 238, 230).withOpacity(0.85),
+                            fontSize: 13,
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 0.3,
+                            letterSpacing: 0.2,
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -476,8 +468,8 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                       Text(
                         _formatTimestamp(message.timestamp),
                         style: GoogleFonts.sourceSans3(
-                          color: const Color.fromARGB(255, 240, 238, 230),
-                          fontSize: 13,
+                          color: const Color.fromARGB(255, 240, 238, 230).withOpacity(0.7),
+                          fontSize: 12,
                           fontWeight: FontWeight.w400,
                         ),
                       ),
@@ -485,21 +477,20 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                   ),
                 ),
                 
-                // Layer 2: Optional render audio bar - darker but not as dark as header, full width
+                // Layer 2: Optional render audio bar - light transparent background
                 if (message.renders.isNotEmpty)
                   for (final render in message.renders)
                     Container(
                       decoration: BoxDecoration(
-                        color: messageRenderColor,
-                        borderRadius: BorderRadius.zero, // No radius, connects seamlessly
-                        border: Border(
-                          left: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
-                          right: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
-                          top: BorderSide.none, // No top border to connect with header
-                          bottom: BorderSide.none, // No bottom border to connect with chain element
+                        color: messageRenderColor.withOpacity(messageRenderOpacity),
+                        borderRadius: const BorderRadius.all(Radius.circular(6)),
+                        border: Border.all(
+                          color: AppColors.sequencerBorder.withOpacity(0.2),
+                          width: 0.5,
                         ),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), // Symmetric vertical padding for centering
+                      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       child: Center(
                         child: _buildRenderButton(context, message, render),
                       ),
@@ -516,17 +507,13 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                         width: bottomElementWidth,
                       decoration: BoxDecoration(
                         color: messageChainContainerColor.withOpacity(messageChainContainerOpacity),
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(2),
-                          bottomRight: Radius.circular(2),
-                        ),
-                        border: Border(
-                          left: BorderSide(color: AppColors.sequencerBorder.withOpacity(messageChainContainerOpacity), width: 0.5),
-                          right: BorderSide(color: AppColors.sequencerBorder.withOpacity(messageChainContainerOpacity), width: 0.5),
-                          bottom: BorderSide(color: AppColors.sequencerBorder.withOpacity(messageChainContainerOpacity), width: 0.5),
-                          top: BorderSide.none, // No top border to connect with render element
+                        borderRadius: const BorderRadius.all(Radius.circular(6)),
+                        border: Border.all(
+                          color: AppColors.sequencerBorder.withOpacity(0.15),
+                          width: 0.5,
                         ),
                       ),
+                      margin: const EdgeInsets.symmetric(horizontal: 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         mainAxisSize: MainAxisSize.min,
@@ -549,52 +536,22 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
                               bottom: buttonsPaddingBottom,
                               right: buttonsPaddingRight,
                             ),
-                            child: Row(
-                              children: [
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: null,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: notesButtonBackgroundColor,
-                                    foregroundColor: notesButtonForegroundColor.withOpacity(notesButtonForegroundOpacity),
-                                    disabledBackgroundColor: notesButtonBackgroundColor,
-                                    disabledForegroundColor: notesButtonForegroundColor.withOpacity(notesButtonForegroundOpacity),
-                                    elevation: 0,
-                                    shadowColor: Colors.black.withOpacity(0.1),
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                                    minimumSize: const Size(0, 32),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Notes',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
+                            child: ElevatedButton(
+                              onPressed: () => widget.onApplyMessage(context, message),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: loadButtonBackgroundColor.withOpacity(loadButtonBackgroundOpacity),
+                                foregroundColor: loadButtonForegroundColor,
+                                elevation: 0,
+                                padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+                                minimumSize: const Size(double.infinity, 30),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(6),
                                 ),
                               ),
-                              const SizedBox(width:  8),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () => widget.onApplyMessage(context, message),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: loadButtonBackgroundColor,
-                                    foregroundColor: loadButtonForegroundColor,
-                                    elevation: 0,
-                                    shadowColor: Colors.black.withOpacity(0.1),
-                                    padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
-                                    minimumSize: const Size(0, 32),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Load',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                                  ),
-                                ),
+                              child: const Text(
+                                'Load',
+                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                               ),
-                            ],
                             ),
                           ),
                         ],
@@ -920,7 +877,7 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
         Expanded(
           child: Container(
             height: 1,
-            color: AppColors.sequencerBorder.withOpacity(0.5),
+            color: AppColors.sequencerBorder.withOpacity(0.2),
           ),
         ),
         Padding(
@@ -928,16 +885,16 @@ class _ThreadViewWidgetState extends State<ThreadViewWidget> {
           child: Text(
             dateLabel,
             style: GoogleFonts.sourceSans3(
-              color: AppColors.sequencerLightText,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
+              color: const Color.fromARGB(255, 240, 238, 230).withOpacity(0.6),
+              fontSize: 11,
+              fontWeight: FontWeight.w400,
             ),
           ),
         ),
         Expanded(
           child: Container(
             height: 1,
-            color: AppColors.sequencerBorder.withOpacity(0.5),
+            color: AppColors.sequencerBorder.withOpacity(0.2),
           ),
         ),
       ],

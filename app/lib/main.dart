@@ -219,25 +219,116 @@ class _MainPageState extends State<MainPage> {
   void _showJoinDialog(String threadId) {
     showDialog(
       context: context,
+      barrierDismissible: true,
+      barrierColor: AppColors.sequencerPageBackground.withOpacity(0.8),
       builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Join Project'),
-          content: const Text('You have been invited to join a collaborative project. Do you want to accept?'),
-          actions: <Widget>[
-            TextButton(
-              child: const Text('Decline'),
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
+        final size = MediaQuery.of(context).size;
+        final dialogWidth = (size.width * 0.8).clamp(280.0, size.width);
+        final dialogHeight = (size.height * 0.35).clamp(220.0, size.height);
+
+        return Material(
+          type: MaterialType.transparency,
+          child: Center(
+            child: ConstrainedBox(
+              constraints: BoxConstraints.tightFor(width: dialogWidth, height: dialogHeight),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: AppColors.sequencerSurfaceRaised,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
+                ),
+                clipBehavior: Clip.hardEdge,
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          children: [
+                            Text(
+                              'Join Pattern Project',
+                              style: GoogleFonts.sourceSans3(
+                                color: AppColors.sequencerText,
+                                fontSize: 24,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: Icon(Icons.close, color: AppColors.sequencerLightText, size: 28),
+                              splashRadius: 22,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                              onPressed: () => Navigator.of(context).pop(),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'You have been invited to join a pattern project. Do you want to accept?',
+                          textAlign: TextAlign.left,
+                          style: GoogleFonts.sourceSans3(
+                            color: AppColors.sequencerLightText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                        const Spacer(),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.sequencerText,
+                                  side: BorderSide(color: AppColors.sequencerBorder, width: 0.5),
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  minimumSize: const Size(0, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: Text(
+                                  'Decline',
+                                  style: GoogleFonts.sourceSans3(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.of(context).pop();
+                                  _acceptInviteAndNavigate(threadId);
+                                },
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.sequencerAccent,
+                                  foregroundColor: AppColors.sequencerText,
+                                  padding: const EdgeInsets.symmetric(vertical: 14),
+                                  minimumSize: const Size(0, 48),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                  elevation: 0,
+                                ),
+                                child: Text(
+                                  'Accept',
+                                  style: GoogleFonts.sourceSans3(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
             ),
-            TextButton(
-              child: const Text('Accept'),
-              onPressed: () async {
-                Navigator.of(context).pop();
-                _acceptInviteAndNavigate(threadId);
-              },
-            ),
-          ],
+          ),
         );
       },
     );
@@ -292,8 +383,18 @@ class _MainPageState extends State<MainPage> {
     if (userState.currentUser != null) {
       threadsState.setCurrentUser(
         userState.currentUser!.id,
-        userState.currentUser!.name,
+        userState.currentUser!.username,  // Fixed: Use username instead of name
       );
+      
+      // Add listener to keep ThreadsState in sync when username changes
+      userState.addListener(() {
+        if (userState.currentUser != null) {
+          threadsState.setCurrentUser(
+            userState.currentUser!.id,
+            userState.currentUser!.username,
+          );
+        }
+      });
       
       // Load data on startup (cached for session)
       libraryState.loadPlaylist(userId: userState.currentUser!.id);

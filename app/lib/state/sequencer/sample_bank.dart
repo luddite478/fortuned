@@ -34,6 +34,9 @@ class SampleBankState extends ChangeNotifier {
   
   final SampleBankBindings _sample_bank_ffi;
   
+  // Auto-save callback (set by ThreadsState)
+  void Function()? _onStateChanged;
+  
   // Private state fields (synced from native)
   int _maxSlots = 26;
   int _loadedCount = 0;
@@ -47,6 +50,7 @@ class SampleBankState extends ChangeNotifier {
   // UI-only state (not synced from native)
   final List<String?> _slotNames = List.filled(maxSampleSlots, null);
   final List<String?> _slotPaths = List.filled(maxSampleSlots, null);
+  final List<Color?> _sampleColors = List.filled(maxSampleSlots, null); // Project-specific colors
   int _activeSlot = 0;
   
   // ValueNotifiers for UI binding
@@ -118,6 +122,14 @@ class SampleBankState extends ChangeNotifier {
       if (result == 0) {
         _slotNames[slot] = assetPath.split('/').last;
         _slotPaths[slot] = assetPath;
+        
+        // Assign color from default palette if not already set (preserve project colors on import)
+        if (_sampleColors[slot] == null) {
+          final color = _defaultBankColors[slot % _defaultBankColors.length];
+          _sampleColors[slot] = color;
+          Log.d('🎨 [SAMPLE_BANK_STATE] Assigned color to slot $slot');
+        }
+        
         Log.d('✅ [SAMPLE_BANK_STATE] Loaded sample $slot with id: ${_slotNames[slot]}');
         return true;
       } else {
@@ -193,6 +205,7 @@ class SampleBankState extends ChangeNotifier {
     // Clear UI-only metadata
     _slotNames[slot] = null;
     _slotPaths[slot] = null;
+    _sampleColors[slot] = null; // Clear color when unloading
     
     // Native state will be synced automatically by timer
     Log.d('🗑️ [SAMPLE_BANK_STATE] Unloaded sample $slot');
@@ -334,7 +347,36 @@ class SampleBankState extends ChangeNotifier {
     Color(0xFFB39DDB), // Deep Purple
   ];
   
-  List<Color> get uiBankColors => _defaultBankColors;
+  /// Get colors for all slots - uses project-specific colors or defaults
+  List<Color> get uiBankColors {
+    return List.generate(maxSampleSlots, (i) {
+      return _sampleColors[i] ?? _defaultBankColors[i % _defaultBankColors.length];
+    });
+  }
+  
+  /// Set color for a specific sample slot (project-specific)
+  void setSampleColor(int slot, Color color) {
+    if (slot >= 0 && slot < maxSampleSlots) {
+      _sampleColors[slot] = color;
+      notifyListeners();
+    }
+  }
+  
+  /// Get color for a specific sample slot (null if not set)
+  Color? getSampleColor(int slot) {
+    if (slot >= 0 && slot < maxSampleSlots) {
+      return _sampleColors[slot];
+    }
+    return null;
+  }
+  
+  /// Clear all sample colors (used when loading new project)
+  void clearAllColors() {
+    for (int i = 0; i < maxSampleSlots; i++) {
+      _sampleColors[i] = null;
+    }
+    notifyListeners();
+  }
   
   void uiHandleBankChange(int slot) {
     setActiveSlot(slot);
@@ -427,6 +469,19 @@ class SampleBankState extends ChangeNotifier {
     if (anyChanged) {
       notifyListeners();
     }
+  }
+  
+  /// Set callback for state changes (used by ThreadsState for auto-save)
+  void setOnStateChanged(void Function()? callback) {
+    _onStateChanged = callback;
+  }
+  
+  @override
+  void notifyListeners() {
+    super.notifyListeners();
+    
+    // Trigger auto-save if callback is set
+    _onStateChanged?.call();
   }
   
   @override

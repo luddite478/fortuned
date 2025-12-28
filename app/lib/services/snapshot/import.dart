@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart'; // For Color class
 import '../../state/sequencer/table.dart';
 import '../../state/sequencer/playback.dart';
 import '../../state/sequencer/sample_bank.dart';
@@ -211,7 +212,8 @@ class SnapshotImporter {
         return false;
       }
 
-      // Clear existing samples first
+      // Clear existing samples and colors first
+      _sampleBankState.clearAllColors(); // Clear all project colors
       for (int i = 0; i < 26; i++) {
         _sampleBankState.unloadSample(i);
       }
@@ -225,6 +227,18 @@ class SnapshotImporter {
         final pitch = ((settings?['pitch'] ?? 1.0) as num).toDouble();
         final sampleId = sampleData['sample_id'] as String?;
         final filePath = sampleData['file_path'] as String?;
+
+        // Import color if present (project-specific colors)
+        if (sampleData.containsKey('color')) {
+          final colorHex = sampleData['color'] as String;
+          try {
+            final color = _hexToColor(colorHex);
+            _sampleBankState.setSampleColor(i, color);
+            debugPrint('🎨 [SNAPSHOT_IMPORT] Imported color for slot $i: $colorHex');
+          } catch (e) {
+            debugPrint('⚠️ [SNAPSHOT_IMPORT] Failed to parse color for slot $i: $e');
+          }
+        }
 
         if (loaded && sampleId != null && filePath != null) {
           // Try to load the sample using the manifest ID
@@ -443,5 +457,16 @@ class SnapshotImporter {
       debugPrint('❌ [SNAPSHOT_METADATA] Failed to get metadata: $e');
       return null;
     }
+  }
+  
+  /// Convert hex color string to Color object (e.g., "#FF5733" -> Color)
+  Color _hexToColor(String hex) {
+    final buffer = StringBuffer();
+    if (hex.startsWith('#')) {
+      buffer.write(hex.substring(1)); // Remove #
+    } else {
+      buffer.write(hex);
+    }
+    return Color(int.parse(buffer.toString(), radix: 16) + 0xFF000000);
   }
 }

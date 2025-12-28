@@ -4,8 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 import '../state/audio_player_state.dart';
 import '../utils/app_colors.dart';
 
-class BottomAudioPlayer extends StatelessWidget {
+class BottomAudioPlayer extends StatefulWidget {
   const BottomAudioPlayer({Key? key}) : super(key: key);
+
+  @override
+  State<BottomAudioPlayer> createState() => _BottomAudioPlayerState();
+}
+
+class _BottomAudioPlayerState extends State<BottomAudioPlayer> {
+  bool _isDragging = false;
+  double _dragValue = 0.0;
 
   String _formatDuration(Duration duration) {
     final minutes = duration.inMinutes;
@@ -39,11 +47,16 @@ class BottomAudioPlayer extends StatelessWidget {
         final loopMode = audioPlayer.loopMode;
         final shuffleEnabled = audioPlayer.shuffleEnabled;
 
+        // Use drag value when dragging, otherwise use actual position
+        final displayPosition = _isDragging 
+            ? Duration(milliseconds: _dragValue.toInt())
+            : position;
+
         return Container(
           decoration: BoxDecoration(
-            color: AppColors.menuEntryBackground,
+            color: AppColors.sequencerSurfaceRaised,
             border: Border(
-              top: BorderSide(color: AppColors.menuBorder, width: 1),
+              top: BorderSide(color: AppColors.sequencerBorder, width: 1),
             ),
           ),
           child: SafeArea(
@@ -57,9 +70,9 @@ class BottomAudioPlayer extends StatelessWidget {
                   Row(
                     children: [
                       Text(
-                        _formatDuration(position),
+                        _formatDuration(displayPosition),
                         style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuLightText,
+                          color: AppColors.sequencerLightText,
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
@@ -71,19 +84,33 @@ class BottomAudioPlayer extends StatelessWidget {
                             trackHeight: 2,
                             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
                             overlayShape: const RoundSliderOverlayShape(overlayRadius: 10),
-                            activeTrackColor: AppColors.menuText.withOpacity(0.7),
-                            inactiveTrackColor: AppColors.menuBorder.withOpacity(0.3),
-                            thumbColor: AppColors.menuText,
-                            overlayColor: AppColors.menuText.withOpacity(0.1),
+                            activeTrackColor: AppColors.sequencerAccent,
+                            inactiveTrackColor: AppColors.sequencerBorder.withOpacity(0.5),
+                            thumbColor: AppColors.sequencerText,
+                            overlayColor: AppColors.sequencerAccent.withOpacity(0.2),
                           ),
                           child: Slider(
                             value: duration.inMilliseconds > 0
-                                ? position.inMilliseconds.toDouble()
+                                ? (_isDragging ? _dragValue : position.inMilliseconds.toDouble())
                                 : 0.0,
                             min: 0.0,
                             max: duration.inMilliseconds.toDouble().clamp(1.0, double.infinity),
-                            onChanged: (value) async {
+                            onChangeStart: (value) {
+                              setState(() {
+                                _isDragging = true;
+                                _dragValue = value;
+                              });
+                            },
+                            onChanged: (value) {
+                              setState(() {
+                                _dragValue = value;
+                              });
+                            },
+                            onChangeEnd: (value) async {
                               await audioPlayer.seek(Duration(milliseconds: value.toInt()));
+                              setState(() {
+                                _isDragging = false;
+                              });
                             },
                           ),
                         ),
@@ -92,7 +119,7 @@ class BottomAudioPlayer extends StatelessWidget {
                       Text(
                         _formatDuration(duration),
                         style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuLightText,
+                          color: AppColors.sequencerLightText,
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
@@ -109,8 +136,8 @@ class BottomAudioPlayer extends StatelessWidget {
                         icon: Icon(
                           Icons.shuffle,
                           color: shuffleEnabled
-                              ? AppColors.menuOnlineIndicator
-                              : AppColors.menuLightText,
+                              ? AppColors.sequencerAccent
+                              : AppColors.sequencerLightText,
                           size: 20,
                         ),
                         onPressed: () => audioPlayer.toggleShuffle(),
@@ -120,7 +147,7 @@ class BottomAudioPlayer extends StatelessWidget {
                       IconButton(
                         icon: Icon(
                           Icons.skip_previous,
-                          color: AppColors.menuText,
+                          color: AppColors.sequencerText,
                           size: 28,
                         ),
                         onPressed: () => audioPlayer.playPrevious(),
@@ -139,12 +166,12 @@ class BottomAudioPlayer extends StatelessWidget {
                           width: 48,
                           height: 48,
                           decoration: BoxDecoration(
-                            color: AppColors.menuText.withOpacity(0.8),
+                            color: AppColors.sequencerAccent,
                             shape: BoxShape.circle,
                           ),
                           child: Icon(
                             isPlaying ? Icons.pause : Icons.play_arrow,
-                            color: AppColors.menuPageBackground,
+                            color: AppColors.sequencerPageBackground,
                             size: 24,
                           ),
                         ),
@@ -153,7 +180,7 @@ class BottomAudioPlayer extends StatelessWidget {
                       IconButton(
                         icon: Icon(
                           Icons.skip_next,
-                          color: AppColors.menuText,
+                          color: AppColors.sequencerText,
                           size: 28,
                         ),
                         onPressed: () => audioPlayer.playNext(),
@@ -164,8 +191,8 @@ class BottomAudioPlayer extends StatelessWidget {
                         icon: Icon(
                           _getLoopIcon(loopMode),
                           color: loopMode != LoopMode.off
-                              ? AppColors.menuOnlineIndicator
-                              : AppColors.menuLightText,
+                              ? AppColors.sequencerAccent
+                              : AppColors.sequencerLightText,
                           size: 20,
                         ),
                         onPressed: () => audioPlayer.toggleLoopMode(),

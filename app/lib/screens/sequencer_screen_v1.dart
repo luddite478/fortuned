@@ -9,6 +9,7 @@ import '../widgets/sequencer/v1/sequencer_body.dart';
 import '../widgets/sequencer/v1/value_control_overlay.dart';
 import '../widgets/app_header_widget.dart';
 import '../state/threads_state.dart';
+import '../state/user_state.dart';
 import '../services/threads_service.dart';
 import '../services/snapshot/snapshot_service.dart';
 import '../utils/app_colors.dart';
@@ -155,7 +156,12 @@ class _SequencerScreenV1State extends State<SequencerScreenV1> with WidgetsBindi
           final threadName = ThreadNameGenerator.generate(DateTime.now().microsecondsSinceEpoch.toString());
           final threadId = await threadsState.createThread(
             users: [
-              ThreadUser(id: currentUserId, name: currentUserName ?? 'User', joinedAt: DateTime.now()),
+              ThreadUser(
+                id: currentUserId, 
+                username: context.read<UserState>().currentUser?.username ?? currentUserName ?? 'User',
+                name: currentUserName ?? 'User', 
+                joinedAt: DateTime.now()
+              ),
             ],
             name: threadName,
             metadata: {
@@ -283,10 +289,18 @@ class _SequencerScreenV1State extends State<SequencerScreenV1> with WidgetsBindi
         backgroundColor: AppColors.sequencerPageBackground,
         appBar: AppHeaderWidget(
           mode: HeaderMode.sequencer,
-          onBack: () {
+          onBack: () async {
             if (_playbackState.isPlaying) {
               _playbackState.stop();
             }
+            
+            // Force auto-save before leaving sequencer
+            try {
+              await context.read<ThreadsState>().forceAutoSave();
+            } catch (e) {
+              debugPrint('⚠️ [SEQUENCER] Failed to auto-save before exit: $e');
+            }
+            
             Navigator.of(context).pop();
           },
           threadsService: _threadsService,

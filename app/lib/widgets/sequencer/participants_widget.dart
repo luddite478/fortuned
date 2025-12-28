@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -10,7 +11,7 @@ import '../../services/users_service.dart';
 /// Widget displaying participants in the sequencer header
 /// Shows first participant with online status, stacked chips for multiple participants
 /// Click to show participants overflow menu
-class ParticipantsWidget extends StatelessWidget {
+class ParticipantsWidget extends StatefulWidget {
   final Thread? thread;
   final VoidCallback onTap;
   
@@ -21,8 +22,38 @@ class ParticipantsWidget extends StatelessWidget {
   });
 
   @override
+  State<ParticipantsWidget> createState() => _ParticipantsWidgetState();
+}
+
+class _ParticipantsWidgetState extends State<ParticipantsWidget> {
+  Timer? _refreshTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    // Request online users when widget is first built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<UsersService>().requestOnlineUsers();
+        // Set up periodic refresh every 10 seconds
+        _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+          if (mounted) {
+            context.read<UsersService>().requestOnlineUsers();
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (thread == null || thread!.users.isEmpty) {
+    if (widget.thread == null || widget.thread!.users.isEmpty) {
       return const SizedBox.shrink();
     }
     
@@ -31,7 +62,7 @@ class ParticipantsWidget extends StatelessWidget {
     final currentUserId = userState.currentUser?.id ?? '';
     
     // Get other participants (exclude current user)
-    final otherParticipants = thread!.users
+    final otherParticipants = widget.thread!.users
         .where((u) => u.id != currentUserId)
         .toList();
     
@@ -43,7 +74,7 @@ class ParticipantsWidget extends StatelessWidget {
     final hasMore = otherParticipants.length > 1;
     
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
@@ -63,7 +94,7 @@ class ParticipantsWidget extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.sequencerAccent,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(0), // Squared corners
                   border: Border.all(
                     color: AppColors.sequencerPageBackground,
                     width: 1,
@@ -100,7 +131,7 @@ class ParticipantsWidget extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
             color: AppColors.sequencerSurfaceRaised.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(0), // Squared corners
             border: Border.all(
               color: AppColors.sequencerBorder,
               width: 0.5,
@@ -146,13 +177,29 @@ class ParticipantsWidget extends StatelessWidget {
 
 /// Participants overflow menu dialog
 /// Shows all participants with their online status
-class ParticipantsMenuDialog extends StatelessWidget {
+class ParticipantsMenuDialog extends StatefulWidget {
   final Thread thread;
   
   const ParticipantsMenuDialog({
     super.key,
     required this.thread,
   });
+
+  @override
+  State<ParticipantsMenuDialog> createState() => _ParticipantsMenuDialogState();
+}
+
+class _ParticipantsMenuDialogState extends State<ParticipantsMenuDialog> {
+  @override
+  void initState() {
+    super.initState();
+    // Request online users when dialog is opened
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<UsersService>().requestOnlineUsers();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +210,7 @@ class ParticipantsMenuDialog extends StatelessWidget {
     final userState = context.read<UserState>();
     final currentUserId = userState.currentUser?.id ?? '';
     
-    final allParticipants = thread.users;
+    final allParticipants = widget.thread.users;
     
     return Material(
       type: MaterialType.transparency,
@@ -177,7 +224,7 @@ class ParticipantsMenuDialog extends StatelessWidget {
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.sequencerSurfaceRaised,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(0), // Squared corners
               border: Border.all(color: AppColors.sequencerBorder, width: 0.5),
             ),
             clipBehavior: Clip.hardEdge,
@@ -235,7 +282,7 @@ class ParticipantsMenuDialog extends StatelessWidget {
                                 color: isMe 
                                     ? AppColors.sequencerAccent.withOpacity(0.15)
                                     : AppColors.sequencerSurfaceBase,
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(0), // Squared corners
                                 border: Border.all(
                                   color: isMe 
                                       ? AppColors.sequencerAccent.withOpacity(0.3)
@@ -277,7 +324,7 @@ class ParticipantsMenuDialog extends StatelessWidget {
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: AppColors.sequencerAccent.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(6),
+                                        borderRadius: BorderRadius.circular(0), // Squared corners
                                       ),
                                       child: Text(
                                         'You',

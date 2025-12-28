@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import '../state/threads_state.dart';
 import '../state/audio_player_state.dart';
 import '../state/user_state.dart';
 import '../models/thread/thread.dart';
+import '../models/thread/thread_user.dart';
 import '../services/threads_api.dart';
 
 import '../utils/app_colors.dart';
@@ -29,185 +31,174 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   String? _error;
   bool _isOpeningProject = false;
   final Set<String> _deletingThreadIds = {}; // Prevent double deletion
-  String _sortBy = 'modified'; // 'modified' or 'created'
-  bool _sortAscending = false; // false = descending (newest first)
-  
-  // Cache for project snapshots to avoid re-fetching on every rebuild
-  final Map<String, Future<Map<String, dynamic>?>> _snapshotFutures = {};
+  Timer? _timestampUpdateTimer; // Periodic timer to update relative timestamps
+  final ValueNotifier<int> _timestampTick = ValueNotifier<int>(0); // Tick counter for timestamp updates
 
   // ============================================================================
   // LAYOUT CONTROL VARIABLES - CENTRALIZED CONFIGURATION
   // ============================================================================
   // All adjustable layout parameters in one place. Change these to customize appearance.
-  // Using flex ratios and relative sizing (following flutter_overflow_prevention_guide.md)
+  // Using 2-column grid layout similar to Google Docs
   
   // ----------------------------------------------------------------------------
-  // TILE HEIGHT CONTROL
+  // LIST LAYOUT CONTROL
   // ----------------------------------------------------------------------------
-  // Controls the height of each project tile as a percentage of screen height
-  // 
-  // Recommended values:
-  // - 8-10%:  Compact view (more projects visible, less detail)
-  // - 10-12%: Balanced view (good mix of visibility and detail)
-  // - 12-15%: Comfortable view (fewer projects, more detail visible)
-  // - 15%+:   Spacious view (best for tablets/large screens)
-  //
-  // Current: 8.0% = Compact view showing more projects
-  static const double _tileHeightPercent = 9.0;
+  // Single column layout with horizontal tiles
   
-  // Tile horizontal spacing (% of screen width)
-  static const double _tileHorizontalPaddingLeftPercent = 2.0;
-  static const double _tileHorizontalPaddingRightPercent = 2.0;
+  // Spacing between tiles
+  static const double _tileSpacing = 12.0;  // Vertical gap between tiles
+  static const double _listPadding = 16.0;  // Padding around list
   
   // ----------------------------------------------------------------------------
-  // COLUMN FLEX RATIOS - CENTRALIZED (Total must equal 100)
+  // TILE DIMENSIONS CONTROL
   // ----------------------------------------------------------------------------
-  // Controls width proportions of all 5 columns using Expanded flex ratios.
-  // This is the RECOMMENDED approach (no overflow possible).
-  //
-  // Adjust these to change column widths:
-  static const int _patternColumnFlex = 38;      // Pattern preview (32%)
-  static const int _sampleBankColumnFlex = 11;   // Sample bank grid (14%)
-  static const int _countersColumnFlex = 15;     // LEN/HST counters (12%)
-  static const int _createdColumnFlex = 17;      // Created date (21%)
-  static const int _modifiedColumnFlex = 17;     // Modified date (21%)
-  // Total: 100 (exact, no floating-point errors, overflow-safe
+  // Fixed tile height (in logical pixels)
+  // Recommended: 120-180px for comfortable viewing
+  static const double _tileHeight = 180.0;
   
   // ----------------------------------------------------------------------------
-  // PATTERN PREVIEW INNER PADDING (as % of tile height for proportional sizing)
+  // TILE BACKGROUND COLOR
   // ----------------------------------------------------------------------------
-  // Controls inner padding between the pattern widget border and the actual cells.
-  // This affects how much the cells spread within the available space.
-  // SMALLER padding = cells spread MORE (more rectangular when given wide space)
-  // LARGER padding = cells spread LESS (more constrained)
-  // Using percentages of tile height for responsive scaling
-  //
-  // Recommended values:
-  // - 0-1%:   Minimal padding (maximum cell spreading)
-  // - 1-3%:   Compact padding (cells fill most of space)
-  // - 3-5%:   Comfortable padding (balanced spacing)
-  // - 5%+:    Spacious padding (more border space)
-  //
-  // Current: Minimal padding for maximum cell spreading
-  static const double _patternPreviewInnerPaddingLeftPercent = 2;    // 0.3% of tile height
-  static const double _patternPreviewInnerPaddingTopPercent = 0.3;     // 0.3% of tile height
-  static const double _patternPreviewInnerPaddingRightPercent = 1;   // 0.6% of tile height
-  static const double _patternPreviewInnerPaddingBottomPercent = 5;  // 0.3% of tile height
+  // Controls the background color of the entire project tile
+  static const Color _tileBackgroundColor = AppColors.sequencerSurfaceRaised;
+  static const double _tileBorderRadius = 8.0;  // Rounded corners to match sequencer
+  static const double _tileElevation = 2.0;
   
   // ----------------------------------------------------------------------------
-  // SAMPLE BANK GRID SIZE CONTROL
+  // OVERLAY CONTROLS (Participants & Steps)
   // ----------------------------------------------------------------------------
-  // Controls the dimensions of the sample bank grid
-  // Total samples shown = columns × rows
-  //
-  // Recommended configurations:
-  // - 5×4 = 20 samples (current, good balance)
-  // - 4×4 = 16 samples (square grid)
-  // - 6×4 = 24 samples (more samples)
-  // - 5×3 = 15 samples (shorter grid)
-  static const int _sampleBankColumns = 5;  // Number of columns in sample grid
-  static const int _sampleBankRows = 4;     // Number of rows in sample grid
+  // Background overlay color (color of the overlay backgrounds)
+  static const Color _overlayBackgroundColor = AppColors.sequencerSurfaceBase;
   
-  // ----------------------------------------------------------------------------
-  // SAMPLE BANK SIZE CONTROL (Independent Width & Height Control)
-  // ----------------------------------------------------------------------------
-  // Controls how much space the sample grid occupies inside its column
-  // Cells automatically fill the specified dimensions using Expanded widgets
-  //
-  // WIDTH CONTROL (% of column width):
-  // - 50-70%: Narrow grid
-  // - 70-85%: Comfortable width (recommended)
-  // - 85-100%: Wide grid (maximum visibility)
-  static const double _sampleBankWidthPercent = 100.0;  // % of column width
+  // Background overlay opacity (0.0 = fully transparent, 1.0 = fully opaque)
+  static const double _overlayBackgroundOpacity = 0.95;
   
-  // HEIGHT CONTROL (% of column height):
-  // - 40-55%: Compact height
-  // - 55-70%: Comfortable height (recommended)
-  // - 70-85%: Tall grid (maximum visibility)
-  static const double _sampleBankHeightPercent = 55.0;  // % of column height
+  // Text color (color of the text on overlays)
+  static const Color _overlayTextColor = AppColors.sequencerText;
   
-  // ----------------------------------------------------------------------------
-  // SAMPLE BANK INNER PADDING (as % of tile height for proportional sizing)
-  // ----------------------------------------------------------------------------
-  // Controls inner padding between the sample grid border and the actual cells.
-  // Cells now fill available space using Expanded widgets (responsive)
-  // SMALLER padding = more room for cells
-  // LARGER padding = more border space
-  static const double _sampleBankInnerPaddingPercent = 4.0;  // All sides (% of tile height)
+  // Text opacity (0.0 = fully transparent, 1.0 = fully opaque)
+  static const double _overlayTextOpacity = 1.0;
   
-  // ----------------------------------------------------------------------------
-  // ELEMENT PADDING CONTROL (Responsive, as % of tile dimensions)
-  // ----------------------------------------------------------------------------
-  // Each main element gets its own box with controlled padding
-  // All values are percentages for responsive scaling
+  // Text font weight (w100-w900, or use FontWeight.normal, FontWeight.bold, etc.)
+  static const FontWeight _overlayTextFontWeight = FontWeight.w700;
   
-  // Pattern preview element padding (% of tile height)
-  static const double _patternElementPaddingTopPercent = 3.0;       // 3% top
-  static const double _patternElementPaddingBottomPercent = 3.0;    // 3% bottom
-  static const double _patternElementPaddingLeftPercent = 3.0;      // 2% left
-  static const double _patternElementPaddingRightPercent = 3.0;     // 2% right
+  // Font family for overlay text (use GoogleFonts method name)
+  // Examples: 'sourceSans3', 'roboto', 'inter', 'montserrat', 'poppins', 'openSans'
+  static const String _overlayFontFamily = 'CrimsonPro';
   
-  // Sample bank element padding (% of tile height)
-  static const double _sampleElementPaddingTopPercent = 3.0;        // 3% top
-  static const double _sampleElementPaddingBottomPercent = 3.0;     // 3% bottom
-  static const double _sampleElementPaddingLeftPercent = 2.0;       // 2% left
-  static const double _sampleElementPaddingRightPercent = 2.0;      // 2% right
+  // Corner radius for overlays (0.0 = squared corners)
+  static const double _overlayCornerRadius = 4.0;
   
-  // Counters element padding (% of tile height)
-  static const double _countersElementPaddingTopPercent = 3.0;      // 3% top
-  static const double _countersElementPaddingBottomPercent = 3.0;   // 3% bottom
-  static const double _countersElementPaddingLeftPercent = 8.0;     // 3% left
-  static const double _countersElementPaddingRightPercent = 8.0;    // 3% right
+  // Extension space around text (how much the background extends beyond text)
+  // This controls the padding around the text content
+  static const double _overlayHorizontalExtension = 14.0; // Horizontal padding (left & right)
+  static const double _overlayVerticalExtension = 2.0;    // Vertical padding (top & bottom)
   
-  // Date columns element padding (% of tile height)
-  static const double _dateElementPaddingTopPercent = 3.0;          // 3% top
-  static const double _dateElementPaddingBottomPercent = 3.0;       // 3% bottom
-  static const double _dateElementPaddingLeftPercent = 2.0;         // 2% left
-  static const double _dateElementPaddingRightPercent = 2.0;        // 2% right
+  // Overlay positioning offset from table corners
+  // Controls spacing between overlay and pattern table edge (individual controls for each overlay)
+  // Participants overlay (top right)
+  static const double _participantsOverlayHorizontalOffset = 5.0; // Horizontal spacing from right edge
+  static const double _participantsOverlayVerticalOffset = 5.0;   // Vertical spacing from top edge
+  static const double _participantsOverlayFontSize = 12.0; // Font size for participant names
+  // Metadata overlay (top left) - shows LEN, STP, HST
+  static const double _metadataOverlayHorizontalOffset = 5.0; // Horizontal spacing from left edge
+  static const double _metadataOverlayVerticalOffset = 5.0;   // Vertical spacing from top edge
+  static const double _metadataOverlayLabelFontSize = 12.0; // Font size for labels (LEN, STP, HST)
+  static const double _metadataOverlayNumberFontSize = 15.0; // Font size for numbers
   
-  // ----------------------------------------------------------------------------
-  // COUNTERS LAYOUT (Internal spacing within counter element)
-  // ----------------------------------------------------------------------------
-  // Spacing between label and number (as % of column width)
-  static const double _counterLabelGapPercent = 3.0;    // 3% of column width
-  // Spacing between LEN and HST rows (as % of column height)
-  static const double _counterRowGapPercent = 0.5;      // 0.5% of column height
+  // Footer section (bottom of tile - shows created/modified dates)
+  static const bool _showFooter = true; // Show/hide footer with dates
+  static const double _footerHeight = 20.0; // Height of footer section
+  static const double _footerHorizontalPadding = 12.0; // Horizontal padding inside footer
+  static const double _footerLabelFontSize = 10.0; // Font size for "CREATED"/"MODIFIED" labels
+  static const double _footerDateFontSize = 10.0; // Font size for date/time text
+  static const Color _footerBackgroundColor = AppColors.sequencerSurfaceBase; // Footer background
+  static const double _footerBackgroundOpacity = 0.8; // Footer background opacity
+  static const Color _footerTextColor = AppColors.sequencerLightText; // Footer text color
+  static const double _footerTextOpacity = 1.0; // Footer text opacity
+  static const double _footerLabelOpacity = 0.7; // Opacity for "CREATED"/"MODIFIED" labels (lighter)
   
-  // ----------------------------------------------------------------------------
-  // DEBUG COLORS (set to null to disable)
-  // ----------------------------------------------------------------------------
-  static const Color? _patternPreviewDebugColor = Color.fromARGB(255, 194, 194, 194); // Light red
-  static const Color? _sampleBankDebugColor = Color.fromARGB(255, 194, 194, 194); // Light green
-  static const Color? _countersDebugColor = Color.fromARGB(255, 194, 194, 194);// Light blue
-  static const Color? _createdColumnDebugColor = Color.fromARGB(255, 194, 194, 194);/// Light yellow
-  static const Color? _modifiedColumnDebugColor = Color.fromARGB(255, 194, 194, 194); // Light purple
+  // Font family for footer text (use GoogleFonts method name)
+  // Examples: 'sourceSans3', 'roboto', 'inter', 'montserrat', 'poppins', 'openSans'
+  static const String _footerFontFamily = 'sourceSans3';
   
-  // ----------------------------------------------------------------------------
-  // BACKGROUND PATTERN CONTROLS (Checkerboard Pattern)
-  // ----------------------------------------------------------------------------
-  // Controls the appearance of the background checkerboard pattern
+  // Gradient edge fade controls
+  // These create a gradient from transparent edges to solid center
+  // Horizontal gradient (left-right fade on participants overlay)
+  static const double _overlayHorizontalFadeWidth = 0.01; // 0.0-1.0, percentage of overlay width to fade (larger padding + smaller fade = more solid center)
+  // Vertical gradient (top-bottom fade on both overlays)
+  static const double _overlayVerticalFadeHeight = 0.5; // 0.0-1.0, percentage of overlay height to fade
   
-  // Base background color (shows between rounded squares when cornerRadius > 0)
-  // Set this to match your pattern colors for seamless appearance with rounded corners
-  static const Color _bgBaseColor = Color.fromARGB(255, 240, 240, 240);
-  
-  // Pattern colors (alternating squares)
-  static const Color _bgPatternColor1 = Color.fromARGB(255, 239, 238, 238);  // Light gray
-  static const Color _bgPatternColor2 = Color.fromARGB(255, 238, 238, 238);  // Light beige
-  
-  // Square size (in pixels)
-  static const double _bgPatternSquareSize = 10.0;
-  
-  // Corner roundness (0.0 = sharp corners, higher = more rounded)
-  // Recommended: 0.0 for squares, 2-5 for slightly rounded, 10+ for very rounded
-  static const double _bgPatternCornerRadius = 10;
-  
-  // Gray overlay (sits on top of pattern to adjust overall grayness/brightness)
-  // Set opacity to 0.0 for no overlay, increase for more gray (0.0 - 1.0)
-  // Recommended: 0.0 = no overlay, 0.1-0.3 = subtle, 0.4-0.6 = moderate, 0.7+ = heavy
-  static const double _bgOverlayOpacity = 0.1;
-  // Overlay color (white = lighten, black = darken, gray = desaturate)
-  static const Color _bgOverlayColor = Color.fromARGB(255, 42, 42, 42);
+
+  // Helper method to get font family based on font family string
+  static TextStyle _getFontStyle(String fontFamily, {
+    Color? color,
+    double? fontSize,
+    FontWeight? fontWeight,
+    double? letterSpacing,
+    double? height,
+  }) {
+    // Map font family string to GoogleFonts method
+    switch (fontFamily.toLowerCase()) {
+      case 'sourcesans3':
+        return GoogleFonts.sourceSans3(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+      case 'roboto':
+        return GoogleFonts.roboto(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+      case 'inter':
+        return GoogleFonts.inter(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+      case 'montserrat':
+        return GoogleFonts.montserrat(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+      case 'poppins':
+        return GoogleFonts.poppins(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+      case 'opensans':
+        return GoogleFonts.openSans(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+      default:
+        // Default to sourceSans3 if unknown font family
+        return GoogleFonts.sourceSans3(
+          color: color,
+          fontSize: fontSize,
+          fontWeight: fontWeight,
+          letterSpacing: letterSpacing,
+          height: height,
+        );
+    }
+  }
 
   @override
   void initState() {
@@ -222,6 +213,14 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       ),
     );
     
+    // Start periodic timer to update relative timestamps (every 10 seconds)
+    // Uses ValueNotifier to only rebuild timestamp widgets, not entire screen
+    _timestampUpdateTimer = Timer.periodic(const Duration(seconds: 10), (_) {
+      if (mounted) {
+        _timestampTick.value++; // Increment tick to trigger ValueListenableBuilder
+      }
+    });
+    
     // Stop any playing audio when ProjectsScreen becomes visible
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -234,6 +233,10 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 
   @override
   void dispose() {
+    // Cancel timestamp update timer
+    _timestampUpdateTimer?.cancel();
+    _timestampTick.dispose();
+    
     // Restore default system UI styling when leaving this screen
     SystemChrome.setSystemUIOverlayStyle(
       const SystemUiOverlayStyle(
@@ -295,25 +298,36 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     }
   }
 
+  /// Sort projects by most recently modified timestamp
+  /// Considers both thread.updatedAt and working state timestamps
+  Future<List<Thread>> _sortProjectsByModifiedTime(
+    List<Thread> projects,
+    ThreadsState threadsState,
+  ) async {
+    // Create list of (project, modifiedAt) tuples
+    final projectsWithTimestamps = <MapEntry<Thread, DateTime>>[];
+    
+    for (final project in projects) {
+      final modifiedAt = await threadsState.getThreadModifiedAt(
+        project.id,
+        project.updatedAt,
+      );
+      projectsWithTimestamps.add(MapEntry(project, modifiedAt));
+    }
+    
+    // Sort by timestamp (descending - newest first)
+    projectsWithTimestamps.sort((a, b) => b.value.compareTo(a.value));
+    
+    // Return sorted projects
+    return projectsWithTimestamps.map((e) => e.key).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: _bgBaseColor, // Base color shows between rounded squares
+      backgroundColor: AppColors.sequencerPageBackground, // Solid background color matching sequencer
       body: Stack(
         children: [
-          // Background pattern layer (behind everything)
-          Positioned.fill(
-            child: _buildBackgroundPattern(),
-          ),
-          
-          // Gray overlay layer (for adjusting overall grayness/brightness)
-          if (_bgOverlayOpacity > 0.0)
-            Positioned.fill(
-              child: Container(
-                color: _bgOverlayColor.withOpacity(_bgOverlayOpacity),
-              ),
-            ),
-          
           SafeArea(
         child: Column(
           children: [
@@ -326,7 +340,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                 if (threadsState.isLoading && !threadsState.hasLoaded) {
                   return Expanded(
                     child: Center(
-                      child: CircularProgressIndicator(color: AppColors.menuLightText),
+                      child: CircularProgressIndicator(color: AppColors.sequencerAccent),
                     ),
                   );
                 }
@@ -343,17 +357,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                               children: [
                                 // Projects content
                                 Expanded(
-                                  child: _error != null
+                                  child:                                   _error != null
                                       ? Center(
                                           child: Column(
                                             mainAxisAlignment: MainAxisAlignment.center,
                                             children: [
-                                              Icon(Icons.error_outline, color: AppColors.menuLightText, size: 48),
+                                              Icon(Icons.error_outline, color: AppColors.sequencerLightText, size: 48),
                                               const SizedBox(height: 12),
                                               Text(
                                                 _error!, 
                                                 style: GoogleFonts.sourceSans3(
-                                                  color: AppColors.menuLightText,
+                                                  color: AppColors.sequencerText,
                                                   fontWeight: FontWeight.w500,
                                                 ),
                                               ),
@@ -363,12 +377,12 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                                   _loadProjects();
                                                 },
                                                 style: ElevatedButton.styleFrom(
-                                                  backgroundColor: AppColors.menuButtonBackground,
+                                                  backgroundColor: AppColors.sequencerAccent,
                                                 ),
                                                 child: Text(
                                                   'RETRY',
                                                   style: GoogleFonts.sourceSans3(
-                                                    color: AppColors.menuText,
+                                                    color: AppColors.sequencerText,
                                                     fontWeight: FontWeight.bold,
                                                     letterSpacing: 1.0,
                                                   ),
@@ -384,107 +398,93 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                               // Add mock project for testing layer boundaries
                                               _addMockProject(projects);
                                               
-                                              // Sort based on current sort settings
-                                              projects.sort((a, b) {
-                                                int comparison;
-                                                if (_sortBy == 'created') {
-                                                  comparison = a.createdAt.compareTo(b.createdAt);
-                                                } else {
-                                                  comparison = a.updatedAt.compareTo(b.updatedAt);
-                                                }
-                                                return _sortAscending ? comparison : -comparison;
-                                              });
+                                              // Sort by most recently modified (descending)
+                                              // This will be done asynchronously below to consider working state timestamps
                                               
                                               if (projects.isEmpty) {
                                                 return const SizedBox.shrink(); // Show nothing when no projects
                                               }
                                               
-                                              return Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  // Invites section (if current user has pending invites)
-                                                  Consumer2<UserState, ThreadsState>(
-                                                    builder: (context, userState, threadsState, _) {
-                                                      final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
-                                                      if (invites.isEmpty) return const SizedBox.shrink();
-                                                      // Ensure missing invite thread summaries are loaded
-                                                      final existingIds = threadsState.threads.map((t) => t.id).toSet();
-                                                      final missing = invites.where((id) => !existingIds.contains(id)).toList();
-                                                      if (missing.isNotEmpty) {
-                                                        WidgetsBinding.instance.addPostFrameCallback((_) async {
-                                                          for (final id in missing) {
-                                                            try { await threadsState.ensureThreadSummary(id); } catch (_) {}
+                                              // Use FutureBuilder to sort projects asynchronously
+                                              // This allows us to consider working state timestamps
+                                              return FutureBuilder<List<Thread>>(
+                                                future: _sortProjectsByModifiedTime(projects, threadsState),
+                                                builder: (context, snapshot) {
+                                                  final sortedProjects = snapshot.data ?? projects;
+                                                  
+                                                  return Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      // Invites section (if current user has pending invites)
+                                                      Consumer2<UserState, ThreadsState>(
+                                                        builder: (context, userState, threadsState, _) {
+                                                          final invites = userState.currentUser?.pendingInvitesToThreads ?? const [];
+                                                          if (invites.isEmpty) return const SizedBox.shrink();
+                                                          // Ensure missing invite thread summaries are loaded
+                                                          final existingIds = threadsState.threads.map((t) => t.id).toSet();
+                                                          final missing = invites.where((id) => !existingIds.contains(id)).toList();
+                                                          if (missing.isNotEmpty) {
+                                                            WidgetsBinding.instance.addPostFrameCallback((_) async {
+                                                              for (final id in missing) {
+                                                                try { await threadsState.ensureThreadSummary(id); } catch (_) {}
+                                                              }
+                                                              if (mounted) setState(() {});
+                                                            });
                                                           }
-                                                          if (mounted) setState(() {});
-                                                        });
-                                                      }
-                                                      return Column(
-                                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                                        children: [
-                                                          Padding(
-                                                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                                                          return Column(
+                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            children: [
+                                                              Padding(
+                                                                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                                                                child: Text(
+                                                                  'INVITES',
+                                                                  style: GoogleFonts.sourceSans3(
+                                                                    color: AppColors.sequencerText,
+                                                                    fontSize: 13,
+                                                                    fontWeight: FontWeight.w600,
+                                                                    letterSpacing: 1.5,
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                              ...invites.map((id) {
+                                                                final t = threadsState.threads.firstWhere(
+                                                                  (x) => x.id == id,
+                                                                  orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
+                                                                );
+                                                                return _buildInviteCard(t.users.isEmpty ? null : t, userState, id);
+                                                              }).toList(),
+                                                            ],
+                                                          );
+                                                        },
+                                                      ),
+                                      // Header with sorting controls
+                                                      Padding(
+                                                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
                                                             child: Text(
-                                                              'INVITES',
+                                                              'PATTERNS',
                                                               style: GoogleFonts.sourceSans3(
-                                                                color: AppColors.menuText,
-                                                                fontSize: 13,
+                                                                color: AppColors.sequencerText,
+                                                                fontSize: 15,
                                                                 fontWeight: FontWeight.w600,
                                                                 letterSpacing: 1.5,
                                                               ),
                                                             ),
-                                                          ),
-                                                          ...invites.map((id) {
-                                                            final t = threadsState.threads.firstWhere(
-                                                              (x) => x.id == id,
-                                                              orElse: () => Thread(id: id, name: ThreadNameGenerator.generate(id), createdAt: DateTime.now(), updatedAt: DateTime.now(), users: const [], messageIds: const [], invites: const []),
-                                                            );
-                                                            return _buildInviteCard(t.users.isEmpty ? null : t, userState, id);
-                                                          }).toList(),
-                                                        ],
-                                                      );
-                                                    },
-                                                  ),
-                                  // Header with sorting controls - aligned with tile columns
-                                                  LayoutBuilder(
-                                                    builder: (context, constraints) {
-                                                      final screenWidth = constraints.maxWidth;
+                                                      ),
                                                       
-                                      // Use same padding as tiles for perfect alignment
-                                                      final paddingLeft = screenWidth * (_tileHorizontalPaddingLeftPercent / 100);
-                                                      final paddingRight = screenWidth * (_tileHorizontalPaddingRightPercent / 100);
-                                                      
-                                                      return Padding(
-                                                        padding: EdgeInsets.only(left: paddingLeft, right: paddingRight, bottom: 8),
-                                                        child: Row(
-                                                          crossAxisAlignment: CrossAxisAlignment.center,
-                                                          children: [
-                                            // Column 1: Patterns header
-                                            Expanded(flex: _patternColumnFlex, child: _buildHeaderPatternsColumn()),
-                                            // Column 2: Sample bank header
-                                            Expanded(flex: _sampleBankColumnFlex, child: _buildHeaderSampleBankColumn()),
-                                            // Column 3: Counters header
-                                            Expanded(flex: _countersColumnFlex, child: _buildHeaderCountersColumn()),
-                                            // Column 4: Created header
-                                            Expanded(flex: _createdColumnFlex, child: _buildHeaderCreatedColumn()),
-                                            // Column 5: Modified header
-                                            Expanded(flex: _modifiedColumnFlex, child: _buildHeaderModifiedColumn()),
-                                                          ],
+                                                      // Projects list (single column)
+                                                      Expanded(
+                                                        child: ListView.separated(
+                                                          padding: EdgeInsets.all(_listPadding),
+                                                          itemCount: sortedProjects.length,
+                                                          separatorBuilder: (context, index) => SizedBox(height: _tileSpacing),
+                                                          itemBuilder: (context, index) {
+                                                            return _buildProjectCard(sortedProjects[index]);
+                                                          },
                                                         ),
-                                                      );
-                                                    },
-                                                  ),
-                                                  
-                                                  // Projects list
-                                                  Expanded(
-                                                    child: ListView.builder(
-                                                      padding: EdgeInsets.zero,
-                                                      itemCount: projects.length,
-                                                      itemBuilder: (context, index) {
-                                                        return _buildProjectCard(projects[index]);
-                                                      },
-                                                    ),
-                                                  ),
-                                                ],
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
                                               );
                                             },
                                           ),
@@ -502,9 +502,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(4),
                             decoration: BoxDecoration(
-                              color: AppColors.menuEntryBackground.withOpacity(0.9),
+                              color: AppColors.sequencerSurfaceRaised.withOpacity(0.9),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: AppColors.menuBorder),
+                              border: Border.all(color: AppColors.sequencerBorder),
                             ),
                             child: SizedBox(
                               width: 16,
@@ -512,7 +512,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
                                 valueColor: AlwaysStoppedAnimation<Color>(
-                                  AppColors.menuOnlineIndicator,
+                                  AppColors.sequencerAccent,
                                 ),
                               ),
                             ),
@@ -529,9 +529,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           if (_isOpeningProject)
             Positioned.fill(
               child: Container(
-                color: AppColors.menuPageBackground.withOpacity(0.8),
+                color: AppColors.sequencerPageBackground.withOpacity(0.8),
                 child: Center(
-                  child: CircularProgressIndicator(color: AppColors.menuPrimaryButton),
+                  child: CircularProgressIndicator(color: AppColors.sequencerAccent),
                 ),
               ),
             ),
@@ -561,9 +561,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                   ),
                 );
               },
-              backgroundColor: Colors.white, // White background
-              foregroundColor: const Color(0xFF424242), // Dark gray cross
-              elevation: 4, // Add shadow for Google-style appearance
+              backgroundColor: AppColors.sequencerAccent,
+              foregroundColor: AppColors.sequencerText,
+              elevation: 4,
               child: const Icon(Icons.add, size: 50),
             ),
           ),
@@ -572,285 +572,232 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
 
-  Widget _buildBackgroundPattern() {
-    return CustomPaint(
-      painter: _CheckerboardPatternPainter(
-        color1: _bgPatternColor1,
-        color2: _bgPatternColor2,
-        squareSize: _bgPatternSquareSize,
-        cornerRadius: _bgPatternCornerRadius,
-      ),
-      child: const SizedBox.expand(),
-    );
-  }
 
   Widget _buildProjectCard(Thread project) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenWidth = constraints.maxWidth;
-        final tileHeight = MediaQuery.of(context).size.height * (_tileHeightPercent / 100);
+    final threadsState = context.read<ThreadsState>();
+    
+    // Check if project was updated by collaborators (async, so use FutureBuilder)
+    return FutureBuilder<bool>(
+      future: threadsState.isThreadUpdatedSinceLastView(project.id),
+      builder: (context, snapshot) {
+        final hasCollaboratorUpdates = snapshot.data ?? false;
         
-        // Calculate horizontal padding
-        final paddingLeft = screenWidth * (_tileHorizontalPaddingLeftPercent / 100);
-        final paddingRight = screenWidth * (_tileHorizontalPaddingRightPercent / 100);
-        
-        return Padding(
-          padding: EdgeInsets.only(left: paddingLeft, right: paddingRight),
-          child: Container(
-          height: tileHeight,
-      margin: const EdgeInsets.only(bottom: 2),
-      decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
-        border: Border(
-          left: BorderSide(
-            color: AppColors.menuLightText.withOpacity(0.3),
-            width: 2,
+        return Container(
+          // Rebuild when project's message count changes OR when working state is saved
+          // workingStateVersion increments on each auto-save, forcing widget rebuild
+          key: ValueKey('${project.id}_${project.messageIds.length}_${threadsState.workingStateVersion}'),
+          height: _tileHeight,
+          decoration: BoxDecoration(
+            // Blue-tinted background if updated by collaborators
+            color: hasCollaboratorUpdates 
+                ? AppColors.sequencerAccent.withOpacity(0.15)
+                : _tileBackgroundColor,
+            borderRadius: BorderRadius.circular(_tileBorderRadius),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: _tileElevation * 2,
+                offset: Offset(0, _tileElevation),
+              ),
+            ],
+            border: Border.all(
+              color: AppColors.sequencerBorder,
+              width: 0.5,
+            ),
           ),
-          bottom: BorderSide(
-            color: AppColors.menuBorder,
-            width: 0.5,
-          ),
-        ),
-      ),
-      child: Material(
+          child: Material(
         color: Colors.transparent,
+        borderRadius: BorderRadius.circular(_tileBorderRadius),
         child: InkWell(
           onTap: () => _openProject(project),
           onLongPress: () => _showDeleteDialog(project),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+          borderRadius: BorderRadius.circular(_tileBorderRadius),
+              child: Column(
                 children: [
-                    // Column 1: Pattern preview
-                    Expanded(
-                      flex: _patternColumnFlex,
-                      child: _buildPatternsColumn(project, tileHeight),
-                    ),
-                    
-                    // Column 2: Sample bank grid
-                    Expanded(
-                      flex: _sampleBankColumnFlex,
-                      child: _buildSampleBankColumn(project, tileHeight),
-                    ),
-                    
-                    // Column 3: Counters - LEN & HST
-                    Expanded(
-                      flex: _countersColumnFlex,
-                      child: _buildCountersColumn(project, tileHeight),
-                    ),
-                    
-                    // Column 4: Created date
-                    Expanded(
-                      flex: _createdColumnFlex,
-                      child: _buildDateColumn(
-                      _formatDate(project.createdAt),
-                        _createdColumnDebugColor,
-                      tileHeight,
+                  // Pattern preview with overlays
+                  Expanded(
+                    child: Stack(
+                      children: [
+                        // Pattern preview fills entire tile
+                        ClipRRect(
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(_tileBorderRadius),
+                            topRight: Radius.circular(_tileBorderRadius),
+                            bottomLeft: _showFooter ? Radius.zero : Radius.circular(_tileBorderRadius),
+                            bottomRight: _showFooter ? Radius.zero : Radius.circular(_tileBorderRadius),
+                          ),
+                          child: PatternPreviewWidget(
+                            project: project,
+                            getProjectSnapshot: _getProjectSnapshot,
+                            getSampleBankColors: _getSampleBankColors,
+                            fadeOverlayColor: _tileBackgroundColor,
+                            innerPadding: const EdgeInsets.all(6),
+                          ),
+                        ),
+                        
+                        // Participants overlay (top right)
+                        _buildParticipantsOverlay(project),
+                        
+                        // Metadata overlay (top left)
+                        _buildMetadataOverlay(project),
+                      ],
                     ),
                   ),
                   
-                    // Column 5: Modified date
-                    Expanded(
-                      flex: _modifiedColumnFlex,
-                      child: _buildDateColumn(
-                      _formatDate(project.updatedAt),
-                        _modifiedColumnDebugColor,
-                      tileHeight,
-                    ),
-                  ),
+                  // Footer section (below pattern preview)
+                  if (_showFooter)
+                    _buildFooter(project),
                 ],
               ),
             ),
           ),
-          ),
         );
       },
     );
   }
   
-  Widget _buildPatternsColumn(Thread project, double tileHeight) {
-    // Calculate element padding as percentage of tile height
-    final paddingTop = tileHeight * (_patternElementPaddingTopPercent / 100);
-    final paddingBottom = tileHeight * (_patternElementPaddingBottomPercent / 100);
-    final paddingLeft = tileHeight * (_patternElementPaddingLeftPercent / 100);
-    final paddingRight = tileHeight * (_patternElementPaddingRightPercent / 100);
+  /// Builds participants overlay for top right corner
+  Widget _buildParticipantsOverlay(Thread project) {
+    final userState = context.read<UserState>();
+    final currentUserId = userState.currentUser?.id ?? '';
+    final otherParticipants = project.users
+        .where((u) => u.id != currentUserId)
+        .toList();
     
-    // Calculate inner padding for pattern preview widget (space between border and cells)
-    final innerPaddingLeft = tileHeight * (_patternPreviewInnerPaddingLeftPercent / 100);
-    final innerPaddingTop = tileHeight * (_patternPreviewInnerPaddingTopPercent / 100);
-    final innerPaddingRight = tileHeight * (_patternPreviewInnerPaddingRightPercent / 100);
-    final innerPaddingBottom = tileHeight * (_patternPreviewInnerPaddingBottomPercent / 100);
+    if (otherParticipants.isEmpty) {
+      return const SizedBox.shrink();
+    }
     
-    return Container(
-      color: _patternPreviewDebugColor,
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: paddingTop,
-          bottom: paddingBottom,
-          left: paddingLeft,
-          right: paddingRight,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: AppColors.menuBorder.withOpacity(0.3),
-              width: 0.5,
-            ),
-          ),
-          child: ClipRect(
-            child: PatternPreviewWidget(
-              project: project,
-              getProjectSnapshot: _getProjectSnapshot,
-              getSampleBankColors: _getSampleBankColors,
-              fadeOverlayColor: _patternPreviewDebugColor,
-              innerPadding: EdgeInsets.only(
-                left: innerPaddingLeft,
-                top: innerPaddingTop,
-                right: innerPaddingRight,
-                bottom: innerPaddingBottom,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildDateColumn(String dateText, Color? debugColor, double tileHeight) {
-    // Calculate element padding as percentage of tile height
-    final paddingTop = tileHeight * (_dateElementPaddingTopPercent / 100);
-    final paddingBottom = tileHeight * (_dateElementPaddingBottomPercent / 100);
-    final paddingLeft = tileHeight * (_dateElementPaddingLeftPercent / 100);
-    final paddingRight = tileHeight * (_dateElementPaddingRightPercent / 100);
+    // Position at the corner of the pattern table (accounting for innerPadding)
+    // innerPadding = 6px (from PatternPreviewWidget)
+    const patternInnerPadding = 6.0;
+    const maxVisible = 5;
     
-    return Container(
-      color: debugColor,
-      child: Padding(
-        padding: EdgeInsets.only(
-          top: paddingTop,
-          bottom: paddingBottom,
-          left: paddingLeft,
-          right: paddingRight,
-            ),
-            child: Center(
+    // Build list of participants to display (max 5 + "and N others" if needed)
+    final List<Widget> participantWidgets = [];
+    final visibleParticipants = otherParticipants.take(maxVisible).toList();
+    final remaining = otherParticipants.length - maxVisible;
+    
+    // Add visible participants
+    for (final user in visibleParticipants) {
+      participantWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
           child: Text(
-            dateText,
-            style: GoogleFonts.crimsonPro(
-              color: AppColors.menuText,
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.3,
+            user.username,
+            style: _getFontStyle(
+              _overlayFontFamily,
+              color: _overlayTextColor.withOpacity(_overlayTextOpacity),
+              fontSize: _participantsOverlayFontSize,
+              fontWeight: _overlayTextFontWeight,
             ),
-            textAlign: TextAlign.center,
           ),
+        ),
+      );
+    }
+    
+    // Add "and N others" if there are more
+    if (remaining > 0) {
+      participantWidgets.add(
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Text(
+            'and $remaining others',
+            style: _getFontStyle(
+              _overlayFontFamily,
+              color: _overlayTextColor.withOpacity(_overlayTextOpacity * 0.7),
+              fontSize: _participantsOverlayFontSize,
+              fontWeight: _overlayTextFontWeight,
+            ),
+          ),
+        ),
+      );
+    }
+    
+    return Positioned(
+      top: patternInnerPadding + _participantsOverlayVerticalOffset,
+      right: patternInnerPadding + _participantsOverlayHorizontalOffset,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(_overlayCornerRadius),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Background layer with gradient edges (positioned behind text)
+            Positioned.fill(
+              child: _buildOverlayBackground(),
+            ),
+            // Text layer with padding (defines size, drawn on top)
+            Padding(
+              padding: EdgeInsets.symmetric(
+                horizontal: _overlayHorizontalExtension,
+                vertical: _overlayVerticalExtension,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: participantWidgets,
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
   
-  Widget _buildSampleBankColumn(Thread project, double tileHeight) {
-    return FutureBuilder<Map<String, dynamic>?>(
-      future: _getProjectSnapshot(project.id),
-      builder: (context, snapshot) {
-        List<Color> sampleColors = [];
-        
-        if (snapshot.hasData && snapshot.data != null) {
-          sampleColors = _getSampleBankColors(snapshot.data!);
-        } else {
-          // Default colors if no data
-          sampleColors = _getSampleBankColors({});
-        }
-        
-        // Use centralized grid size configuration
-        final totalSamples = _sampleBankColumns * _sampleBankRows;
-        final samplesToShow = sampleColors.take(totalSamples).toList();
-        
-        // Calculate element padding as percentage of tile height
-        final paddingTop = tileHeight * (_sampleElementPaddingTopPercent / 100);
-        final paddingBottom = tileHeight * (_sampleElementPaddingBottomPercent / 100);
-        final paddingLeft = tileHeight * (_sampleElementPaddingLeftPercent / 100);
-        final paddingRight = tileHeight * (_sampleElementPaddingRightPercent / 100);
-        
-        // Calculate inner padding for sample grid (space between border and cells)
-        final innerPadding = tileHeight * (_sampleBankInnerPaddingPercent / 100);
-        
-        // Use centralized grid size
-        final cols = _sampleBankColumns;
-        final rows = _sampleBankRows;
-        
-        // Cell spacing - using fixed values from PatternPreviewWidget for consistency
-        final rowGap = PatternPreviewWidget.patternCellMargin * 4.0;
-        final colGap = PatternPreviewWidget.patternCellMargin * 4.0;
-        
-        return Container(
-          color: _sampleBankDebugColor,
-          child: Padding(
-            padding: EdgeInsets.only(
-              top: paddingTop,
-              bottom: paddingBottom,
-              left: paddingLeft,
-              right: paddingRight,
+  /// Builds metadata overlay for top left corner
+  /// Shows LEN (sections), STP (total steps), HST (message history count)
+  Widget _buildMetadataOverlay(Thread project) {
+    // Helper to calculate font size based on digit count
+    // 4 digits or less: use normal size, more than 4: scale down to fit
+    double _getNumberFontSize(int number) {
+      final digitCount = number.toString().length;
+      if (digitCount <= 4) {
+        return _metadataOverlayNumberFontSize;
+      } else {
+        // Scale down proportionally for numbers > 4 digits
+        return _metadataOverlayNumberFontSize * (4.0 / digitCount);
+      }
+    }
+    
+    // Helper to build a metric row with fixed-width number container
+    Widget _buildMetricRow(String label, int value) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: _getFontStyle(
+              _overlayFontFamily,
+              color: _overlayTextColor.withOpacity(_overlayTextOpacity * 0.7),
+              fontSize: _metadataOverlayLabelFontSize,
+              fontWeight: _overlayTextFontWeight,
+              letterSpacing: 0.5,
             ),
-            child: Center(
-              child: FractionallySizedBox(
-                widthFactor: _sampleBankWidthPercent / 100,   // Width control
-                heightFactor: _sampleBankHeightPercent / 100, // Height control
-                child: Container(
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: AppColors.menuBorder.withOpacity(0.3),
-                      width: 0.5,
-                    ),
-                  ),
-                  child: Padding(
-                    padding: EdgeInsets.all(innerPadding),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.max,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (int row = 0; row < rows; row++) ...[
-                          if (row > 0) SizedBox(height: rowGap), // Gap between rows
-                          Expanded(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.max,
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (int col = 0; col < cols; col++) ...[
-                                  if (col > 0) SizedBox(width: colGap), // Gap between columns
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: () {
-                                          final index = row * cols + col;
-                                          return index < samplesToShow.length
-                                              ? samplesToShow[index]
-                                              : AppColors.sequencerCellEmpty;
-                                        }(),
-                                        borderRadius: BorderRadius.circular(0),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
+          ),
+          const SizedBox(width: 4),
+          // Fixed-width container for numbers (sized for 4 digits)
+          SizedBox(
+            width: _metadataOverlayNumberFontSize * 2.4, // Approximately 4 digits width
+            child: Text(
+              '$value',
+              textAlign: TextAlign.end,
+              style: _getFontStyle(
+                _overlayFontFamily,
+                color: _overlayTextColor.withOpacity(_overlayTextOpacity),
+                fontSize: _getNumberFontSize(value),
+                fontWeight: _overlayTextFontWeight,
               ),
             ),
           ),
-        );
-      },
-    );
-  }
-  
-  Widget _buildCountersColumn(Thread project, double tileHeight) {
+        ],
+      );
+    }
+    
     return FutureBuilder<Map<String, dynamic>?>(
       future: _getProjectSnapshot(project.id),
       builder: (context, snapshot) {
-        int sectionsCount = 0;
+        int sectionsCount = 0; // LEN
+        int totalSteps = 0; // STP
         
         if (snapshot.hasData && snapshot.data != null) {
           try {
@@ -858,127 +805,63 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
             final table = source?['table'] as Map<String, dynamic>?;
             final sections = table?['sections'] as List<dynamic>?;
             sectionsCount = sections?.length ?? 0;
+            
+            // Calculate total steps across all sections
+            if (sections != null) {
+              for (var section in sections) {
+                if (section is Map<String, dynamic>) {
+                  final numSteps = section['num_steps'] as int? ?? 0;
+                  totalSteps += numSteps;
+                }
+              }
+            }
           } catch (e) {
             sectionsCount = 0;
+            totalSteps = 0;
           }
         }
         
-        final historyCount = project.messageIds.length;
+        // HST: Message count from thread
+        final messageCount = project.messageIds.length;
         
-        // Calculate element padding as percentage of tile height
-        final paddingTop = tileHeight * (_countersElementPaddingTopPercent / 100);
-        final paddingBottom = tileHeight * (_countersElementPaddingBottomPercent / 100);
-        final paddingLeft = tileHeight * (_countersElementPaddingLeftPercent / 100);
-        final paddingRight = tileHeight * (_countersElementPaddingRightPercent / 100);
+        // Position at the corner of the pattern table (accounting for innerPadding)
+        // innerPadding = 6px (from PatternPreviewWidget)
+        const patternInnerPadding = 6.0;
         
-        return Container(
-          color: _countersDebugColor,
-          child: Padding(
-      padding: EdgeInsets.only(
-        top: paddingTop,
-        bottom: paddingBottom,
-        left: paddingLeft,
-        right: paddingRight,
-      ),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final columnWidth = constraints.maxWidth;
-                final columnHeight = constraints.maxHeight;
-                
-                // Calculate internal spacing as percentages
-                final labelGap = columnWidth * (_counterLabelGapPercent / 100);
-                final rowGap = columnHeight * (_counterRowGapPercent / 100);
-                
-                return Center(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: AppColors.menuBorder.withOpacity(0.3),
-                        width: 0.5,
-                      ),
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: labelGap, vertical: rowGap * 2),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // LEN counter - using Expanded for overflow-safe layout
-                        Row(
-                          mainAxisSize: MainAxisSize.max,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Label with intrinsic width
-                            Text(
-                              'LEN:',
-                              style: GoogleFonts.crimsonPro(
-                                color: AppColors.menuLightText,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                            SizedBox(width: labelGap),
-                            // Number takes remaining space with FittedBox for overflow prevention
-                            // FittedBox with scaleDown only scales if needed - otherwise displays at full size
-                            Expanded(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '$sectionsCount',
-                                  style: GoogleFonts.crimsonPro(
-                                    color: AppColors.menuText,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: rowGap),
-                        // HST counter - using Expanded for overflow-safe layout
-                        Row(
-                          mainAxisSize: MainAxisSize.max,
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            // Label with intrinsic width
-                            Text(
-                              'HST:',
-                              style: GoogleFonts.crimsonPro(
-                                color: AppColors.menuLightText,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w400,
-                                letterSpacing: 0.8,
-                              ),
-                            ),
-                            SizedBox(width: labelGap),
-                            // Number takes remaining space with FittedBox for overflow prevention
-                            // FittedBox with scaleDown only scales if needed - otherwise displays at full size
-                            Expanded(
-                              child: FittedBox(
-                                fit: BoxFit.scaleDown,
-                                alignment: Alignment.centerLeft,
-                                child: Text(
-                                  '$historyCount',
-                                  style: GoogleFonts.crimsonPro(
-                                    color: AppColors.menuText,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                    letterSpacing: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+        return Positioned(
+          top: patternInnerPadding + _metadataOverlayVerticalOffset,
+          left: patternInnerPadding + _metadataOverlayHorizontalOffset,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(_overlayCornerRadius),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Background layer with gradient edges (positioned behind text)
+                Positioned.fill(
+                  child: _buildOverlayBackground(),
+                ),
+                // Text layer with padding (defines size, drawn on top)
+                Padding(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: _overlayHorizontalExtension,
+                    vertical: _overlayVerticalExtension,
                   ),
-                );
-              },
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // LEN (sections count)
+                      _buildMetricRow('LEN', sectionsCount),
+                      const SizedBox(height: 2),
+                      // STP (total steps)
+                      _buildMetricRow('STP', totalSteps),
+                      const SizedBox(height: 2),
+                      // HST (message history count)
+                      _buildMetricRow('HST', messageCount),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         );
@@ -986,36 +869,362 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     );
   }
   
-  // Mock project for testing layer boundaries
+  /// Builds footer section showing created and modified dates
+  Widget _buildFooter(Thread project) {
+    // Format absolute dates with slashes
+    String formatDate(DateTime date) {
+      return '${date.year}/${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}';
+    }
+    
+    // Format relative time for recent dates (< 48 hours)
+    String formatRelativeTime(DateTime date) {
+      final now = DateTime.now();
+      final difference = now.difference(date);
+      
+      // If more than 48 hours, show absolute date
+      if (difference.inHours >= 48) {
+        return formatDate(date);
+      }
+      
+      // Less than 48 hours - show relative time
+      if (difference.inSeconds < 5) {
+        return 'just now'; // Show "just now" instead of "0s ago"
+      } else if (difference.inSeconds < 60) {
+        return '${difference.inSeconds}s ago';
+      } else if (difference.inMinutes < 60) {
+        return '${difference.inMinutes}m ago';
+      } else {
+        return '${difference.inHours}h ago';
+      }
+    }
+    
+    final createdDate = formatDate(project.createdAt);
+    
+    final footerColor = _footerBackgroundColor.withOpacity(_footerBackgroundOpacity);
+    debugPrint('🎨 [FOOTER] Background color: $footerColor, opacity: $_footerBackgroundOpacity');
+    
+    return Container(
+      height: _footerHeight,
+      decoration: BoxDecoration(
+        color: footerColor,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(_tileBorderRadius),
+          bottomRight: Radius.circular(_tileBorderRadius),
+        ),
+      ),
+      padding: EdgeInsets.symmetric(horizontal: _footerHorizontalPadding),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Created date (left)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'CREATED',
+                style: _getFontStyle(
+                  _footerFontFamily,
+                  color: _footerTextColor.withOpacity(_footerLabelOpacity),
+                  fontSize: _footerLabelFontSize,
+                  fontWeight: _overlayTextFontWeight,
+                  letterSpacing: 0.5,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                createdDate,
+                style: _getFontStyle(
+                  _footerFontFamily,
+                  color: _footerTextColor.withOpacity(_footerTextOpacity),
+                  fontSize: _footerDateFontSize,
+                  fontWeight: _overlayTextFontWeight,
+                ),
+              ),
+            ],
+          ),
+          // Modified date (right) - Shows working state timestamp if newer
+          // Uses FutureBuilder for async timestamp fetch + ValueListenableBuilder for periodic updates
+          FutureBuilder<DateTime>(
+            key: ValueKey('modified_${project.id}_${context.read<ThreadsState>().workingStateVersion}'),
+            future: context.read<ThreadsState>().getThreadModifiedAt(project.id, project.updatedAt),
+            builder: (context, snapshot) {
+              final timestamp = snapshot.data ?? project.updatedAt;
+              
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'MODIFIED',
+                    style: _getFontStyle(
+                      _footerFontFamily,
+                      color: _footerTextColor.withOpacity(_footerLabelOpacity),
+                      fontSize: _footerLabelFontSize,
+                      fontWeight: _overlayTextFontWeight,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  // ValueListenableBuilder only rebuilds this Text widget every 10 seconds
+                  ValueListenableBuilder<int>(
+                    valueListenable: _timestampTick,
+                    builder: (context, tick, child) {
+                      // Recalculate relative time on each tick
+                      final modifiedDateText = formatRelativeTime(timestamp);
+                      return Text(
+                        modifiedDateText,
+                        style: _getFontStyle(
+                          _footerFontFamily,
+                          color: _footerTextColor.withOpacity(_footerTextOpacity),
+                          fontSize: _footerDateFontSize,
+                          fontWeight: _overlayTextFontWeight,
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+  
+  /// Builds overlay background with gradient edges
+  /// Supports both horizontal and vertical fade with independent controls
+  /// Uses CustomPaint for proper gradient composition
+  Widget _buildOverlayBackground() {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _OverlayGradientPainter(
+          backgroundColor: _overlayBackgroundColor,
+          opacity: _overlayBackgroundOpacity,
+          horizontalFade: _overlayHorizontalFadeWidth,
+          verticalFade: _overlayVerticalFadeHeight,
+          cornerRadius: _overlayCornerRadius,
+        ),
+        child: Container(),
+      ),
+    );
+  }
+  
+  
+  // Mock projects for testing layer boundaries
   void _addMockProject(List<Thread> projects) {
-    const mockId = 'mock-layer-test-project';
+    const mockId1 = 'mock-layer-test-project-1';
+    const mockId2 = 'mock-layer-test-project-2';
     
     // Only add if not already present
-    if (projects.any((p) => p.id == mockId)) return;
+    final existingIds = projects.map((p) => p.id).toSet();
     
-    // Create mock project
-    final mockProject = Thread(
-      id: mockId,
-      name: '🧪 MOCK: Layer Test (2,6,5,7,8,4,2,1)',
-      createdAt: DateTime.now().subtract(const Duration(days: 100)),
-      updatedAt: DateTime.now(),
-      users: const [],
-      messageIds: const ['msg1', 'msg2', 'msg3', 'msg4', 'msg5', 'msg6', 'msg7', 'msg7', 'msg7', 'msg7', 'msg7', 'msg7', 'msg7', 'msg7', 'msg7'], // 7 messages for HST counter
-      invites: const [],
-      isLocal: true,
-    );
+    // Mock project 1: With 3 participants
+    if (!existingIds.contains(mockId1)) {
+      final mockProject1 = Thread(
+        id: mockId1,
+        name: '🧪 MOCK: 3-Digit Test (LEN=123, HST=456)',
+        createdAt: DateTime.now().subtract(const Duration(days: 100)),
+        updatedAt: DateTime.now().subtract(const Duration(hours: 5, minutes: 30)), // 5.5 hours ago
+        users: [
+          ThreadUser(
+            id: 'mock-user-1',
+            username: 'Vsevolod',
+            name: 'Alice Johnson',
+            joinedAt: DateTime.now().subtract(const Duration(days: 95)),
+          ),
+          ThreadUser(
+            id: 'mock-user-2',
+            username: 'superpuper bro hello',
+            name: 'Bob Smith',
+            joinedAt: DateTime.now().subtract(const Duration(days: 90)),
+          ),
+          ThreadUser(
+            id: 'mock-user-3',
+            username: 'User3',
+            name: 'Charlie Brown',
+            joinedAt: DateTime.now().subtract(const Duration(days: 85)),
+          ),
+          ThreadUser(
+            id: 'mock-user-3',
+            username: 'User3',
+            name: 'Charlie Brown',
+            joinedAt: DateTime.now().subtract(const Duration(days: 85)),
+          ),
+          ThreadUser(
+            id: 'mock-user-3',
+            username: 'User3',
+            name: 'Charlie Brown',
+            joinedAt: DateTime.now().subtract(const Duration(days: 85)),
+          ),
+          ThreadUser(
+            id: 'mock-user-3',
+            username: 'User3',
+            name: 'Charlie Brown',
+            joinedAt: DateTime.now().subtract(const Duration(days: 85)),
+          ),
+        ],
+        messageIds: List.generate(456, (i) => 'msg$i'), // 456 messages for HST counter (3 digits)
+        invites: const [],
+        isLocal: true,
+      );
+      projects.insert(0, mockProject1);
+    }
     
-    projects.insert(0, mockProject); // Add at top
+    // Mock project 2: Solo project (no additional participants)
+    if (!existingIds.contains(mockId2)) {
+      final userState = context.read<UserState>();
+      final currentUserId = userState.currentUser?.id ?? 'mock-current-user';
+      final currentUsername = userState.currentUser?.username ?? 'CurrentUser';
+      
+      final mockProject2 = Thread(
+        id: mockId2,
+        name: '🧪 MOCK: Solo Project (64 steps)',
+        createdAt: DateTime.now().subtract(const Duration(days: 50)),
+        updatedAt: DateTime.now().subtract(const Duration(minutes: 25)), // 25 minutes ago
+        users: [
+          ThreadUser(
+            id: currentUserId,
+            username: currentUsername,
+            name: 'Current User',
+            joinedAt: DateTime.now().subtract(const Duration(days: 50)),
+          ),
+        ],
+        messageIds: List.generate(64, (i) => 'msg$i'), // 64 messages
+        invites: const [],
+        isLocal: true,
+      );
+      projects.insert(1, mockProject2); // Add as second item
+    }
+  }
+  
+  /// Extracts sample bank colors from snapshot data
+  /// Follows schema: sample_bank has 'samples' array with 'loaded' flag and optional 'color'
+  /// Returns colors for ALL 25 slots (A-Y) - slot 25 (Z) is internal preview slot
+  /// ONLY loaded samples have colors - unloaded slots return empty cell color
+  /// Pattern preview expects array index to match sample slot number!
+  /// This function matches the signature expected by PatternPreviewWidget
+  List<Color> _getSampleBankColors(Map<String, dynamic> snapshotData) {
+    final List<Color> colors = [];
     
-    // Create mock snapshot with 8 layers: [2, 6, 5, 7, 8, 4, 2, 1] = 35 columns
-    final mockSnapshot = {
+    try {
+      // Extract sample_bank from snapshot
+      final source = snapshotData['source'] as Map<String, dynamic>?;
+      if (source == null) {
+        // Return empty colors for all 25 slots
+        return List.generate(25, (i) => AppColors.sequencerCellEmpty);
+      }
+      
+      final sampleBankData = source['sample_bank'] as Map<String, dynamic>?;
+      if (sampleBankData == null) {
+        return List.generate(25, (i) => AppColors.sequencerCellEmpty);
+      }
+      
+      final samples = sampleBankData['samples'] as List<dynamic>?;
+      if (samples == null) {
+        return List.generate(25, (i) => AppColors.sequencerCellEmpty);
+      }
+      
+      // Process first 25 slots (A-Y) - skip slot 25 (Z) which is internal preview
+      // ONLY use color for loaded samples (project-specific colors)
+      // Pattern preview uses array index as sample_slot number
+      final slotsToProcess = samples.length.clamp(0, 25);
+      int loadedCount = 0;
+      int coloredCount = 0;
+      
+      for (int i = 0; i < slotsToProcess; i++) {
+        final sample = samples[i];
+        if (sample is Map<String, dynamic>) {
+          final loaded = sample['loaded'] as bool? ?? false;
+          final hasColor = sample.containsKey('color');
+          
+          if (loaded) loadedCount++;
+          
+          // ONLY use color if sample is loaded AND has color field
+          if (loaded && hasColor) {
+            final colorHex = sample['color'] as String;
+            try {
+              final color = _hexToColor(colorHex);
+              colors.add(color);
+              coloredCount++;
+              debugPrint('✅ [COLOR] Slot $i: $colorHex');
+            } catch (e) {
+              debugPrint('❌ [COLOR] Slot $i parse error: $e');
+              colors.add(AppColors.sequencerCellEmpty);
+            }
+          } else {
+            // Use empty cell color for unloaded slots
+            colors.add(AppColors.sequencerCellEmpty);
+            if (loaded && !hasColor) {
+              debugPrint('⚠️ [COLOR] Slot $i: LOADED but NO COLOR (old format?)');
+            }
+          }
+        } else {
+          colors.add(AppColors.sequencerCellEmpty);
+        }
+      }
+      
+      debugPrint('🎨 [COLOR] Summary: $loadedCount loaded, $coloredCount with colors');
+      
+      // If we have fewer than 25 colors, fill the rest with empty color
+      while (colors.length < 25) {
+        colors.add(AppColors.sequencerCellEmpty);
+      }
+    } catch (e) {
+      debugPrint('❌ [PROJECTS] Error parsing sample bank colors: $e');
+      // Return empty colors on error
+      return List.generate(25, (i) => AppColors.sequencerCellEmpty);
+    }
+    
+    return colors;
+  }
+  
+  /// Convert hex color string to Color object (e.g., "#FF5733" -> Color)
+  Color _hexToColor(String hex) {
+    final buffer = StringBuffer();
+    if (hex.startsWith('#')) {
+      buffer.write(hex.substring(1)); // Remove #
+    } else {
+      buffer.write(hex);
+    }
+    return Color(int.parse(buffer.toString(), radix: 16) + 0xFF000000);
+  }
+  Future<Map<String, dynamic>?> _getProjectSnapshot(String threadId) async {
+    try {
+      // Special handling for mock projects
+      if (threadId == 'mock-layer-test-project-1') {
+        return _createMockSnapshot(sectionsCount: 123);
+      }
+      if (threadId == 'mock-layer-test-project-2') {
+        return _createMockSnapshot(sectionsCount: 64);
+      }
+      
+      // Use unified cache from ThreadsState (no local caching!)
+      final threadsState = context.read<ThreadsState>();
+      final snapshot = await threadsState.loadProjectSnapshot(threadId);
+      
+      if (snapshot == null || snapshot.isEmpty) {
+        debugPrint('📸 [PROJECTS] No snapshot for $threadId - returning empty pattern');
+        // Return an empty but valid snapshot structure for threads with no messages
+        return _createEmptySnapshot();
+      }
+      
+      debugPrint('📸 [PROJECTS] Loaded snapshot for $threadId: success');
+      return snapshot;
+    } catch (e) {
+      debugPrint('❌ [PROJECTS] Error loading snapshot for $threadId: $e');
+      // Return empty snapshot instead of null to show empty grid
+      return _createEmptySnapshot();
+    }
+  }
+  
+  /// Create mock snapshot with colors for testing
+  Map<String, dynamic> _createMockSnapshot({int sectionsCount = 123}) {
+    return {
       'source': {
         'table': {
-          'sections': [
-            {'num_steps': 8, 'start_step': 0},
-            {'num_steps': 8, 'start_step': 8},
-            {'num_steps': 8, 'start_step': 16}
-          ],
+          'sections': List.generate(sectionsCount, (i) => {
+            'num_steps': 16,
+            'start_step': i * 16,
+          }),
           'layers': [
             [
               {'len': 2},  // Layer 1: 2 columns
@@ -1028,250 +1237,74 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               {'len': 1},  // Layer 8: 1 column
             ]
           ],
-          'table_cells': List.generate(8, (row) {
-            // Create 8 rows, each with some colored cells
+          'table_cells': List.generate(16, (row) {
             return List.generate(35, (col) {
-              // Add some cells with colors (sample slots)
+              // Add some cells with sample slots
               if ((row + col) % 3 == 0) {
-                return {'sample_slot': (col % 8)}; // Vary sample slots
+                return {'sample_slot': (col % 8)};
               }
-              return null; // Empty cell
+              return null;
             });
           }),
         },
         'sample_bank': {
-          'samples': List.generate(10, (i) => {
-            'color': {
-              'r': ((i * 30) % 255) / 255.0,
-              'g': ((i * 60) % 255) / 255.0,
-              'b': ((i * 90) % 255) / 255.0,
-            }
+          'max_slots': 26,
+          'samples': List.generate(26, (i) {
+            // First 10 slots loaded with colors
+            final loaded = i < 10;
+            return {
+              'loaded': loaded,
+              'settings': {
+                'volume': 1.0,
+                'pitch': 1.0,
+              },
+              if (loaded) 'color': '#${((i * 30) % 255).toRadixString(16).padLeft(2, '0')}'
+                                      '${((i * 60) % 255).toRadixString(16).padLeft(2, '0')}'
+                                      '${((i * 90) % 255).toRadixString(16).padLeft(2, '0')}'.toUpperCase(),
+            };
           }),
         },
       },
     };
-    
-    // Cache the mock snapshot
-    _snapshotFutures[mockId] = Future.value(mockSnapshot);
   }
   
-  // Header Column Builders
-  
-  Widget _buildHeaderPatternsColumn() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-            'PATTERNS',
-              style: GoogleFonts.sourceSans3(
-                color: AppColors.menuText,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 1.5,
+  /// Creates an empty snapshot structure for threads with no messages
+  /// This allows pattern preview to show an empty grid instead of error state
+  /// Follows schema: sample_bank.json
+  Map<String, dynamic> _createEmptySnapshot() {
+    return {
+      'source': {
+        'table': {
+          'sections_count': 1,
+          'sections': [
+            {'start_step': 0, 'num_steps': 16}
+          ],
+          'layers': [
+            [4, 4, 4, 4] // 4 layers with 4 columns each (16 total)
+          ],
+          'table_cells': List.generate(
+            16, // 16 steps
+            (step) => List.generate(
+              16, // 16 columns
+              (col) => {
+                'sample_slot': -1, // Empty cell
+                'settings': {'volume': -1.0, 'pitch': -1.0}
+              },
             ),
           ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildHeaderSampleBankColumn() {
-    return const SizedBox.shrink(); // Empty header
-  }
-  
-  Widget _buildHeaderCountersColumn() {
-    return const SizedBox.shrink(); // Empty header
-  }
-  
-  Widget _buildHeaderCreatedColumn() {
-    return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              if (_sortBy == 'created') {
-                _sortAscending = !_sortAscending;
-              } else {
-                _sortBy = 'created';
-                _sortAscending = false;
-              }
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                    'CREATED',
-                      style: GoogleFonts.sourceSans3(
-                        color: _sortBy == 'created' 
-                            ? AppColors.menuText 
-                            : AppColors.menuLightText,
-                        fontSize: 10,
-                        fontWeight: _sortBy == 'created'
-                            ? FontWeight.w500
-                            : FontWeight.w400,
-                      letterSpacing: 1.3,
-                      ),
-                    ),
-                    if (_sortBy == 'created')
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Icon(
-                          _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                          size: 12,
-                          color: AppColors.menuText,
-                        ),
-                      ),
-                  ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildHeaderModifiedColumn() {
-    return Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            setState(() {
-              if (_sortBy == 'modified') {
-                _sortAscending = !_sortAscending;
-              } else {
-                _sortBy = 'modified';
-                _sortAscending = false;
-              }
-            });
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-            child: Center(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                    'MODIFIED',
-                      style: GoogleFonts.sourceSans3(
-                        color: _sortBy == 'modified' 
-                            ? AppColors.menuText 
-                            : AppColors.menuLightText,
-                        fontSize: 10,
-                        fontWeight: _sortBy == 'modified'
-                            ? FontWeight.w500
-                            : FontWeight.w400,
-                      letterSpacing: 1.3,
-                      ),
-                    ),
-                    if (_sortBy == 'modified')
-                      Padding(
-                        padding: const EdgeInsets.only(left: 4),
-                        child: Icon(
-                          _sortAscending ? Icons.arrow_upward : Icons.arrow_downward,
-                          size: 12,
-                          color: AppColors.menuText,
-                        ),
-                      ),
-                  ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-  
-  List<Color> _getSampleBankColors(Map<String, dynamic> snapshotData) {
-    // Default color palette (same as in SampleBankState)
-    return const [
-      Color(0xFFE57373), // Red
-      Color(0xFFF06292), // Pink
-      Color(0xFFBA68C8), // Purple
-      Color(0xFF9575CD), // Deep Purple
-      Color(0xFF7986CB), // Indigo
-      Color(0xFF64B5F6), // Blue
-      Color(0xFF4FC3F7), // Light Blue
-      Color(0xFF4DD0E1), // Cyan
-      Color(0xFF4DB6AC), // Teal
-      Color(0xFF81C784), // Green
-      Color(0xFFAED581), // Light Green
-      Color(0xFFDCE775), // Lime
-      Color(0xFFFFF176), // Yellow
-      Color(0xFFFFD54F), // Amber
-      Color(0xFFFFB74D), // Orange
-      Color(0xFFFF8A65), // Deep Orange
-      Color(0xFFA1887F), // Brown
-      Color(0xFFE0E0E0), // Grey
-      Color(0xFF90A4AE), // Blue Grey
-      Color(0xFFEF5350), // Red (alt)
-      Color(0xFFEC407A), // Pink (alt)
-      Color(0xFFAB47BC), // Purple (alt)
-      Color(0xFF7E57C2), // Deep Purple (alt)
-      Color(0xFF5C6BC0), // Indigo (alt)
-      Color(0xFF42A5F5), // Blue (alt)
-      Color(0xFF29B6F6), // Light Blue (alt)
-    ];
-  }
-  
-  Future<Map<String, dynamic>?> _getProjectSnapshot(String threadId) {
-    // Return cached future if already loading/loaded
-    if (_snapshotFutures.containsKey(threadId)) {
-      return _snapshotFutures[threadId]!;
-    }
-    
-    // Create and cache the future
-    final future = _fetchProjectSnapshot(threadId);
-    _snapshotFutures[threadId] = future;
-    return future;
-  }
-  
-  Future<Map<String, dynamic>?> _fetchProjectSnapshot(String threadId) async {
-    try {
-      final threadsState = context.read<ThreadsState>();
-      final snapshot = await threadsState.loadProjectSnapshot(threadId);
-      debugPrint('📸 [PROJECTS] Loaded snapshot for $threadId: ${snapshot != null ? "success" : "null"}');
-      return snapshot;
-    } catch (e) {
-      debugPrint('❌ [PROJECTS] Error loading snapshot for $threadId: $e');
-      return null;
-    }
-  }
-  
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final dateDay = DateTime(date.year, date.month, date.day);
-    
-    if (dateDay == today) {
-      // Show relative time for today (e.g., "2h ago", "5m ago")
-      final difference = now.difference(date);
-      if (difference.inMinutes < 1) {
-        return 'just now';
-      } else if (difference.inMinutes < 60) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else {
-      return 'Today';
-      }
-    } else if (dateDay == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
-    } else {
-      // Always show year in short format (e.g., "8/17/25")
-      final yearShort = date.year % 100; // Get last 2 digits of year
-      return '${date.month}/${date.day}/${yearShort.toString().padLeft(2, '0')}';
-    }
+        },
+        'sample_bank': {
+          'max_slots': 26,  // Schema requires 26 (includes preview slot Z)
+          'samples': List.generate(26, (i) => {
+            'loaded': false,  // All slots empty
+            'settings': {
+              'volume': 1.0,
+              'pitch': 1.0,
+            },
+          }),
+        },
+      },
+    };
   }
 
   Widget _buildInviteCard(Thread? thread, UserState userState, String threadId) {
@@ -1335,16 +1368,16 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         }
 
         return Container(
-          margin: const EdgeInsets.only(bottom: 2),
+          margin: const EdgeInsets.only(bottom: 4),
           decoration: BoxDecoration(
-            color: AppColors.menuEntryBackground,
+            color: AppColors.sequencerSurfaceRaised,
             border: Border(
               left: BorderSide(
-                color: AppColors.menuLightText.withOpacity(0.3),
+                color: AppColors.sequencerAccent.withOpacity(0.5),
                 width: 2,
               ),
               bottom: BorderSide(
-                color: AppColors.menuBorder,
+                color: AppColors.sequencerBorder,
                 width: 0.5,
               ),
             ),
@@ -1381,7 +1414,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       Text(
                         '${thread?.messageIds.length ?? 0}',
                         style: GoogleFonts.sourceSans3(
-                          color: AppColors.menuLightText,
+                          color: AppColors.sequencerLightText,
                           fontSize: 10,
                           fontWeight: FontWeight.w500,
                         ),
@@ -1395,13 +1428,13 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                           margin: const EdgeInsets.only(left: 6),
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: AppColors.menuBorder.withOpacity(0.5),
+                            color: AppColors.sequencerBorder.withOpacity(0.5),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Text(
                             'invite',
                             style: GoogleFonts.sourceSans3(
-                              color: AppColors.menuLightText,
+                              color: AppColors.sequencerLightText,
                               fontSize: 12,
                               fontWeight: FontWeight.w500,
                             ),
@@ -1416,33 +1449,33 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                       decoration: BoxDecoration(
-                        color: AppColors.menuPrimaryButton.withOpacity(0.15),
+                        color: AppColors.sequencerAccent.withOpacity(0.15),
                         borderRadius: BorderRadius.circular(4),
                         border: Border.all(
-                          color: AppColors.menuPrimaryButton,
+                          color: AppColors.sequencerAccent,
                           width: 1.5,
                         ),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.person, color: AppColors.menuPrimaryButton, size: 16),
+                          Icon(Icons.person, color: AppColors.sequencerAccent, size: 16),
                           const SizedBox(width: 8),
-                          Expanded(
+                            Expanded(
                             child: TextField(
                               controller: usernameController,
                               style: GoogleFonts.sourceSans3(
-                                color: AppColors.menuText,
+                                color: AppColors.sequencerText,
                                 fontSize: 14,
                               ),
                               decoration: InputDecoration(
                                 hintText: 'Create username to accept',
                                 hintStyle: GoogleFonts.sourceSans3(
-                                  color: AppColors.menuLightText,
+                                  color: AppColors.sequencerLightText,
                                   fontSize: 14,
                                 ),
                                 errorText: usernameError,
                                 errorStyle: GoogleFonts.sourceSans3(
-                                  color: AppColors.menuErrorColor,
+                                  color: Colors.red,
                                   fontSize: 11,
                                 ),
                                 border: InputBorder.none,
@@ -1465,7 +1498,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
                                   valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.menuPrimaryButton,
+                                    AppColors.sequencerAccent,
                                   ),
                                 ),
                               ),
@@ -1482,9 +1515,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                     children: [
                       ActionButton(
                         label: 'ACCEPT',
-                        background: AppColors.menuPrimaryButton,
-                        border: AppColors.menuPrimaryButton,
-                        textColor: AppColors.menuPrimaryButtonText,
+                        background: AppColors.sequencerAccent,
+                        border: AppColors.sequencerAccent,
+                        textColor: AppColors.sequencerText,
                         height: 32,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         fontSize: 12,
@@ -1493,9 +1526,9 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
                       const SizedBox(width: 8),
                       ActionButton(
                         label: 'DENY',
-                        background: AppColors.menuSecondaryButton,
-                        border: AppColors.menuSecondaryButtonBorder,
-                        textColor: AppColors.menuSecondaryButtonText,
+                        background: AppColors.sequencerSurfaceBase,
+                        border: AppColors.sequencerBorder,
+                        textColor: AppColors.sequencerText,
                         height: 32,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         fontSize: 12,
@@ -1530,18 +1563,18 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
     final others = project.users.where((u) => u.id != me).map((u) => u.username).toList();
     if (others.isEmpty) return const SizedBox.shrink();
     final List<Widget> chips = [];
-    const maxVisible = 2;
+    const maxVisible = 5;
     for (final username in others.take(maxVisible)) {
       chips.add(Container(
         margin: const EdgeInsets.only(left: 6),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.menuBorder.withOpacity(0.5),
+          color: AppColors.sequencerBorder.withOpacity(0.5),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
           username,
-          style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 12, fontWeight: FontWeight.w500),
+          style: GoogleFonts.sourceSans3(color: AppColors.sequencerLightText, fontSize: 12, fontWeight: FontWeight.w500),
           overflow: TextOverflow.ellipsis,
         ),
       ));
@@ -1552,17 +1585,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
         margin: const EdgeInsets.only(left: 6),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: AppColors.menuBorder.withOpacity(0.3),
+          color: AppColors.sequencerBorder.withOpacity(0.3),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
-          '+$remaining',
-          style: GoogleFonts.sourceSans3(color: AppColors.menuLightText, fontSize: 12, fontWeight: FontWeight.w500),
+          'and $remaining others',
+          style: GoogleFonts.sourceSans3(color: AppColors.sequencerLightText, fontSize: 12, fontWeight: FontWeight.w500),
         ),
       ));
     }
     return SizedBox(
-      width: 140,
+      width: 280,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         physics: const ClampingScrollPhysics(),
@@ -1633,11 +1666,11 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: AppColors.menuPageBackground,
+          backgroundColor: AppColors.sequencerSurfaceRaised,
           title: Text(
             'Delete Project',
             style: GoogleFonts.sourceSans3(
-              color: AppColors.menuText,
+              color: AppColors.sequencerText,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -1645,7 +1678,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
           content: Text(
             'Are you sure you want to delete this pattern? This will delete it for all participants.',
             style: GoogleFonts.sourceSans3(
-              color: AppColors.menuLightText,
+              color: AppColors.sequencerLightText,
               fontSize: 14,
               fontWeight: FontWeight.w400,
             ),
@@ -1656,7 +1689,7 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
               child: Text(
                 'Cancel',
                 style: GoogleFonts.sourceSans3(
-                  color: AppColors.menuLightText,
+                  color: AppColors.sequencerLightText,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1738,69 +1771,92 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
 }
 
 // ============================================================================
-// CHECKERBOARD PATTERN PAINTER
+// OVERLAY GRADIENT PAINTER
 // ============================================================================
-// Custom painter for creating a checkerboard/grid background pattern
-// Uses two alternating colors with configurable square size and corner roundness
+// Custom painter for overlay backgrounds with gradient edges
+// Properly composites horizontal and vertical gradients for fade effect
 
-class _CheckerboardPatternPainter extends CustomPainter {
-  final Color color1;
-  final Color color2;
-  final double squareSize;
+class _OverlayGradientPainter extends CustomPainter {
+  final Color backgroundColor;
+  final double opacity;
+  final double horizontalFade;
+  final double verticalFade;
   final double cornerRadius;
 
-  _CheckerboardPatternPainter({
-    required this.color1,
-    required this.color2,
-    required this.squareSize,
+  _OverlayGradientPainter({
+    required this.backgroundColor,
+    required this.opacity,
+    required this.horizontalFade,
+    required this.verticalFade,
     required this.cornerRadius,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint1 = Paint()
-      ..color = color1
-      ..style = PaintingStyle.fill;
-      
-    final paint2 = Paint()
-      ..color = color2
-      ..style = PaintingStyle.fill;
-
-    // Calculate number of squares needed to cover the canvas
-    final numCols = (size.width / squareSize).ceil() + 1;
-    final numRows = (size.height / squareSize).ceil() + 1;
-
-    // Draw checkerboard pattern
-    for (int row = 0; row < numRows; row++) {
-      for (int col = 0; col < numCols; col++) {
-        // Alternate colors based on row + col (checkerboard pattern)
-        final isEvenSquare = (row + col) % 2 == 0;
-        final paint = isEvenSquare ? paint1 : paint2;
-        
-        final left = col * squareSize;
-        final top = row * squareSize;
-        final rect = Rect.fromLTWH(left, top, squareSize, squareSize);
-        
-        if (cornerRadius > 0) {
-          // Draw rounded rectangle
-          final rrect = RRect.fromRectAndRadius(
-            rect,
-            Radius.circular(cornerRadius),
-          );
-          canvas.drawRRect(rrect, paint);
-        } else {
-          // Draw square rectangle
-          canvas.drawRect(rect, paint);
-        }
-      }
+    final rect = Rect.fromLTWH(0, 0, size.width, size.height);
+    
+    // Calculate alpha at each point based on both horizontal and vertical position
+    // Edges fade to transparent, center stays at full opacity
+    final paint = Paint();
+    
+    // Create gradient shader that handles both horizontal and vertical fading
+    paint.shader = _createCombinedGradientShader(rect);
+    
+    // Draw with or without rounded corners
+    if (cornerRadius > 0) {
+      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(cornerRadius));
+      canvas.drawRRect(rrect, paint);
+    } else {
+      canvas.drawRect(rect, paint);
     }
+  }
+  
+  Shader _createCombinedGradientShader(Rect rect) {
+    // For a proper edge fade, we need to calculate opacity based on distance from edges
+    // Using a radial gradient approach centered on the content
+    // However, Flutter's built-in gradients don't directly support this
+    // We'll use a workaround with LinearGradient for horizontal fade
+    
+    // If no fading, return solid color
+    if (horizontalFade <= 0 && verticalFade <= 0) {
+      return LinearGradient(
+        colors: [
+          backgroundColor.withOpacity(opacity),
+          backgroundColor.withOpacity(opacity),
+        ],
+      ).createShader(rect);
+    }
+    
+    // For now, use horizontal fade (most visible effect for right-aligned overlays)
+    // Create stops for smooth fade from edges
+    final stops = <double>[
+      0.0,
+      horizontalFade > 0 ? horizontalFade : 0.0,
+      horizontalFade > 0 ? 1.0 - horizontalFade : 1.0,
+      1.0,
+    ];
+    
+    final colors = <Color>[
+      backgroundColor.withOpacity(0.0),
+      backgroundColor.withOpacity(opacity),
+      backgroundColor.withOpacity(opacity),
+      backgroundColor.withOpacity(0.0),
+    ];
+    
+    return LinearGradient(
+      begin: Alignment.centerLeft,
+      end: Alignment.centerRight,
+      stops: stops,
+      colors: colors,
+    ).createShader(rect);
   }
 
   @override
-  bool shouldRepaint(_CheckerboardPatternPainter oldDelegate) {
-    return oldDelegate.color1 != color1 ||
-        oldDelegate.color2 != color2 ||
-        oldDelegate.squareSize != squareSize ||
+  bool shouldRepaint(_OverlayGradientPainter oldDelegate) {
+    return oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.opacity != opacity ||
+        oldDelegate.horizontalFade != horizontalFade ||
+        oldDelegate.verticalFade != verticalFade ||
         oldDelegate.cornerRadius != cornerRadius;
   }
-} 
+}

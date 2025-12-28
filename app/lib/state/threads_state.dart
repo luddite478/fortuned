@@ -13,6 +13,9 @@ import '../services/ws_client.dart';
 import '../services/snapshot/snapshot_service.dart';
 import '../services/upload_service.dart';
 import '../services/cache/offline_sync_service.dart';
+import '../services/cache/snapshots_cache_service.dart';
+import '../services/cache/working_state_cache_service.dart';
+import '../services/cache/last_viewed_cache_service.dart';
 import 'sequencer/table.dart';
 import 'sequencer/playback.dart';
 import 'sequencer/sample_bank.dart';
@@ -52,6 +55,14 @@ class ThreadsState extends ChangeNotifier {
   
   // Callback for when a render completes uploading (used to sync with library)
   Function(String renderId, String url)? _onRenderUploadComplete;
+  
+  // Auto-save manager for working state
+  Timer? _autoSaveTimer;
+  bool _autoSaveInProgress = false;
+  static const Duration _autoSaveDelay = Duration(seconds: 3);
+  
+  // Track working state changes for UI refresh (increment on auto-save)
+  int _workingStateVersion = 0;
 
   ThreadsState({
     required WebSocketClient wsClient,
@@ -63,6 +74,19 @@ class ThreadsState extends ChangeNotifier {
         _playbackState = playbackState,
         _sampleBankState = sampleBankState {
     _registerWsHandlers();
+    _setupAutoSaveCallbacks();
+  }
+  
+  /// Setup auto-save callbacks for state changes
+  void _setupAutoSaveCallbacks() {
+    debugPrint('⚙️ [THREADS_STATE] Setting up auto-save callbacks');
+    
+    // Register auto-save callbacks with state objects
+    _tableState.setOnStateChanged(() => scheduleAutoSave());
+    _playbackState.setOnStateChanged(() => scheduleAutoSave());
+    _sampleBankState.setOnStateChanged(() => scheduleAutoSave());
+    
+    debugPrint('✅ [THREADS_STATE] Auto-save callbacks registered');
   }
 
   void attachRecordingState(RecordingState recordingState) {
@@ -87,6 +111,7 @@ class ThreadsState extends ChangeNotifier {
   String? get currentUserId => _currentUserId;
   String? get currentUserName => _currentUserName;
   bool get isThreadViewActive => _isThreadViewActive;
+  int get workingStateVersion => _workingStateVersion; // For widget keys
   
   bool isLoadingMessages(String threadId) => _messagesLoadingByThread[threadId] ?? false;
   bool hasMessagesLoaded(String threadId) => _messagesByThread.containsKey(threadId);
@@ -226,6 +251,24 @@ class ThreadsState extends ChangeNotifier {
       );
       // Store in ascending (oldest -> newest) for UI
       final List<Message> stored = (order == 'desc') ? messages.reversed.toList() : messages;
+      
+      // Cache snapshots to disk for offline access
+      if (includeSnapshot) {
+        int cachedCount = 0;
+        for (final message in stored) {
+          if (message.snapshot.isNotEmpty) {
+            try {
+              await SnapshotsCacheService.cacheSnapshot(message.id, message.snapshot);
+              cachedCount++;
+            } catch (e) {
+              debugPrint('⚠️ [THREADS] Failed to cache snapshot for message ${message.id}: $e');
+            }
+          }
+        }
+        if (cachedCount > 0) {
+          debugPrint('💾 [THREADS] Cached $cachedCount snapshots to disk');
+        }
+      }
       
       // Merge with any existing optimistic uploads
       final existingMessages = _messagesByThread[threadId] ?? [];
@@ -400,6 +443,7 @@ class ThreadsState extends ChangeNotifier {
 
   Future<void> sendMessageFromSequencer({
     required String threadId,
+    bool clearWorkingState = false, // Option to clear working state after checkpoint
   }) async {
     final snapshotService = SnapshotService(
       tableState: _tableState,
@@ -462,6 +506,13 @@ class ThreadsState extends ChangeNotifier {
         renders: [],
         timestamp: pending.timestamp,
       );
+      
+      // Optionally clear working state after successful checkpoint save
+      // By default (Option A), we keep the working state for safety
+      if (clearWorkingState) {
+        await WorkingStateCacheService.clearWorkingState(threadId);
+        debugPrint('🗑️ [THREADS] Cleared working state after checkpoint save');
+      }
 
       // Replace pending with saved (keep optimistic renders with uploading status)
       final list = _messagesByThread[threadId] ?? [];
@@ -476,12 +527,20 @@ class ThreadsState extends ChangeNotifier {
         );
         list[idx] = updated;
         _messagesByThread[threadId] = List<Message>.from(list);
+        
+        // Update thread's messageIds for HST counter (optimistic update)
+        _updateThreadMessageIds(threadId, saved.id);
+        
         notifyListeners();
       } else {
         // If not found (e.g., reconciled by websocket), append if missing by id
         final exists = list.any((m) => m.id == saved.id);
         if (!exists) {
           _messagesByThread[threadId] = [...list, saved.copyWith(sendStatus: SendStatus.sent)];
+          
+          // Update thread's messageIds for HST counter (optimistic update)
+          _updateThreadMessageIds(threadId, saved.id);
+          
           notifyListeners();
         }
       }
@@ -808,27 +867,64 @@ class ThreadsState extends ChangeNotifier {
 
   // === UNIFIED PROJECT LOADING ===
   
-  /// Load project snapshot from cache or API (cache-aware)
+  /// Load project snapshot from cache or API (cache-aware with disk persistence)
   /// Returns snapshot map or null if not available
+  /// 
+  /// Cache hierarchy (offline-first):
+  /// 1. Working state (auto-saved draft) - most recent unsaved edits ✨ NEW
+  /// 2. In-memory cache (_messagesByThread) - fastest saved checkpoint
+  /// 3. Disk cache (SnapshotsCacheService) - persistent saved checkpoint
+  /// 4. API fetch (ThreadsApi) - server-side checkpoint
   Future<Map<String, dynamic>?> loadProjectSnapshot(
     String threadId, {
     bool forceRefresh = false,
   }) async {
     debugPrint('📂 [PROJECT_LOAD] Loading snapshot for thread $threadId (forceRefresh: $forceRefresh)');
     
-    // 1. Check cache first (if not forcing refresh)
+    // 1. Check working state first (unless force refresh)
+    // This is the auto-saved draft that captures unsaved user edits
+    if (!forceRefresh) {
+      try {
+        final workingState = await WorkingStateCacheService.loadWorkingState(threadId);
+        if (workingState != null && workingState.isNotEmpty) {
+          final timestamp = await WorkingStateCacheService.getWorkingStateTimestamp(threadId);
+          debugPrint('📝 [PROJECT_LOAD] ✅ Using working state (auto-saved at: $timestamp)');
+          return workingState;
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PROJECT_LOAD] Working state read failed: $e');
+      }
+    }
+    
+    // 2. Check in-memory cache (if not forcing refresh)
     if (!forceRefresh) {
       final cachedMessages = _messagesByThread[threadId];
       if (cachedMessages != null && cachedMessages.isNotEmpty) {
         final latestCached = cachedMessages.last;
         if (latestCached.snapshot.isNotEmpty) {
-          debugPrint('📦 [PROJECT_LOAD] Using cached snapshot from message ${latestCached.id}');
+          debugPrint('📦 [PROJECT_LOAD] ✅ Using in-memory cached snapshot from message ${latestCached.id}');
           return latestCached.snapshot;
+        }
+        
+        // 3. Check disk cache if in-memory has no snapshot
+        debugPrint('💾 [PROJECT_LOAD] Checking disk cache for message ${latestCached.id}');
+        try {
+          final diskSnapshot = await SnapshotsCacheService.loadSnapshot(latestCached.id);
+          if (diskSnapshot != null && diskSnapshot.isNotEmpty) {
+            debugPrint('📦 [PROJECT_LOAD] ✅ Using disk cached snapshot from message ${latestCached.id}');
+            
+            // Update in-memory cache with disk snapshot
+            _updateMessageCache(threadId, latestCached.copyWith(snapshot: diskSnapshot));
+            
+            return diskSnapshot;
+          }
+        } catch (e) {
+          debugPrint('⚠️ [PROJECT_LOAD] Disk cache read failed: $e');
         }
       }
     }
     
-    // 2. Fetch from API with snapshot
+    // 4. Fetch from API with snapshot
     debugPrint('📥 [PROJECT_LOAD] Fetching latest message with snapshot from API');
     try {
       final latest = await ThreadsApi.getLatestMessage(threadId, includeSnapshot: true);
@@ -838,35 +934,119 @@ class ThreadsState extends ChangeNotifier {
         return null;
       }
       
-      // 3. Update cache
+      // 5. Update both in-memory and disk cache
       _updateMessageCache(threadId, latest);
+      
+      // Save to disk cache for offline access
+      if (latest.snapshot.isNotEmpty) {
+        debugPrint('💾 [PROJECT_LOAD] Caching snapshot to disk for message ${latest.id}');
+        await SnapshotsCacheService.cacheSnapshot(latest.id, latest.snapshot);
+      }
       
       return latest.snapshot;
     } catch (e) {
-      debugPrint('❌ [PROJECT_LOAD] Failed to fetch snapshot: $e');
+      debugPrint('❌ [PROJECT_LOAD] Failed to fetch snapshot from API: $e');
+      
+      // 6. Last resort: try disk cache even if we failed to get latest message ID
+      // Check if we have any cached messages for this thread
+      final cachedMessages = _messagesByThread[threadId];
+      if (cachedMessages != null && cachedMessages.isNotEmpty) {
+        final latestCached = cachedMessages.last;
+        debugPrint('💾 [PROJECT_LOAD] API failed, attempting disk cache fallback for message ${latestCached.id}');
+        
+        try {
+          final diskSnapshot = await SnapshotsCacheService.loadSnapshot(latestCached.id);
+          if (diskSnapshot != null && diskSnapshot.isNotEmpty) {
+            debugPrint('📦 [PROJECT_LOAD] ✅ Using disk cached snapshot as fallback');
+            return diskSnapshot;
+          }
+        } catch (diskError) {
+          debugPrint('❌ [PROJECT_LOAD] Disk cache fallback also failed: $diskError');
+        }
+      }
+      
       return null;
     }
   }
   
+  /// Update thread's messageIds array (for HST counter)
+  void _updateThreadMessageIds(String threadId, String messageId) {
+    final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+    if (threadIndex >= 0) {
+      final thread = _threads[threadIndex];
+      // Only add if not already present
+      if (!thread.messageIds.contains(messageId)) {
+        final updatedThread = thread.copyWith(
+          messageIds: [...thread.messageIds, messageId],
+        );
+        _threads[threadIndex] = updatedThread;
+        
+        // Update active thread if it's the same
+        if (_activeThread?.id == threadId) {
+          _activeThread = updatedThread;
+        }
+        
+        debugPrint('📊 [THREADS] Updated HST for thread $threadId: ${updatedThread.messageIds.length} messages');
+      }
+    }
+  }
+  
+  /// Update thread's updatedAt timestamp (for collaborator updates)
+  void _updateThreadTimestamp(String threadId, DateTime timestamp) {
+    final threadIndex = _threads.indexWhere((t) => t.id == threadId);
+    if (threadIndex >= 0) {
+      final thread = _threads[threadIndex];
+      // Only update if new timestamp is newer
+      if (timestamp.isAfter(thread.updatedAt)) {
+        final updatedThread = thread.copyWith(
+          updatedAt: timestamp,
+        );
+        _threads[threadIndex] = updatedThread;
+        
+        // Update active thread if it's the same
+        if (_activeThread?.id == threadId) {
+          _activeThread = updatedThread;
+        }
+        
+        debugPrint('📅 [THREADS] Updated timestamp for thread $threadId: $timestamp');
+      }
+    }
+  }
+  
   /// Update message cache with a message (preserves existing snapshot if new one is empty)
+  /// Also caches snapshot to disk for offline access
   void _updateMessageCache(String threadId, Message message) {
     final messages = _messagesByThread[threadId] ?? [];
     final existingIndex = messages.indexWhere((m) => m.id == message.id);
     
+    Message finalMessage = message;
     if (existingIndex >= 0) {
       // Update existing message (preserve snapshot if new message lacks it)
       final existing = messages[existingIndex];
-      messages[existingIndex] = message.snapshot.isNotEmpty 
+      finalMessage = message.snapshot.isNotEmpty 
         ? message 
         : message.copyWith(snapshot: existing.snapshot);
+      messages[existingIndex] = finalMessage;
       debugPrint('🔄 [PROJECT_LOAD] Updated cached message ${message.id}');
     } else {
       // Add new message
-      messages.add(message);
+      messages.add(finalMessage);
       debugPrint('➕ [PROJECT_LOAD] Added message ${message.id} to cache');
     }
     
     _messagesByThread[threadId] = messages;
+    
+    // Cache snapshot to disk for offline access
+    if (finalMessage.snapshot.isNotEmpty) {
+      SnapshotsCacheService.cacheSnapshot(finalMessage.id, finalMessage.snapshot).then((success) {
+        if (success) {
+          debugPrint('💾 [PROJECT_LOAD] Cached snapshot to disk for message ${finalMessage.id}');
+        }
+      }).catchError((e) {
+        debugPrint('⚠️ [PROJECT_LOAD] Failed to cache snapshot to disk: $e');
+      });
+    }
+    
     notifyListeners();
   }
   
@@ -914,6 +1094,8 @@ class ThreadsState extends ChangeNotifier {
       final ok = await service.importFromJson(jsonString);
       
       if (ok) {
+        // Save last viewed timestamp (for collaborator update detection)
+        await LastViewedCacheService.saveLastViewed(threadId, DateTime.now());
         debugPrint('✅ [PROJECT_LOAD] Successfully loaded project $threadId');
       } else {
         debugPrint('❌ [PROJECT_LOAD] Failed to import project $threadId');
@@ -964,7 +1146,12 @@ class ThreadsState extends ChangeNotifier {
     final index = _threads.indexWhere((t) => t.id == threadId);
     if (index >= 0) {
       final thread = _threads[index];
-      final users = [...thread.users, ThreadUser(id: userId, name: userName, joinedAt: DateTime.now())];
+      final users = [...thread.users, ThreadUser(
+        id: userId, 
+        username: userName,  // userName is actually the username in this context
+        name: userName, 
+        joinedAt: DateTime.now()
+      )];
       final invites = thread.invites.where((i) => i.userId != userId).toList();
       _threads[index] = thread.copyWith(users: users, invites: invites);
         if (_activeThread?.id == threadId) {
@@ -1010,10 +1197,225 @@ class ThreadsState extends ChangeNotifier {
   // WebSocket integration
   void _registerWsHandlers() {
     _wsClient.registerMessageHandler('message_created', _onMessageCreated);
+    _wsClient.registerMessageHandler('user_profile_updated', _onUserProfileUpdated);
   }
 
   void disposeWs() {
     _wsClient.unregisterAllHandlers('message_created');
+    _wsClient.unregisterAllHandlers('user_profile_updated');
+    _autoSaveTimer?.cancel();
+  }
+  
+  void _onUserProfileUpdated(Map<String, dynamic> payload) {
+    final userId = payload['user_id'] as String?;
+    final username = payload['username'] as String?;
+    
+    if (userId == null || username == null) {
+      debugPrint('⚠️ [THREADS] Invalid user_profile_updated payload');
+      return;
+    }
+    
+    debugPrint('🔄 [THREADS] User profile updated: $userId -> $username');
+    
+    // Update username in all loaded threads
+    bool anyUpdated = false;
+    for (int i = 0; i < _threads.length; i++) {
+      final thread = _threads[i];
+      bool threadHasUser = thread.users.any((user) => user.id == userId);
+      
+      if (threadHasUser) {
+        final updatedUsers = thread.users.map((user) {
+          if (user.id == userId) {
+            return ThreadUser(
+              id: user.id,
+              username: username,
+              name: username,
+              joinedAt: user.joinedAt,
+            );
+          }
+          return user;
+        }).toList();
+        
+        _threads[i] = thread.copyWith(users: updatedUsers);
+        anyUpdated = true;
+      }
+    }
+    
+    // Also update active thread if affected
+    if (_activeThread != null && anyUpdated) {
+      final activeIndex = _threads.indexWhere((t) => t.id == _activeThread!.id);
+      if (activeIndex >= 0) {
+        _activeThread = _threads[activeIndex];
+      }
+    }
+    
+    if (anyUpdated) {
+      notifyListeners();
+    }
+  }
+  
+  // === AUTO-SAVE WORKING STATE ===
+  
+  /// Schedule auto-save (debounced - waits 3 seconds after last change)
+  /// 
+  /// Called by state objects (TableState, PlaybackState, SampleBankState)
+  /// when user makes changes. Only saves after user stops editing for 3 seconds.
+  void scheduleAutoSave() {
+    // Skip if no active thread
+    if (_activeThread == null) return;
+    
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(_autoSaveDelay, _performAutoSave);
+  }
+  
+  /// Perform actual auto-save to working state cache
+  Future<void> _performAutoSave() async {
+    // Skip if already saving or no active thread
+    if (_autoSaveInProgress || _activeThread == null) return;
+    
+    try {
+      _autoSaveInProgress = true;
+      
+      final threadId = _activeThread!.id;
+      debugPrint('💾 [AUTO_SAVE] Starting auto-save for thread $threadId');
+      
+      // Export current state to snapshot
+      final service = SnapshotService(
+        tableState: _tableState,
+        playbackState: _playbackState,
+        sampleBankState: _sampleBankState,
+      );
+      
+      final jsonString = service.exportToJson(name: 'Working State');
+      final snapshot = json.decode(jsonString) as Map<String, dynamic>;
+      
+      // Save to working state cache
+      final success = await WorkingStateCacheService.saveWorkingState(
+        threadId,
+        snapshot,
+      );
+      
+      if (success) {
+        debugPrint('✅ [AUTO_SAVE] Successfully auto-saved working state for thread $threadId');
+        
+        // Increment version to force widget rebuild
+        _workingStateVersion++;
+        
+        // Notify listeners so UI (projects screen) refreshes to show new working state
+        notifyListeners();
+      } else {
+        debugPrint('⚠️ [AUTO_SAVE] Failed to auto-save working state for thread $threadId');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ [AUTO_SAVE] Error during auto-save: $e');
+      debugPrint('📋 [AUTO_SAVE] Stack trace: $stackTrace');
+    } finally {
+      _autoSaveInProgress = false;
+    }
+  }
+  
+  /// Force immediate auto-save (without debouncing)
+  /// 
+  /// Called when:
+  /// - User switches to another project
+  /// - App is about to close
+  /// - User explicitly wants to save working state
+  Future<void> forceAutoSave() async {
+    if (_activeThread == null) return;
+    
+    _autoSaveTimer?.cancel();
+    await _performAutoSave();
+  }
+  
+  /// Get the most recent modification timestamp for a thread
+  /// Considers both thread's updatedAt and working state timestamp
+  /// Returns working state timestamp if it's newer, otherwise thread updatedAt
+  Future<DateTime> getThreadModifiedAt(String threadId, DateTime fallbackTimestamp) async {
+    // Get thread's server-side updatedAt (use fallback if not found)
+    final thread = _threads.firstWhere(
+      (t) => t.id == threadId, 
+      orElse: () => _unsyncedThreads.firstWhere(
+        (t) => t.id == threadId,
+        orElse: () => Thread(
+          id: threadId,
+          name: '',
+          createdAt: fallbackTimestamp,
+          updatedAt: fallbackTimestamp,
+          users: const [],
+          messageIds: const [],
+          invites: const [],
+        ),
+      ),
+    );
+    
+    // Check if working state exists and is newer
+    try {
+      final workingStateTimestamp = await WorkingStateCacheService.getWorkingStateTimestamp(threadId);
+      if (workingStateTimestamp != null && workingStateTimestamp.isAfter(thread.updatedAt)) {
+        debugPrint('📅 [THREADS] Thread $threadId: using working state timestamp (${workingStateTimestamp})');
+        return workingStateTimestamp;
+      }
+    } catch (e) {
+      debugPrint('⚠️ [THREADS] Error getting working state timestamp: $e');
+    }
+    
+    debugPrint('📅 [THREADS] Thread $threadId: using thread updatedAt (${thread.updatedAt})');
+    return thread.updatedAt;
+  }
+  
+  /// Check if thread has unsaved changes (working state exists and is newer than last message)
+  Future<bool> hasUnsavedChanges(String threadId) async {
+    try {
+      final hasWorkingState = await WorkingStateCacheService.hasWorkingState(threadId);
+      return hasWorkingState;
+    } catch (e) {
+      return false;
+    }
+  }
+  
+  /// Check if thread was updated by collaborators since user last viewed it
+  /// Returns true if thread.updatedAt > lastViewedTimestamp
+  /// Used to highlight projects that have new updates from collaborators
+  Future<bool> isThreadUpdatedSinceLastView(String threadId) async {
+    try {
+      // Get thread
+      final thread = _threads.firstWhere(
+        (t) => t.id == threadId,
+        orElse: () => _unsyncedThreads.firstWhere(
+          (t) => t.id == threadId,
+          orElse: () => Thread(
+            id: threadId,
+            name: '',
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            users: const [],
+            messageIds: const [],
+            invites: const [],
+          ),
+        ),
+      );
+      
+      // Get last viewed timestamp
+      final lastViewed = await LastViewedCacheService.getLastViewed(threadId);
+      
+      // If never viewed, not considered "updated since last view"
+      if (lastViewed == null) {
+        return false;
+      }
+      
+      // Check if thread was updated after last view
+      // Use a small buffer (1 second) to avoid false positives from timing differences
+      final isUpdated = thread.updatedAt.isAfter(lastViewed.add(const Duration(seconds: 1)));
+      
+      if (isUpdated) {
+        debugPrint('🔔 [THREADS] Thread $threadId updated since last view (thread: ${thread.updatedAt}, viewed: $lastViewed)');
+      }
+      
+      return isUpdated;
+    } catch (e) {
+      debugPrint('⚠️ [THREADS] Error checking if thread updated: $e');
+      return false;
+    }
   }
 
   void _onMessageCreated(Map<String, dynamic> payload) {
@@ -1025,6 +1427,8 @@ class ThreadsState extends ChangeNotifier {
       final message = Message.fromJson(payload);
       final list = _messagesByThread[threadId] ?? [];
       final pendingIdx = list.indexWhere((m) => m.sendStatus != null && m.sendStatus != SendStatus.sent && _isSameMessageContent(m, message));
+      
+      Message? finalMessage;
       if (pendingIdx >= 0) {
         // Preserve local upload status and snapshot when reconciling with server message
         final localMessage = list[pendingIdx];
@@ -1033,12 +1437,13 @@ class ThreadsState extends ChangeNotifier {
           ? localMessage.snapshot
           : message.snapshot;
         
-        list[pendingIdx] = message.copyWith(
+        finalMessage = message.copyWith(
           sendStatus: SendStatus.sent, 
           localTempId: null,
           renders: mergedRenders,
           snapshot: mergedSnapshot,
         );
+        list[pendingIdx] = finalMessage;
       } else if (!list.any((m) => m.id == message.id)) {
         // Check if we have a cached version with snapshot
         final existing = list.firstWhere((m) => m.id == message.id, orElse: () => message);
@@ -1046,12 +1451,37 @@ class ThreadsState extends ChangeNotifier {
           ? existing.snapshot
           : message.snapshot;
         
-        list.add(message.copyWith(
+        finalMessage = message.copyWith(
           sendStatus: SendStatus.sent,
           snapshot: preservedSnapshot,
-        ));
+        );
+        list.add(finalMessage);
       }
+      
       _messagesByThread[threadId] = List<Message>.from(list);
+      
+      // Update thread's messageIds for HST counter (if message was added)
+      if (finalMessage != null) {
+        _updateThreadMessageIds(threadId, finalMessage.id);
+        
+        // Update thread's updatedAt timestamp if message is from collaborator (not current user)
+        if (finalMessage.userId != _currentUserId) {
+          _updateThreadTimestamp(threadId, finalMessage.timestamp);
+          debugPrint('🔔 [WS] Updated thread $threadId timestamp from collaborator message');
+        }
+      }
+      
+      // Cache snapshot to disk for offline access
+      if (finalMessage != null && finalMessage.snapshot.isNotEmpty) {
+        SnapshotsCacheService.cacheSnapshot(finalMessage.id, finalMessage.snapshot).then((success) {
+          if (success) {
+            debugPrint('💾 [WS] Cached snapshot to disk for message ${finalMessage!.id}');
+          }
+        }).catchError((e) {
+          debugPrint('⚠️ [WS] Failed to cache snapshot to disk: $e');
+        });
+      }
+      
       notifyListeners();
     } catch (_) {}
   }

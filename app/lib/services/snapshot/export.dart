@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart'; // For Color class
 import 'dart:ffi' as ffi;
 import '../../ffi/sample_bank_bindings.dart';
 import '../../state/sequencer/table.dart';
@@ -172,6 +173,7 @@ class SnapshotExporter {
     debugPrint('🎛️ [SNAPSHOT_EXPORT] Exporting sample bank state');
 
     final sampleBankPtr = _sampleBankState.getSampleBankStatePtr();
+    final uiColors = _sampleBankState.uiBankColors;  // Get UI colors
     int tries = 0;
     const maxTries = 3;
 
@@ -191,7 +193,9 @@ class SnapshotExporter {
       for (int i = 0; i < 26; i++) { // MAX_SAMPLE_SLOTS = 26
         final samplePtr = samplesPtr + i;
         final sampleData = SampleData.fromPointer(samplePtr);
-        samples.add({
+        
+        // Build sample entry
+        final sampleEntry = <String, dynamic>{
           'loaded': sampleData.loaded,
           'settings': {
             'volume': sampleData.volume,
@@ -200,7 +204,17 @@ class SnapshotExporter {
           'sample_id': sampleData.id,
           'file_path': sampleData.filePath,
           'display_name': sampleData.displayName,
-        });
+        };
+        
+        // ONLY include color if sample is loaded (project-specific colors)
+        if (sampleData.loaded) {
+          final color = i < uiColors.length ? uiColors[i] : uiColors[0];
+          final hexColor = _colorToHex(color);
+          sampleEntry['color'] = hexColor;
+          debugPrint('✅ [EXPORT] Slot $i: $hexColor');
+        }
+        
+        samples.add(sampleEntry);
       }
 
       final v2 = sampleBankPtr.ref.version;
@@ -229,11 +243,19 @@ class SnapshotExporter {
         'sample_id': null,
         'file_path': null,
         'display_name': null,
+        // No color for empty slots
       });
     }
     return {
       'max_slots': 26,
       'samples': samples,
     };
+  }
+  
+  /// Convert Color to hex string (e.g., #FF5733)
+  String _colorToHex(Color color) {
+    return '#${color.red.toRadixString(16).padLeft(2, '0')}'
+           '${color.green.toRadixString(16).padLeft(2, '0')}'
+           '${color.blue.toRadixString(16).padLeft(2, '0')}'.toUpperCase();
   }
 }

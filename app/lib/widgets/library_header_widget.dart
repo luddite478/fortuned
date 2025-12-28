@@ -12,10 +12,10 @@ class LibraryHeaderWidget extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.menuEntryBackground,
+        color: const Color.fromARGB(255, 66, 66, 66),
         border: Border(
           bottom: BorderSide(
-            color: AppColors.menuBorder,
+            color: AppColors.sequencerBorder,
             width: 1,
           ),
         ),
@@ -32,7 +32,7 @@ class LibraryHeaderWidget extends StatelessWidget {
             },
             icon: Icon(
               Icons.arrow_back,
-              color: AppColors.menuText,
+              color: AppColors.sequencerText,
               size: 24,
             ),
             padding: const EdgeInsets.all(8),
@@ -45,7 +45,7 @@ class LibraryHeaderWidget extends StatelessWidget {
               child: Text(
                 'LIBRARY',
                 style: TextStyle(
-                  color: AppColors.menuText,
+                  color: AppColors.sequencerText,
                   fontSize: 16,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 1.5,

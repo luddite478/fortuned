@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:provider/provider.dart';
 import '../utils/app_colors.dart';
 import '../models/thread/thread.dart';
-import '../state/user_state.dart';
 
 class PatternPreviewWidget extends StatelessWidget {
   final Thread project;
@@ -28,7 +26,18 @@ class PatternPreviewWidget extends StatelessWidget {
   static const Color layerBoundaryColor = Color.fromARGB(255, 65, 65, 65);
   
   // Empty cell colors
-  static const Color patternEmptyCellColor = Color.fromARGB(255, 152, 152, 152);
+  static const Color patternEmptyCellColor = Color.fromARGB(255, 101, 101, 101);
+  
+  // ============================================================================
+  // ROW COUNT CONTROL - ADJUST THIS TO EXPERIMENT
+  // ============================================================================
+  // Maximum number of rows to show in pattern preview
+  // Increase this value to show more rows (more vertical cells)
+  // Recommended values:
+  // - 12-16: Good for mobile phones
+  // - 16-20: Good for tablets
+  // - 20-24: Maximum detail (may be cramped on phones)
+  static const int maxPatternRows = 40;  // Increased from adaptive calculation
   
   // Pattern preview fade gradient (horizontal)
   // Gradient now spans 17 columns to cover column 17
@@ -41,7 +50,7 @@ class PatternPreviewWidget extends StatelessWidget {
   static const double patternVerticalFadeEndPercent = 100.0; // End fade at bottom, fully transparent
   
   // Pattern preview layer header
-  static const bool showPatternLayerHeader = true;
+  static const bool showPatternLayerHeader = false;
   static const double patternLayerHeaderHeight = 12.0;
   static const double patternLayerHeaderFontSize = 8.0;
 
@@ -94,12 +103,17 @@ class PatternPreviewWidget extends StatelessWidget {
           );
         }
 
-        return _buildPatternPreviewFromSnapshot(snapshot.data!);
+        // Wrap in LayoutBuilder to get available height for responsive row calculation
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            return _buildPatternPreviewFromSnapshot(snapshot.data!, constraints.maxHeight);
+          },
+        );
       },
     );
   }
 
-  Widget _buildPatternPreviewFromSnapshot(Map<String, dynamic> snapshotData) {
+  Widget _buildPatternPreviewFromSnapshot(Map<String, dynamic> snapshotData, double availableHeight) {
     debugPrint('📸 [PREVIEW] Building pattern preview, snapshot has ${snapshotData.length} keys');
     debugPrint('📸 [PREVIEW] Snapshot keys: ${snapshotData.keys.toList()}');
     
@@ -194,7 +208,11 @@ class PatternPreviewWidget extends StatelessWidget {
     }
     
     final sampleBankColors = getSampleBankColors(snapshotData);
-    final rowsToShow = (numSteps).clamp(1, 8);
+    
+    // Use configurable max rows (see maxPatternRows constant above)
+    // This allows easy experimentation with row count
+    final rowsToShow = (numSteps).clamp(1, maxPatternRows);
+    debugPrint('📸 [PREVIEW] Available height: ${availableHeight.toStringAsFixed(1)}px, showing $rowsToShow rows (max: $maxPatternRows)');
     
     return ClipRect(
       child: LayoutBuilder(
@@ -213,6 +231,8 @@ class PatternPreviewWidget extends StatelessWidget {
           final cellWidth = availableWidthAfterPadding / columnsToShow;
           
           // Determine if vertical fade is needed
+          // Enable fade when showing many rows to indicate more content below
+          // Threshold: 8+ rows on any screen size
           final needsVerticalFade = rowsToShow >= 8;
           
           // Build layer info for header (only for visible columns)
@@ -240,10 +260,7 @@ class PatternPreviewWidget extends StatelessWidget {
         
         return Padding(
           padding: innerPadding,
-          child: Stack(
-            children: [
-              // Main content column
-              Column(
+          child: Column(
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -401,78 +418,11 @@ class PatternPreviewWidget extends StatelessWidget {
             ),
           ],
         ),
-              
-              // Participant chip overlay (centered on top of pattern)
-              _buildParticipantChip(context),
-            ],
-          ),
         );
         },
       ),
     );
   }
   
-  Widget _buildParticipantChip(BuildContext context) {
-    // Get current user to filter out self
-    final userState = context.read<UserState>();
-    final currentUserId = userState.currentUser?.id ?? '';
-    
-    // Get other participants (exclude current user)
-    final otherParticipants = project.users
-        .where((u) => u.id != currentUserId)
-        .toList();
-    
-    // Only show if there are other participants
-    if (otherParticipants.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    
-    final firstUsername = otherParticipants.first.username;
-    final hasMore = otherParticipants.length > 1;
-    
-    // Build text based on number of participants
-    final chipText = hasMore 
-        ? 'w/ $firstUsername and others'
-        : 'w/ $firstUsername';
-    
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: Center(
-        child: FractionallySizedBox(
-          widthFactor: 0.9, // Use 90% of available width to prevent overflow
-          child: Container(
-            margin: const EdgeInsets.only(top: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-            decoration: BoxDecoration(
-              color: AppColors.menuEntryBackground.withOpacity(0.95),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: AppColors.menuBorder.withOpacity(0.5),
-                width: 0.5,
-              ),
-            ),
-            child: FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.center,
-              child: Text(
-                chipText,
-                style: GoogleFonts.sourceSans3(
-                  color: AppColors.menuText,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.3,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 

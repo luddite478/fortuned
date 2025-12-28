@@ -491,7 +491,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       elevation: 0,
       leading: IconButton(
         icon: Icon(Icons.arrow_back, color: AppColors.sequencerText),
-        onPressed: () {
+        onPressed: () async {
             if (_playbackState.isPlaying) {
               _playbackState.stop();
             }
@@ -499,6 +499,14 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             try {
               context.read<AudioPlayerState>().stop();
             } catch (_) {}
+            
+            // Force auto-save before leaving sequencer
+            try {
+              await context.read<ThreadsState>().forceAutoSave();
+            } catch (e) {
+              debugPrint('⚠️ [SEQUENCER] Failed to auto-save before exit: $e');
+            }
+            
             // Draft saving disabled - only manual checkpoints are saved
             // _draftService.saveDraft();
             Navigator.of(context).pop();
@@ -507,17 +515,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
       ),
       title: const SizedBox.shrink(),
       actions: [
-        // Settings button (always visible)
-        IconButton(
-          icon: Icon(Icons.settings, color: AppColors.sequencerAccent),
-          onPressed: () => _navigateToSettings(context),
-          iconSize: 18,
-          padding: const EdgeInsets.all(2),
-          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-        ),
-        const SizedBox(width: 4),
-        
-        // Participants widget (shows if thread has other users)
+        // Participants widget (shows if thread has other users) - LEFT of settings
         Consumer<ThreadsState>(
           builder: (context, threadsState, _) {
             final thread = threadsState.activeThread;
@@ -533,6 +531,16 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
             return const SizedBox.shrink();
           },
         ),
+        
+        // Settings button (always visible)
+        IconButton(
+          icon: Icon(Icons.settings, color: AppColors.sequencerAccent),
+          onPressed: () => _navigateToSettings(context),
+          iconSize: 18,
+          padding: const EdgeInsets.all(2),
+          constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+        ),
+        const SizedBox(width: 4),
         
         // Invite button (always visible)
         IconButton(

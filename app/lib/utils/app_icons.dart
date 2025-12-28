@@ -17,10 +17,10 @@ class AppIcons {
   static double sendIconScale = 1;
 
   /// Thread view icon asset filename (SVG). Point to any file under `icons/`.
-  static String threadViewIconAsset = 'thread-view';
+  static String threadViewIconAsset = 'thread-menu';
 
   /// Default size multiplier for thread view icon when used in square buttons.
-  static double threadViewIconScale = 1.6;
+  static double threadViewIconScale = 1.0;
 
   /// Returns a widget for the configured send icon.
   ///

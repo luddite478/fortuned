@@ -211,7 +211,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
         return true;
       },
       child: Scaffold(
-        backgroundColor: AppColors.menuPageBackground,
+        backgroundColor: AppColors.sequencerPageBackground,
         body: Column(
         children: [
           Expanded(
@@ -224,10 +224,10 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                   // Tab bar
                   Container(
                     decoration: BoxDecoration(
-                      color: AppColors.menuEntryBackground,
+                      color: AppColors.sequencerSurfaceRaised,
                       border: Border(
                         bottom: BorderSide(
-                          color: AppColors.menuBorder,
+                          color: AppColors.sequencerBorder,
                           width: 1,
                         ),
                       ),
@@ -238,8 +238,8 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                         Tab(text: 'PLAYLIST'),
                         Tab(text: 'SAMPLES'),
                       ],
-                      labelColor: AppColors.menuText,
-                      unselectedLabelColor: AppColors.menuLightText,
+                      labelColor: AppColors.sequencerText,
+                      unselectedLabelColor: AppColors.sequencerLightText,
                       labelStyle: GoogleFonts.sourceSans3(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
@@ -250,7 +250,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                         fontWeight: FontWeight.w500,
                         letterSpacing: 1.5,
                       ),
-                      indicatorColor: AppColors.menuText,
+                      indicatorColor: AppColors.sequencerText,
                       indicatorWeight: 2,
                     ),
                   ),
@@ -295,14 +295,14 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
               children: [
                 // Icon(
                 //   Icons.library_music_outlined,
-                //   color: AppColors.menuLightText,
+                //   color: AppColors.sequencerLightText,
                 //   size: 48,
                 // ),
                 // const SizedBox(height: 12),
                 Text(
                   'Your playlist is empty',
                   style: GoogleFonts.sourceSans3(
-                    color: AppColors.menuLightText,
+                    color: AppColors.sequencerLightText,
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -311,7 +311,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                 Text(
                   'Add audio recordings from projects history',
                   style: GoogleFonts.sourceSans3(
-                    color: AppColors.menuLightText,
+                    color: AppColors.sequencerLightText,
                     fontSize: 12,
                   ),
                 ),
@@ -321,7 +321,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
         }
         
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.only(top: 2),
           itemCount: libraryState.playlist.length,
           itemBuilder: (context, index) {
             final item = libraryState.playlist[index];
@@ -332,11 +332,11 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
               margin: const EdgeInsets.only(bottom: 2),
               decoration: BoxDecoration(
                 color: isPlaying 
-                    ? AppColors.menuOnlineIndicator.withOpacity(0.1)
-                    : AppColors.menuEntryBackground,
+                    ? AppColors.sequencerAccent.withOpacity(0.1)
+                    : AppColors.sequencerSurfaceRaised,
                 border: Border(
                   bottom: BorderSide(
-                    color: AppColors.menuBorder,
+                    color: AppColors.sequencerBorder,
                     width: 0.5,
                   ),
                 ),
@@ -347,13 +347,13 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                   onTap: () => _playPlaylistItem(item),
                   onLongPress: () => _showRemoveDialog(item),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Row(
                       children: [
                         // Static note icon (no circle background)
                         Icon(
                           Icons.music_note,
-                          color: AppColors.menuText,
+                          color: AppColors.sequencerText,
                           size: 22,
                         ),
                         const SizedBox(width: 10),
@@ -370,7 +370,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                                     child: Text(
                                       item.name,
                                       style: GoogleFonts.sourceSans3(
-                                        color: AppColors.menuText,
+                                        color: AppColors.sequencerText,
                                         fontSize: 14,
                                         fontWeight: FontWeight.w600,
                                       ),
@@ -386,7 +386,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                                       child: CircularProgressIndicator(
                                         strokeWidth: 1.5,
                                         valueColor: AlwaysStoppedAnimation<Color>(
-                                          AppColors.menuLightText.withOpacity(0.5),
+                                          AppColors.sequencerLightText.withOpacity(0.5),
                                         ),
                                       ),
                                     ),
@@ -398,7 +398,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                                 Text(
                                   _formatDuration(item.duration!),
                                   style: GoogleFonts.sourceSans3(
-                                    color: AppColors.menuLightText,
+                                    color: AppColors.sequencerLightText,
                                     fontSize: 11,
                                   ),
                                 ),
@@ -416,8 +416,8 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
                             color: (item.uploadStatus == RenderUploadStatus.uploading || 
                                    item.url.isEmpty || 
                                    !item.url.startsWith('http'))
-                                ? AppColors.menuLightText.withOpacity(0.3)
-                                : AppColors.menuLightText,
+                                ? AppColors.sequencerLightText.withOpacity(0.3)
+                                : AppColors.sequencerLightText,
                             size: 20,
                           ),
                           onPressed: (item.uploadStatus == RenderUploadStatus.uploading || 
@@ -482,11 +482,11 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          backgroundColor: AppColors.menuPageBackground,
+          backgroundColor: AppColors.sequencerSurfaceRaised,
           title: Text(
             'Remove from Playlist',
             style: GoogleFonts.sourceSans3(
-              color: AppColors.menuText,
+              color: AppColors.sequencerText,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -494,7 +494,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
           content: Text(
             'Are you sure you want to remove "${item.name}" from your playlist?',
             style: GoogleFonts.sourceSans3(
-              color: AppColors.menuLightText,
+              color: AppColors.sequencerLightText,
               fontSize: 14,
               fontWeight: FontWeight.w400,
             ),
@@ -505,7 +505,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
               child: Text(
                 'Cancel',
                 style: GoogleFonts.sourceSans3(
-                  color: AppColors.menuLightText,
+                  color: AppColors.sequencerLightText,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -547,7 +547,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(success ? 'Removed from playlist' : 'Failed to remove'),
-          backgroundColor: success ? AppColors.menuBorder : Colors.red.shade900,
+          backgroundColor: success ? AppColors.sequencerAccent : Colors.red.shade900,
           duration: const Duration(seconds: 1),
         ),
       );
@@ -562,7 +562,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: const Text('Track is still uploading. Please wait...'),
-              backgroundColor: AppColors.menuBorder,
+              backgroundColor: AppColors.sequencerAccent,
               duration: const Duration(seconds: 2),
             ),
           );
@@ -657,14 +657,14 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
         children: [
           // Icon(
           //   Icons.music_note,
-          //   color: AppColors.menuLightText,
+          //   color: AppColors.sequencerLightText,
           //   size: 48,
           // ),
           // const SizedBox(height: 12),
           Text(
             'Samples',
             style: GoogleFonts.sourceSans3(
-              color: AppColors.menuLightText,
+              color: AppColors.sequencerLightText,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -673,7 +673,7 @@ class _LibraryScreenState extends State<LibraryScreen> with TickerProviderStateM
           Text(
             'Coming soon',
             style: GoogleFonts.sourceSans3(
-              color: AppColors.menuLightText,
+              color: AppColors.sequencerLightText,
               fontSize: 12,
             ),
           ),
@@ -692,7 +692,7 @@ class _DownloadingDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      backgroundColor: AppColors.menuPageBackground,
+      backgroundColor: AppColors.sequencerSurfaceRaised,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
@@ -706,7 +706,7 @@ class _DownloadingDialog extends StatelessWidget {
               width: 40,
               height: 40,
               child: CircularProgressIndicator(
-                color: AppColors.menuText,
+                color: AppColors.sequencerText,
                 strokeWidth: 3,
               ),
             ),
@@ -715,7 +715,7 @@ class _DownloadingDialog extends StatelessWidget {
             Text(
               'Downloading track',
               style: GoogleFonts.sourceSans3(
-                color: AppColors.menuText,
+                color: AppColors.sequencerText,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
@@ -724,7 +724,7 @@ class _DownloadingDialog extends StatelessWidget {
             Text(
               trackName,
               style: GoogleFonts.sourceSans3(
-                color: AppColors.menuLightText,
+                color: AppColors.sequencerLightText,
                 fontSize: 13,
                 fontWeight: FontWeight.w400,
               ),

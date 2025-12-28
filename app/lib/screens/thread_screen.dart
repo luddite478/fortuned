@@ -11,7 +11,6 @@ import '../models/thread/thread.dart';
 import '../utils/app_colors.dart';
 import '../utils/thread_name_generator.dart';
 import '../models/thread/thread_user.dart';
-import '../services/users_service.dart';
 import '../services/audio_cache_service.dart';
 import '../widgets/sections_chain_squares.dart';
 import '../state/user_state.dart';
@@ -394,7 +393,12 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
   }) {
     final userName = thread.users.firstWhere(
       (u) => u.id == message.userId,
-      orElse: () => ThreadUser(id: message.userId, name: 'User ${message.userId.substring(0, 6)}', joinedAt: DateTime.now()),
+      orElse: () => ThreadUser(
+        id: message.userId, 
+        username: 'user_${message.userId.substring(0, 6)}',
+        name: 'User ${message.userId.substring(0, 6)}', 
+        joinedAt: DateTime.now()
+      ),
     ).name;
 
     final bubble = Container(

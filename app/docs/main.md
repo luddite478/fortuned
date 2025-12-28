@@ -290,7 +290,7 @@ Look for your running simulator (e.g., "iPhone 15 (E84AFBA4-AB0D-4EEE-9C13-5D7F0
 rm -rf ~/Library/Developer/CoreSimulator/Caches/*
 xcrun simctl boot "iPhone SE (3rd generation)" 
 open -a Simulator
-./run-ios.sh stage simulator 'iPhone SE (3rd generation)'
+./run-ios.sh stage simulator 'iPhone SE (3rd generation)' "" ""
 cd ios && flutter run --debug
 xcrun simctl addmedia E84AFBA4-AB0D-4EEE-9C13-5D7F0004BFFF ~/path/to/your/audio.wav
 ```
