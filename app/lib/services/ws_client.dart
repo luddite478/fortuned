@@ -136,6 +136,12 @@ class WebSocketClient {
         return;
       }
       
+      // Handle heartbeat pings silently (server keeps connection alive)
+      if (type == 'ping' || type == 'heartbeat') {
+        // Silently ignore - these are just keep-alive messages
+        return;
+      }
+      
       // Route message to registered handlers
       final handlers = _messageHandlers[type];
       if (handlers != null && handlers.isNotEmpty) {

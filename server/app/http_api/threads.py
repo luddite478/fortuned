@@ -57,11 +57,16 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
                 continue
             if not user_id:  # user_id cannot be empty
                 continue
+            # Get user's last_online from users collection
+            user_doc = db.users.find_one({"id": user_id}, {"last_online": 1})
+            last_online = user_doc.get("last_online") if user_doc else now
+            
             normalized_users.append({
                 "id": user_id,
                 "username": username or user_name,  # Fallback to name if username empty
                 "name": user_name,
-                "joined_at": joined_at
+                "joined_at": joined_at,
+                "last_online": last_online
             })
 
         invites = thread_data.get("invites", [])
@@ -135,11 +140,15 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
             final_username = f"{username}_{counter}"
             print(f"Username collision detected. Changed '{username}' to '{final_username}'")
         
+        # Get user's last_online from users collection
+        user_last_online = user_doc.get("last_online", datetime.utcnow().isoformat() + "Z")
+        
         new_user = {
             "id": user_id,
             "username": final_username,
             "name": display_name,
-            "joined_at": datetime.utcnow().isoformat() + "Z"
+            "joined_at": datetime.utcnow().isoformat() + "Z",
+            "last_online": user_last_online
         }
         db.threads.update_one(
             {"id": thread_id},
@@ -509,10 +518,17 @@ async def manage_invitation_handler(request: Request, thread_id: str, user_id: s
         
         if action == "accept":
             # Add user to thread members
+            # Get user's current last_online status
+            user_doc = db.users.find_one({"id": user_id}, {"username": 1, "last_online": 1})
+            user_last_online = user_doc.get("last_online", datetime.utcnow().isoformat() + "Z") if user_doc else datetime.utcnow().isoformat() + "Z"
+            username = user_doc.get("username", invitation["user_name"]) if user_doc else invitation["user_name"]
+            
             new_user = {
                 "id": user_id,
+                "username": username,
                 "name": invitation["user_name"],
-                "joined_at": datetime.utcnow().isoformat() + "Z"
+                "joined_at": datetime.utcnow().isoformat() + "Z",
+                "last_online": user_last_online
             }
             
             # Remove invitation and add user in one atomic operation

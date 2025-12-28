@@ -394,10 +394,21 @@ async def register_client(client_id, websocket):
     
     # Update last_online timestamp when user connects
     try:
+        timestamp = datetime.utcnow().isoformat() + "Z"
+        
+        # Update users collection
         db.users.update_one(
             {"id": client_id},
-            {"$set": {"last_online": datetime.utcnow().isoformat() + "Z"}}
+            {"$set": {"last_online": timestamp}}
         )
+        
+        # Sync to threads collection (denormalized data)
+        db.threads.update_many(
+            {"users.id": client_id},
+            {"$set": {"users.$[elem].last_online": timestamp}},
+            array_filters=[{"elem.id": client_id}]
+        )
+        
         logger.debug(f"Updated last_online for {client_id}")
     except Exception as e:
         logger.error(f"Failed to update last_online for {client_id}: {e}")
@@ -415,10 +426,21 @@ def unregister_client(client_id):
         
         # Update last_online when user disconnects for accurate online status
         try:
+            timestamp = datetime.utcnow().isoformat() + "Z"
+            
+            # Update users collection
             db.users.update_one(
                 {"id": client_id},
-                {"$set": {"last_online": datetime.utcnow().isoformat() + "Z"}}
+                {"$set": {"last_online": timestamp}}
             )
+            
+            # Sync to threads collection (denormalized data)
+            db.threads.update_many(
+                {"users.id": client_id},
+                {"$set": {"users.$[elem].last_online": timestamp}},
+                array_filters=[{"elem.id": client_id}]
+            )
+            
             logger.debug(f"Updated last_online for disconnected user {client_id}")
         except Exception as e:
             logger.error(f"Failed to update last_online on disconnect: {e}")
@@ -520,11 +542,22 @@ async def heartbeat_loop():
             continue
         
         try:
-            # Batch update all active users
+            timestamp = datetime.utcnow().isoformat() + "Z"
+            
+            # Batch update all active users in users collection
             result = db.users.update_many(
                 {"id": {"$in": active_clients}},
-                {"$set": {"last_online": datetime.utcnow().isoformat() + "Z"}}
+                {"$set": {"last_online": timestamp}}
             )
+            
+            # Sync to threads collection (denormalized data)
+            for client_id in active_clients:
+                db.threads.update_many(
+                    {"users.id": client_id},
+                    {"$set": {"users.$[elem].last_online": timestamp}},
+                    array_filters=[{"elem.id": client_id}]
+                )
+            
             logger.debug(f"Heartbeat: Updated {result.modified_count} active user(s)")
         except Exception as e:
             logger.error(f"Heartbeat error: {e}")

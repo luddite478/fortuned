@@ -50,9 +50,13 @@
           "joined_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "last_online": {
+            "type": "string",
+            "format": "date-time"
           }
         },
-        "required": ["id", "username", "name", "joined_at"],
+        "required": ["id", "username", "name", "joined_at", "last_online"],
         "additionalProperties": false
       }
     },
