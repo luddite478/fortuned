@@ -1150,7 +1150,8 @@ class ThreadsState extends ChangeNotifier {
         id: userId, 
         username: userName,  // userName is actually the username in this context
         name: userName, 
-        joinedAt: DateTime.now()
+        joinedAt: DateTime.now(),
+        isOnline: true,  // User just accepted, they're online
       )];
       final invites = thread.invites.where((i) => i.userId != userId).toList();
       _threads[index] = thread.copyWith(users: users, invites: invites);
@@ -1234,6 +1235,7 @@ class ThreadsState extends ChangeNotifier {
           username: userName,
           name: userName,
           joinedAt: DateTime.now(),
+          isOnline: payload['is_online'] ?? false,
         );
         
         final updatedUsers = [...thread.users, newUser];
@@ -1279,6 +1281,7 @@ class ThreadsState extends ChangeNotifier {
               username: username,
               name: username,
               joinedAt: user.joinedAt,
+              isOnline: user.isOnline,
             );
           }
           return user;

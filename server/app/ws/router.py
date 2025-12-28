@@ -392,26 +392,8 @@ async def register_client(client_id, websocket):
     clients[client_id] = websocket
     logger.info(f"{client_id} connected (total: {len(clients)})")
     
-    # Update last_online timestamp when user connects
-    try:
-        timestamp = datetime.utcnow().isoformat() + "Z"
-        
-        # Update users collection
-        db.users.update_one(
-            {"id": client_id},
-            {"$set": {"last_online": timestamp}}
-        )
-        
-        # Sync to threads collection (denormalized data)
-        db.threads.update_many(
-            {"users.id": client_id},
-            {"$set": {"users.$[elem].last_online": timestamp}},
-            array_filters=[{"elem.id": client_id}]
-        )
-        
-        logger.debug(f"Updated last_online for {client_id}")
-    except Exception as e:
-        logger.error(f"Failed to update last_online for {client_id}: {e}")
+    # Note: Online status is now determined by presence in clients dict
+    # No database writes needed - connection state is ephemeral
     
     await send_json(websocket, {
         "type": "connected",
@@ -424,26 +406,16 @@ def unregister_client(client_id):
         del clients[client_id]
         logger.info(f"{client_id} disconnected (remaining: {len(clients)})")
         
-        # Update last_online when user disconnects for accurate online status
+        # Optional: Update last_online for "last seen" feature
         try:
             timestamp = datetime.utcnow().isoformat() + "Z"
-            
-            # Update users collection
             db.users.update_one(
                 {"id": client_id},
                 {"$set": {"last_online": timestamp}}
             )
-            
-            # Sync to threads collection (denormalized data)
-            db.threads.update_many(
-                {"users.id": client_id},
-                {"$set": {"users.$[elem].last_online": timestamp}},
-                array_filters=[{"elem.id": client_id}]
-            )
-            
-            logger.debug(f"Updated last_online for disconnected user {client_id}")
+            logger.debug(f"Updated last_seen for {client_id}")
         except Exception as e:
-            logger.error(f"Failed to update last_online on disconnect: {e}")
+            logger.error(f"Failed to update last_seen on disconnect: {e}")
 
 async def handler(websocket):
     client_id = None
@@ -503,9 +475,9 @@ def is_user_online(user_id):
 # --- Entry Point ---
 
 async def heartbeat_loop():
-    """Update last_online and clean up stale connections every 60 seconds"""
+    """Clean up stale connections every 60 seconds"""
     while True:
-        await asyncio.sleep(60)  # Update every minute
+        await asyncio.sleep(60)
         
         if not clients:
             continue
@@ -535,32 +507,7 @@ async def heartbeat_loop():
             unregister_client(client_id)
             logger.info(f"Removed stale connection: {client_id}")
         
-        # Get list of still-active clients
-        active_clients = [cid for cid in connected_ids if cid not in stale_clients]
-        
-        if not active_clients:
-            continue
-        
-        try:
-            timestamp = datetime.utcnow().isoformat() + "Z"
-            
-            # Batch update all active users in users collection
-            result = db.users.update_many(
-                {"id": {"$in": active_clients}},
-                {"$set": {"last_online": timestamp}}
-            )
-            
-            # Sync to threads collection (denormalized data)
-            for client_id in active_clients:
-                db.threads.update_many(
-                    {"users.id": client_id},
-                    {"$set": {"users.$[elem].last_online": timestamp}},
-                    array_filters=[{"elem.id": client_id}]
-                )
-            
-            logger.debug(f"Heartbeat: Updated {result.modified_count} active user(s)")
-        except Exception as e:
-            logger.error(f"Heartbeat error: {e}")
+        logger.debug(f"Heartbeat: {len(clients)} active connection(s)")
 
 async def start_websocket_server():
     logger.info("Starting WebSocket server at ws://0.0.0.0:8765")
@@ -615,6 +562,10 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
         thread = db.threads.find_one({"id": thread_id})
         if not thread:
             return 0
+        
+        # Check online status from memory (clients dict)
+        is_online = accepted_user_id in clients
+        
         recipients = set()
         for u in thread.get("users", []):
             if isinstance(u, dict) and u.get("id"):
@@ -633,6 +584,7 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
                         "thread_id": thread_id,
                         "user_id": accepted_user_id,
                         "user_name": accepted_user_name,
+                        "is_online": is_online,
                         "timestamp": int(time.time())
                     })
                     delivered += 1

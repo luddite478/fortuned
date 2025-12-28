@@ -455,83 +455,173 @@ async def update_username_handler(...):
 
 ## Online Status System
 
-### Client-Side Check
+### Design Philosophy
 
-**File**: `app/lib/services/users_service.dart`
+**Online status is EPHEMERAL** - it reflects current WebSocket connection state, not persistent data.
 
+**Principle**: Use in-memory WebSocket state as the source of truth for real-time status.
+
+### Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│              WEBSOCKET-BASED ONLINE STATUS                   │
+└─────────────────────────────────────────────────────────────┘
+
+Server Memory (Source of Truth):
+  clients = {}  # user_id -> websocket
+
+Client Connects:
+  clients["user_123"] = <websocket>
+  └─→ User is ONLINE
+
+Client Disconnects:
+  del clients["user_123"]
+  └─→ User is OFFLINE
+
+Check Status:
+  is_online = "user_123" in clients  # O(1) lookup
+```
+
+### Implementation
+
+#### Server-Side (`server/app/ws/router.py`)
+
+**Connection State**:
+```python
+# In-memory dict of active connections
+clients = {}  # user_id -> websocket
+
+async def register_client(client_id, websocket):
+    clients[client_id] = websocket
+    # No DB writes needed - connection state is ephemeral
+
+def unregister_client(client_id):
+    if client_id in clients:
+        del clients[client_id]
+        # Optional: Write last_online to users collection for "last seen" feature
+        db.users.update_one({"id": client_id}, {"$set": {"last_online": now()}})
+
+def is_user_online(user_id):
+    return user_id in clients  # Instant, accurate
+```
+
+**Heartbeat Loop** (60s):
+```python
+async def heartbeat_loop():
+    # Only detects stale connections, no DB updates
+    for client_id, ws in clients.items():
+        try:
+            await send_json(ws, {"type": "ping"})
+        except:
+            unregister_client(client_id)  # Connection dead, remove
+```
+
+#### API Responses (`server/app/http_api/threads.py`)
+
+**Compute `is_online` at request time**:
+```python
+from ws.router import clients
+
+async def get_thread_handler(thread_id: str):
+    thread = db.threads.find_one({"id": thread_id})
+    
+    # Enrich with real-time online status
+    for user in thread.get("users", []):
+        user["is_online"] = user["id"] in clients  # Check memory, not DB
+    
+    return thread
+```
+
+#### WebSocket Notifications
+
+**Include `is_online` in real-time events**:
+```python
+async def send_invitation_accepted_notification(thread_id, user_id, user_name):
+    # Check online status from memory
+    is_online = user_id in clients
+    
+    for recipient_id in recipients:
+        await send_json(clients[recipient_id], {
+            "type": "invitation_accepted",
+            "user_id": user_id,
+            "user_name": user_name,
+            "is_online": is_online,  # Real-time state
+        })
+```
+
+#### Client-Side (`app/lib/models/thread/thread_user.dart`)
+
+**Simple boolean field**:
 ```dart
-class UserProfile {
-  final DateTime lastOnline;
+class ThreadUser {
+  final String id;
+  final String username;
+  final bool isOnline;  // Computed by server from WebSocket state
   
-  bool get isOnline {
-    final now = DateTime.now();
-    final diff = now.difference(lastOnline);
-    return diff.inMinutes < 15; // Online if active within 15 min
+  factory ThreadUser.fromJson(Map<String, dynamic> json) {
+    return ThreadUser(
+      id: json['id'],
+      username: json['username'],
+      isOnline: json['is_online'] ?? false,
+    );
   }
 }
 ```
-
-### Server-Side Status Updates
-
-**On Connection**:
-- Update `last_online` immediately
-- User shows as online
-
-**During Session**:
-- Heartbeat updates `last_online` every 60s
-- Only for active connections (verified by ping)
-
-**On Disconnection**:
-- Update `last_online` immediately
-- User shows as offline
-
-**Stale Detection**:
-- Ping each connection with 5s timeout
-- Remove connections that don't respond
-- Update their `last_online`
 
 ### Online Status Flow
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                  ONLINE STATUS TIMELINE                      │
+│                  REAL-TIME STATUS FLOW                       │
 └─────────────────────────────────────────────────────────────┘
 
-T+0s:    User connects
-         └─→ last_online = now()
+User Connects via WebSocket:
+  clients["alice"] = <ws>
+  └─→ is_online = true (instantly)
 
-T+60s:   Heartbeat ping
-         └─→ Responds → last_online = now()
+User Accepts Invitation:
+  Server sends WebSocket event:
+    {"type": "invitation_accepted", "is_online": true}
+  Client updates UI:
+    └─→ Green indicator
 
-T+120s:  Heartbeat ping
-         └─→ Responds → last_online = now()
+User Disconnects:
+  del clients["alice"]
+  └─→ is_online = false (instantly)
 
-T+180s:  User disconnects
-         └─→ last_online = now()
-
-T+190s:  Other users check isOnline
-         └─→ diff = 10s → TRUE (online)
-
-T+960s:  Other users check isOnline (15 min later)
-         └─→ diff = 15min → FALSE (offline)
+Other Users Load Thread:
+  GET /threads/{id}
+  Server checks: "alice" in clients → false
+  Response includes: {"is_online": false}
+  Client shows gray indicator
 ```
+
+### Benefits
+
+| Metric              | Old (DB-Heavy)      | New (WS-Based)   |
+|---------------------|---------------------|------------------|
+| DB Writes/min       | 1000-2000           | 0 (or 1 on disconnect) |
+| DB Reads            | Every thread load   | 0                |
+| Latency             | +10-50ms per req    | Instant          |
+| Accuracy            | ±60s stale          | Real-time        |
+| Complexity          | High (2 collections)| Low (1 dict)     |
+| Scalability         | Poor (DB load)      | Excellent        |
 
 ### UI Display
 
 **Participants Widget**:
 ```dart
 Widget _buildParticipantItem(ThreadUser user) {
-  final isOnline = user.lastOnline.isOnline; // Uses 15min threshold
-  
   return Row(
     children: [
       Container(
         width: 10,
         height: 10,
         decoration: BoxDecoration(
-          color: isOnline 
-              ? AppColors.menuOnlineIndicator  // Green
-              : AppColors.sequencerLightText.withOpacity(0.3), // Gray
+          color: user.isOnline 
+              ? AppColors.menuOnlineIndicator  // Green (online)
+              : AppColors.sequencerLightText.withOpacity(0.3), // Gray (offline)
           shape: BoxShape.circle,
         ),
       ),
@@ -540,6 +630,35 @@ Widget _buildParticipantItem(ThreadUser user) {
   );
 }
 ```
+
+### Optional: "Last Seen" Feature
+
+If you want to show "Last seen 2 hours ago":
+
+1. **Store `last_online` only in `users` collection** (not in `threads`)
+2. **Write only on disconnect** (not on heartbeat)
+3. **Display logic**:
+   ```dart
+   if (user.isOnline) {
+     return "Online now";
+   } else if (user.lastOnline != null) {
+     final diff = DateTime.now().difference(user.lastOnline);
+     return "Last seen ${_formatDuration(diff)} ago";
+   } else {
+     return "Offline";
+   }
+   ```
+
+### Key Insights
+
+✅ **Connection state = ephemeral** → store in memory  
+✅ **Online status = connection state** → compute from memory  
+✅ **Persistent data** → store in database  
+✅ **Last seen timestamp** → optional, write once on disconnect  
+
+❌ **Don't sync ephemeral data to denormalized thread copies**  
+❌ **Don't write to DB every 60s for heartbeats**  
+❌ **Don't query DB for online status**
 
 ---
 

@@ -57,16 +57,12 @@ async def create_thread_handler(request: Request, thread_data: Dict[str, Any] = 
                 continue
             if not user_id:  # user_id cannot be empty
                 continue
-            # Get user's last_online from users collection
-            user_doc = db.users.find_one({"id": user_id}, {"last_online": 1})
-            last_online = user_doc.get("last_online") if user_doc else now
             
             normalized_users.append({
                 "id": user_id,
                 "username": username or user_name,  # Fallback to name if username empty
                 "name": user_name,
-                "joined_at": joined_at,
-                "last_online": last_online
+                "joined_at": joined_at
             })
 
         invites = thread_data.get("invites", [])
@@ -140,15 +136,11 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
             final_username = f"{username}_{counter}"
             print(f"Username collision detected. Changed '{username}' to '{final_username}'")
         
-        # Get user's last_online from users collection
-        user_last_online = user_doc.get("last_online", datetime.utcnow().isoformat() + "Z")
-        
         new_user = {
             "id": user_id,
             "username": final_username,
             "name": display_name,
-            "joined_at": datetime.utcnow().isoformat() + "Z",
-            "last_online": user_last_online
+            "joined_at": datetime.utcnow().isoformat() + "Z"
         }
         db.threads.update_one(
             {"id": thread_id},
@@ -192,8 +184,19 @@ async def get_threads_handler(request: Request, token: str, limit: int = 50, off
             
         total = db.threads.count_documents(query)
         threads_cursor = db.threads.find(query, {"_id": 0}).sort("updated_at", -1).limit(limit).skip(offset)
+        threads = list(threads_cursor)
+        
+        # Compute is_online from WebSocket connections (memory)
+        from ws.router import clients
+        for thread in threads:
+            users = thread.get("users", [])
+            for user in users:
+                if isinstance(user, dict) and user.get("id"):
+                    # Check if user is connected via WebSocket
+                    user["is_online"] = user["id"] in clients
+        
         return {
-            "threads": list(threads_cursor),
+            "threads": threads,
             "pagination": {
                 "limit": limit,
                 "offset": offset,
@@ -211,6 +214,15 @@ async def get_thread_handler(request: Request, thread_id: str, token: str = Quer
         thread = db.threads.find_one({"id": thread_id}, {"_id": 0})
         if not thread:
             raise HTTPException(status_code=404, detail=f"Thread not found: {thread_id}")
+        
+        # Compute is_online from WebSocket connections (memory)
+        from ws.router import clients
+        users = thread.get("users", [])
+        for user in users:
+            if isinstance(user, dict) and user.get("id"):
+                # Check if user is connected via WebSocket
+                user["is_online"] = user["id"] in clients
+        
         return thread
     except Exception as e:
         if isinstance(e, HTTPException): raise e
@@ -518,17 +530,15 @@ async def manage_invitation_handler(request: Request, thread_id: str, user_id: s
         
         if action == "accept":
             # Add user to thread members
-            # Get user's current last_online status
-            user_doc = db.users.find_one({"id": user_id}, {"username": 1, "last_online": 1})
-            user_last_online = user_doc.get("last_online", datetime.utcnow().isoformat() + "Z") if user_doc else datetime.utcnow().isoformat() + "Z"
+            # Get user's current username
+            user_doc = db.users.find_one({"id": user_id}, {"username": 1})
             username = user_doc.get("username", invitation["user_name"]) if user_doc else invitation["user_name"]
             
             new_user = {
                 "id": user_id,
                 "username": username,
                 "name": invitation["user_name"],
-                "joined_at": datetime.utcnow().isoformat() + "Z",
-                "last_online": user_last_online
+                "joined_at": datetime.utcnow().isoformat() + "Z"
             }
             
             # Remove invitation and add user in one atomic operation

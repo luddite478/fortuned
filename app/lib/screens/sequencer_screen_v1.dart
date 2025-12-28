@@ -160,7 +160,7 @@ class _SequencerScreenV1State extends State<SequencerScreenV1> with WidgetsBindi
                 id: currentUserId, 
                 username: context.read<UserState>().currentUser?.username ?? currentUserName ?? 'User',
                 name: currentUserName ?? 'User', 
-                joinedAt: DateTime.now()
+                joinedAt: DateTime.now(),
               ),
             ],
             name: threadName,

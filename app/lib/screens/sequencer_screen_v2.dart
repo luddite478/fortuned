@@ -198,7 +198,7 @@ class _SequencerScreenV2State extends State<SequencerScreenV2> with TickerProvid
                 id: currentUserId, 
                 username: context.read<UserState>().currentUser?.username ?? currentUserName ?? 'User',
                 name: currentUserName ?? 'User', 
-                joinedAt: DateTime.now()
+                joinedAt: DateTime.now(),
               ),
             ],
             name: threadName,

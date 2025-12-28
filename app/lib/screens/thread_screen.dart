@@ -397,7 +397,7 @@ class _ThreadScreenState extends State<ThreadScreen> with TickerProviderStateMix
         id: message.userId, 
         username: 'user_${message.userId.substring(0, 6)}',
         name: 'User ${message.userId.substring(0, 6)}', 
-        joinedAt: DateTime.now()
+        joinedAt: DateTime.now(),
       ),
     ).name;
 

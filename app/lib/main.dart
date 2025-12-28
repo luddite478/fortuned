@@ -534,7 +534,7 @@ class _MainPageState extends State<MainPage> {
                   id: userId, 
                   username: 'user_${userId.substring(0, 6)}',
                   name: 'User ${userId.substring(0, 6)}', 
-                  joinedAt: DateTime.now()
+                  joinedAt: DateTime.now(),
                 ),
               );
               senderName = user.name;

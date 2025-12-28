@@ -3,14 +3,14 @@ class ThreadUser {
   final String username;
   final String name;
   final DateTime joinedAt;
-  final DateTime lastOnline;
+  final bool isOnline;
 
   const ThreadUser({
     required this.id,
     required this.username,
     required this.name,
     required this.joinedAt,
-    required this.lastOnline,
+    this.isOnline = false,
   });
 
   factory ThreadUser.fromJson(Map<String, dynamic> json) {
@@ -19,7 +19,7 @@ class ThreadUser {
       username: json['username'] ?? json['name'] ?? '',  // Fallback to name if username not present
       name: json['name'] ?? '',
       joinedAt: DateTime.parse(json['joined_at'] ?? DateTime.now().toIso8601String()),
-      lastOnline: DateTime.parse(json['last_online'] ?? DateTime.now().toIso8601String()),
+      isOnline: json['is_online'] ?? false,
     );
   }
 
@@ -28,28 +28,22 @@ class ThreadUser {
         'username': username,
         'name': name,
         'joined_at': joinedAt.toIso8601String(),
-        'last_online': lastOnline.toIso8601String(),
+        'is_online': isOnline,
       };
-  
-  bool get isOnline {
-    final now = DateTime.now();
-    final diff = now.difference(lastOnline);
-    return diff.inMinutes < 15; // Consider online if active within 15 minutes
-  }
   
   ThreadUser copyWith({
     String? id,
     String? username,
     String? name,
     DateTime? joinedAt,
-    DateTime? lastOnline,
+    bool? isOnline,
   }) {
     return ThreadUser(
       id: id ?? this.id,
       username: username ?? this.username,
       name: name ?? this.name,
       joinedAt: joinedAt ?? this.joinedAt,
-      lastOnline: lastOnline ?? this.lastOnline,
+      isOnline: isOnline ?? this.isOnline,
     );
   }
 }
