@@ -412,14 +412,25 @@ class _MainPageState extends State<MainPage> {
 
   void _initializeThreadsService(ThreadsService threadsService, String userId, BuildContext context) async {
     try {
+      debugPrint('🔌 [MAIN] Connecting WebSocket for user: $userId');
       final success = await threadsService.connectRealtime(userId);
       if (success) {
+        debugPrint('✅ [MAIN] WebSocket connected successfully');
+        
+        // Refresh threads to get accurate online status (now that WebSocket is connected)
+        final threadsState = Provider.of<ThreadsState>(context, listen: false);
+        await threadsState.refreshThreadsInBackground();
+        debugPrint('✅ [MAIN] Threads refreshed with online status');
+        
         // Get UsersService and request online users
         final usersService = Provider.of<UsersService>(context, listen: false);
         usersService.requestOnlineUsers();
+        debugPrint('✅ [MAIN] Online users list requested');
       } else {
+        debugPrint('❌ [MAIN] WebSocket connection failed');
       }
     } catch (e) {
+      debugPrint('❌ [MAIN] Error initializing WebSocket: $e');
     }
   }
   

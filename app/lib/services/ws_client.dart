@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../utils/log.dart';
 
@@ -70,9 +71,11 @@ class WebSocketClient {
     try {
       _clientId = clientId;
       Log.d('Connecting to $serverUrl as $clientId...', 'WS');
+      debugPrint('🔌 [WS] Attempting WebSocket connection for user: $clientId');
       
       // Connect to WebSocket
       _socket = await WebSocket.connect(serverUrl);
+      debugPrint('🔌 [WS] WebSocket connection established, sending auth...');
       
       // Send authentication message
       final authMessage = jsonEncode({
@@ -132,7 +135,8 @@ class WebSocketClient {
         if (!_connectionController.isClosed) {
           _connectionController.add(true);
         }
-        Log.i('${message['message']}', 'WS');
+        Log.i('✅ WebSocket connected: ${message['message']} (client_id: $_clientId)', 'WS');
+        debugPrint('✅ [WS] Connection established. User is now ONLINE. Active clients: ${message['active_clients']}');
         return;
       }
       

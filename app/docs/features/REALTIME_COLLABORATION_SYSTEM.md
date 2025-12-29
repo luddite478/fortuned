@@ -461,26 +461,39 @@ async def update_username_handler(...):
 
 **Principle**: Use in-memory WebSocket state as the source of truth for real-time status.
 
+### Critical Implementation Detail
+
+**Timing is Everything**: Threads must be loaded/refreshed **after** WebSocket connection is established, otherwise all users will show as offline.
+
+**Why?** The server computes `is_online` by checking if `user_id in clients` dict. If threads are loaded before WebSocket connects, the user isn't in `clients` yet, so everyone appears offline.
+
+**Solution**: 
+1. Load threads initially (may show offline)
+2. Connect WebSocket
+3. **Refresh threads immediately after connection** to get accurate online status
+
 ### Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│              WEBSOCKET-BASED ONLINE STATUS                   │
+│         100% WEBSOCKET-BASED ONLINE STATUS (ZERO DB)         │
 └─────────────────────────────────────────────────────────────┘
 
-Server Memory (Source of Truth):
+Server Memory (ONLY Source of Truth):
   clients = {}  # user_id -> websocket
 
 Client Connects:
   clients["user_123"] = <websocket>
-  └─→ User is ONLINE
+  └─→ User is ONLINE (instant)
 
 Client Disconnects:
   del clients["user_123"]
-  └─→ User is OFFLINE
+  └─→ User is OFFLINE (instant)
 
 Check Status:
-  is_online = "user_123" in clients  # O(1) lookup
+  is_online = "user_123" in clients  # O(1) lookup, NO database query
+
+Database: NOT INVOLVED in online status
 ```
 
 ### Implementation
@@ -599,14 +612,15 @@ Other Users Load Thread:
 
 ### Benefits
 
-| Metric              | Old (DB-Heavy)      | New (WS-Based)   |
-|---------------------|---------------------|------------------|
-| DB Writes/min       | 1000-2000           | 0 (or 1 on disconnect) |
-| DB Reads            | Every thread load   | 0                |
-| Latency             | +10-50ms per req    | Instant          |
-| Accuracy            | ±60s stale          | Real-time        |
-| Complexity          | High (2 collections)| Low (1 dict)     |
-| Scalability         | Poor (DB load)      | Excellent        |
+| Metric              | Old (DB-Heavy)      | Current (WS-Only) |
+|---------------------|---------------------|-------------------|
+| DB Writes/min       | 1000-2000           | **0**             |
+| DB Reads/min        | Every thread load   | **0**             |
+| Latency             | +10-50ms per req    | **<1ms**          |
+| Accuracy            | ±60s stale          | **Real-time**     |
+| Complexity          | High (2 collections)| **Trivial (1 dict)** |
+| Scalability         | Poor (DB load)      | **Excellent**     |
+| Database Impact     | High                | **ZERO**          |
 
 ### UI Display
 
@@ -631,43 +645,63 @@ Widget _buildParticipantItem(ThreadUser user) {
 }
 ```
 
-### Optional: "Last Seen" Feature
+### Optional: "Last Seen" Feature (Disabled by Default)
 
-If you want to show "Last seen 2 hours ago":
+Currently **disabled** to keep system 100% WebSocket-based with zero database overhead.
 
-1. **Store `last_online` only in `users` collection** (not in `threads`)
-2. **Write only on disconnect** (not on heartbeat)
-3. **Display logic**:
-   ```dart
-   if (user.isOnline) {
-     return "Online now";
-   } else if (user.lastOnline != null) {
-     final diff = DateTime.now().difference(user.lastOnline);
-     return "Last seen ${_formatDuration(diff)} ago";
-   } else {
-     return "Offline";
-   }
-   ```
+If you want to show "Last seen 2 hours ago", **uncomment** the database write in `unregister_client()`:
+
+```python
+# server/app/ws/router.py - unregister_client()
+try:
+    timestamp = datetime.utcnow().isoformat() + "Z"
+    db.users.update_one(
+        {"id": client_id},
+        {"$set": {"last_online": timestamp}}
+    )
+except Exception as e:
+    logger.error(f"Failed to update last_seen: {e}")
+```
+
+**Display logic** (client):
+```dart
+if (user.isOnline) {
+  return "Online now";
+} else if (user.lastOnline != null) {
+  final diff = DateTime.now().difference(user.lastOnline);
+  return "Last seen ${_formatDuration(diff)} ago";
+} else {
+  return "Offline";
+}
+```
+
+**Trade-off**: Adds 1 database write per disconnect (negligible impact).
 
 ### Key Insights
 
-✅ **Connection state = ephemeral** → store in memory  
-✅ **Online status = connection state** → compute from memory  
-✅ **Persistent data** → store in database  
-✅ **Last seen timestamp** → optional, write once on disconnect  
+✅ **Online status = WebSocket connection** → 100% in-memory, zero database  
+✅ **Connection state = ephemeral** → `clients` dict only  
+✅ **Compute at request time** → `user_id in clients` (O(1) lookup)  
+✅ **Real-time updates** → Instant connect/disconnect detection  
 
-❌ **Don't sync ephemeral data to denormalized thread copies**  
-❌ **Don't write to DB every 60s for heartbeats**  
-❌ **Don't query DB for online status**
+❌ **Don't use database for online status** → Not needed, adds latency  
+❌ **Don't write to DB on heartbeats** → Wasteful, ephemeral data  
+❌ **Don't sync online status to thread documents** → Compute dynamically  
+❌ **Don't poll/cache online status** → Use WebSocket connections directly
 
 ### Implementation Details
 
 #### Files Modified
 
 **Server (3 files)**:
-- `server/app/ws/router.py` - Removed DB writes on connect/heartbeat, simplified
-- `server/app/http_api/threads.py` - Compute `is_online` from memory, removed `last_online` queries
+- `server/app/ws/router.py` - Removed DB writes on connect/heartbeat, added connection logging
+- `server/app/http_api/threads.py` - Compute `is_online` from memory, added debug logging
 - No changes to `server/app/http_api/users.py` (username updates unaffected)
+
+**Client (3 files)**:
+- `app/lib/main.dart` - **Refresh threads after WebSocket connects** to get accurate online status
+- `app/lib/services/ws_client.dart` - Added connection status logging
+- Other files unchanged (model, state, widgets already correct)
 
 **Client (9 files)**:
 - `app/lib/models/thread/thread_user.dart` - Changed `DateTime lastOnline` → `bool isOnline`
@@ -795,8 +829,10 @@ db.threads.updateMany(
 
 **Users showing offline when they should be online**:
 - Check: Is WebSocket connected? (`wsClient.isConnected`)
-- Check: Is user in `clients` dict on server? (add log)
+- Check: Is user in `clients` dict on server? (check server logs for "Active clients")
+- Check: Are threads being refreshed **after** WebSocket connects? (check client logs)
 - Check: Is HTTP response including `is_online` field?
+- **Most common issue**: Threads loaded before WebSocket connection → refresh threads after connection
 
 **Excessive database writes**:
 - Check: Heartbeat loop should not write to DB

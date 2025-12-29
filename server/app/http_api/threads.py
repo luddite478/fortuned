@@ -188,12 +188,16 @@ async def get_threads_handler(request: Request, token: str, limit: int = 50, off
         
         # Compute is_online from WebSocket connections (memory)
         from ws.router import clients
+        logger.info(f"🔍 Computing is_online for threads. Active WebSocket clients: {list(clients.keys())}")
         for thread in threads:
             users = thread.get("users", [])
             for user in users:
                 if isinstance(user, dict) and user.get("id"):
                     # Check if user is connected via WebSocket
-                    user["is_online"] = user["id"] in clients
+                    user_id = user["id"]
+                    is_online = user_id in clients
+                    user["is_online"] = is_online
+                    logger.debug(f"   User {user_id} ({user.get('username', 'unknown')}): is_online={is_online}")
         
         return {
             "threads": threads,
@@ -217,11 +221,15 @@ async def get_thread_handler(request: Request, thread_id: str, token: str = Quer
         
         # Compute is_online from WebSocket connections (memory)
         from ws.router import clients
+        logger.info(f"🔍 Computing is_online for thread {thread_id}. Active WebSocket clients: {list(clients.keys())}")
         users = thread.get("users", [])
         for user in users:
             if isinstance(user, dict) and user.get("id"):
                 # Check if user is connected via WebSocket
-                user["is_online"] = user["id"] in clients
+                user_id = user["id"]
+                is_online = user_id in clients
+                user["is_online"] = is_online
+                logger.info(f"   User {user_id} ({user.get('username', 'unknown')}): is_online={is_online}")
         
         return thread
     except Exception as e:

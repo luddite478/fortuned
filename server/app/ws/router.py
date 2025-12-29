@@ -390,7 +390,8 @@ async def process_message(websocket, client_id, message):
 
 async def register_client(client_id, websocket):
     clients[client_id] = websocket
-    logger.info(f"{client_id} connected (total: {len(clients)})")
+    logger.info(f"✅ {client_id} connected (total: {len(clients)})")
+    logger.info(f"📋 Active clients: {list(clients.keys())}")
     
     # Note: Online status is now determined by presence in clients dict
     # No database writes needed - connection state is ephemeral
@@ -406,16 +407,16 @@ def unregister_client(client_id):
         del clients[client_id]
         logger.info(f"{client_id} disconnected (remaining: {len(clients)})")
         
-        # Optional: Update last_online for "last seen" feature
-        try:
-            timestamp = datetime.utcnow().isoformat() + "Z"
-            db.users.update_one(
-                {"id": client_id},
-                {"$set": {"last_online": timestamp}}
-            )
-            logger.debug(f"Updated last_seen for {client_id}")
-        except Exception as e:
-            logger.error(f"Failed to update last_seen on disconnect: {e}")
+        # Note: Online status is purely WebSocket-based (no DB needed)
+        # If you want "last seen" timestamps, uncomment below:
+        # try:
+        #     timestamp = datetime.utcnow().isoformat() + "Z"
+        #     db.users.update_one(
+        #         {"id": client_id},
+        #         {"$set": {"last_online": timestamp}}
+        #     )
+        # except Exception as e:
+        #     logger.error(f"Failed to update last_seen: {e}")
 
 async def handler(websocket):
     client_id = None
