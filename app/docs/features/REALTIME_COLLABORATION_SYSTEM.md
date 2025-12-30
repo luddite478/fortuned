@@ -750,14 +750,16 @@ if (user.isOnline) {
 
 **Database Load Reduction**:
 
-| Operation                  | Before (per minute) | After (per minute) | Savings    |
-|----------------------------|--------------------:|-------------------:|------------|
-| WebSocket connect          | 2 writes            | 0 writes           | 100%       |
-| WebSocket disconnect       | 2 writes            | 1 write (optional) | 50%        |
-| Heartbeat (60s, 100 users) | 200 writes          | 0 writes           | 100%       |
-| HTTP GET /threads          | 1 read              | 0 reads            | 100%       |
-| HTTP GET /threads/{id}     | 1 read              | 0 reads            | 100%       |
-| **Total for 100 users**    | **~1000-2000**      | **~2 (optional)**  | **99%**    |
+| Operation                  | Before (per minute) | Current (per minute) | Savings    |
+|----------------------------|--------------------:|---------------------:|------------|
+| WebSocket connect          | 2 writes            | **0 writes**         | **100%**   |
+| WebSocket disconnect       | 2 writes            | **0 writes**         | **100%**   |
+| Heartbeat (60s, 100 users) | 200 writes          | **0 writes**         | **100%**   |
+| HTTP GET /threads          | 1 read per user     | **0 reads**          | **100%**   |
+| HTTP GET /threads/{id}     | 1 read              | **0 reads**          | **100%**   |
+| **Total for 100 users**    | **~1000-2000**      | **0**                | **100%**   |
+
+**Database is NOT involved in online status determination.**
 
 **Latency Improvement**:
 

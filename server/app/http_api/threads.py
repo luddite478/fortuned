@@ -165,6 +165,18 @@ async def join_thread_handler(request: Request, thread_id: str, user_data: Dict[
                 }}
             )
         
+        # Notify existing thread members that user joined (via WebSocket)
+        try:
+            from ws.router import send_invitation_accepted_notification
+            asyncio.create_task(send_invitation_accepted_notification(
+                thread_id, 
+                user_id, 
+                final_username,
+                None  # No specific inviter for direct join
+            ))
+        except Exception as e:
+            logger.error(f"Failed to send join notification: {e}")
+        
         return {
             "status": "user_added",
             "username": final_username  # Return the final username (possibly modified)

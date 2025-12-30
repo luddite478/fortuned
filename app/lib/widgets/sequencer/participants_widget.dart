@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -7,12 +6,15 @@ import '../../utils/app_colors.dart';
 import '../../models/thread/thread.dart';
 import '../../models/thread/thread_user.dart';
 import '../../state/user_state.dart';
-import '../../services/users_service.dart';
 
 /// Widget displaying participants in the sequencer header
 /// Shows first participant with online status, stacked chips for multiple participants
 /// Click to show participants overflow menu
-class ParticipantsWidget extends StatefulWidget {
+/// 
+/// Online status comes directly from ThreadUser.isOnline field, which is updated via:
+/// - HTTP API responses (GET /threads)
+/// - WebSocket notifications (invitation_accepted, etc)
+class ParticipantsWidget extends StatelessWidget {
   final Thread? thread;
   final VoidCallback onTap;
   
@@ -23,40 +25,8 @@ class ParticipantsWidget extends StatefulWidget {
   });
 
   @override
-  State<ParticipantsWidget> createState() => _ParticipantsWidgetState();
-}
-
-class _ParticipantsWidgetState extends State<ParticipantsWidget> {
-  Timer? _refreshTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    // Request online users when widget is first built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        final usersService = context.read<UsersService>();
-        debugPrint('👥 [PARTICIPANTS] Requesting online users, WS connected: ${usersService.isConnected}');
-        usersService.requestOnlineUsers();
-        // Set up periodic refresh every 10 seconds
-        _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
-          if (mounted) {
-            context.read<UsersService>().requestOnlineUsers();
-          }
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.thread == null || widget.thread!.users.isEmpty) {
+    if (thread == null || thread!.users.isEmpty) {
       return const SizedBox.shrink();
     }
     
@@ -65,7 +35,7 @@ class _ParticipantsWidgetState extends State<ParticipantsWidget> {
     final currentUserId = userState.currentUser?.id ?? '';
     
     // Get other participants (exclude current user)
-    final otherParticipants = widget.thread!.users
+    final otherParticipants = thread!.users
         .where((u) => u.id != currentUserId)
         .toList();
     
@@ -77,16 +47,12 @@ class _ParticipantsWidgetState extends State<ParticipantsWidget> {
     final hasMore = otherParticipants.length > 1;
     
     return GestureDetector(
-      onTap: widget.onTap,
+      onTap: onTap,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
           // Main chip (first participant)
-          _buildParticipantChip(
-            context,
-            firstParticipant,
-            isFirst: true,
-          ),
+          _buildParticipantChip(firstParticipant),
           
           // Stacked chips indicator (if more than one participant)
           if (hasMore)
@@ -118,95 +84,69 @@ class _ParticipantsWidgetState extends State<ParticipantsWidget> {
     );
   }
   
-  Widget _buildParticipantChip(
-    BuildContext context,
-    ThreadUser user,
-    {required bool isFirst}
-  ) {
-    return StreamBuilder<List<String>>(
-      stream: context.read<UsersService>().onlineUsersStream,
-      initialData: const [],
-      builder: (context, snapshot) {
-        final onlineUsers = snapshot.data ?? [];
-        // User is online if:
-        // 1. They're in the real-time stream (most authoritative), OR
-        // 2. Their isOnline flag is true (from HTTP API or recent WebSocket notification)
-        // This ensures newly joined users show as online immediately
-        final isOnline = onlineUsers.contains(user.id) || user.isOnline;
-        
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: AppColors.sequencerSurfaceRaised.withOpacity(0.9),
-            borderRadius: BorderRadius.circular(0), // Squared corners
-            border: Border.all(
-              color: AppColors.sequencerBorder,
-              width: 0.5,
+  Widget _buildParticipantChip(ThreadUser user) {
+    // Online status comes directly from ThreadUser.isOnline
+    // This is updated via:
+    // - HTTP API responses (includes is_online computed from WebSocket clients)
+    // - WebSocket notifications (invitation_accepted includes all participants with is_online)
+    final isOnline = user.isOnline;
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.sequencerSurfaceRaised.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(0), // Squared corners
+        border: Border.all(
+          color: AppColors.sequencerBorder,
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Online status dot
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: isOnline 
+                  ? AppColors.menuOnlineIndicator 
+                  : AppColors.sequencerLightText.withOpacity(0.3),
+              shape: BoxShape.circle,
             ),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Online status dot
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: isOnline 
-                      ? AppColors.menuOnlineIndicator 
-                      : AppColors.sequencerLightText.withOpacity(0.3),
-                  shape: BoxShape.circle,
-                ),
+          const SizedBox(width: 6),
+          
+          // Username
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 80),
+            child: Text(
+              user.username,
+              style: GoogleFonts.sourceSans3(
+                color: AppColors.sequencerText,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(width: 6),
-              
-              // Username
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 80),
-                child: Text(
-                  user.username,
-                  style: GoogleFonts.sourceSans3(
-                    color: AppColors.sequencerText,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-              ),
-            ],
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
 
 /// Participants overflow menu dialog
 /// Shows all participants with their online status
-class ParticipantsMenuDialog extends StatefulWidget {
+/// Online status comes directly from ThreadUser.isOnline field
+class ParticipantsMenuDialog extends StatelessWidget {
   final Thread thread;
   
   const ParticipantsMenuDialog({
     super.key,
     required this.thread,
   });
-
-  @override
-  State<ParticipantsMenuDialog> createState() => _ParticipantsMenuDialogState();
-}
-
-class _ParticipantsMenuDialogState extends State<ParticipantsMenuDialog> {
-  @override
-  void initState() {
-    super.initState();
-    // Request online users when dialog is opened
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        context.read<UsersService>().requestOnlineUsers();
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -217,7 +157,7 @@ class _ParticipantsMenuDialogState extends State<ParticipantsMenuDialog> {
     final userState = context.read<UserState>();
     final currentUserId = userState.currentUser?.id ?? '';
     
-    final allParticipants = widget.thread.users;
+    final allParticipants = thread.users;
     
     return Material(
       type: MaterialType.transparency,
@@ -267,102 +207,90 @@ class _ParticipantsMenuDialogState extends State<ParticipantsMenuDialog> {
                   
                   // Participants list
                   Flexible(
-                    child: StreamBuilder<List<String>>(
-                      stream: context.read<UsersService>().onlineUsersStream,
-                      initialData: const [],
-                      builder: (context, snapshot) {
-                        final onlineUsers = snapshot.data ?? [];
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      itemCount: allParticipants.length,
+                      itemBuilder: (context, index) {
+                        final participant = allParticipants[index];
+                        final isMe = participant.id == currentUserId;
+                        final isOnline = participant.isOnline;
                         
-                        return ListView.builder(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                          itemCount: allParticipants.length,
-                          itemBuilder: (context, index) {
-                            final participant = allParticipants[index];
-                            final isMe = participant.id == currentUserId;
-                            // User is online if:
-                            // 1. They're in the real-time stream (most authoritative), OR
-                            // 2. Their isOnline flag is true (from HTTP API or recent WebSocket notification)
-                            // This ensures newly joined users show as online immediately
-                            final isOnline = onlineUsers.contains(participant.id) || participant.isOnline;
-                            
-                            return Container(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: isMe 
-                                    ? AppColors.sequencerAccent.withOpacity(0.15)
-                                    : AppColors.sequencerSurfaceBase,
-                                borderRadius: BorderRadius.circular(0), // Squared corners
-                                border: Border.all(
-                                  color: isMe 
-                                      ? AppColors.sequencerAccent.withOpacity(0.3)
-                                      : AppColors.sequencerBorder,
-                                  width: 0.5,
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isMe 
+                                ? AppColors.sequencerAccent.withOpacity(0.15)
+                                : AppColors.sequencerSurfaceBase,
+                            borderRadius: BorderRadius.circular(0), // Squared corners
+                            border: Border.all(
+                              color: isMe 
+                                  ? AppColors.sequencerAccent.withOpacity(0.3)
+                                  : AppColors.sequencerBorder,
+                              width: 0.5,
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              // Online status dot
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: isOnline 
+                                      ? AppColors.menuOnlineIndicator 
+                                      : AppColors.sequencerLightText.withOpacity(0.3),
+                                  shape: BoxShape.circle,
                                 ),
                               ),
-                              child: Row(
-                                children: [
-                                  // Online status dot
-                                  Container(
-                                    width: 10,
-                                    height: 10,
-                                    decoration: BoxDecoration(
-                                      color: isOnline 
-                                          ? AppColors.menuOnlineIndicator 
-                                          : AppColors.sequencerLightText.withOpacity(0.3),
-                                      shape: BoxShape.circle,
-                                    ),
+                              const SizedBox(width: 12),
+                              
+                              // Username
+                              Expanded(
+                                child: Text(
+                                  participant.username,
+                                  style: GoogleFonts.sourceSans3(
+                                    color: AppColors.sequencerText,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
                                   ),
-                                  const SizedBox(width: 12),
-                                  
-                                  // Username
-                                  Expanded(
-                                    child: Text(
-                                      participant.username,
-                                      style: GoogleFonts.sourceSans3(
-                                        color: AppColors.sequencerText,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  
-                                  // "You" badge
-                                  if (isMe)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: AppColors.sequencerAccent.withOpacity(0.2),
-                                        borderRadius: BorderRadius.circular(0), // Squared corners
-                                      ),
-                                      child: Text(
-                                        'You',
-                                        style: GoogleFonts.sourceSans3(
-                                          color: AppColors.sequencerAccent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  
-                                  // Online status text
-                                  if (!isMe)
-                                    Text(
-                                      isOnline ? 'Online' : 'Offline',
-                                      style: GoogleFonts.sourceSans3(
-                                        color: isOnline 
-                                            ? AppColors.menuOnlineIndicator 
-                                            : AppColors.sequencerLightText,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w400,
-                                      ),
-                                    ),
-                                ],
+                                  overflow: TextOverflow.ellipsis,
+                                ),
                               ),
-                            );
-                          },
+                              
+                              // "You" badge
+                              if (isMe)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.sequencerAccent.withOpacity(0.2),
+                                    borderRadius: BorderRadius.circular(0), // Squared corners
+                                  ),
+                                  child: Text(
+                                    'You',
+                                    style: GoogleFonts.sourceSans3(
+                                      color: AppColors.sequencerAccent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ),
+                              
+                              // Online status text
+                              if (!isMe)
+                                Text(
+                                  isOnline ? 'Online' : 'Offline',
+                                  style: GoogleFonts.sourceSans3(
+                                    color: isOnline 
+                                        ? AppColors.menuOnlineIndicator 
+                                        : AppColors.sequencerLightText,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                            ],
+                          ),
                         );
                       },
                     ),

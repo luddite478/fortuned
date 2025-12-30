@@ -558,16 +558,31 @@ async def send_message_created_notification(thread_id: str, message_doc: Dict[st
         return 0
 
 async def send_invitation_accepted_notification(thread_id: str, accepted_user_id: str, accepted_user_name: str, invited_by: Optional[str]) -> int:
-    """Notify inviter and thread members that an invitation was accepted."""
+    """Notify inviter and thread members that an invitation was accepted.
+    Sends complete participant list with current online status for immediate UI update.
+    """
     try:
         thread = db.threads.find_one({"id": thread_id})
         if not thread:
             return 0
         
-        # Check online status from memory (clients dict)
-        is_online = accepted_user_id in clients
-        logger.info(f"invitation_accepted: user={accepted_user_id}, is_online={is_online}, connected_clients={list(clients.keys())}")
+        # Build complete participants list with online status
+        all_participants = []
+        for u in thread.get("users", []):
+            if isinstance(u, dict) and u.get("id"):
+                user_id = u["id"]
+                all_participants.append({
+                    "id": user_id,
+                    "username": u.get("username", ""),
+                    "name": u.get("name", ""),
+                    "is_online": user_id in clients,
+                    "joined_at": u.get("joined_at", "")
+                })
         
+        logger.info(f"invitation_accepted: user={accepted_user_id} joined thread {thread_id}. Online clients: {list(clients.keys())}")
+        logger.info(f"  Sending {len(all_participants)} participants with online status to other members")
+        
+        # Collect recipients (all thread members except the one who just joined)
         recipients = set()
         for u in thread.get("users", []):
             if isinstance(u, dict) and u.get("id"):
@@ -576,6 +591,7 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
         if invited_by:
             if invited_by != accepted_user_id:
                 recipients.add(invited_by)
+        
         delivered = 0
         for user_id in recipients:
             ws = clients.get(user_id)
@@ -586,14 +602,17 @@ async def send_invitation_accepted_notification(thread_id: str, accepted_user_id
                         "thread_id": thread_id,
                         "user_id": accepted_user_id,
                         "user_name": accepted_user_name,
-                        "is_online": is_online,
+                        "participants": all_participants,  # Send complete list with online status
                         "timestamp": int(time.time())
                     })
                     delivered += 1
                 except Exception:
                     pass
+        
+        logger.info(f"  Delivered invitation_accepted to {delivered}/{len(recipients)} recipients")
         return delivered
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to send invitation_accepted notification: {e}")
         return 0
 
 async def send_user_profile_updated_notification(user_id: str, username: str) -> int:

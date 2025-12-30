@@ -1213,40 +1213,77 @@ class ThreadsState extends ChangeNotifier {
     final threadId = payload['thread_id'] as String?;
     final userId = payload['user_id'] as String?;
     final userName = payload['user_name'] as String?;
+    final participants = payload['participants'] as List<dynamic>?;
     
     if (threadId == null || userId == null || userName == null) {
       debugPrint('⚠️ [THREADS] Invalid invitation_accepted payload');
       return;
     }
     
-    debugPrint('🎉 [THREADS] Invitation accepted: $userName joined thread $threadId (is_online: ${payload['is_online']})');
+    debugPrint('🎉 [THREADS] Invitation accepted: $userName joined thread $threadId');
+    debugPrint('   Participants in payload: ${participants != null ? participants.length : 0}');
+    if (participants != null) {
+      for (var p in participants) {
+        if (p is Map) {
+          debugPrint('     - ${p['username']} (is_online: ${p['is_online']})');
+        }
+      }
+    }
     
-    // Create the new user with online status from payload
-    final newUser = ThreadUser(
-      id: userId,
-      username: userName,
-      name: userName,
-      joinedAt: DateTime.now(),
-      isOnline: payload['is_online'] ?? true, // Default to true since they just accepted
-    );
-    
-    // Find the thread in _threads first
+    // Find the thread
     final threadIndex = _threads.indexWhere((t) => t.id == threadId);
     if (threadIndex >= 0) {
       final thread = _threads[threadIndex];
       
-      // Check if user is already in the thread
+      // If participants list provided, use it (includes all users with current online status)
+      if (participants != null && participants.isNotEmpty) {
+        debugPrint('   Updating all participants with online status from server');
+        final updatedUsers = participants.map((p) {
+          if (p is Map<String, dynamic>) {
+            return ThreadUser(
+              id: p['id'] as String,
+              username: p['username'] as String? ?? '',
+              name: p['name'] as String? ?? '',
+              joinedAt: p['joined_at'] != null 
+                ? DateTime.tryParse(p['joined_at'] as String) ?? DateTime.now()
+                : DateTime.now(),
+              isOnline: p['is_online'] as bool? ?? false,
+            );
+          }
+          return null;
+        }).whereType<ThreadUser>().toList();
+        
+        if (updatedUsers.isNotEmpty) {
+          _threads[threadIndex] = thread.copyWith(users: updatedUsers);
+          
+          if (_activeThread?.id == threadId) {
+            _activeThread = _threads[threadIndex];
+          }
+          
+          debugPrint('✅ [THREADS] Updated thread $threadId with ${updatedUsers.length} participants');
+          notifyListeners();
+          return;
+        }
+      }
+      
+      // Fallback: Just add the new user if participants list not provided
       if (!thread.users.any((u) => u.id == userId)) {
+        final newUser = ThreadUser(
+          id: userId,
+          username: userName,
+          name: userName,
+          joinedAt: DateTime.now(),
+          isOnline: true,
+        );
+        
         final updatedUsers = [...thread.users, newUser];
         _threads[threadIndex] = thread.copyWith(users: updatedUsers);
         
-        // Update active thread if it's the same one
         if (_activeThread?.id == threadId) {
           _activeThread = _threads[threadIndex];
-          debugPrint('✅ [THREADS] Updated activeThread with new user');
         }
         
-        debugPrint('✅ [THREADS] Added $userName to thread $threadId in _threads');
+        debugPrint('✅ [THREADS] Added $userName to thread $threadId');
         notifyListeners();
       }
       return;
@@ -1258,6 +1295,14 @@ class ThreadsState extends ChangeNotifier {
       final thread = _unsyncedThreads[unsyncedIndex];
       
       if (!thread.users.any((u) => u.id == userId)) {
+        final newUser = ThreadUser(
+          id: userId,
+          username: userName,
+          name: userName,
+          joinedAt: DateTime.now(),
+          isOnline: true,
+        );
+        
         final updatedUsers = [...thread.users, newUser];
         _unsyncedThreads[unsyncedIndex] = thread.copyWith(users: updatedUsers);
         
