@@ -192,6 +192,8 @@ class _MainPageState extends State<MainPage> {
     if (!mounted) return;
     
     final userState = context.read<UserState>();
+    final wsClient = context.read<WebSocketClient>();
+    
     showDialog(
       context: context,
       barrierDismissible: true,
@@ -203,9 +205,21 @@ class _MainPageState extends State<MainPage> {
           // Update username via UserState
           final success = await userState.updateUsername(username);
           if (success) {
-            // Close dialog and proceed to join
+            // Close dialog
             if (context.mounted) {
               Navigator.pop(context);
+              
+              // CRITICAL: Ensure WebSocket is connected before joining
+              debugPrint('🔌 [MAIN] Checking WebSocket connection before join...');
+              if (!wsClient.isConnected && userState.currentUser != null) {
+                debugPrint('🔌 [MAIN] WebSocket not connected, connecting now...');
+                final threadsService = context.read<ThreadsService>();
+                await threadsService.connectRealtime(userState.currentUser!.id);
+                // Wait a moment for connection to stabilize
+                await Future.delayed(const Duration(milliseconds: 500));
+              }
+              debugPrint('✅ [MAIN] WebSocket ready, proceeding to join');
+              
               _acceptInviteAndNavigate(threadId);
             }
           } else {

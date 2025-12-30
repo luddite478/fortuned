@@ -407,6 +407,9 @@ def unregister_client(client_id):
         del clients[client_id]
         logger.info(f"{client_id} disconnected (remaining: {len(clients)})")
         
+        # Broadcast to thread members that user went offline
+        asyncio.create_task(broadcast_user_status_change(client_id, is_online=False))
+        
         # Note: Online status is purely WebSocket-based (no DB needed)
         # If you want "last seen" timestamps, uncomment below:
         # try:
@@ -660,4 +663,56 @@ async def send_user_profile_updated_notification(user_id: str, username: str) ->
         
     except Exception as e:
         logger.error(f"Failed to broadcast user profile update: {e}")
+        return 0
+
+async def broadcast_user_status_change(user_id: str, is_online: bool) -> int:
+    """Broadcast when a user goes online or offline to all thread members.
+    
+    This ensures real-time online status updates without polling.
+    Called when:
+    - User disconnects (clean or detected as stale)
+    - User reconnects (optional, can be inferred from other events)
+    """
+    try:
+        # Find all threads where this user is a participant
+        threads_cursor = db.threads.find({"users.id": user_id}, {"id": 1, "users": 1})
+        threads = list(threads_cursor)
+        
+        if not threads:
+            logger.debug(f"User {user_id} is not in any threads, no status broadcast needed")
+            return 0
+        
+        # Collect all unique user IDs from these threads (excluding the user who changed status)
+        recipient_ids = set()
+        for thread in threads:
+            for user in thread.get("users", []):
+                if isinstance(user, dict) and user.get("id") and user["id"] != user_id:
+                    recipient_ids.add(user["id"])
+        
+        if not recipient_ids:
+            logger.debug(f"No other users in threads with {user_id}, no status broadcast needed")
+            return 0
+        
+        # Send status change notification to all online recipients
+        delivered = 0
+        status_text = "online" if is_online else "offline"
+        for recipient_id in recipient_ids:
+            ws = clients.get(recipient_id)
+            if ws:
+                try:
+                    await send_json(ws, {
+                        "type": "user_status_changed",
+                        "user_id": user_id,
+                        "is_online": is_online,
+                        "timestamp": int(time.time())
+                    })
+                    delivered += 1
+                except Exception as e:
+                    logger.error(f"Failed to send status change to {recipient_id}: {e}")
+        
+        logger.info(f"Broadcasted user {user_id} went {status_text} to {delivered}/{len(recipient_ids)} online user(s)")
+        return delivered
+        
+    except Exception as e:
+        logger.error(f"Failed to broadcast user status change: {e}")
         return 0

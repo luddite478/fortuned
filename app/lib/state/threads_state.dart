@@ -1200,12 +1200,14 @@ class ThreadsState extends ChangeNotifier {
     _wsClient.registerMessageHandler('message_created', _onMessageCreated);
     _wsClient.registerMessageHandler('user_profile_updated', _onUserProfileUpdated);
     _wsClient.registerMessageHandler('invitation_accepted', _onInvitationAccepted);
+    _wsClient.registerMessageHandler('user_status_changed', _onUserStatusChanged);
   }
 
   void disposeWs() {
     _wsClient.unregisterAllHandlers('message_created');
     _wsClient.unregisterAllHandlers('user_profile_updated');
     _wsClient.unregisterAllHandlers('invitation_accepted');
+    _wsClient.unregisterAllHandlers('user_status_changed');
     _autoSaveTimer?.cancel();
   }
   
@@ -1350,6 +1352,50 @@ class ThreadsState extends ChangeNotifier {
               joinedAt: user.joinedAt,
               isOnline: user.isOnline,
             );
+          }
+          return user;
+        }).toList();
+        
+        _threads[i] = thread.copyWith(users: updatedUsers);
+        anyUpdated = true;
+      }
+    }
+    
+    // Also update active thread if affected
+    if (_activeThread != null && anyUpdated) {
+      final activeIndex = _threads.indexWhere((t) => t.id == _activeThread!.id);
+      if (activeIndex >= 0) {
+        _activeThread = _threads[activeIndex];
+      }
+    }
+    
+    if (anyUpdated) {
+      notifyListeners();
+    }
+  }
+  
+  void _onUserStatusChanged(Map<String, dynamic> payload) {
+    final userId = payload['user_id'] as String?;
+    final isOnline = payload['is_online'] as bool?;
+    
+    if (userId == null || isOnline == null) {
+      debugPrint('⚠️ [THREADS] Invalid user_status_changed payload');
+      return;
+    }
+    
+    final statusText = isOnline ? 'online' : 'offline';
+    debugPrint('🔄 [THREADS] User status changed: $userId is now $statusText');
+    
+    // Update online status in all loaded threads
+    bool anyUpdated = false;
+    for (int i = 0; i < _threads.length; i++) {
+      final thread = _threads[i];
+      bool threadHasUser = thread.users.any((user) => user.id == userId);
+      
+      if (threadHasUser) {
+        final updatedUsers = thread.users.map((user) {
+          if (user.id == userId) {
+            return user.copyWith(isOnline: isOnline);
           }
           return user;
         }).toList();
